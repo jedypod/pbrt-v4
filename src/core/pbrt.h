@@ -103,7 +103,7 @@ class SurfaceInteraction;
 class Shape;
 class Primitive;
 class GeometricPrimitive;
-template <int nSpectrumSamples>
+template <typename Child, int nSpectrumSamples>
 class CoefficientSpectrum;
 class RGBSpectrum;
 class SampledSpectrum;

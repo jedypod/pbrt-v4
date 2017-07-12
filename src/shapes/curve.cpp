@@ -289,10 +289,10 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
         if (edge < 0) return false;
 
         // Compute line $w$ that gives minimum distance to sample point
-        Vector2f segmentDirection = Point2f(cp[3]) - Point2f(cp[0]);
+        Vector2f segmentDirection = Point2f(cp[3].x, cp[3].y) - Point2f(cp[0].x, cp[0].y);
         Float denom = segmentDirection.LengthSquared();
         if (denom == 0) return false;
-        Float w = Dot(-Vector2f(cp[0]), segmentDirection) / denom;
+        Float w = Dot(-Vector2f(cp[0].x, cp[0].y), segmentDirection) / denom;
 
         // Compute $u$ coordinate of curve intersection point and _hitWidth_
         Float u = Clamp(Lerp(w, u0, u1), u0, u1);

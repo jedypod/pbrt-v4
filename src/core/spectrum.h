@@ -97,7 +97,7 @@ extern const Float RGBIllum2SpectGreen[nRGB2SpectSamples];
 extern const Float RGBIllum2SpectBlue[nRGB2SpectSamples];
 
 // Spectrum Declarations
-template <int nSpectrumSamples>
+template <typename Child, int nSpectrumSamples>
 class CoefficientSpectrum {
   public:
     // CoefficientSpectrum Public Methods
@@ -106,15 +106,14 @@ class CoefficientSpectrum {
         DCHECK(!HasNaNs());
     }
 #ifdef DEBUG
-    CoefficientSpectrum(const CoefficientSpectrum &s) {
+    CoefficientSpectrum(const Child &s) {
         DCHECK(!s.HasNaNs());
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] = s.c[i];
     }
-
-    CoefficientSpectrum &operator=(const CoefficientSpectrum &s) {
+    Child &operator=(const Child &s) {
         DCHECK(!s.HasNaNs());
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] = s.c[i];
-        return *this;
+        return static_cast<Child *>(*this);
     }
 #endif  // DEBUG
     void Print(FILE *f) const {
@@ -125,79 +124,75 @@ class CoefficientSpectrum {
         }
         fprintf(f, "]");
     }
-    CoefficientSpectrum &operator+=(const CoefficientSpectrum &s2) {
+    Child &operator+=(const Child &s2) {
         DCHECK(!s2.HasNaNs());
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] += s2.c[i];
-        return *this;
+        return static_cast<Child &>(*this);
     }
-    CoefficientSpectrum operator+(const CoefficientSpectrum &s2) const {
+    Child operator+(const Child &s2) const {
         DCHECK(!s2.HasNaNs());
-        CoefficientSpectrum ret = *this;
+        Child ret = static_cast<const Child &>(*this);
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] += s2.c[i];
         return ret;
     }
-    CoefficientSpectrum operator-(const CoefficientSpectrum &s2) const {
+    Child operator-(const Child &s2) const {
         DCHECK(!s2.HasNaNs());
-        CoefficientSpectrum ret = *this;
+        Child ret = static_cast<const Child &>(*this);
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] -= s2.c[i];
         return ret;
     }
-    CoefficientSpectrum operator/(const CoefficientSpectrum &s2) const {
+    Child operator/(const Child &s2) const {
         DCHECK(!s2.HasNaNs());
-        CoefficientSpectrum ret = *this;
-        for (int i = 0; i < nSpectrumSamples; ++i) {
-          CHECK_NE(s2.c[i], 0);
-          ret.c[i] /= s2.c[i];
-        }
+        Child ret = static_cast<const Child &>(*this);
+        for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] /= s2.c[i];
         return ret;
     }
-    CoefficientSpectrum operator*(const CoefficientSpectrum &sp) const {
+    Child operator*(const Child &sp) const {
         DCHECK(!sp.HasNaNs());
-        CoefficientSpectrum ret = *this;
+        Child ret = static_cast<const Child &>(*this);
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] *= sp.c[i];
         return ret;
     }
-    CoefficientSpectrum &operator*=(const CoefficientSpectrum &sp) {
+    Child &operator*=(const Child &sp) {
         DCHECK(!sp.HasNaNs());
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] *= sp.c[i];
-        return *this;
+        return static_cast<Child &>(*this);
     }
-    CoefficientSpectrum operator*(Float a) const {
-        CoefficientSpectrum ret = *this;
+    Child operator*(Float a) const {
+        Child ret = static_cast<const Child &>(*this);
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] *= a;
         DCHECK(!ret.HasNaNs());
         return ret;
     }
-    CoefficientSpectrum &operator*=(Float a) {
+    Child &operator*=(Float a) {
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] *= a;
         DCHECK(!HasNaNs());
-        return *this;
+        return static_cast<Child &>(*this);
     }
-    friend inline CoefficientSpectrum operator*(Float a,
-                                                const CoefficientSpectrum &s) {
+    friend inline Child operator*(Float a, const Child &s) {
         DCHECK(!std::isnan(a) && !s.HasNaNs());
         return s * a;
     }
-    CoefficientSpectrum operator/(Float a) const {
+    Child operator/(Float a) const {
         CHECK_NE(a, 0);
         DCHECK(!std::isnan(a));
-        CoefficientSpectrum ret = *this;
+        Child ret = static_cast<const Child &>(*this);
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] /= a;
         DCHECK(!ret.HasNaNs());
         return ret;
     }
-    CoefficientSpectrum &operator/=(Float a) {
+    Child &operator/=(Float a) {
         CHECK_NE(a, 0);
         DCHECK(!std::isnan(a));
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] /= a;
-        return *this;
+        return static_cast<Child &>(*this);
     }
-    bool operator==(const CoefficientSpectrum &sp) const {
+    bool operator==(const Child &sp) const {
         for (int i = 0; i < nSpectrumSamples; ++i)
             if (c[i] != sp.c[i]) return false;
         return true;
     }
-    bool operator!=(const CoefficientSpectrum &sp) const {
+    bool operator!=(const Child &sp) const {
         return !(*this == sp);
     }
     bool IsBlack() const {
@@ -205,28 +200,25 @@ class CoefficientSpectrum {
             if (c[i] != 0.) return false;
         return true;
     }
-    friend CoefficientSpectrum Sqrt(const CoefficientSpectrum &s) {
-        CoefficientSpectrum ret;
+    friend Child Sqrt(const Child &s) {
+        Child ret;
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = std::sqrt(s.c[i]);
         DCHECK(!ret.HasNaNs());
         return ret;
     }
-    template <int n>
-    friend inline CoefficientSpectrum<n> Pow(const CoefficientSpectrum<n> &s,
-                                             Float e);
-    CoefficientSpectrum operator-() const {
-        CoefficientSpectrum ret;
+    friend inline Child Pow(const Child &s, Float e);
+    Child operator-() const {
+        Child ret;
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = -c[i];
         return ret;
     }
-    friend CoefficientSpectrum Exp(const CoefficientSpectrum &s) {
-        CoefficientSpectrum ret;
+    friend Child Exp(const Child &s) {
+        Child ret;
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = std::exp(s.c[i]);
         DCHECK(!ret.HasNaNs());
         return ret;
     }
-    friend std::ostream &operator<<(std::ostream &os,
-                                    const CoefficientSpectrum &s) {
+    friend std::ostream &operator<<(std::ostream &os, const Child &s) {
         return os << s.ToString();
     }
     std::string ToString() const {
@@ -238,8 +230,8 @@ class CoefficientSpectrum {
         str += " ]";
         return str;
     }
-    CoefficientSpectrum Clamp(Float low = 0, Float high = Infinity) const {
-        CoefficientSpectrum ret;
+    Child Clamp(Float low = 0, Float high = Infinity) const {
+        Child ret;
         for (int i = 0; i < nSpectrumSamples; ++i)
             ret.c[i] = pbrt::Clamp(c[i], low, high);
         DCHECK(!ret.HasNaNs());
@@ -265,7 +257,7 @@ class CoefficientSpectrum {
     }
     bool Write(FILE *f) const {
         for (int i = 0; i < nSpectrumSamples; ++i)
-            if (fprintf(f, "%f ", c[i]) < 0) return false;
+            if (fprintf(f, "%.17g ", c[i]) < 0) return false;
         return true;
     }
     bool Read(FILE *f) {
@@ -293,12 +285,15 @@ class CoefficientSpectrum {
     Float c[nSpectrumSamples];
 };
 
-class SampledSpectrum : public CoefficientSpectrum<nSpectralSamples> {
+class SampledSpectrum :
+    public CoefficientSpectrum<SampledSpectrum, nSpectralSamples> {
   public:
+    using CoefficientSpectrum<SampledSpectrum, nSpectralSamples>::c;
+
     // SampledSpectrum Public Methods
     SampledSpectrum(Float v = 0.f) : CoefficientSpectrum(v) {}
-    SampledSpectrum(const CoefficientSpectrum<nSpectralSamples> &v)
-        : CoefficientSpectrum<nSpectralSamples>(v) {}
+/*CO    SampledSpectrum(const CoefficientSpectrum<nSpectralSamples> &v)*/
+/*CO        : CoefficientSpectrum<nSpectralSamples>(v) {}*/
     static SampledSpectrum FromSampled(const Float *lambda, const Float *v,
                                        int n) {
         // Sort samples if unordered, use sorted for returned spectrum
@@ -433,13 +428,13 @@ class SampledSpectrum : public CoefficientSpectrum<nSpectralSamples> {
     static SampledSpectrum rgbIllum2SpectBlue;
 };
 
-class RGBSpectrum : public CoefficientSpectrum<3> {
-    using CoefficientSpectrum<3>::c;
-
+class RGBSpectrum : public CoefficientSpectrum<RGBSpectrum, 3> {
   public:
+    using CoefficientSpectrum<RGBSpectrum, 3>::c;
+
     // RGBSpectrum Public Methods
-    RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<3>(v) {}
-    RGBSpectrum(const CoefficientSpectrum<3> &v) : CoefficientSpectrum<3>(v) {}
+RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
+/*CO    RGBSpectrum(const CoefficientSpectrum<3> &v) : CoefficientSpectrum<RGBSpectrum 3>(v) {}*/
     RGBSpectrum(const RGBSpectrum &s,
                 SpectrumType type = SpectrumType::Reflectance) {
         *this = s;
@@ -495,10 +490,10 @@ class RGBSpectrum : public CoefficientSpectrum<3> {
 };
 
 // Spectrum Inline Functions
-template <int nSpectrumSamples>
-inline CoefficientSpectrum<nSpectrumSamples> Pow(
-    const CoefficientSpectrum<nSpectrumSamples> &s, Float e) {
-    CoefficientSpectrum<nSpectrumSamples> ret;
+template <typename Child, int nSpectrumSamples>
+inline CoefficientSpectrum<Child, nSpectrumSamples> Pow(
+    const CoefficientSpectrum<Child, nSpectrumSamples> &s, Float e) {
+  CoefficientSpectrum<Child, nSpectrumSamples> ret;
     for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = std::pow(s.c[i], e);
     DCHECK(!ret.HasNaNs());
     return ret;

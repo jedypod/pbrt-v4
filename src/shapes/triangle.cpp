@@ -198,10 +198,10 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     if (kx == 3) kx = 0;
     int ky = kx + 1;
     if (ky == 3) ky = 0;
-    Vector3f d = Permute(ray.d, kx, ky, kz);
-    p0t = Permute(p0t, kx, ky, kz);
-    p1t = Permute(p1t, kx, ky, kz);
-    p2t = Permute(p2t, kx, ky, kz);
+    Vector3f d = Permute(ray.d, { kx, ky, kz });
+    p0t = Permute(p0t, { kx, ky, kz });
+    p1t = Permute(p1t, { kx, ky, kz });
+    p2t = Permute(p2t, { kx, ky, kz });
 
     // Apply shear transformation to translated vertex positions
     Float Sx = -d.x / d.z;
@@ -414,10 +414,10 @@ bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
     if (kx == 3) kx = 0;
     int ky = kx + 1;
     if (ky == 3) ky = 0;
-    Vector3f d = Permute(ray.d, kx, ky, kz);
-    p0t = Permute(p0t, kx, ky, kz);
-    p1t = Permute(p1t, kx, ky, kz);
-    p2t = Permute(p2t, kx, ky, kz);
+    Vector3f d = Permute(ray.d, { kx, ky, kz });
+    p0t = Permute(p0t, { kx, ky, kz });
+    p1t = Permute(p1t, { kx, ky, kz });
+    p2t = Permute(p2t, { kx, ky, kz });
 
     // Apply shear transformation to translated vertex positions
     Float Sx = -d.x / d.z;

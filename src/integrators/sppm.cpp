@@ -417,12 +417,13 @@ void SPPMIntegrator::Render(const Scene &scene) {
             ProfilePhase _(Prof::SPPMStatsUpdate);
             ParallelFor([&](int i) {
                 SPPMPixel &p = pixels[i];
-                if (p.M > 0) {
+                int M = p.M.load();
+                if (M > 0) {
                     // Update pixel photon count, search radius, and $\tau$ from
                     // photons
                     Float gamma = (Float)2 / (Float)3;
-                    Float Nnew = p.N + gamma * p.M;
-                    Float Rnew = p.radius * std::sqrt(Nnew / (p.N + p.M));
+                    Float Nnew = p.N + gamma * M;
+                    Float Rnew = p.radius * std::sqrt(Nnew / (p.N + M));
                     Spectrum Phi;
                     for (int j = 0; j < Spectrum::nSamples; ++j)
                         Phi[j] = p.Phi[j];
