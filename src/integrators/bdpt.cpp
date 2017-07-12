@@ -364,8 +364,8 @@ void BDPTIntegrator::Render(const Scene &scene) {
                     Point2f pFilm = (Point2f)pPixel + tileSampler->Get2D();
 
                     // Trace the camera subpath
-                    Vertex *cameraVertices = arena.Alloc<Vertex>(maxDepth + 2);
-                    Vertex *lightVertices = arena.Alloc<Vertex>(maxDepth + 1);
+                    Vertex *cameraVertices = arena.AllocArray<Vertex>(maxDepth + 2);
+                    Vertex *lightVertices = arena.AllocArray<Vertex>(maxDepth + 1);
                     int nCamera = GenerateCameraSubpath(
                         scene, *tileSampler, arena, maxDepth + 2, *camera,
                         pFilm, cameraVertices);

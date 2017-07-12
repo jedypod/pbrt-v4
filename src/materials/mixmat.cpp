@@ -58,9 +58,9 @@ void MixMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     int n1 = si->bsdf->NumComponents(), n2 = si2.bsdf->NumComponents();
     for (int i = 0; i < n1; ++i)
         si->bsdf->bxdfs[i] =
-            ARENA_ALLOC(arena, ScaledBxDF)(si->bsdf->bxdfs[i], s1);
+            arena.Alloc<ScaledBxDF>(si->bsdf->bxdfs[i], s1);
     for (int i = 0; i < n2; ++i)
-        si->bsdf->Add(ARENA_ALLOC(arena, ScaledBxDF)(si2.bsdf->bxdfs[i], s2));
+        si->bsdf->Add(arena.Alloc<ScaledBxDF>(si2.bsdf->bxdfs[i], s2));
 }
 
 MixMaterial *CreateMixMaterial(const TextureParams &mp,

@@ -48,7 +48,7 @@ void TranslucentMaterial::ComputeScatteringFunctions(
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
     Float eta = 1.5f;
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si, eta);
+    si->bsdf = arena.Alloc<BSDF>(*si, eta);
 
     Spectrum r = reflect->Evaluate(*si).Clamp();
     Spectrum t = transmit->Evaluate(*si).Clamp();
@@ -57,9 +57,9 @@ void TranslucentMaterial::ComputeScatteringFunctions(
     Spectrum kd = Kd->Evaluate(*si).Clamp();
     if (!kd.IsBlack()) {
         if (!r.IsBlack())
-            si->bsdf->Add(ARENA_ALLOC(arena, LambertianReflection)(r * kd));
+            si->bsdf->Add(arena.Alloc<LambertianReflection>(r * kd));
         if (!t.IsBlack())
-            si->bsdf->Add(ARENA_ALLOC(arena, LambertianTransmission)(t * kd));
+            si->bsdf->Add(arena.Alloc<LambertianTransmission>(t * kd));
     }
     Spectrum ks = Ks->Evaluate(*si).Clamp();
     if (!ks.IsBlack() && (!r.IsBlack() || !t.IsBlack())) {
@@ -67,14 +67,14 @@ void TranslucentMaterial::ComputeScatteringFunctions(
         if (remapRoughness)
             rough = TrowbridgeReitzDistribution::RoughnessToAlpha(rough);
         MicrofacetDistribution *distrib =
-            ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(rough, rough);
+            arena.Alloc<TrowbridgeReitzDistribution>(rough, rough);
         if (!r.IsBlack()) {
-            Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
-            si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(
+            Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, eta);
+            si->bsdf->Add(arena.Alloc<MicrofacetReflection>(
                 r * ks, distrib, fresnel));
         }
         if (!t.IsBlack())
-            si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(
+            si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(
                 t * ks, distrib, 1.f, eta, mode));
     }
 }

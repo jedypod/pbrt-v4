@@ -484,7 +484,7 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (bumpMap) Bump(bumpMap, si);
 
     // Evaluate textures for _DisneyMaterial_ material and allocate BRDF
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
+    si->bsdf = arena.Alloc<BSDF>(*si);
 
     // Diffuse
     Spectrum c = color->Evaluate(*si).Clamp();
@@ -510,27 +510,27 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             Float flat = flatness->Evaluate(*si);
             // Blend between DisneyDiffuse and fake subsurface based on
             // flatness.  Additionally, weight using diffTrans.
-            si->bsdf->Add(ARENA_ALLOC(arena, DisneyDiffuse)(diffuseWeight * (1 - flat) * (1 - dt) * c));
-            si->bsdf->Add(ARENA_ALLOC(arena, DisneyFakeSS)(diffuseWeight * flat * (1 - dt) * c, rough));
+            si->bsdf->Add(arena.Alloc<DisneyDiffuse>(diffuseWeight * (1 - flat) * (1 - dt) * c));
+            si->bsdf->Add(arena.Alloc<DisneyFakeSS>(diffuseWeight * flat * (1 - dt) * c, rough));
         } else {
             Spectrum sd = scatterDistance->Evaluate(*si);
             if (sd.IsBlack())
                 // No subsurface scattering; use regular (Fresnel modified) diffuse.
-                si->bsdf->Add(ARENA_ALLOC(arena, DisneyDiffuse)(diffuseWeight * c));
+                si->bsdf->Add(arena.Alloc<DisneyDiffuse>(diffuseWeight * c));
             else {
                 // Use a BSSRDF instead.
-                si->bsdf->Add(ARENA_ALLOC(arena, SpecularTransmission)(1.f, 1.f, e, mode));
-                si->bssrdf = ARENA_ALLOC(arena, DisneyBSSRDF)(c * diffuseWeight, sd,
-                                                              *si, e, this, mode);
+                si->bsdf->Add(arena.Alloc<SpecularTransmission>(1.f, 1.f, e, mode));
+                si->bssrdf = arena.Alloc<DisneyBSSRDF>(c * diffuseWeight, sd,
+                                                       *si, e, this, mode);
             }
         }
 
         // Retro-reflection.
-        si->bsdf->Add(ARENA_ALLOC(arena, DisneyRetro)(diffuseWeight * c, rough));
+        si->bsdf->Add(arena.Alloc<DisneyRetro>(diffuseWeight * c, rough));
 
         // Sheen (if enabled)
         if (sheenWeight > 0)
-            si->bsdf->Add(ARENA_ALLOC(arena, DisneySheen)(
+            si->bsdf->Add(arena.Alloc<DisneySheen>(
                 diffuseWeight * sheenWeight * Csheen, SheenMode::Reflect));
     }
 
@@ -540,7 +540,7 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     Float ax = std::max(Float(.001), sqr(rough) / aspect);
     Float ay = std::max(Float(.001), sqr(rough) * aspect);
     MicrofacetDistribution *distrib =
-        ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(ax, ay);
+        arena.Alloc<TrowbridgeReitzDistribution>(ax, ay);
 
     // Specular is Trowbridge-Reitz with the Schlick Fresnel function.
     // TODO: Cspec0 will actually be non-black with metallicWeight == 0.
@@ -550,16 +550,14 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             Lerp(metallicWeight,
                  SchlickR0FromEta(e) * Lerp(specularTint->Evaluate(*si), Spectrum(1.), Ctint), c);
 
-        Fresnel *fresnel = ARENA_ALLOC(arena, SchlickFresnel)(Cspec0);
-        si->bsdf->Add(
-            ARENA_ALLOC(arena, MicrofacetReflection)(c, distrib, fresnel));
+        Fresnel *fresnel = arena.Alloc<SchlickFresnel>(Cspec0);
+        si->bsdf->Add(arena.Alloc<MicrofacetReflection>(c, distrib, fresnel));
     }
 
     // Clearcoat
     Float cc = clearcoat->Evaluate(*si);
     if (cc > 0) {
-        si->bsdf->Add(ARENA_ALLOC(arena, DisneyClearcoat)(
-            cc, clearcoatGloss->Evaluate(*si)));
+        si->bsdf->Add(arena.Alloc<DisneyClearcoat>(cc, clearcoatGloss->Evaluate(*si)));
     }
 
     // BTDF
@@ -574,16 +572,16 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             Float ax = std::max(Float(.001), sqr(rscaled) / aspect);
             Float ay = std::max(Float(.001), sqr(rscaled) * aspect);
             MicrofacetDistribution *scaledDistrib =
-                ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(ax, ay);
-            si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(T, scaledDistrib, 1.,
-                                                                     e, mode));
+                arena.Alloc<TrowbridgeReitzDistribution>(ax, ay);
+            si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(T, scaledDistrib, 1.,
+                                                              e, mode));
         } else
-            si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(T, distrib, 1.,
-                                                                     e, mode));
+            si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(T, distrib, 1.,
+                                                              e, mode));
     }
     if (thin) {
         // Lambertian, weighted by (1 - diffTrans)
-        si->bsdf->Add(ARENA_ALLOC(arena, LambertianTransmission)(dt * c));
+        si->bsdf->Add(arena.Alloc<LambertianTransmission>(dt * c));
     }
 }
 

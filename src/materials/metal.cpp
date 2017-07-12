@@ -62,7 +62,7 @@ void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                bool allowMultipleLobes) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
+    si->bsdf = arena.Alloc<BSDF>(*si);
 
     Float uRough =
         uRoughness ? uRoughness->Evaluate(*si) : roughness->Evaluate(*si);
@@ -72,11 +72,11 @@ void MetalMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         uRough = TrowbridgeReitzDistribution::RoughnessToAlpha(uRough);
         vRough = TrowbridgeReitzDistribution::RoughnessToAlpha(vRough);
     }
-    Fresnel *frMf = ARENA_ALLOC(arena, FresnelConductor)(1., eta->Evaluate(*si),
-                                                         k->Evaluate(*si));
+    Fresnel *frMf = arena.Alloc<FresnelConductor>(1., eta->Evaluate(*si),
+                                                  k->Evaluate(*si));
     MicrofacetDistribution *distrib =
-        ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(uRough, vRough);
-    si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(1., distrib, frMf));
+        arena.Alloc<TrowbridgeReitzDistribution>(uRough, vRough);
+    si->bsdf->Add(arena.Alloc<MicrofacetReflection>(1., distrib, frMf));
 }
 
 const int CopperSamples = 56;

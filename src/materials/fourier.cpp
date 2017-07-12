@@ -214,11 +214,11 @@ void FourierMaterial::ComputeScatteringFunctions(
     bool allowMultipleLobes) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
+    si->bsdf = arena.Alloc<BSDF>(*si);
     // Checking for zero channels works as a proxy for checking whether the
     // table was successfully read from the file.
     if (bsdfTable->nChannels > 0)
-        si->bsdf->Add(ARENA_ALLOC(arena, FourierBSDF)(*bsdfTable, mode));
+        si->bsdf->Add(arena.Alloc<FourierBSDF>(*bsdfTable, mode));
 }
 
 FourierMaterial *CreateFourierMaterial(const TextureParams &mp) {

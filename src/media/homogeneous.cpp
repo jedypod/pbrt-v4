@@ -58,7 +58,7 @@ Spectrum HomogeneousMedium::Sample(const Ray &ray, Sampler &sampler,
     bool sampledMedium = t < ray.tMax;
     if (sampledMedium)
         *mi = MediumInteraction(ray(t), -ray.d, ray.time, this,
-                                ARENA_ALLOC(arena, HenyeyGreenstein)(g));
+                                arena.Alloc<HenyeyGreenstein>(g));
 
     // Compute the transmittance and sampling density
     Spectrum Tr = Exp(-sigma_t * std::min(t, MaxFloat) * ray.d.Length());

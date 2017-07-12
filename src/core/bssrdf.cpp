@@ -237,8 +237,8 @@ Spectrum SeparableBSSRDF::Sample_S(const Scene &scene, Float u1,
     Spectrum Sp = Sample_Sp(scene, u1, u2, arena, si, pdf);
     if (!Sp.IsBlack()) {
         // Initialize material model at sampled surface interaction
-        si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
-        si->bsdf->Add(ARENA_ALLOC(arena, SeparableBSSRDFAdapter)(this));
+        si->bsdf = arena.Alloc<BSDF>(*si);
+        si->bsdf->Add(arena.Alloc<SeparableBSSRDFAdapter>(this));
         si->wo = Vector3f(si->shading.n);
     }
     return Sp;
@@ -297,7 +297,7 @@ Spectrum SeparableBSSRDF::Sample_Sp(const Scene &scene, Float u1,
         SurfaceInteraction si;
         IntersectionChain *next = nullptr;
     };
-    IntersectionChain *chain = ARENA_ALLOC(arena, IntersectionChain)();
+    IntersectionChain *chain = arena.Alloc<IntersectionChain>();
 
     // Accumulate chain of intersections along ray
     IntersectionChain *ptr = chain;
@@ -306,7 +306,7 @@ Spectrum SeparableBSSRDF::Sample_Sp(const Scene &scene, Float u1,
         base = ptr->si;
         // Append admissible intersection to _IntersectionChain_
         if (ptr->si.primitive->GetMaterial() == this->material) {
-            IntersectionChain *next = ARENA_ALLOC(arena, IntersectionChain)();
+            IntersectionChain *next = arena.Alloc<IntersectionChain>();
             ptr->next = next;
             ptr = next;
             nFound++;

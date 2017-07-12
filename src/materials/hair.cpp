@@ -146,7 +146,7 @@ void HairMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     Float a = Radians(alpha->Evaluate(*si));
     Float e = eta->Evaluate(*si);
 
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si, e);
+    si->bsdf = arena.Alloc<BSDF>(*si, e);
 
     Spectrum sig_a;
     if (sigma_a)
@@ -163,7 +163,7 @@ void HairMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
     // Offset along width
     Float h = -1 + 2 * si->uv[1];
-    si->bsdf->Add(ARENA_ALLOC(arena, HairBSDF)(h, e, sig_a, bm, bn, a));
+    si->bsdf->Add(arena.Alloc<HairBSDF>(h, e, sig_a, bm, bn, a));
 }
 
 HairMaterial *CreateHairMaterial(const TextureParams &mp) {

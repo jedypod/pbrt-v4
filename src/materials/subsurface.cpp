@@ -56,14 +56,13 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
     Float vrough = vRoughness->Evaluate(*si);
 
     // Initialize _bsdf_ for smooth or rough dielectric
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si, eta);
+    si->bsdf = arena.Alloc<BSDF>(*si, eta);
 
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
     if (isSpecular && allowMultipleLobes) {
-        si->bsdf->Add(
-            ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
+        si->bsdf->Add(arena.Alloc<FresnelSpecular>(R, T, 1.f, eta, mode));
     } else {
         if (remapRoughness) {
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
@@ -71,30 +70,28 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
         }
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
-                       : ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(
-                             urough, vrough);
+            : arena.Alloc<TrowbridgeReitzDistribution>(urough, vrough);
         if (!R.IsBlack()) {
-            Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
+            Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, eta);
             if (isSpecular)
-                si->bsdf->Add(
-                    ARENA_ALLOC(arena, SpecularReflection)(R, fresnel));
+                si->bsdf->Add(arena.Alloc<SpecularReflection>(R, fresnel));
             else
-                si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(
+                si->bsdf->Add(arena.Alloc<MicrofacetReflection>(
                     R, distrib, fresnel));
         }
         if (!T.IsBlack()) {
             if (isSpecular)
-                si->bsdf->Add(ARENA_ALLOC(arena, SpecularTransmission)(
+                si->bsdf->Add(arena.Alloc<SpecularTransmission>(
                     T, 1.f, eta, mode));
             else
-                si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(
+                si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(
                     T, distrib, 1.f, eta, mode));
         }
     }
     Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
     Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
-    si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
-                                                     sig_a, sig_s, table);
+    si->bssrdf = arena.Alloc<TabulatedBSSRDF>(*si, this, mode, eta,
+                                              sig_a, sig_s, table);
 }
 
 SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {

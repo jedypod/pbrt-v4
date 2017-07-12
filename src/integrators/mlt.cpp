@@ -141,7 +141,7 @@ Spectrum MLTIntegrator::L(const Scene &scene, MemoryArena &arena,
     }
 
     // Generate a camera subpath with exactly _t_ vertices
-    Vertex *cameraVertices = arena.Alloc<Vertex>(t);
+    Vertex *cameraVertices = arena.AllocArray<Vertex>(t);
     Bounds2f sampleBounds = (Bounds2f)camera->film->GetSampleBounds();
     *pRaster = sampleBounds.Lerp(sampler.Get2D());
     if (GenerateCameraSubpath(scene, sampler, arena, t, *camera, *pRaster,
@@ -150,7 +150,7 @@ Spectrum MLTIntegrator::L(const Scene &scene, MemoryArena &arena,
 
     // Generate a light subpath with exactly _s_ vertices
     sampler.StartStream(lightStreamIndex);
-    Vertex *lightVertices = arena.Alloc<Vertex>(s);
+    Vertex *lightVertices = arena.AllocArray<Vertex>(s);
     if (GenerateLightSubpath(scene, sampler, arena, s, cameraVertices[0].time(),
                              *lightDistr, lightToIndex, lightVertices) != s)
         return Spectrum(0.f);

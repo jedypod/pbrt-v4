@@ -422,7 +422,7 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
             // Add entry to _treeletsToBuild_ for this treelet
             int nPrimitives = end - start;
             int maxBVHNodes = 2 * nPrimitives;
-            BVHBuildNode *nodes = arena.Alloc<BVHBuildNode>(maxBVHNodes, false);
+            BVHBuildNode *nodes = arena.AllocArray<BVHBuildNode>(maxBVHNodes, false);
             treeletsToBuild.push_back({start, nPrimitives, nodes});
             start = end;
         }

@@ -43,11 +43,11 @@
 #include "port.h"
 #include <list>
 #include <cstddef>
+#include <utility>
 
 namespace pbrt {
 
 // Memory Declarations
-#define ARENA_ALLOC(arena, Type) new ((arena).Alloc(sizeof(Type))) Type
 void *AllocAligned(size_t size);
 template <typename T>
 T *AllocAligned(size_t count) {
@@ -55,7 +55,8 @@ T *AllocAligned(size_t count) {
 }
 
 void FreeAligned(void *);
-class alignas(PBRT_L1_CACHE_LINE_SIZE)
+
+ class alignas(PBRT_L1_CACHE_LINE_SIZE)
 MemoryArena {
   public:
     // MemoryArena Public Methods
@@ -107,11 +108,15 @@ MemoryArena {
         return ret;
     }
     template <typename T>
-    T *Alloc(size_t n = 1, bool runConstructor = true) {
+    T *AllocArray(size_t n = 1, bool runConstructor = true) {
         T *ret = (T *)Alloc(n * sizeof(T));
         if (runConstructor)
             for (size_t i = 0; i < n; ++i) new (&ret[i]) T();
         return ret;
+    }
+    template<typename T, typename ...Args> T *Alloc(Args&&... args)  {
+        T *ptr = (T *)Alloc(sizeof(T));
+        return new (ptr) T(std::forward<Args>(args)...);
     }
     void Reset() {
         currentBlockPos = 0;

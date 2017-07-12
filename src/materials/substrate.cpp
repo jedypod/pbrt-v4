@@ -47,7 +47,7 @@ void SubstrateMaterial::ComputeScatteringFunctions(
     bool allowMultipleLobes) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
-    si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
+    si->bsdf = arena.Alloc<BSDF>(*si);
     Spectrum d = Kd->Evaluate(*si).Clamp();
     Spectrum s = Ks->Evaluate(*si).Clamp();
     Float roughu = nu->Evaluate(*si);
@@ -59,8 +59,8 @@ void SubstrateMaterial::ComputeScatteringFunctions(
             roughv = TrowbridgeReitzDistribution::RoughnessToAlpha(roughv);
         }
         MicrofacetDistribution *distrib =
-            ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(roughu, roughv);
-        si->bsdf->Add(ARENA_ALLOC(arena, FresnelBlend)(d, s, distrib));
+            arena.Alloc<TrowbridgeReitzDistribution>(roughu, roughv);
+        si->bsdf->Add(arena.Alloc<FresnelBlend>(d, s, distrib));
     }
 }
 

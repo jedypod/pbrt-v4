@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
             Ray r(origin, direction);
             SurfaceInteraction isect;
             disk->Intersect(r, &tHit, &isect);
-            bsdf = ARENA_ALLOC(arena, BSDF)(isect);
+            bsdf = arena.Alloc<BSDF>(isect);
             (BSDFFuncArray[model])(bsdf);
         }
 
@@ -347,7 +347,7 @@ void Gen_UniformHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi,
 
 void createLambertian(BSDF* bsdf) {
     Spectrum Kd(1);
-    bsdf->Add(ARENA_ALLOC(arena, LambertianReflection)(Kd));
+    bsdf->Add(arena.Alloc<LambertianReflection>(Kd));
 }
 
 void createMicrofacet(BSDF* bsdf, bool beckmann, bool samplevisible,
@@ -357,17 +357,17 @@ void createMicrofacet(BSDF* bsdf, bool beckmann, bool samplevisible,
     if (beckmann) {
       Float alphax = BeckmannDistribution::RoughnessToAlpha(roughx);
       Float alphay = BeckmannDistribution::RoughnessToAlpha(roughy);
-      distrib = ARENA_ALLOC(arena, BeckmannDistribution)(alphax, alphay,
+      distrib = arena.Alloc<BeckmannDistribution>(alphax, alphay,
                                                         samplevisible);
     }
     else {
       Float alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(roughx);
       Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
-      distrib = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(alphax, alphay,
+      distrib = arena.Alloc<TrowbridgeReitzDistribution>(alphax, alphay,
                                                                samplevisible);
     }
-    Fresnel* fresnel = ARENA_ALLOC(arena, FresnelNoOp)();
-    BxDF* bxdf = ARENA_ALLOC(arena, MicrofacetReflection)(Ks, distrib, fresnel);
+    Fresnel* fresnel = arena.Alloc<FresnelNoOp>();
+    BxDF* bxdf = arena.Alloc<MicrofacetReflection>(Ks, distrib, fresnel);
     bsdf->Add(bxdf);
 }
 
@@ -380,16 +380,16 @@ void createFresnelBlend(BSDF* bsdf, bool beckmann, bool samplevisible,
     if (beckmann) {
       Float alphax = BeckmannDistribution::RoughnessToAlpha(roughx);
       Float alphay = BeckmannDistribution::RoughnessToAlpha(roughy);
-      distrib = ARENA_ALLOC(arena, BeckmannDistribution)(alphax, alphay,
+      distrib = arena.Alloc<BeckmannDistribution>(alphax, alphay,
                                                         samplevisible);
     }
     else {
       Float alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(roughx);
       Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
-      distrib = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(alphax, alphay,
+      distrib = arena.Alloc<TrowbridgeReitzDistribution>(alphax, alphay,
                                                                samplevisible);
     }
-    BxDF* bxdf = ARENA_ALLOC(arena, FresnelBlend)(d, s, distrib);
+    BxDF* bxdf = arena.Alloc<FresnelBlend>(d, s, distrib);
     bsdf->Add(bxdf);
 }
 
@@ -399,41 +399,41 @@ void createMicrofacet30and0(BSDF* bsdf, bool beckmann) {
     if (beckmann) {
       Float alphax = BeckmannDistribution::RoughnessToAlpha(0.8);
       Float alphay = BeckmannDistribution::RoughnessToAlpha(0.8);
-      distrib1 = ARENA_ALLOC(arena, BeckmannDistribution)(alphax, alphay);
+      distrib1 = arena.Alloc<BeckmannDistribution>(alphax, alphay);
 
       alphax = BeckmannDistribution::RoughnessToAlpha(0.01);
       alphay = BeckmannDistribution::RoughnessToAlpha(0.01);
-      distrib2 = ARENA_ALLOC(arena, BeckmannDistribution)(alphax, alphay);
+      distrib2 = arena.Alloc<BeckmannDistribution>(alphax, alphay);
     }
     else {
       Float alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(0.8);
       Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(0.8);
-      distrib1 = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(alphax, alphay);
+      distrib1 = arena.Alloc<TrowbridgeReitzDistribution>(alphax, alphay);
 
       alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(0.01);
       alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(0.01);
-      distrib2 = ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(alphax, alphay);
+      distrib2 = arena.Alloc<TrowbridgeReitzDistribution>(alphax, alphay);
     }
 
-    Fresnel* fresnel = ARENA_ALLOC(arena, FresnelNoOp)();
+    Fresnel* fresnel = arena.Alloc<FresnelNoOp>();
     BxDF* bxdf1 =
-        ARENA_ALLOC(arena, MicrofacetReflection)(Ks, distrib1, fresnel);
+        arena.Alloc<MicrofacetReflection>(Ks, distrib1, fresnel);
     bsdf->Add(bxdf1);
     BxDF* bxdf2 =
-        ARENA_ALLOC(arena, MicrofacetReflection)(Ks, distrib2, fresnel);
+        arena.Alloc<MicrofacetReflection>(Ks, distrib2, fresnel);
     bsdf->Add(bxdf2);
 }
 
 void createOrenNayar0(BSDF* bsdf) {
     Spectrum Kd(1);
     float sigma = 0.0;
-    BxDF* bxdf = ARENA_ALLOC(arena, OrenNayar)(Kd, sigma);
+    BxDF* bxdf = arena.Alloc<OrenNayar>(Kd, sigma);
     bsdf->Add(bxdf);
 }
 
 void createOrenNayar20(BSDF* bsdf) {
     Spectrum Kd(1);
     float sigma = 20.0;
-    BxDF* bxdf = ARENA_ALLOC(arena, OrenNayar)(Kd, sigma);
+    BxDF* bxdf = arena.Alloc<OrenNayar>(Kd, sigma);
     bsdf->Add(bxdf);
 }
