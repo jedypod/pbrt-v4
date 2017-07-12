@@ -131,7 +131,7 @@ struct FourierBSDFTable {
     Float eta;
     int mMax;
     int nChannels;
-    int nMu;
+    size_t nMu;
     Float *mu;
     int *m;
     int *aOffset;

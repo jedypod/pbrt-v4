@@ -35,6 +35,9 @@
 #include "shapes/heightfield.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
+#include "ext/google/array_slice.h"
+
+using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -44,15 +47,14 @@ std::vector<std::shared_ptr<Shape>> CreateHeightfield(
     bool reverseOrientation, const ParamSet &params) {
     int nx = params.FindOneInt("nu", -1);
     int ny = params.FindOneInt("nv", -1);
-    int nitems;
-    const Float *z = params.FindFloat("Pz", &nitems);
-    CHECK_EQ(nitems, nx * ny);
-    CHECK(nx != -1 && ny != -1 && z != nullptr);
+    ArraySlice<Float> z = params.FindFloat("Pz");
+    CHECK_EQ(z.size(), nx * ny);
+    CHECK(nx != -1 && ny != -1 && !z.empty());
 
     int ntris = 2 * (nx - 1) * (ny - 1);
-    std::unique_ptr<int[]> indices(new int[3 * ntris]);
-    std::unique_ptr<Point3f[]> P(new Point3f[nx * ny]);
-    std::unique_ptr<Point2f[]> uvs(new Point2f[nx * ny]);
+    std::vector<int> indices(3 * ntris);
+    std::vector<Point3f> P(nx * ny);
+    std::vector<Point2f> uvs(nx * ny);
     int nverts = nx * ny;
     // Compute heightfield vertex positions
     int pos = 0;
@@ -66,7 +68,7 @@ std::vector<std::shared_ptr<Shape>> CreateHeightfield(
     }
 
     // Fill in heightfield vertex offset array
-    int *vp = indices.get();
+    int *vp = indices.data();
     for (int y = 0; y < ny - 1; ++y) {
         for (int x = 0; x < nx - 1; ++x) {
 #define VERT(x, y) ((x) + (y)*nx)
@@ -82,8 +84,7 @@ std::vector<std::shared_ptr<Shape>> CreateHeightfield(
     }
 
     return CreateTriangleMesh(ObjectToWorld, WorldToObject, reverseOrientation,
-                              ntris, indices.get(), nverts, P.get(), nullptr,
-                              nullptr, uvs.get(), nullptr, nullptr);
+                              indices, P, {}, {}, uvs, nullptr, nullptr);
 }
 
 }  // namespace pbrt

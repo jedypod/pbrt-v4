@@ -40,17 +40,17 @@
 
 // shapes/curve.h*
 #include "shape.h"
+#include "ext/google/array_slice.h"
 
 namespace pbrt {
-struct CurveCommon;
 
 // CurveType Declarations
 enum class CurveType { Flat, Cylinder, Ribbon };
 
 // CurveCommon Declarations
 struct CurveCommon {
-    CurveCommon(const Point3f c[4], Float w0, Float w1, CurveType type,
-                const Normal3f *norm);
+    CurveCommon(gtl::ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
+                gtl::ArraySlice<Normal3f> norm);
     const CurveType type;
     Point3f cpObj[4];
     Float width[2];

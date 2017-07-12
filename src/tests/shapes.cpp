@@ -91,9 +91,9 @@ TEST(Triangle, Watertight) {
     }
 
     Transform identity;
-    std::vector<std::shared_ptr<Shape>> tris = CreateTriangleMesh(
-        &identity, &identity, false, indices.size() / 3, &indices[0], nVertices,
-        &vertices[0], nullptr, nullptr, nullptr, nullptr, nullptr);
+    std::vector<std::shared_ptr<Shape>> tris =
+        CreateTriangleMesh(&identity, &identity, false, indices, vertices, {},
+                           {}, {}, nullptr, nullptr);
 
     for (int i = 0; i < 100000; ++i) {
         RNG rng(i);
@@ -142,8 +142,8 @@ std::shared_ptr<Triangle> GetRandomTriangle(std::function<Float()> value) {
     static Transform identity;
     int indices[3] = {0, 1, 2};
     std::vector<std::shared_ptr<Shape>> triVec =
-        CreateTriangleMesh(&identity, &identity, false, 1, indices, 3, v,
-                           nullptr, nullptr, nullptr, nullptr, nullptr);
+        CreateTriangleMesh(&identity, &identity, false, indices, v, {}, {}, {},
+                           nullptr, nullptr);
     EXPECT_EQ(1, triVec.size());
     std::shared_ptr<Triangle> tri =
         std::dynamic_pointer_cast<Triangle>(triVec[0]);

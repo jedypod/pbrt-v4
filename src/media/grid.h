@@ -42,6 +42,7 @@
 #include "medium.h"
 #include "transform.h"
 #include "stats.h"
+#include "ext/google/array_slice.h"
 
 namespace pbrt {
 
@@ -53,7 +54,7 @@ class GridDensityMedium : public Medium {
     // GridDensityMedium Public Methods
     GridDensityMedium(const Spectrum &sigma_a, const Spectrum &sigma_s, Float g,
                       int nx, int ny, int nz, const Transform &mediumToWorld,
-                      const Float *d)
+                      gtl::ArraySlice<Float> d)
         : sigma_a(sigma_a),
           sigma_s(sigma_s),
           g(g),
@@ -63,7 +64,7 @@ class GridDensityMedium : public Medium {
           WorldToMedium(Inverse(mediumToWorld)),
           density(new Float[nx * ny * nz]) {
         densityBytes += nx * ny * nz * sizeof(Float);
-        memcpy((Float *)density.get(), d, sizeof(Float) * nx * ny * nz);
+        memcpy((Float *)density.get(), d.data(), sizeof(Float) * nx * ny * nz);
         // Precompute values for Monte Carlo sampling of _GridDensityMedium_
         sigma_t = (sigma_a + sigma_s)[0];
         if (Spectrum(sigma_t) != sigma_a + sigma_s)

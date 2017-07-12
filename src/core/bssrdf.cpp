@@ -146,40 +146,40 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
     // Choose radius values of the diffusion profile discretization
     t->radiusSamples[0] = 0;
     t->radiusSamples[1] = 2.5e-3f;
-    for (int i = 2; i < t->nRadiusSamples; ++i)
+    for (int i = 2; i < t->radiusSamples.size(); ++i)
         t->radiusSamples[i] = t->radiusSamples[i - 1] * 1.2f;
 
     // Choose albedo values of the diffusion profile discretization
-    for (int i = 0; i < t->nRhoSamples; ++i)
+    for (int i = 0; i < t->rhoSamples.size(); ++i)
         t->rhoSamples[i] =
-            (1 - std::exp(-8 * i / (Float)(t->nRhoSamples - 1))) /
+            (1 - std::exp(-8 * i / (Float)(t->rhoSamples.size() - 1))) /
             (1 - std::exp(-8));
     ParallelFor([&](int i) {
         // Compute the diffusion profile for the _i_th albedo sample
 
         // Compute scattering profile for chosen albedo $\rho$
-        for (int j = 0; j < t->nRadiusSamples; ++j) {
+        size_t nSamples = t->radiusSamples.size();
+        for (int j = 0; j < nSamples; ++j) {
             Float rho = t->rhoSamples[i], r = t->radiusSamples[j];
-            t->profile[i * t->nRadiusSamples + j] =
+            t->profile[i * nSamples + j] =
                 2 * Pi * r * (BeamDiffusionSS(rho, 1 - rho, g, eta, r) +
                               BeamDiffusionMS(rho, 1 - rho, g, eta, r));
         }
 
         // Compute effective albedo $\rho_{\roman{eff}}$ and CDF for importance
         // sampling
-        t->rhoEff[i] =
-            IntegrateCatmullRom(t->nRadiusSamples, t->radiusSamples.get(),
-                                &t->profile[i * t->nRadiusSamples],
-                                &t->profileCDF[i * t->nRadiusSamples]);
-    }, t->nRhoSamples);
+        t->rhoEff[i] = IntegrateCatmullRom(
+            t->radiusSamples,
+            {&t->profile[i * nSamples], nSamples},
+            {&t->profileCDF[i * nSamples], nSamples});
+    }, t->rhoSamples.size());
 }
 
 void SubsurfaceFromDiffuse(const BSSRDFTable &t, const Spectrum &rhoEff,
                            const Spectrum &mfp, Spectrum *sigma_a,
                            Spectrum *sigma_s) {
     for (int c = 0; c < Spectrum::nSamples; ++c) {
-        Float rho = InvertCatmullRom(t.nRhoSamples, t.rhoSamples.get(),
-                                     t.rhoEff.get(), rhoEff[c]);
+        Float rho = InvertCatmullRom(t.rhoSamples, t.rhoEff, rhoEff[c]);
         (*sigma_s)[c] = rho / mfp[c];
         (*sigma_a)[c] = (1 - rho) / mfp[c];
     }
@@ -187,13 +187,11 @@ void SubsurfaceFromDiffuse(const BSSRDFTable &t, const Spectrum &rhoEff,
 
 // BSSRDF Method Definitions
 BSSRDFTable::BSSRDFTable(int nRhoSamples, int nRadiusSamples)
-    : nRhoSamples(nRhoSamples),
-      nRadiusSamples(nRadiusSamples),
-      rhoSamples(new Float[nRhoSamples]),
-      radiusSamples(new Float[nRadiusSamples]),
-      profile(new Float[nRadiusSamples * nRhoSamples]),
-      rhoEff(new Float[nRhoSamples]),
-      profileCDF(new Float[nRadiusSamples * nRhoSamples]) {}
+    : rhoSamples(nRhoSamples),
+      radiusSamples(nRadiusSamples),
+      profile(nRadiusSamples * nRhoSamples),
+      rhoEff(nRhoSamples),
+      profileCDF(nRadiusSamples * nRhoSamples) {}
 
 Spectrum TabulatedBSSRDF::Sr(Float r) const {
     Spectrum Sr(0.f);
@@ -204,10 +202,10 @@ Spectrum TabulatedBSSRDF::Sr(Float r) const {
         // Compute spline weights to interpolate BSSRDF on channel _ch_
         int rhoOffset, radiusOffset;
         Float rhoWeights[4], radiusWeights[4];
-        if (!CatmullRomWeights(table.nRhoSamples, table.rhoSamples.get(),
-                               rho[ch], &rhoOffset, rhoWeights) ||
-            !CatmullRomWeights(table.nRadiusSamples, table.radiusSamples.get(),
-                               rOptical, &radiusOffset, radiusWeights))
+        if (!CatmullRomWeights(table.rhoSamples, rho[ch], &rhoOffset,
+                               rhoWeights) ||
+            !CatmullRomWeights(table.radiusSamples, rOptical, &radiusOffset,
+                               radiusWeights))
             continue;
 
         // Set BSSRDF value _Sr[ch]_ using tensor spline interpolation
@@ -348,10 +346,8 @@ Float SeparableBSSRDF::Pdf_Sp(const SurfaceInteraction &pi) const {
 
 Float TabulatedBSSRDF::Sample_Sr(int ch, Float u) const {
     if (sigma_t[ch] == 0) return -1;
-    return SampleCatmullRom2D(table.nRhoSamples, table.nRadiusSamples,
-                              table.rhoSamples.get(), table.radiusSamples.get(),
-                              table.profile.get(), table.profileCDF.get(),
-                              rho[ch], u) /
+    return SampleCatmullRom2D(table.rhoSamples, table.radiusSamples,
+                              table.profile, table.profileCDF, rho[ch], u) /
            sigma_t[ch];
 }
 
@@ -362,10 +358,9 @@ Float TabulatedBSSRDF::Pdf_Sr(int ch, Float r) const {
     // Compute spline weights to interpolate BSSRDF density on channel _ch_
     int rhoOffset, radiusOffset;
     Float rhoWeights[4], radiusWeights[4];
-    if (!CatmullRomWeights(table.nRhoSamples, table.rhoSamples.get(), rho[ch],
-                           &rhoOffset, rhoWeights) ||
-        !CatmullRomWeights(table.nRadiusSamples, table.radiusSamples.get(),
-                           rOptical, &radiusOffset, radiusWeights))
+    if (!CatmullRomWeights(table.rhoSamples, rho[ch], &rhoOffset, rhoWeights) ||
+        !CatmullRomWeights(table.radiusSamples, rOptical, &radiusOffset,
+                           radiusWeights))
         return 0.f;
 
     // Return BSSRDF profile density for channel _ch_

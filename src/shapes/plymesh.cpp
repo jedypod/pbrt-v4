@@ -36,6 +36,7 @@
 #include "textures/constant.h"
 #include "paramset.h"
 #include "ext/rply.h"
+using gtl::ArraySlice;
 
 #include <iostream>
 
@@ -47,10 +48,10 @@ struct CallbackContext {
     Normal3f *n;
     Point2f *uv;
     int *indices;
-    int indexCtr;
+    size_t indexCtr;
     int face[4];
     bool error;
-    int vertexCount;
+    size_t vertexCount;
 
     CallbackContext()
         : p(nullptr),
@@ -117,7 +118,7 @@ int rply_face_callback(p_ply_argument argument) {
             Error(
                 "plymesh: Vertex reference %i is out of bounds! "
                 "Valid range is [0..%i)",
-                value, context->vertexCount);
+                value, (int)context->vertexCount);
             context->error = true;
         }
         context->face[value_index] = value;
@@ -154,7 +155,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     }
 
     p_ply_element element = nullptr;
-    long vertexCount = 0, faceCount = 0;
+    size_t vertexCount = 0, faceCount = 0;
 
     /* Inspect the structure of the PLY file */
     while ((element = ply_get_next_element(ply, element)) != nullptr) {
@@ -261,10 +262,14 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
         shadowAlphaTex.reset(new ConstantTexture<Float>(0.f));
 
-    return CreateTriangleMesh(o2w, w2o, reverseOrientation,
-                              context.indexCtr / 3, context.indices,
-                              vertexCount, context.p, nullptr, context.n,
-                              context.uv, alphaTex, shadowAlphaTex);
+    ArraySlice<Normal3f> N;
+    if (context.n) N = {context.n, vertexCount};
+    ArraySlice<Point2f> uv;
+    if (context.uv) uv = {context.uv, vertexCount};
+
+    return CreateTriangleMesh(
+        o2w, w2o, reverseOrientation, {context.indices, context.indexCtr},
+        {context.p, vertexCount}, {}, N, uv, alphaTex, shadowAlphaTex);
 }
 
 }  // namespace pbrt

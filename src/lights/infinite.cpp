@@ -55,7 +55,8 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
 
     // Compute scalar-valued image _img_ from environment map
     int width = 2 * image.resolution.x, height = 2 * image.resolution.y;
-    std::unique_ptr<Float[]> img(new Float[width * height]);
+    std::vector<Float> img(width * height);
+
     float fwidth = 0.5f / std::min(width, height);
     ParallelFor(
         [&](int64_t v) {
@@ -69,7 +70,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
         }, height, 32);
 
     // Compute sampling distributions for rows and columns of image
-    distribution.reset(new Distribution2D(img.get(), width, height));
+    distribution.reset(new Distribution2D(img, width, height));
 }
 
 Spectrum InfiniteAreaLight::Power() const {

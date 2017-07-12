@@ -136,16 +136,17 @@ class TabulatedBSSRDF : public SeparableBSSRDF {
 
 struct BSSRDFTable {
     // BSSRDFTable Public Data
-    const int nRhoSamples, nRadiusSamples;
-    std::unique_ptr<Float[]> rhoSamples, radiusSamples;
-    std::unique_ptr<Float[]> profile;
-    std::unique_ptr<Float[]> rhoEff;
-    std::unique_ptr<Float[]> profileCDF;
+    std::vector<Float> rhoSamples, radiusSamples;
+    std::vector<Float> profile;
+    std::vector<Float> rhoEff;
+    std::vector<Float> profileCDF;
 
     // BSSRDFTable Public Methods
     BSSRDFTable(int nRhoSamples, int nRadiusSamples);
     inline Float EvalProfile(int rhoIndex, int radiusIndex) const {
-        return profile[rhoIndex * nRadiusSamples + radiusIndex];
+        CHECK(rhoIndex >= 0 && rhoIndex < rhoSamples.size());
+        CHECK(radiusIndex >= 0 && radiusIndex < radiusSamples.size());
+        return profile[rhoIndex * radiusSamples.size() + radiusIndex];
     }
 };
 

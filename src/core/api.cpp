@@ -117,6 +117,8 @@
 #include <map>
 #include <stdio.h>
 
+using gtl::ArraySlice;
+
 namespace pbrt {
 
 // API Global Variables
@@ -334,27 +336,27 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 getenv("PLY_PREFIX") ? getenv("PLY_PREFIX") : "mesh";
             std::string fn = StringPrintf("%s_%05d.ply", plyPrefix, count++);
 
-            int nvi, npi, nuvi, nsi, nni;
-            const int *vi = paramSet.FindInt("indices", &nvi);
-            const Point3f *P = paramSet.FindPoint3f("P", &npi);
-            const Point2f *uvs = paramSet.FindPoint2f("uv", &nuvi);
-            if (!uvs) uvs = paramSet.FindPoint2f("st", &nuvi);
+            ArraySlice<int> vi = paramSet.FindInt("indices");
+            ArraySlice<Point3f> P = paramSet.FindPoint3f("P");
+            ArraySlice<Point2f> uvs = paramSet.FindPoint2f("uv");
+            if (uvs.empty()) uvs = paramSet.FindPoint2f("st");
             std::vector<Point2f> tempUVs;
-            if (!uvs) {
-                const Float *fuv = paramSet.FindFloat("uv", &nuvi);
-                if (!fuv) fuv = paramSet.FindFloat("st", &nuvi);
-                if (fuv) {
-                    nuvi /= 2;
-                    tempUVs.reserve(nuvi);
-                    for (int i = 0; i < nuvi; ++i)
+            if (uvs.empty()) {
+                ArraySlice<Float> fuv = paramSet.FindFloat("uv");
+                if (fuv.empty()) fuv = paramSet.FindFloat("st");
+                if (!fuv.empty()) {
+                    tempUVs.reserve(fuv.size() / 2);
+                    for (size_t i = 0; i < fuv.size() / 2; ++i)
                         tempUVs.push_back(Point2f(fuv[2 * i], fuv[2 * i + 1]));
-                    uvs = &tempUVs[0];
+                    uvs = tempUVs;
                 }
             }
-            const Normal3f *N = paramSet.FindNormal3f("N", &nni);
-            const Vector3f *S = paramSet.FindVector3f("S", &nsi);
+            ArraySlice<Normal3f> N = paramSet.FindNormal3f("N");
+            ArraySlice<Vector3f> S = paramSet.FindVector3f("S");
+            // TODO: check that if non-empty, N and S are at least as big
+            // as P.
 
-            if (!WritePlyFile(fn.c_str(), nvi / 3, vi, npi, P, S, N, uvs))
+            if (!WritePlyFile(fn, vi, P, S, N, uvs))
                 Error("Unable to write PLY file \"%s\"", fn.c_str());
 
             printf("%*sShape \"plymesh\" \"string filename\" \"%s\" ",
@@ -365,11 +367,10 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture alpha\" \"%s\" ", catIndentCount + 8, "",
                        alphaTex.c_str());
             else {
-                int count;
-                const Float *alpha = paramSet.FindFloat("alpha", &count);
-                if (alpha)
+                ArraySlice<Float> alpha = paramSet.FindFloat("alpha");
+                if (!alpha.empty())
                     printf("\n%*s\"float alpha\" %f ", catIndentCount + 8, "",
-                           *alpha);
+                           alpha[0]);
             }
 
             std::string shadowAlphaTex = paramSet.FindTexture("shadowalpha");
@@ -377,11 +378,10 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture shadowalpha\" \"%s\" ",
                        catIndentCount + 8, "", shadowAlphaTex.c_str());
             else {
-                int count;
-                const Float *alpha = paramSet.FindFloat("shadowalpha", &count);
-                if (alpha)
+                ArraySlice<Float> alpha = paramSet.FindFloat("shadowalpha");
+                if (!alpha.empty())
                     printf("\n%*s\"float shadowalpha\" %f ", catIndentCount + 8,
-                           "", *alpha);
+                           "", alpha[0]);
             }
             printf("\n");
         } else
@@ -564,23 +564,22 @@ std::shared_ptr<Medium> MakeMedium(const std::string &name,
     if (name == "homogeneous") {
         m = new HomogeneousMedium(sig_a, sig_s, g);
     } else if (name == "heterogeneous") {
-        int nitems;
-        const Float *data = paramSet.FindFloat("density", &nitems);
-        if (!data) {
+        ArraySlice<Float> data = paramSet.FindFloat("density");
+        if (data.empty()) {
             Error("No \"density\" values provided for heterogeneous medium?");
-            return NULL;
+            return nullptr;
         }
         int nx = paramSet.FindOneInt("nx", 1);
         int ny = paramSet.FindOneInt("ny", 1);
         int nz = paramSet.FindOneInt("nz", 1);
         Point3f p0 = paramSet.FindOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
         Point3f p1 = paramSet.FindOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-        if (nitems != nx * ny * nz) {
+        if (data.size() != nx * ny * nz) {
             Error(
                 "GridDensityMedium has %d density values; expected nx*ny*nz = "
                 "%d",
-                nitems, nx * ny * nz);
-            return NULL;
+                (int)data.size(), nx * ny * nz);
+            return nullptr;
         }
         Transform data2Medium = Translate(Vector3f(p0)) *
                                 Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);

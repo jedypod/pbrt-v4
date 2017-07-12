@@ -36,6 +36,8 @@
 #include "paramset.h"
 #include "stats.h"
 
+using gtl::ArraySlice;
+
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Curves", curveBytes);
@@ -72,14 +74,14 @@ static Point3f EvalBezier(const Point3f cp[4], Float u,
 }
 
 // Curve Method Definitions
-CurveCommon::CurveCommon(const Point3f c[4], Float width0, Float width1,
-                         CurveType type, const Normal3f *norm)
+CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
+                         CurveType type, ArraySlice<Normal3f> norm)
     : type(type) {
     width[0] = width0;
     width[1] = width1;
-    for (int i = 0; i < 4; ++i)
-        cpObj[i] = c[i];
-    if (norm) {
+    CHECK_EQ(c.size(), 4);
+    for (int i = 0; i < 4; ++i) cpObj[i] = c[i];
+    if (norm.size() == 2) {
         n[0] = Normalize(norm[0]);
         n[1] = Normalize(norm[1]);
         normalAngle = std::acos(Clamp(Dot(n[0], n[1]), 0, 1));
@@ -90,8 +92,8 @@ CurveCommon::CurveCommon(const Point3f c[4], Float width0, Float width1,
 
 std::vector<std::shared_ptr<Shape>> CreateCurve(
     const Transform *o2w, const Transform *w2o, bool reverseOrientation,
-    const Point3f c[4], Float w0, Float w1, CurveType type,
-    const Normal3f *norm, int splitDepth) {
+    ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
+    ArraySlice<Normal3f> norm, int splitDepth) {
     std::vector<std::shared_ptr<Shape>> segments;
     std::shared_ptr<CurveCommon> common =
         std::make_shared<CurveCommon>(c, w0, w1, type, norm);
@@ -386,13 +388,12 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(const Transform *o2w,
     Float width0 = params.FindOneFloat("width0", width);
     Float width1 = params.FindOneFloat("width1", width);
 
-    int ncp;
-    const Point3f *cp = params.FindPoint3f("P", &ncp);
-    if (ncp != 4) {
+    ArraySlice<Point3f> cp = params.FindPoint3f("P");
+    if (cp.size() != 4) {
         Error(
             "Must provide 4 control points for \"curve\" primitive. "
             "(Provided %d).",
-            ncp);
+            (int)cp.size());
         return std::vector<std::shared_ptr<Shape>>();
     }
 
@@ -408,25 +409,25 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(const Transform *o2w,
         Error("Unknown curve type \"%s\".  Using \"flat\".", curveType.c_str());
         type = CurveType::Cylinder;
     }
-    int nnorm;
-    const Normal3f *n = params.FindNormal3f("N", &nnorm);
-    if (n != nullptr) {
+
+    ArraySlice<Normal3f> n = params.FindNormal3f("N");
+    if (n.size() > 0) {
         if (type != CurveType::Ribbon) {
             Warning("Curve normals are only used with \"ribbon\" type curves.");
-            n = nullptr;
-        } else if (nnorm != 2) {
+            n = {};
+        } else if (n.size() != 2) {
             Error(
                 "Must provide two normals with \"N\" parameter for ribbon "
                 "curves. "
                 "(Provided %d).",
-                nnorm);
+                (int)n.size());
             return std::vector<std::shared_ptr<Shape>>();
         }
     }
 
     int sd = params.FindOneFloat("splitdepth", 3);
 
-    if (type == CurveType::Ribbon && !n) {
+    if (type == CurveType::Ribbon && n.empty()) {
         Error(
             "Must provide normals \"N\" at curve endpoints with ribbon "
             "curves.");

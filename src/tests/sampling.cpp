@@ -27,9 +27,9 @@ TEST(LowDiscrepancy, ScrambledRadicalInverse) {
 
         std::vector<uint16_t> perm;
         for (int i = 0; i < base; ++i) perm.push_back(base - 1 - i);
-        Shuffle(&perm[0], perm.size(), 1, rng);
+        Shuffle(gtl::MutableArraySlice<uint16_t>(&perm), 1, rng);
 
-        for (const uint32_t index : { 0, 1, 2, 1151, 32351, 4363211, 681122 }) {
+        for (const uint32_t index : {0, 1, 2, 1151, 32351, 4363211, 681122}) {
             // First, compare to the pbrt-v2 implementation.
             {
                 Float val = 0;
@@ -48,7 +48,7 @@ TEST(LowDiscrepancy, ScrambledRadicalInverse) {
                 // trailing at the end of the radical inverse value.
                 val += perm[0] * base / (base - 1.0f) * invBi;
 
-                EXPECT_NEAR(val, ScrambledRadicalInverse(dim, index, &perm[0]),
+                EXPECT_NEAR(val, ScrambledRadicalInverse(dim, index, perm),
                             1e-5);
             }
 
@@ -66,7 +66,7 @@ TEST(LowDiscrepancy, ScrambledRadicalInverse) {
                     val += d_i * invBi;
                     invBi *= invBase;
                 }
-                EXPECT_NEAR(val, ScrambledRadicalInverse(dim, index, &perm[0]),
+                EXPECT_NEAR(val, ScrambledRadicalInverse(dim, index, perm),
                             1e-5);
             }
         }
@@ -85,9 +85,8 @@ TEST(LowDiscrepancy, GeneratorMatrix) {
     for (int a = 0; a < 128; ++a) {
         // Make sure identity generator matrix matches van der Corput
         EXPECT_EQ(a, MultiplyGenerator(C, a));
-        EXPECT_EQ(RadicalInverse(0, a),
-                  ReverseBits32(MultiplyGenerator(C, a)) *
-                  2.3283064365386963e-10f);
+        EXPECT_EQ(RadicalInverse(0, a), ReverseBits32(MultiplyGenerator(C, a)) *
+                                            2.3283064365386963e-10f);
         EXPECT_EQ(RadicalInverse(0, a), SampleGeneratorMatrix(Crev, a));
     }
 
@@ -109,7 +108,7 @@ TEST(LowDiscrepancy, GrayCodeSample) {
     for (int i = 0; i < 32; ++i) C[i] = 1 << i;
 
     std::vector<Float> v(64, (Float)0);
-    GrayCodeSample(C, v.size(), 0, &v[0]);
+    GrayCodeSample(C, 0, &v);
 
     for (int a = 0; a < (int)v.size(); ++a) {
         Float u = MultiplyGenerator(C, a) * 2.3283064365386963e-10f;
@@ -118,11 +117,11 @@ TEST(LowDiscrepancy, GrayCodeSample) {
 }
 
 TEST(LowDiscrepancy, Sobol) {
-  // Check that float and double variants match (as float values).
+    // Check that float and double variants match (as float values).
     for (int i = 0; i < 256; ++i) {
         for (int dim = 0; dim < 100; ++dim) {
-          EXPECT_EQ(SobolSampleFloat(i, dim, 0),
-                    (float)SobolSampleDouble(i, dim, 0));
+            EXPECT_EQ(SobolSampleFloat(i, dim, 0),
+                      (float)SobolSampleDouble(i, dim, 0));
         }
     }
 
@@ -231,8 +230,7 @@ TEST(MaxMinDist, MinDist) {
 TEST(Distribution1D, Discrete) {
     // Carefully chosen distribution so that transitions line up with
     // (inverse) powers of 2.
-    Float func[4] = {0, 1., 0., 3.};
-    Distribution1D dist(func, sizeof(func) / sizeof(func[0]));
+    Distribution1D dist({0.f, 1.f, 0.f, 3.f});
     EXPECT_EQ(4, dist.Count());
 
     EXPECT_EQ(0, dist.DiscretePDF(0));
@@ -280,8 +278,7 @@ TEST(Distribution1D, Discrete) {
 }
 
 TEST(Distribution1D, Continuous) {
-    Float func[] = {1, 1, 2, 4, 8};
-    Distribution1D dist(func, sizeof(func) / sizeof(func[0]));
+    Distribution1D dist({1.f, 1.f, 2.f, 4.f, 8.f});
     EXPECT_EQ(5, dist.Count());
 
     Float pdf;

@@ -47,6 +47,8 @@ namespace pbrt {
 
 STAT_COUNTER("Integrator/Camera rays traced", nCameraRays);
 
+using gtl::ArraySlice;
+
 // Integrator Method Definitions
 Integrator::~Integrator() {}
 
@@ -61,9 +63,9 @@ Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
         // Accumulate contribution of _j_th light to _L_
         const std::shared_ptr<Light> &light = scene.lights[j];
         int nSamples = nLightSamples[j];
-        const Point2f *uLightArray = sampler.Get2DArray(nSamples);
-        const Point2f *uScatteringArray = sampler.Get2DArray(nSamples);
-        if (!uLightArray || !uScatteringArray) {
+        ArraySlice<Point2f> uLightArray = sampler.Get2DArray(nSamples);
+        ArraySlice<Point2f> uScatteringArray = sampler.Get2DArray(nSamples);
+        if (uLightArray.empty() || uScatteringArray.empty()) {
             // Use a single sample for illumination from _light_
             Point2f uLight = sampler.Get2D();
             Point2f uScattering = sampler.Get2D();
@@ -220,8 +222,7 @@ std::unique_ptr<Distribution1D> ComputeLightPowerDistribution(
     std::vector<Float> lightPower;
     for (const auto &light : scene.lights)
         lightPower.push_back(light->Power().y());
-    return std::unique_ptr<Distribution1D>(
-        new Distribution1D(&lightPower[0], lightPower.size()));
+    return std::unique_ptr<Distribution1D>(new Distribution1D(lightPower));
 }
 
 // SamplerIntegrator Method Definitions

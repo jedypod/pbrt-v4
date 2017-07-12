@@ -41,6 +41,8 @@
 // shapes/triangle.h*
 #include "shape.h"
 #include "stats.h"
+#include "ext/google/array_slice.h"
+
 #include <map>
 
 namespace pbrt {
@@ -50,19 +52,20 @@ STAT_MEMORY_COUNTER("Memory/Triangle meshes", triMeshBytes);
 // Triangle Declarations
 struct TriangleMesh {
     // TriangleMesh Public Methods
-    TriangleMesh(const Transform &ObjectToWorld, int nTriangles,
-                 const int *vertexIndices, int nVertices, const Point3f *P,
-                 const Vector3f *S, const Normal3f *N, const Point2f *uv,
+    TriangleMesh(const Transform &ObjectToWorld,
+                 gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
+                 gtl::ArraySlice<Vector3f> S, gtl::ArraySlice<Normal3f> N,
+                 gtl::ArraySlice<Point2f> uv,
                  const std::shared_ptr<Texture<Float>> &alphaMask,
                  const std::shared_ptr<Texture<Float>> &shadowAlphaMask);
 
     // TriangleMesh Data
     const int nTriangles, nVertices;
     std::vector<int> vertexIndices;
-    std::unique_ptr<Point3f[]> p;
-    std::unique_ptr<Normal3f[]> n;
-    std::unique_ptr<Vector3f[]> s;
-    std::unique_ptr<Point2f[]> uv;
+    std::vector<Point3f> p;
+    std::vector<Normal3f> n;
+    std::vector<Vector3f> s;
+    std::vector<Point2f> uv;
     std::shared_ptr<Texture<Float>> alphaMask, shadowAlphaMask;
 };
 
@@ -93,7 +96,7 @@ class Triangle : public Shape {
   private:
     // Triangle Private Methods
     void GetUVs(Point2f uv[3]) const {
-        if (mesh->uv) {
+        if (mesh->uv.size() > 0) {
             uv[0] = mesh->uv[v[0]];
             uv[1] = mesh->uv[v[1]];
             uv[2] = mesh->uv[v[2]];
@@ -111,8 +114,9 @@ class Triangle : public Shape {
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform *o2w, const Transform *w2o, bool reverseOrientation,
-    int nTriangles, const int *vertexIndices, int nVertices, const Point3f *p,
-    const Vector3f *s, const Normal3f *n, const Point2f *uv,
+    gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
+    gtl::ArraySlice<Vector3f> s, gtl::ArraySlice<Normal3f> n,
+    gtl::ArraySlice<Point2f> uv,
     const std::shared_ptr<Texture<Float>> &alphaTexture,
     const std::shared_ptr<Texture<Float>> &shadowAlphaTexture);
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
@@ -121,9 +125,10 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures =
         nullptr);
 
-bool WritePlyFile(const std::string &filename, int nTriangles,
-                  const int *vertexIndices, int nVertices, const Point3f *P,
-                  const Vector3f *S, const Normal3f *N, const Point2f *UV);
+bool WritePlyFile(const std::string &filename,
+                  gtl::ArraySlice<int> vertexIndices,
+                  gtl::ArraySlice<Point3f> P, gtl::ArraySlice<Vector3f> S,
+                  gtl::ArraySlice<Normal3f> N, gtl::ArraySlice<Point2f> UV);
 
 }  // namespace pbrt
 

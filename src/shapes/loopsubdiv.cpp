@@ -35,6 +35,7 @@
 #include "shapes/loopsubdiv.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
+#include "ext/google/array_slice.h"
 #include <set>
 #include <map>
 
@@ -42,6 +43,7 @@ namespace pbrt {
 
 struct SDFace;
 struct SDVertex;
+using gtl::ArraySlice;
 
 // LoopSubdiv Macros
 #define NEXT(i) (((i) + 1) % 3)
@@ -148,23 +150,23 @@ inline Float loopGamma(int valence) {
 // LoopSubdiv Function Definitions
 static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     const Transform *ObjectToWorld, const Transform *WorldToObject,
-    bool reverseOrientation, int nLevels, int nIndices,
-    const int *vertexIndices, int nVertices, const Point3f *p) {
+    bool reverseOrientation, int nLevels, ArraySlice<int> vertexIndices,
+    ArraySlice<Point3f> p) {
     std::vector<SDVertex *> vertices;
     std::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
-    std::unique_ptr<SDVertex[]> verts(new SDVertex[nVertices]);
-    for (int i = 0; i < nVertices; ++i) {
+    std::unique_ptr<SDVertex[]> verts(new SDVertex[p.size()]);
+    for (int i = 0; i < p.size(); ++i) {
         verts[i] = SDVertex(p[i]);
         vertices.push_back(&verts[i]);
     }
-    int nFaces = nIndices / 3;
+    size_t nFaces = vertexIndices.size() / 3;
     std::unique_ptr<SDFace[]> fs(new SDFace[nFaces]);
     for (int i = 0; i < nFaces; ++i) faces.push_back(&fs[i]);
 
     // Set face to vertex pointers
-    const int *vp = vertexIndices;
-    for (int i = 0; i < nFaces; ++i, vp += 3) {
+    const int *vp = vertexIndices.data();
+    for (size_t i = 0; i < nFaces; ++i, vp += 3) {
         SDFace *f = faces[i];
         for (int j = 0; j < 3; ++j) {
             SDVertex *v = vertices[vp[j]];
@@ -197,7 +199,7 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     }
 
     // Finish vertex initialization
-    for (int i = 0; i < nVertices; ++i) {
+    for (size_t i = 0; i < p.size(); ++i) {
         SDVertex *v = vertices[i];
         SDFace *f = v->startFace;
         do {
@@ -331,7 +333,7 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     }
 
     // Push vertices to limit surface
-    std::unique_ptr<Point3f[]> pLimit(new Point3f[v.size()]);
+    std::vector<Point3f> pLimit(v.size());
     for (size_t i = 0; i < v.size(); ++i) {
         if (v[i]->boundary)
             pLimit[i] = weightBoundary(v[i], 1.f / 5.f);
@@ -381,8 +383,8 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     // Create triangle mesh from subdivision mesh
     {
         size_t ntris = f.size();
-        std::unique_ptr<int[]> verts(new int[3 * ntris]);
-        int *vp = verts.get();
+        std::vector<int> verts(3 * ntris);
+        int *vp = verts.data();
         size_t totVerts = v.size();
         std::map<SDVertex *, int> usedVerts;
         for (size_t i = 0; i < totVerts; ++i) usedVerts[v[i]] = i;
@@ -393,9 +395,8 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
             }
         }
         return CreateTriangleMesh(ObjectToWorld, WorldToObject,
-                                  reverseOrientation, ntris, verts.get(),
-                                  totVerts, pLimit.get(), nullptr, &Ns[0],
-                                  nullptr, nullptr, nullptr);
+                                  reverseOrientation, verts, pLimit, {}, Ns, {},
+                                  nullptr, nullptr);
     }
 }
 
@@ -405,22 +406,21 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(const Transform *o2w,
                                                      const ParamSet &params) {
     int nLevels = params.FindOneInt("levels",
                                     params.FindOneInt("nlevels", 3));
-    int nps, nIndices;
-    const int *vertexIndices = params.FindInt("indices", &nIndices);
-    const Point3f *P = params.FindPoint3f("P", &nps);
-    if (!vertexIndices) {
+    ArraySlice<int> vertexIndices = params.FindInt("indices");
+    ArraySlice<Point3f> P = params.FindPoint3f("P");
+    if (vertexIndices.empty()) {
         Error("Vertex indices \"indices\" not provided for LoopSubdiv shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    if (!P) {
+    if (P.empty()) {
         Error("Vertex positions \"P\" not provided for LoopSubdiv shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
     // don't actually use this for now...
     std::string scheme = params.FindOneString("scheme", "loop");
-    return LoopSubdivide(o2w, w2o, reverseOrientation, nLevels, nIndices,
-                         vertexIndices, nps, P);
+    return LoopSubdivide(o2w, w2o, reverseOrientation, nLevels, vertexIndices,
+                         P);
 }
 
 static Point3f weightOneRing(SDVertex *vert, Float beta) {

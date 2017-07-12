@@ -34,6 +34,9 @@
 // core/lowdiscrepancy.cpp*
 #include "lowdiscrepancy.h"
 
+using gtl::ArraySlice;
+using gtl::MutableArraySlice;
+
 namespace pbrt {
 
 // Low Discrepancy Data Definitions
@@ -414,7 +417,8 @@ __declspec(noinline)
 __attribute__((noinline))
 #endif
 static Float
-ScrambledRadicalInverseSpecialized(const uint16_t *perm, uint64_t a) {
+ScrambledRadicalInverseSpecialized(ArraySlice<uint16_t> perm, uint64_t a) {
+    CHECK_EQ(perm.size(), base);
     const Float invBase = (Float)1 / (Float)base;
     uint64_t reversedDigits = 0;
     Float invBaseN = 1;
@@ -2507,13 +2511,14 @@ std::vector<uint16_t> ComputeRadicalInversePermutations(RNG &rng) {
     for (int i = 0; i < PrimeTableSize; ++i) {
         // Generate random permutation for $i$th prime base
         for (int j = 0; j < Primes[i]; ++j) p[j] = j;
-        Shuffle(p, Primes[i], 1, rng);
+        Shuffle(MutableArraySlice<uint16_t>(p, Primes[i]), 1, rng);
         p += Primes[i];
     }
     return perms;
 }
 
-Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const uint16_t *perm) {
+Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
+                              ArraySlice<uint16_t> perm) {
     switch (baseIndex) {
     case 0:
         return ScrambledRadicalInverseSpecialized<2>(perm, a);

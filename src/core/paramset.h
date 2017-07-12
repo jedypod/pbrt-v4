@@ -44,6 +44,7 @@
 #include "geometry.h"
 #include "texture.h"
 #include "spectrum.h"
+#include "ext/google/array_slice.h"
 #include <stdio.h>
 #include <map>
 
@@ -105,16 +106,16 @@ class ParamSet {
     std::string FindOneFilename(const std::string &,
                                 const std::string &d) const;
     std::string FindTexture(const std::string &) const;
-    const Float *FindFloat(const std::string &, int *n) const;
-    const int *FindInt(const std::string &, int *nValues) const;
-    const bool *FindBool(const std::string &, int *nValues) const;
-    const Point2f *FindPoint2f(const std::string &, int *nValues) const;
-    const Vector2f *FindVector2f(const std::string &, int *nValues) const;
-    const Point3f *FindPoint3f(const std::string &, int *nValues) const;
-    const Vector3f *FindVector3f(const std::string &, int *nValues) const;
-    const Normal3f *FindNormal3f(const std::string &, int *nValues) const;
-    const Spectrum *FindSpectrum(const std::string &, int *nValues) const;
-    const std::string *FindString(const std::string &, int *nValues) const;
+    gtl::ArraySlice<Float> FindFloat(const std::string &) const;
+    gtl::ArraySlice<int> FindInt(const std::string &) const;
+    gtl::ArraySlice<bool> FindBool(const std::string &) const;
+    gtl::ArraySlice<Point2f> FindPoint2f(const std::string &) const;
+    gtl::ArraySlice<Vector2f> FindVector2f(const std::string &) const;
+    gtl::ArraySlice<Point3f> FindPoint3f(const std::string &) const;
+    gtl::ArraySlice<Vector3f> FindVector3f(const std::string &) const;
+    gtl::ArraySlice<Normal3f> FindNormal3f(const std::string &) const;
+    gtl::ArraySlice<Spectrum> FindSpectrum(const std::string &) const;
+    gtl::ArraySlice<std::string> FindString(const std::string &) const;
     void ReportUnused() const;
     void Clear();
     std::string ToString() const;
@@ -140,19 +141,19 @@ template <typename T>
 struct ParamSetItem {
     // ParamSetItem Public Methods
     ParamSetItem(const std::string &name, std::unique_ptr<T[]> val,
-                 int nValues = 1);
+                 size_t nValues = 1);
 
     // ParamSetItem Data
     const std::string name;
     const std::unique_ptr<T[]> values;
-    const int nValues;
+    const size_t nValues;
     mutable bool lookedUp = false;
 };
 
 // ParamSetItem Methods
 template <typename T>
 ParamSetItem<T>::ParamSetItem(const std::string &name, std::unique_ptr<T[]> v,
-                              int nValues)
+                              size_t nValues)
     : name(name), values(std::move(v)), nValues(nValues) {}
 
 // TextureParams Declarations

@@ -42,29 +42,33 @@
 #include "pbrt.h"
 #include "geometry.h"
 #include "rng.h"
+#include "ext/google/array_slice.h"
 #include <algorithm>
 
 namespace pbrt {
 
 // Sampling Declarations
-void StratifiedSample1D(Float *samples, int nsamples, RNG &rng,
+void StratifiedSample1D(gtl::MutableArraySlice<Float> samples, RNG &rng,
                         bool jitter = true);
-void StratifiedSample2D(Point2f *samples, int nx, int ny, RNG &rng,
-                        bool jitter = true);
-void LatinHypercube(Float *samples, int nSamples, int nDim, RNG &rng);
+void StratifiedSample2D(gtl::MutableArraySlice<Point2f> samples, int nx, int ny,
+                        RNG &rng, bool jitter = true);
+void LatinHypercube(gtl::MutableArraySlice<Float> samples, int nDim, RNG &rng);
 struct Distribution1D {
     // Distribution1D Public Methods
-    Distribution1D(const Float *f, int n) : func(f, f + n), cdf(n + 1) {
+    Distribution1D(gtl::ArraySlice<Float> f)
+        : func(f.begin(), f.end()), cdf(f.size() + 1) {
         // Compute integral of step function at $x_i$
         cdf[0] = 0;
-        for (int i = 1; i < n + 1; ++i) cdf[i] = cdf[i - 1] + func[i - 1] / n;
+        size_t n = f.size();
+        for (size_t i = 1; i < n + 1; ++i)
+            cdf[i] = cdf[i - 1] + func[i - 1] / n;
 
         // Transform step function integral into CDF
         funcInt = cdf[n];
         if (funcInt == 0) {
-            for (int i = 1; i < n + 1; ++i) cdf[i] = Float(i) / Float(n);
+            for (size_t i = 1; i < n + 1; ++i) cdf[i] = Float(i) / Float(n);
         } else {
-            for (int i = 1; i < n + 1; ++i) cdf[i] /= funcInt;
+            for (size_t i = 1; i < n + 1; ++i) cdf[i] /= funcInt;
         }
     }
     int Count() const { return func.size(); }
@@ -123,7 +127,7 @@ Point2f UniformSampleTriangle(const Point2f &u);
 class Distribution2D {
   public:
     // Distribution2D Public Methods
-    Distribution2D(const Float *data, int nu, int nv);
+    Distribution2D(gtl::ArraySlice<Float> data, int nu, int nv);
     Point2f SampleContinuous(const Point2f &u, Float *pdf) const {
         Float pdfs[2];
         int v;
@@ -148,11 +152,13 @@ class Distribution2D {
 
 // Sampling Inline Functions
 template <typename T>
-void Shuffle(T *samp, int count, int nDimensions, RNG &rng) {
-    for (int i = 0; i < count; ++i) {
-        int other = i + rng.UniformUInt32(count - i);
+void Shuffle(gtl::MutableArraySlice<T> samples, int nDimensions, RNG &rng) {
+    CHECK_EQ(0, (samples.size() % nDimensions));
+    size_t nSamples = samples.size() / nDimensions;
+    for (size_t i = 0; i < nSamples; ++i) {
+        size_t other = i + rng.UniformUInt32(nSamples - i);
         for (int j = 0; j < nDimensions; ++j)
-            std::swap(samp[nDimensions * i + j], samp[nDimensions * other + j]);
+            std::swap(samples[nDimensions * i + j], samples[nDimensions * other + j]);
     }
 }
 

@@ -35,52 +35,60 @@
 #include "spectrum.h"
 #include <algorithm>
 
+using gtl::ArraySlice;
+using gtl::MutableArraySlice;
+
 namespace pbrt {
 
 // Spectrum Method Definitions
-bool SpectrumSamplesSorted(const Float *lambda, const Float *vals, int n) {
-    for (int i = 0; i < n - 1; ++i)
+bool SpectrumSamplesSorted(ArraySlice<Float> lambda, ArraySlice<Float> vals) {
+    CHECK_EQ(lambda.size(), vals.size());
+    for (size_t i = 0; i < lambda.size() - 1; ++i)
         if (lambda[i] > lambda[i + 1]) return false;
     return true;
 }
 
-void SortSpectrumSamples(Float *lambda, Float *vals, int n) {
+void SortSpectrumSamples(MutableArraySlice<Float> lambda,
+                         MutableArraySlice<Float> vals) {
+    CHECK_EQ(lambda.size(), vals.size());
     std::vector<std::pair<Float, Float>> sortVec;
-    sortVec.reserve(n);
-    for (int i = 0; i < n; ++i)
+    sortVec.reserve(lambda.size());
+    for (size_t i = 0; i < lambda.size(); ++i)
         sortVec.push_back(std::make_pair(lambda[i], vals[i]));
     std::sort(sortVec.begin(), sortVec.end());
-    for (int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < lambda.size(); ++i) {
         lambda[i] = sortVec[i].first;
         vals[i] = sortVec[i].second;
     }
 }
 
-Float AverageSpectrumSamples(const Float *lambda, const Float *vals, int n,
+Float AverageSpectrumSamples(ArraySlice<Float> lambda, ArraySlice<Float> vals,
                              Float lambdaStart, Float lambdaEnd) {
-    for (int i = 0; i < n - 1; ++i) CHECK_GT(lambda[i + 1], lambda[i]);
+    CHECK_EQ(lambda.size(), vals.size());
+    for (int i = 0; i < lambda.size() - 1; ++i) CHECK_GT(lambda[i + 1], lambda[i]);
     CHECK_LT(lambdaStart, lambdaEnd);
+
     // Handle cases with out-of-bounds range or single sample only
-    if (lambdaEnd <= lambda[0]) return vals[0];
-    if (lambdaStart >= lambda[n - 1]) return vals[n - 1];
-    if (n == 1) return vals[0];
+    if (lambdaEnd <= lambda.front()) return vals.front();
+    if (lambdaStart >= lambda.back()) return vals.back();
+    if (lambda.size() == 1) return vals[0];
     Float sum = 0;
     // Add contributions of constant segments before/after samples
     if (lambdaStart < lambda[0]) sum += vals[0] * (lambda[0] - lambdaStart);
-    if (lambdaEnd > lambda[n - 1])
-        sum += vals[n - 1] * (lambdaEnd - lambda[n - 1]);
+    if (lambdaEnd > lambda.back())
+        sum += vals.back() * (lambdaEnd - lambda.back());
 
     // Advance to first relevant wavelength segment
-    int i = 0;
+    size_t i = 0;
     while (lambdaStart > lambda[i + 1]) ++i;
-    CHECK_LT(i + 1, n);
+    CHECK_LT(i + 1, lambda.size());
 
     // Loop over wavelength sample segments and add contributions
-    auto interp = [lambda, vals](Float w, int i) {
+    auto interp = [lambda, vals](Float w, size_t i) {
         return Lerp((w - lambda[i]) / (lambda[i + 1] - lambda[i]), vals[i],
                     vals[i + 1]);
     };
-    for (; i + 1 < n && lambdaEnd >= lambda[i]; ++i) {
+    for (; i + 1 < lambda.size() && lambdaEnd >= lambda[i]; ++i) {
         Float segLambdaStart = std::max(lambdaStart, lambda[i]);
         Float segLambdaEnd = std::min(lambdaEnd, lambda[i + 1]);
         sum += 0.5 * (interp(segLambdaStart, i) + interp(segLambdaEnd, i)) *
@@ -176,12 +184,15 @@ SampledSpectrum::SampledSpectrum(const RGBSpectrum &r, SpectrumType t) {
     *this = SampledSpectrum::FromRGB(rgb, t);
 }
 
-Float InterpolateSpectrumSamples(const Float *lambda, const Float *vals, int n,
-                                 Float l) {
-    for (int i = 0; i < n - 1; ++i) CHECK_GT(lambda[i + 1], lambda[i]);
-    if (l <= lambda[0]) return vals[0];
-    if (l >= lambda[n - 1]) return vals[n - 1];
-    int offset = FindInterval(n, [&](int index) { return lambda[index] <= l; });
+Float InterpolateSpectrumSamples(ArraySlice<Float> lambda,
+                                 ArraySlice<Float> vals, Float l) {
+    CHECK_EQ(lambda.size(), vals.size());
+    for (int i = 0; i < lambda.size() - 1; ++i)
+        CHECK_GT(lambda[i + 1], lambda[i]);
+    if (l <= lambda.front()) return vals.front();
+    if (l >= lambda.back()) return vals.back();
+    int offset = FindInterval(lambda.size(),
+                              [&](int index) { return lambda[index] <= l; });
     CHECK(l >= lambda[offset] && l <= lambda[offset + 1]);
     Float t = (l - lambda[offset]) / (lambda[offset + 1] - lambda[offset]);
     return Lerp(t, vals[offset], vals[offset + 1]);
@@ -936,15 +947,16 @@ const Float CIE_lambda[nCIESamples] = {
     795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805, 806, 807, 808, 809,
     810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 820, 821, 822, 823, 824,
     825, 826, 827, 828, 829, 830};
-void Blackbody(const Float *lambda, int n, Float T, Float *Le) {
+void Blackbody(ArraySlice<Float> lambda, Float T, MutableArraySlice<Float> Le) {
+    CHECK_GE(Le.size(), lambda.size());
     if (T <= 0) {
-        for (int i = 0; i < n; ++i) Le[i] = 0.f;
+        for (size_t i = 0; i < lambda.size(); ++i) Le[i] = 0.f;
         return;
     }
     const Float c = 299792458;
     const Float h = 6.62606957e-34;
     const Float kb = 1.3806488e-23;
-    for (int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < lambda.size(); ++i) {
         // Compute emitted radiance for blackbody at wavelength _lambda[i]_
         Float l = lambda[i] * 1e-9;
         Float lambda5 = (l * l) * (l * l) * l;
@@ -954,13 +966,15 @@ void Blackbody(const Float *lambda, int n, Float T, Float *Le) {
     }
 }
 
-void BlackbodyNormalized(const Float *lambda, int n, Float T, Float *Le) {
-    Blackbody(lambda, n, T, Le);
+void BlackbodyNormalized(gtl::ArraySlice<Float> lambda, Float T,
+                         gtl::MutableArraySlice<Float> Le) {
+    CHECK_LE(lambda.size(), Le.size());
+    Blackbody(lambda, T, Le);
     // Normalize _Le_ values based on maximum blackbody radiance
-    Float lambdaMax = 2.8977721e-3 / T * 1e9;
-    Float maxL;
-    Blackbody(&lambdaMax, 1, T, &maxL);
-    for (int i = 0; i < n; ++i) Le[i] /= maxL;
+    Float lambdaMax[1] = {Float(2.8977721e-3 / T * 1e9)};
+    Float maxL[1];
+    Blackbody(lambdaMax, T, maxL);
+    for (int i = 0; i < Le.size(); ++i) Le[i] /= maxL[0];
 }
 
 // Spectral Data Definitions
@@ -1288,8 +1302,9 @@ void ResampleLinearSpectrum(const Float *lambdaIn, const Float *vIn, int nIn,
         } else {
             // Upsampling: use a box filter and average all values in the
             // input spectrum from lambda +/- delta / 2.
-            return AverageSpectrumSamples(
-                lambdaIn, vIn, nIn, lambda - delta / 2, lambda + delta / 2);
+            return AverageSpectrumSamples(ArraySlice<Float>(lambdaIn, nIn),
+                                          ArraySlice<Float>(vIn, nIn),
+                                          lambda - delta / 2, lambda + delta / 2);
         }
     };
 

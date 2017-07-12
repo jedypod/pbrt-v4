@@ -43,6 +43,7 @@
 #include "rng.h"
 #include "sampling.h"
 #include "sobolmatrices.h"
+#include "ext/google/array_slice.h"
 
 namespace pbrt {
 
@@ -51,10 +52,11 @@ Float RadicalInverse(int baseIndex, uint64_t a);
 std::vector<uint16_t> ComputeRadicalInversePermutations(RNG &rng);
 static constexpr int PrimeTableSize = 1000;
 extern const int Primes[PrimeTableSize];
-Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const uint16_t *perm);
+Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
+                              gtl::ArraySlice<uint16_t> perm);
 extern const int PrimeSums[PrimeTableSize];
 inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
-                    Point2f *samples, RNG &rng);
+                    gtl::MutableArraySlice<Point2f> samples, RNG &rng);
 extern uint32_t CMaxMinDist[17][32];
 inline uint64_t SobolIntervalToIndex(const uint32_t log2Resolution,
                                      uint64_t sampleNum, const Point2i &p);
@@ -90,14 +92,14 @@ inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
     return index;
 }
 
-inline uint32_t MultiplyGenerator(const uint32_t *C, uint32_t a) {
+inline uint32_t MultiplyGenerator(gtl::ArraySlice<uint32_t> C, uint32_t a) {
     uint32_t v = 0;
     for (int i = 0; a != 0; ++i, a >>= 1)
         if (a & 1) v ^= C[i];
     return v;
 }
 
-inline Float SampleGeneratorMatrix(const uint32_t *C, uint32_t a,
+inline Float SampleGeneratorMatrix(gtl::ArraySlice<uint32_t> C, uint32_t a,
                                    uint32_t scramble = 0) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
     return std::min((MultiplyGenerator(C, a) ^ scramble) * Float(2.3283064365386963e-10),
@@ -110,10 +112,10 @@ inline Float SampleGeneratorMatrix(const uint32_t *C, uint32_t a,
 
 inline uint32_t GrayCode(uint32_t v) { return (v >> 1) ^ v; }
 
-inline void GrayCodeSample(const uint32_t *C, uint32_t n, uint32_t scramble,
-                           Float *p) {
+inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C, uint32_t scramble,
+                           gtl::MutableArraySlice<Float> p) {
     uint32_t v = scramble;
-    for (uint32_t i = 0; i < n; ++i) {
+    for (uint32_t i = 0; i < p.size(); ++i) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
         p[i] = std::min(v * Float(2.3283064365386963e-10) /* 1/2^32 */,
                         OneMinusEpsilon);
@@ -125,10 +127,12 @@ inline void GrayCodeSample(const uint32_t *C, uint32_t n, uint32_t scramble,
     }
 }
 
-inline void GrayCodeSample(const uint32_t *C0, const uint32_t *C1, uint32_t n,
-                           const Point2i &scramble, Point2f *p) {
+inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C0,
+                           gtl::ArraySlice<uint32_t> C1,
+                           const Point2i &scramble,
+                           gtl::MutableArraySlice<Point2f> p) {
     uint32_t v[2] = {(uint32_t)scramble.x, (uint32_t)scramble.y};
-    for (uint32_t i = 0; i < n; ++i) {
+    for (uint32_t i = 0; i < p.size(); ++i) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
         p[i].x = std::min(v[0] * Float(2.3283064365386963e-10), OneMinusEpsilon);
         p[i].y = std::min(v[1] * Float(2.3283064365386963e-10), OneMinusEpsilon);
@@ -142,11 +146,12 @@ inline void GrayCodeSample(const uint32_t *C0, const uint32_t *C1, uint32_t n,
 }
 
 inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
-                         Float *samples, RNG &rng) {
+                         gtl::MutableArraySlice<Float> samples, RNG &rng) {
     uint32_t scramble = rng.UniformUInt32();
     // Define _CVanDerCorput_ Generator Matrix
     const uint32_t CVanDerCorput[32] = {
       // clang-format off
+        // clang-format off
       0b10000000000000000000000000000000,
       0b1000000000000000000000000000000,
       0b100000000000000000000000000000,
@@ -180,19 +185,20 @@ inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
       0b100,
       0b10,
       0b1,
-      // clang-format on
     };
-    int totalSamples = nSamplesPerPixelSample * nPixelSamples;
-    GrayCodeSample(CVanDerCorput, totalSamples, scramble, samples);
+    CHECK_EQ(samples.size(), nSamplesPerPixelSample * nPixelSamples);
+    GrayCodeSample(CVanDerCorput, scramble, samples);
     // Randomly shuffle 1D sample points
-    for (int i = 0; i < nPixelSamples; ++i)
-        Shuffle(samples + i * nSamplesPerPixelSample, nSamplesPerPixelSample, 1,
-                rng);
-    Shuffle(samples, nPixelSamples, nSamplesPerPixelSample, rng);
+    for (int i = 0; i < nPixelSamples; ++i) {
+        gtl::MutableArraySlice<Float> pixelSamples(
+            samples, i * nSamplesPerPixelSample, nSamplesPerPixelSample);
+        Shuffle(pixelSamples, 1, rng);
+    }
+    Shuffle(samples, nSamplesPerPixelSample, rng);
 }
 
 inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
-                    Point2f *samples, RNG &rng) {
+                    gtl::MutableArraySlice<Point2f> samples, RNG &rng) {
     Point2i scramble;
     scramble[0] = rng.UniformUInt32();
     scramble[1] = rng.UniformUInt32();
@@ -209,12 +215,14 @@ inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
          0xa000a000, 0xf000f000, 0x88008800, 0xcc00cc00, 0xaa00aa00, 0xff00ff00,
          0x80808080, 0xc0c0c0c0, 0xa0a0a0a0, 0xf0f0f0f0, 0x88888888, 0xcccccccc,
          0xaaaaaaaa, 0xffffffff}};
-    GrayCodeSample(CSobol[0], CSobol[1], nSamplesPerPixelSample * nPixelSamples,
-                   scramble, samples);
-    for (int i = 0; i < nPixelSamples; ++i)
-        Shuffle(samples + i * nSamplesPerPixelSample, nSamplesPerPixelSample, 1,
-                rng);
-    Shuffle(samples, nPixelSamples, nSamplesPerPixelSample, rng);
+    CHECK_EQ(samples.size(), nSamplesPerPixelSample * nPixelSamples);
+    GrayCodeSample(CSobol[0], CSobol[1], scramble, samples);
+    for (int i = 0; i < nPixelSamples; ++i) {
+        gtl::MutableArraySlice<Point2f> slice(
+            samples, i * nSamplesPerPixelSample, nSamplesPerPixelSample);
+        Shuffle(slice, 1, rng);
+    }
+    Shuffle(samples, nSamplesPerPixelSample, rng);
 }
 
 inline uint64_t SobolIntervalToIndex(const uint32_t m, uint64_t frame,

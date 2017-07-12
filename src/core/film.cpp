@@ -130,8 +130,9 @@ void Film::MergeFilmTile(std::unique_ptr<FilmTile> tile) {
     }
 }
 
-void Film::SetImage(const Spectrum *img) const {
+void Film::SetImage(gtl::ArraySlice<Spectrum> img) const {
     int nPixels = croppedPixelBounds.Area();
+    CHECK_EQ(img.size(), nPixels);
     for (int i = 0; i < nPixels; ++i) {
         Pixel &p = pixels[i];
         img[i].ToXYZ(p.xyz);
@@ -168,6 +169,7 @@ void Film::AddSplat(const Point2f &p, Spectrum v) {
 
 void Film::WriteImage(Float splatScale) {
     // Convert image to RGB and compute final pixel values
+    std::vector<Float> rgb(3 * croppedPixelBounds.Area());
     LOG(INFO) <<
         "Converting image to RGB and computing final weighted pixel values";
     Image rgb32(PixelFormat::RGB32, Point2i(croppedPixelBounds.Diagonal()));
@@ -222,15 +224,15 @@ Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
     if (PbrtOptions.quickRender) xres = std::max(1, xres / 4);
     if (PbrtOptions.quickRender) yres = std::max(1, yres / 4);
     Bounds2f crop(Point2f(0, 0), Point2f(1, 1));
-    int cwi;
-    const Float *cr = params.FindFloat("cropwindow", &cwi);
-    if (cr && cwi == 4) {
+    gtl::ArraySlice<Float> cr = params.FindFloat("cropwindow");
+    if (!cr.empty() && cr.size() == 4) {
         crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
         crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
         crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
         crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
-    } else if (cr)
-        Error("%d values supplied for \"cropwindow\". Expected 4.", cwi);
+    } else if (!cr.empty())
+        Error("%d values supplied for \"cropwindow\". Expected 4.",
+              (int)cr.size());
 
     Float scale = params.FindOneFloat("scale", 1.);
     Float diagonal = params.FindOneFloat("diagonal", 35.);

@@ -36,6 +36,8 @@
 #include "shapes/triangle.h"
 #include "paramset.h"
 #include "texture.h"
+#include "ext/google/array_slice.h"
+using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -157,18 +159,18 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
         Error("Must provide u order \"uorder\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    int nuknots, nvknots;
-    const Float *uknots = params.FindFloat("uknots", &nuknots);
-    if (!uknots) {
+
+    ArraySlice<Float> uknots = params.FindFloat("uknots");
+    if (uknots.empty()) {
         Error("Must provide u knot vector \"uknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    if (nuknots != nu + uorder) {
+    if (uknots.size() != nu + uorder) {
         Error(
             "Number of knots in u knot vector %d doesn't match sum of "
             "number of u control points %d and u order %d.",
-            nuknots, nu, uorder);
+            (int)uknots.size(), nu, uorder);
         return std::vector<std::shared_ptr<Shape>>();
     }
 
@@ -187,56 +189,54 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    const Float *vknots = params.FindFloat("vknots", &nvknots);
-    if (!vknots) {
+    ArraySlice<Float> vknots = params.FindFloat("vknots");
+    if (vknots.empty()) {
         Error("Must provide v knot vector \"vknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    if (nvknots != nv + vorder) {
+    if (vknots.size() != nv + vorder) {
         Error(
             "Number of knots in v knot vector %d doesn't match sum of "
             "number of v control points %d and v order %d.",
-            nvknots, nv, vorder);
+            (int)vknots.size(), nv, vorder);
         return std::vector<std::shared_ptr<Shape>>();
     }
 
     Float v0 = params.FindOneFloat("v0", vknots[vorder - 1]);
     Float v1 = params.FindOneFloat("v1", vknots[nv]);
 
-    bool isHomogeneous = false;
-    int npts;
-    const Float *P = (const Float *)params.FindPoint3f("P", &npts);
-    if (!P) {
-        P = params.FindFloat("Pw", &npts);
-        if (!P) {
+    ArraySlice<Point3f> P = params.FindPoint3f("P");
+    ArraySlice<Float> Pw;
+    if (P.empty()) {
+        Pw = params.FindFloat("Pw");
+        if (Pw.empty()) {
             Error(
                 "Must provide control points via \"P\" or \"Pw\" parameter to "
                 "NURBS shape.");
             return std::vector<std::shared_ptr<Shape>>();
         }
-        if ((npts % 4) != 0) {
+        if ((Pw.size() % 4) != 0) {
             Error(
                 "Number of \"Pw\" control points provided to NURBS shape must "
                 "be "
                 "multiple of four");
             return std::vector<std::shared_ptr<Shape>>();
         }
-        npts /= 4;
-        isHomogeneous = true;
     }
-    if (npts != nu * nv) {
+    size_t nPts = P.size() > 0 ? P.size() : Pw.size() / 4;
+    if (nPts != nu * nv) {
         Error("NURBS shape was expecting %dx%d=%d control points, was given %d",
-              nu, nv, nu * nv, npts);
+              nu, nv, nu * nv, (int)nPts);
         return std::vector<std::shared_ptr<Shape>>();
     }
 
     // Compute NURBS dicing rates
     int diceu = 30, dicev = 30;
-    std::unique_ptr<Float[]> ueval(new Float[diceu]);
-    std::unique_ptr<Float[]> veval(new Float[dicev]);
-    std::unique_ptr<Point3f[]> evalPs(new Point3f[diceu * dicev]);
-    std::unique_ptr<Normal3f[]> evalNs(new Normal3f[diceu * dicev]);
+    std::vector<Float> ueval(diceu);
+    std::vector<Float> veval(dicev);
+    std::vector<Point3f> evalPs(diceu * dicev);
+    std::vector<Normal3f> evalNs(diceu * dicev);
     int i;
     for (i = 0; i < diceu; ++i)
         ueval[i] = Lerp((float)i / (float)(diceu - 1), u0, u1);
@@ -244,25 +244,25 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
         veval[i] = Lerp((float)i / (float)(dicev - 1), v0, v1);
 
     // Evaluate NURBS over grid of points
-    memset(evalPs.get(), 0, diceu * dicev * sizeof(Point3f));
-    memset(evalNs.get(), 0, diceu * dicev * sizeof(Point3f));
-    std::unique_ptr<Point2f[]> uvs(new Point2f[diceu * dicev]);
+    memset(evalPs.data(), 0, diceu * dicev * sizeof(Point3f));
+    memset(evalNs.data(), 0, diceu * dicev * sizeof(Point3f));
+    std::vector<Point2f> uvs(diceu * dicev);
 
     // Turn NURBS into triangles
-    std::unique_ptr<Homogeneous3[]> Pw(new Homogeneous3[nu * nv]);
-    if (isHomogeneous) {
+    std::vector<Homogeneous3> PwEval(nu * nv);
+    if (Pw.size() > 0) {
         for (int i = 0; i < nu * nv; ++i) {
-            Pw[i].x = P[4 * i];
-            Pw[i].y = P[4 * i + 1];
-            Pw[i].z = P[4 * i + 2];
-            Pw[i].w = P[4 * i + 3];
+            PwEval[i].x = Pw[4 * i];
+            PwEval[i].y = Pw[4 * i + 1];
+            PwEval[i].z = Pw[4 * i + 2];
+            PwEval[i].w = Pw[4 * i + 3];
         }
     } else {
         for (int i = 0; i < nu * nv; ++i) {
-            Pw[i].x = P[3 * i];
-            Pw[i].y = P[3 * i + 1];
-            Pw[i].z = P[3 * i + 2];
-            Pw[i].w = 1.;
+            PwEval[i].x = P[i].x;
+            PwEval[i].y = P[i].y;
+            PwEval[i].z = P[i].z;
+            PwEval[i].w = 1.;
         }
     }
 
@@ -272,9 +272,9 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
             uvs[(v * diceu + u)].y = veval[v];
 
             Vector3f dpdu, dpdv;
-            Point3f pt = NURBSEvaluateSurface(uorder, uknots, nu, ueval[u],
-                                              vorder, vknots, nv, veval[v],
-                                              Pw.get(), &dpdu, &dpdv);
+            Point3f pt = NURBSEvaluateSurface(
+                uorder, uknots.data(), nu, ueval[u], vorder, vknots.data(), nv,
+                veval[v], PwEval.data(), &dpdu, &dpdv);
             evalPs[v * diceu + u].x = pt.x;
             evalPs[v * diceu + u].y = pt.y;
             evalPs[v * diceu + u].z = pt.z;
@@ -284,8 +284,8 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
 
     // Generate points-polygons mesh
     int nTris = 2 * (diceu - 1) * (dicev - 1);
-    std::unique_ptr<int[]> vertices(new int[3 * nTris]);
-    int *vertp = vertices.get();
+    std::vector<int> vertices(3 * nTris);
+    int *vertp = vertices.data();
     // Compute the vertex offset numbers for the triangles
     for (int v = 0; v < dicev - 1; ++v) {
         for (int u = 0; u < diceu - 1; ++u) {
@@ -302,9 +302,8 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
     }
     int nVerts = diceu * dicev;
 
-    return CreateTriangleMesh(o2w, w2o, reverseOrientation, nTris,
-                              vertices.get(), nVerts, evalPs.get(), nullptr,
-                              evalNs.get(), uvs.get(), nullptr, nullptr);
+    return CreateTriangleMesh(o2w, w2o, reverseOrientation, vertices, evalPs,
+                              {}, evalNs, uvs, nullptr, nullptr);
 }
 
 }  // namespace pbrt

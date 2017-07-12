@@ -33,12 +33,16 @@
 // core/interpolation.cpp*
 #include "interpolation.h"
 
+using gtl::ArraySlice;
+using gtl::MutableArraySlice;
+
 namespace pbrt {
 
 // Spline Interpolation Definitions
-Float CatmullRom(int size, const Float *nodes, const Float *values, Float x) {
-    if (!(x >= nodes[0] && x <= nodes[size - 1])) return 0;
-    int idx = FindInterval(size, [&](int i) { return nodes[i] <= x; });
+Float CatmullRom(ArraySlice<Float> nodes, ArraySlice<Float> values, Float x) {
+    CHECK_EQ(nodes.size(), values.size());
+    if (!(x >= nodes.front() && x <= nodes.back())) return 0;
+    int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
     Float x0 = nodes[idx], x1 = nodes[idx + 1];
     Float f0 = values[idx], f1 = values[idx + 1];
     Float width = x1 - x0;
@@ -48,7 +52,7 @@ Float CatmullRom(int size, const Float *nodes, const Float *values, Float x) {
     else
         d0 = f1 - f0;
 
-    if (idx + 2 < size)
+    if (idx + 2 < nodes.size())
         d1 = width * (values[idx + 2] - f0) / (nodes[idx + 2] - x0);
     else
         d1 = f1 - f0;
@@ -58,13 +62,14 @@ Float CatmullRom(int size, const Float *nodes, const Float *values, Float x) {
            (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
 }
 
-bool CatmullRomWeights(int size, const Float *nodes, Float x, int *offset,
-                       Float *weights) {
+bool CatmullRomWeights(ArraySlice<Float> nodes, Float x, int *offset,
+                       MutableArraySlice<Float> weights) {
+    CHECK_GE(weights.size(), 4);
     // Return _false_ if _x_ is out of bounds
-    if (!(x >= nodes[0] && x <= nodes[size - 1])) return false;
+    if (!(x >= nodes.front() && x <= nodes.back())) return false;
 
     // Search for the interval _idx_ containing _x_
-    int idx = FindInterval(size, [&](int i) { return nodes[i] <= x; });
+    int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
     *offset = idx - 1;
     Float x0 = nodes[idx], x1 = nodes[idx + 1];
 
@@ -88,7 +93,7 @@ bool CatmullRomWeights(int size, const Float *nodes, Float x, int *offset,
     }
 
     // Compute last node weight $w_3$
-    if (idx + 2 < size) {
+    if (idx + 2 < nodes.size()) {
         Float w3 = (t3 - t2) * (x1 - x0) / (nodes[idx + 2] - x0);
         weights[1] -= w3;
         weights[3] = w3;
@@ -101,11 +106,14 @@ bool CatmullRomWeights(int size, const Float *nodes, Float x, int *offset,
     return true;
 }
 
-Float SampleCatmullRom(int n, const Float *x, const Float *f, const Float *F,
-                       Float u, Float *fval, Float *pdf) {
+Float SampleCatmullRom(ArraySlice<Float> x, ArraySlice<Float> f,
+                       ArraySlice<Float> F, Float u, Float *fval, Float *pdf) {
+    CHECK_EQ(x.size(), f.size());
+    CHECK_EQ(f.size(), F.size());
+
     // Map _u_ to a spline interval by inverting _F_
-    u *= F[n - 1];
-    int i = FindInterval(n, [&](int i) { return F[i] <= u; });
+    u *= F.back();
+    int i = FindInterval(F.size(), [&](int i) { return F[i] <= u; });
 
     // Look up $x_i$ and function values of spline segment _i_
     Float x0 = x[i], x1 = x[i + 1];
@@ -118,7 +126,7 @@ Float SampleCatmullRom(int n, const Float *x, const Float *f, const Float *F,
         d0 = width * (f1 - f[i - 1]) / (x1 - x[i - 1]);
     else
         d0 = f1 - f0;
-    if (i + 2 < n)
+    if (i + 2 < x.size())
         d1 = width * (f[i + 2] - f0) / (x[i + 2] - x0);
     else
         d1 = f1 - f0;
@@ -165,33 +173,32 @@ Float SampleCatmullRom(int n, const Float *x, const Float *f, const Float *F,
 
     // Return the sample position and function value
     if (fval) *fval = fhat;
-    if (pdf) *pdf = fhat / F[n - 1];
+    if (pdf) *pdf = fhat / F.back();
     return x0 + width * t;
 }
 
-Float SampleCatmullRom2D(int size1, int size2, const Float *nodes1,
-                         const Float *nodes2, const Float *values,
-                         const Float *cdf, Float alpha, Float u, Float *fval,
-                         Float *pdf) {
+Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
+                         ArraySlice<Float> values, ArraySlice<Float> cdf,
+                         Float alpha, Float u, Float *fval, Float *pdf) {
     // Determine offset and coefficients for the _alpha_ parameter
     int offset;
     Float weights[4];
-    if (!CatmullRomWeights(size1, nodes1, alpha, &offset, weights)) return 0;
+    if (!CatmullRomWeights(nodes1, alpha, &offset, weights)) return 0;
 
     // Define a lambda function to interpolate table entries
-    auto interpolate = [&](const Float *array, int idx) {
+    auto interpolate = [&](ArraySlice<Float> array, int idx) {
         Float value = 0;
         for (int i = 0; i < 4; ++i)
             if (weights[i] != 0)
-                value += array[(offset + i) * size2 + idx] * weights[i];
+                value += array[(offset + i) * nodes2.size() + idx] * weights[i];
         return value;
     };
 
     // Map _u_ to a spline interval by inverting the interpolated _cdf_
-    Float maximum = interpolate(cdf, size2 - 1);
+    Float maximum = interpolate(cdf, nodes2.size() - 1);
     u *= maximum;
-    int idx =
-        FindInterval(size2, [&](int i) { return interpolate(cdf, i) <= u; });
+    int idx = FindInterval(nodes2.size(),
+                           [&](int i) { return interpolate(cdf, i) <= u; });
 
     // Look up node positions and interpolated function values
     Float f0 = interpolate(values, idx), f1 = interpolate(values, idx + 1);
@@ -208,7 +215,7 @@ Float SampleCatmullRom2D(int size1, int size2, const Float *nodes1,
              (x1 - nodes2[idx - 1]);
     else
         d0 = f1 - f0;
-    if (idx + 2 < size2)
+    if (idx + 2 < nodes2.size())
         d1 = width * (interpolate(values, idx + 2) - f0) /
              (nodes2[idx + 2] - x0);
     else
@@ -257,11 +264,12 @@ Float SampleCatmullRom2D(int size1, int size2, const Float *nodes1,
     return x0 + width * t;
 }
 
-Float IntegrateCatmullRom(int n, const Float *x, const Float *values,
-                          Float *cdf) {
+Float IntegrateCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values,
+                          MutableArraySlice<Float> cdf) {
+    CHECK_EQ(x.size(), values.size());
     Float sum = 0;
     cdf[0] = 0;
-    for (int i = 0; i < n - 1; ++i) {
+    for (int i = 0; i < x.size() - 1; ++i) {
         // Look up $x_i$ and function values of spline segment _i_
         Float x0 = x[i], x1 = x[i + 1];
         Float f0 = values[i], f1 = values[i + 1];
@@ -273,7 +281,7 @@ Float IntegrateCatmullRom(int n, const Float *x, const Float *values,
             d0 = width * (f1 - values[i - 1]) / (x1 - x[i - 1]);
         else
             d0 = f1 - f0;
-        if (i + 2 < n)
+        if (i + 2 < x.size())
             d1 = width * (values[i + 2] - f0) / (x[i + 2] - x0);
         else
             d1 = f1 - f0;
@@ -285,15 +293,15 @@ Float IntegrateCatmullRom(int n, const Float *x, const Float *values,
     return sum;
 }
 
-Float InvertCatmullRom(int n, const Float *x, const Float *values, Float u) {
+Float InvertCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values, Float u) {
     // Stop when _u_ is out of bounds
-    if (!(u > values[0]))
-        return x[0];
-    else if (!(u < values[n - 1]))
-        return x[n - 1];
+    if (!(u > values.front()))
+        return x.front();
+    else if (!(u < values.back()))
+        return x.back();
 
     // Map _u_ to a spline interval by inverting _values_
-    int i = FindInterval(n, [&](int i) { return values[i] <= u; });
+    int i = FindInterval(values.size(), [&](int i) { return values[i] <= u; });
 
     // Look up $x_i$ and function values of spline segment _i_
     Float x0 = x[i], x1 = x[i + 1];
@@ -306,7 +314,7 @@ Float InvertCatmullRom(int n, const Float *x, const Float *values, Float u) {
         d0 = width * (f1 - values[i - 1]) / (x1 - x[i - 1]);
     else
         d0 = f1 - f0;
-    if (i + 2 < n)
+    if (i + 2 < x.size())
         d1 = width * (values[i + 2] - f0) / (x[i + 2] - x0);
     else
         d1 = f1 - f0;
@@ -345,12 +353,12 @@ Float InvertCatmullRom(int n, const Float *x, const Float *values, Float u) {
 }
 
 // Fourier Interpolation Definitions
-Float Fourier(const Float *a, int m, double cosPhi) {
+Float Fourier(ArraySlice<Float> a, double cosPhi) {
     double value = 0.0;
     // Initialize cosine iterates
     double cosKMinusOnePhi = cosPhi;
     double cosKPhi = 1;
-    for (int k = 0; k < m; ++k) {
+    for (int k = 0; k < a.size(); ++k) {
         // Add the current summand and update the cosine iterates
         value += a[k] * cosKPhi;
         double cosKPlusOnePhi = 2 * cosPhi * cosKPhi - cosKMinusOnePhi;
@@ -360,7 +368,7 @@ Float Fourier(const Float *a, int m, double cosPhi) {
     return value;
 }
 
-Float SampleFourier(const Float *ak, const Float *recip, int m, Float u,
+Float SampleFourier(ArraySlice<Float> ak, ArraySlice<Float> recip, Float u,
                     Float *pdf, Float *phiPtr) {
     // Pick a side and declare bisection variables
     bool flip = (u >= 0.5);
@@ -382,7 +390,7 @@ Float SampleFourier(const Float *ak, const Float *recip, int m, Float u,
         // Initialize _F_ and _f_ with the first series term
         F = ak[0] * phi;
         f = ak[0];
-        for (int k = 1; k < m; ++k) {
+        for (int k = 1; k < ak.size(); ++k) {
             // Compute next sine and cosine iterates
             double sinPhiNext = 2 * cosPhi * sinPhiCur - sinPhiPrev;
             double cosPhiNext = 2 * cosPhi * cosPhiCur - cosPhiPrev;

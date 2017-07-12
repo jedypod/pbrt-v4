@@ -39,6 +39,8 @@
 #include "film.h"
 #include "scene.h"
 
+using gtl::ArraySlice;
+
 namespace pbrt {
 
 // AOIntegrator Method Definitions
@@ -78,7 +80,7 @@ Spectrum AOIntegrator::Li(const RayDifferential &r, const Scene &scene,
         Vector3f s = Normalize(isect.dpdu);
         Vector3f t = Cross(isect.n, s);
 
-        const Point2f *u = sampler.Get2DArray(nSamples);
+        ArraySlice<Point2f> u = sampler.Get2DArray(nSamples);
         for (int i = 0; i < nSamples; ++i) {
             Vector3f wi;
             Float pdf;
@@ -106,12 +108,12 @@ AOIntegrator *CreateAOIntegrator(const ParamSet &params,
                                  std::shared_ptr<Sampler> sampler,
                                  std::shared_ptr<const Camera> camera) {
     int np;
-    const int *pb = params.FindInt("pixelbounds", &np);
+    ArraySlice<int> pb = params.FindInt("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
-    if (pb) {
-        if (np != 4)
+    if (!pb.empty()) {
+        if (pb.size() != 4)
             Error("Expected four values for \"pixelbounds\" parameter. Got %d.",
-                  np);
+                  (int)pb.size());
         else {
             pixelBounds = Intersect(pixelBounds,
                                     Bounds2i{{pb[0], pb[2]}, {pb[1], pb[3]}});

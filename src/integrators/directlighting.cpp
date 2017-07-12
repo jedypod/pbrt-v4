@@ -112,13 +112,12 @@ DirectLightingIntegrator *CreateDirectLightingIntegrator(
             st.c_str());
         strategy = LightStrategy::UniformSampleAll;
     }
-    int np;
-    const int *pb = params.FindInt("pixelbounds", &np);
+    gtl::ArraySlice<int> pb = params.FindInt("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
-    if (pb) {
-        if (np != 4)
+    if (!pb.empty()) {
+        if (pb.size() != 4)
             Error("Expected four values for \"pixelbounds\" parameter. Got %d.",
-                  np);
+                  (int)pb.size());
         else {
             pixelBounds = Intersect(pixelBounds,
                                     Bounds2i{{pb[0], pb[2]}, {pb[1], pb[3]}});

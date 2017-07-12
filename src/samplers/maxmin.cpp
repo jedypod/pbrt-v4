@@ -38,28 +38,31 @@
 
 namespace pbrt {
 
+using gtl::MutableArraySlice;
+
 // MaxMinDistSampler Method Definitions
 void MaxMinDistSampler::StartPixel(const Point2i &p) {
     ProfilePhase _(Prof::StartPixel);
     Float invSPP = (Float)1 / samplesPerPixel;
     for (int i = 0; i < samplesPerPixel; ++i)
         samples2D[0][i] = Point2f(i * invSPP, SampleGeneratorMatrix(CPixel, i));
-    Shuffle(&samples2D[0][0], samplesPerPixel, 1, rng);
+    Shuffle(gtl::MutableArraySlice<Point2f>(&samples2D[0][0], samplesPerPixel),
+            1, rng);
     // Generate remaining samples for _MaxMinDistSampler_
     for (size_t i = 0; i < samples1D.size(); ++i)
-        VanDerCorput(1, samplesPerPixel, &samples1D[i][0], rng);
+        VanDerCorput(1, samplesPerPixel, &samples1D[i], rng);
 
     for (size_t i = 1; i < samples2D.size(); ++i)
-        Sobol2D(1, samplesPerPixel, &samples2D[i][0], rng);
+        Sobol2D(1, samplesPerPixel, &samples2D[i], rng);
 
     for (size_t i = 0; i < samples1DArraySizes.size(); ++i) {
         int count = samples1DArraySizes[i];
-        VanDerCorput(count, samplesPerPixel, &sampleArray1D[i][0], rng);
+        VanDerCorput(count, samplesPerPixel, &sampleArray1D[i], rng);
     }
 
     for (size_t i = 0; i < samples2DArraySizes.size(); ++i) {
         int count = samples2DArraySizes[i];
-        Sobol2D(count, samplesPerPixel, &sampleArray2D[i][0], rng);
+        Sobol2D(count, samplesPerPixel, &sampleArray2D[i], rng);
     }
     PixelSampler::StartPixel(p);
 }

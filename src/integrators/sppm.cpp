@@ -446,7 +446,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
             int x0 = pixelBounds.pMin.x;
             int x1 = pixelBounds.pMax.x;
             uint64_t Np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
-            std::unique_ptr<Spectrum[]> image(new Spectrum[pixelBounds.Area()]);
+            std::vector<Spectrum> image(pixelBounds.Area());
             int offset = 0;
             for (int y = pixelBounds.pMin.y; y < pixelBounds.pMax.y; ++y) {
                 for (int x = x0; x < x1; ++x) {
@@ -458,7 +458,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                     image[offset++] = L;
                 }
             }
-            camera->film->SetImage(image.get());
+            camera->film->SetImage(image);
             camera->film->WriteImage();
             // Write SPPM radius image, if requested
             if (getenv("SPPM_RADIUS")) {

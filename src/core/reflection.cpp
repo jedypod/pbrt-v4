@@ -340,7 +340,7 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
     }
 
     // Evaluate Fourier expansion for angle $\phi$
-    Float Y = std::max((Float)0, Fourier(ak, mMax, cosPhi));
+    Float Y = std::max((Float)0, Fourier({ak, size_t(mMax)}, cosPhi));
     Float scale = muI != 0 ? (1 / std::abs(muI)) : (Float)0;
 
     // Update _scale_ to account for adjoint light transport
@@ -352,8 +352,8 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
         return Spectrum(Y * scale);
     else {
         // Compute and return RGB colors for tabulated BSDF
-        Float R = Fourier(ak + 1 * bsdfTable.mMax, mMax, cosPhi);
-        Float B = Fourier(ak + 2 * bsdfTable.mMax, mMax, cosPhi);
+        Float R = Fourier({ak + 1 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
+        Float B = Fourier({ak + 2 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
         Float G = 1.39829f * Y - 0.100913f * B - 0.297375f * R;
         Float rgb[3] = {R * scale, G * scale, B * scale};
         return Spectrum::FromRGB(rgb).Clamp();
@@ -372,7 +372,7 @@ std::string FourierBSDF::ToString() const {
 
 bool FourierBSDFTable::GetWeightsAndOffset(Float cosTheta, int *offset,
                                            Float weights[4]) const {
-    return CatmullRomWeights(nMu, mu, cosTheta, offset, weights);
+    return CatmullRomWeights({mu, nMu}, cosTheta, offset, {weights, 4});
 }
 
 Spectrum BxDF::Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u,
@@ -526,9 +526,11 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
     // Sample zenith angle component for _FourierBSDF_
     Float muO = CosTheta(wo);
     Float pdfMu;
-    Float muI = SampleCatmullRom2D(bsdfTable.nMu, bsdfTable.nMu, bsdfTable.mu,
-                                   bsdfTable.mu, bsdfTable.a0, bsdfTable.cdf,
-                                   muO, u[1], nullptr, &pdfMu);
+    Float muI = SampleCatmullRom2D(
+        {bsdfTable.mu, bsdfTable.nMu}, {bsdfTable.mu, bsdfTable.nMu},
+        {bsdfTable.a0, bsdfTable.nMu * bsdfTable.nMu},
+        {bsdfTable.cdf, bsdfTable.nMu * bsdfTable.nMu}, muO, u[1], nullptr,
+        &pdfMu);
 
     // Compute Fourier coefficients $a_k$ for $(\mui, \muo)$
 
@@ -562,7 +564,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     // Importance sample the luminance Fourier expansion
     Float phi, pdfPhi;
-    Float Y = SampleFourier(ak, bsdfTable.recip, mMax, u[0], &pdfPhi, &phi);
+    Float Y = SampleFourier({ak, size_t(mMax)}, {bsdfTable.recip, size_t(mMax)},
+                            u[0], &pdfPhi, &phi);
     *pdf = std::max((Float)0, pdfPhi * pdfMu);
 
     // Compute the scattered direction for _FourierBSDF_
@@ -592,8 +595,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
     }
 
     if (bsdfTable.nChannels == 1) return Spectrum(Y * scale);
-    Float R = Fourier(ak + 1 * bsdfTable.mMax, mMax, cosPhi);
-    Float B = Fourier(ak + 2 * bsdfTable.mMax, mMax, cosPhi);
+    Float R = Fourier({ak + 1 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
+    Float B = Fourier({ak + 2 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
     Float G = 1.39829f * Y - 0.100913f * B - 0.297375f * R;
     Float rgb[3] = {R * scale, G * scale, B * scale};
     return Spectrum::FromRGB(rgb).Clamp();
@@ -636,7 +639,7 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
             bsdfTable.cdf[(offsetO + o) * bsdfTable.nMu + bsdfTable.nMu - 1] *
             (2 * Pi);
     }
-    Float Y = Fourier(ak, mMax, cosPhi);
+    Float Y = Fourier({ak, size_t(mMax)}, cosPhi);
     return (rho > 0 && Y > 0) ? (Y / rho) : 0;
 }
 

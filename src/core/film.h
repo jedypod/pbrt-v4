@@ -44,6 +44,7 @@
 #include "spectrum.h"
 #include "filter.h"
 #include "stats.h"
+#include "ext/google/array_slice.h"
 #include "parallel.h"
 
 namespace pbrt {
@@ -66,7 +67,7 @@ class Film {
     Bounds2f GetPhysicalExtent() const;
     std::unique_ptr<FilmTile> GetFilmTile(const Bounds2i &sampleBounds);
     void MergeFilmTile(std::unique_ptr<FilmTile> tile);
-    void SetImage(const Spectrum *img) const;
+    void SetImage(gtl::ArraySlice<Spectrum> img) const;
     void AddSplat(const Point2f &p, Spectrum v);
     void WriteImage(Float splatScale = 1);
     void Clear();

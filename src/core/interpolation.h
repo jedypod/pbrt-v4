@@ -40,28 +40,33 @@
 
 // core/interpolation.h*
 #include "pbrt.h"
+#include "ext/google/array_slice.h"
 
 namespace pbrt {
 
 // Spline Interpolation Declarations
-Float CatmullRom(int size, const Float *nodes, const Float *values, Float x);
-bool CatmullRomWeights(int size, const Float *nodes, Float x, int *offset,
-                       Float *weights);
-Float SampleCatmullRom(int size, const Float *nodes, const Float *f,
-                       const Float *cdf, Float sample, Float *fval = nullptr,
+Float CatmullRom(gtl::ArraySlice<Float> nodes, gtl::ArraySlice<Float> values,
+                 Float x);
+bool CatmullRomWeights(gtl::ArraySlice<Float> nodes, Float x, int *offset,
+                       gtl::MutableArraySlice<Float> weights);
+Float SampleCatmullRom(gtl::ArraySlice<Float> nodes, gtl::ArraySlice<Float> f,
+                       gtl::ArraySlice<Float> cdf, Float sample, Float *fval = nullptr,
                        Float *pdf = nullptr);
-Float SampleCatmullRom2D(int size1, int size2, const Float *nodes1,
-                         const Float *nodes2, const Float *values,
-                         const Float *cdf, Float alpha, Float sample,
+Float SampleCatmullRom2D(gtl::ArraySlice<Float> nodes1,
+                         gtl::ArraySlice<Float> nodes2,
+                         gtl::ArraySlice<Float> values,
+                         gtl::ArraySlice<Float> cdf, Float alpha, Float sample,
                          Float *fval = nullptr, Float *pdf = nullptr);
-Float IntegrateCatmullRom(int n, const Float *nodes, const Float *values,
-                          Float *cdf);
-Float InvertCatmullRom(int n, const Float *x, const Float *values, Float u);
+Float IntegrateCatmullRom(gtl::ArraySlice<Float> nodes,
+                          gtl::ArraySlice<Float> values,
+                          gtl::MutableArraySlice<Float> cdf);
+Float InvertCatmullRom(gtl::ArraySlice<Float> x, gtl::ArraySlice<Float> values,
+                       Float u);
 
 // Fourier Interpolation Declarations
-Float Fourier(const Float *a, int m, double cosPhi);
-Float SampleFourier(const Float *ak, const Float *recip, int m, Float u,
-                    Float *pdf, Float *phiPtr);
+Float Fourier(gtl::ArraySlice<Float> a, double cosPhi);
+Float SampleFourier(gtl::ArraySlice<Float> ak, gtl::ArraySlice<Float> recip,
+                    Float u, Float *pdf, Float *phiPtr);
 
 }  // namespace pbrt
 

@@ -83,18 +83,22 @@ void Sampler::Request2DArray(int n) {
     sampleArray2D.push_back(std::vector<Point2f>(n * samplesPerPixel));
 }
 
-const Float *Sampler::Get1DArray(int n) {
-    if (array1DOffset == sampleArray1D.size()) return nullptr;
+gtl::ArraySlice<Float> Sampler::Get1DArray(int n) {
+    if (array1DOffset == sampleArray1D.size()) return {};
     CHECK_EQ(samples1DArraySizes[array1DOffset], n);
     CHECK_LT(currentPixelSampleIndex, samplesPerPixel);
-    return &sampleArray1D[array1DOffset++][currentPixelSampleIndex * n];
+    int offset = array1DOffset++;
+    return {&sampleArray1D[offset][currentPixelSampleIndex * n],
+            (size_t)samples1DArraySizes[offset]};
 }
 
-const Point2f *Sampler::Get2DArray(int n) {
-    if (array2DOffset == sampleArray2D.size()) return nullptr;
+gtl::ArraySlice<Point2f> Sampler::Get2DArray(int n) {
+    if (array2DOffset == sampleArray2D.size()) return {};
     CHECK_EQ(samples2DArraySizes[array2DOffset], n);
     CHECK_LT(currentPixelSampleIndex, samplesPerPixel);
-    return &sampleArray2D[array2DOffset++][currentPixelSampleIndex * n];
+    int offset = array2DOffset++;
+    return {&sampleArray2D[offset][currentPixelSampleIndex * n],
+            (size_t)samples2DArraySizes[offset]};
 }
 
 PixelSampler::PixelSampler(int64_t samplesPerPixel, int nSampledDimensions)

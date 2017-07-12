@@ -36,33 +36,39 @@
 #include "geometry.h"
 #include "shape.h"
 
+using gtl::ArraySlice;
+using gtl::MutableArraySlice;
+
 namespace pbrt {
 
 // Sampling Function Definitions
-void StratifiedSample1D(Float *samp, int nSamples, RNG &rng, bool jitter) {
-    Float invNSamples = (Float)1 / nSamples;
-    for (int i = 0; i < nSamples; ++i) {
+void StratifiedSample1D(MutableArraySlice<Float> samples, RNG &rng,
+                        bool jitter) {
+    Float invNSamples = (Float)1 / samples.size();
+    for (size_t i = 0; i < samples.size(); ++i) {
         Float delta = jitter ? rng.UniformFloat() : 0.5f;
-        samp[i] = std::min((i + delta) * invNSamples, OneMinusEpsilon);
+        samples[i] = std::min((i + delta) * invNSamples, OneMinusEpsilon);
     }
 }
 
-void StratifiedSample2D(Point2f *samp, int nx, int ny, RNG &rng, bool jitter) {
+void StratifiedSample2D(MutableArraySlice<Point2f> samp, int nx, int ny,
+                        RNG &rng, bool jitter) {
+    CHECK_EQ(samp.size(), (size_t)nx * (size_t)ny);
     Float dx = (Float)1 / nx, dy = (Float)1 / ny;
+    int offset = 0;
     for (int y = 0; y < ny; ++y)
-        for (int x = 0; x < nx; ++x) {
+        for (int x = 0; x < nx; ++x, ++offset) {
             Float jx = jitter ? rng.UniformFloat() : 0.5f;
             Float jy = jitter ? rng.UniformFloat() : 0.5f;
-            samp->x = std::min((x + jx) * dx, OneMinusEpsilon);
-            samp->y = std::min((y + jy) * dy, OneMinusEpsilon);
-            ++samp;
+            samp[offset].x = std::min((x + jx) * dx, OneMinusEpsilon);
+            samp[offset].y = std::min((y + jy) * dy, OneMinusEpsilon);
         }
 }
 
-void LatinHypercube(Float *samples, int nSamples, int nDim, RNG &rng) {
+void LatinHypercube(MutableArraySlice<Float> samples, int nDim, RNG &rng) {
     // Generate LHS samples along diagonal
-    Float invNSamples = (Float)1 / nSamples;
-    for (int i = 0; i < nSamples; ++i)
+    Float invNSamples = (Float)1 / samples.size();
+    for (size_t i = 0; i < samples.size(); ++i)
         for (int j = 0; j < nDim; ++j) {
             Float sj = (i + (rng.UniformFloat())) * invNSamples;
             samples[nDim * i + j] = std::min(sj, OneMinusEpsilon);
@@ -70,8 +76,8 @@ void LatinHypercube(Float *samples, int nSamples, int nDim, RNG &rng) {
 
     // Permute LHS samples in each dimension
     for (int i = 0; i < nDim; ++i) {
-        for (int j = 0; j < nSamples; ++j) {
-            int other = j + rng.UniformUInt32(nSamples - j);
+        for (size_t j = 0; j < samples.size(); ++j) {
+            size_t other = j + rng.UniformUInt32(samples.size() - j);
             std::swap(samples[nDim * j + i], samples[nDim * other + i]);
         }
     }
@@ -156,18 +162,20 @@ Point2f UniformSampleTriangle(const Point2f &u) {
     return Point2f(1 - su0, u[1] * su0);
 }
 
-Distribution2D::Distribution2D(const Float *func, int nu, int nv) {
+Distribution2D::Distribution2D(ArraySlice<Float> func, int nu, int nv) {
+    CHECK_EQ(func.size(), (size_t)nu * (size_t)nv);
     pConditionalV.reserve(nv);
     for (int v = 0; v < nv; ++v) {
         // Compute conditional sampling distribution for $\tilde{v}$
-        pConditionalV.emplace_back(new Distribution1D(&func[v * nu], nu));
+        pConditionalV.emplace_back(
+            new Distribution1D(ArraySlice<Float>(func, v * nu, nu)));
     }
     // Compute marginal sampling distribution $p[\tilde{v}]$
     std::vector<Float> marginalFunc;
     marginalFunc.reserve(nv);
     for (int v = 0; v < nv; ++v)
         marginalFunc.push_back(pConditionalV[v]->funcInt);
-    pMarginal.reset(new Distribution1D(&marginalFunc[0], nv));
+    pMarginal.reset(new Distribution1D(marginalFunc));
 }
 
 }  // namespace pbrt

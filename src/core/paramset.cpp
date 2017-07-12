@@ -36,19 +36,20 @@
 #include "floatfile.h"
 #include "textures/constant.h"
 
+using gtl::ArraySlice;
+
 namespace pbrt {
 
 // ParamSet Macros
 #define ADD_PARAM_TYPE(T, vec) \
     (vec).emplace_back(new ParamSetItem<T>(name, std::move(values), nValues));
-#define LOOKUP_PTR(vec)             \
-    for (const auto &v : vec)       \
-        if (v->name == name) {      \
-            *nValues = v->nValues;  \
-            v->lookedUp = true;     \
-            return v->values.get(); \
-        }                           \
-    return nullptr
+#define LOOKUP_PTR(vec)                           \
+    for (const auto &v : vec)                     \
+        if (v->name == name) {                    \
+            v->lookedUp = true;                   \
+            return {v->values.get(), v->nValues}; \
+        }                                         \
+    return {}
 #define LOOKUP_ONE(vec)                           \
     for (const auto &v : vec)                     \
         if (v->name == name && v->nValues == 1) { \
@@ -138,11 +139,10 @@ void ParamSet::AddBlackbodySpectrum(const std::string &name,
     CHECK_EQ(nValues % 2, 0);  // temperature (K), scale, ...
     nValues /= 2;
     std::unique_ptr<Spectrum[]> s(new Spectrum[nValues]);
-    std::unique_ptr<Float[]> v(new Float[nCIESamples]);
+    std::vector<Float> v(nCIESamples);
     for (int i = 0; i < nValues; ++i) {
-        BlackbodyNormalized(CIE_lambda, nCIESamples, values[2 * i], v.get());
-        s[i] = values[2 * i + 1] *
-               Spectrum::FromSampled(CIE_lambda, v.get(), nCIESamples);
+        BlackbodyNormalized(CIE_lambda, values[2 * i], &v);
+        s[i] = values[2 * i + 1] * Spectrum::FromSampled(CIE_lambda, v);
     }
     std::shared_ptr<ParamSetItem<Spectrum>> psi(
         new ParamSetItem<Spectrum>(name, std::move(s), nValues));
@@ -155,14 +155,14 @@ void ParamSet::AddSampledSpectrum(const std::string &name,
     EraseSpectrum(name);
     CHECK_EQ(nValues % 2, 0);
     nValues /= 2;
-    std::unique_ptr<Float[]> wl(new Float[nValues]);
-    std::unique_ptr<Float[]> v(new Float[nValues]);
+    std::vector<Float> wl(nValues);
+    std::vector<Float> v(nValues);
     for (int i = 0; i < nValues; ++i) {
         wl[i] = values[2 * i];
         v[i] = values[2 * i + 1];
     }
     std::unique_ptr<Spectrum[]> s(new Spectrum[1]);
-    s[0] = Spectrum::FromSampled(wl.get(), v.get(), nValues);
+    s[0] = Spectrum::FromSampled(wl, v);
     std::shared_ptr<ParamSetItem<Spectrum>> psi(
         new ParamSetItem<Spectrum>(name, std::move(s), 1));
     spectra.push_back(psi);
@@ -197,7 +197,7 @@ void ParamSet::AddSampledSpectrumFiles(const std::string &name,
                 wls.push_back(vals[2 * j]);
                 v.push_back(vals[2 * j + 1]);
             }
-            s[i] = Spectrum::FromSampled(&wls[0], &v[0], wls.size());
+            s[i] = Spectrum::FromSampled(wls, v);
         }
         cachedSpectra[fn] = s[i];
     }
@@ -331,22 +331,27 @@ Float ParamSet::FindOneFloat(const std::string &name, Float d) const {
     return d;
 }
 
-const Float *ParamSet::FindFloat(const std::string &name, int *n) const {
+ArraySlice<Float> ParamSet::FindFloat(const std::string &name) const {
     for (const auto &f : floats)
         if (f->name == name) {
-            *n = f->nValues;
             f->lookedUp = true;
-            return f->values.get();
+            return {f->values.get(), f->nValues};
         }
-    return nullptr;
+    return {};
 }
 
-const int *ParamSet::FindInt(const std::string &name, int *nValues) const {
+ArraySlice<int> ParamSet::FindInt(const std::string &name) const {
     LOOKUP_PTR(ints);
 }
 
-const bool *ParamSet::FindBool(const std::string &name, int *nValues) const {
-    LOOKUP_PTR(bools);
+ArraySlice<bool> ParamSet::FindBool(const std::string &name) const {
+    //    LOOKUP_PTR(bools);
+    for (const auto &v : bools)
+        if (v->name == name) {
+            v->lookedUp = true;
+            return ArraySlice<bool>(v->values.get(), v->nValues);
+        }
+    return {};
 }
 
 int ParamSet::FindOneInt(const std::string &name, int d) const {
@@ -357,8 +362,7 @@ bool ParamSet::FindOneBool(const std::string &name, bool d) const {
     LOOKUP_ONE(bools);
 }
 
-const Point2f *ParamSet::FindPoint2f(const std::string &name,
-                                     int *nValues) const {
+ArraySlice<Point2f> ParamSet::FindPoint2f(const std::string &name) const {
     LOOKUP_PTR(point2fs);
 }
 
@@ -367,8 +371,7 @@ Point2f ParamSet::FindOnePoint2f(const std::string &name,
     LOOKUP_ONE(point2fs);
 }
 
-const Vector2f *ParamSet::FindVector2f(const std::string &name,
-                                       int *nValues) const {
+ArraySlice<Vector2f> ParamSet::FindVector2f(const std::string &name) const {
     LOOKUP_PTR(vector2fs);
 }
 
@@ -377,8 +380,7 @@ Vector2f ParamSet::FindOneVector2f(const std::string &name,
     LOOKUP_ONE(vector2fs);
 }
 
-const Point3f *ParamSet::FindPoint3f(const std::string &name,
-                                     int *nValues) const {
+ArraySlice<Point3f> ParamSet::FindPoint3f(const std::string &name) const {
     LOOKUP_PTR(point3fs);
 }
 
@@ -387,8 +389,7 @@ Point3f ParamSet::FindOnePoint3f(const std::string &name,
     LOOKUP_ONE(point3fs);
 }
 
-const Vector3f *ParamSet::FindVector3f(const std::string &name,
-                                       int *nValues) const {
+ArraySlice<Vector3f> ParamSet::FindVector3f(const std::string &name) const {
     LOOKUP_PTR(vector3fs);
 }
 
@@ -397,8 +398,7 @@ Vector3f ParamSet::FindOneVector3f(const std::string &name,
     LOOKUP_ONE(vector3fs);
 }
 
-const Normal3f *ParamSet::FindNormal3f(const std::string &name,
-                                       int *nValues) const {
+ArraySlice<Normal3f> ParamSet::FindNormal3f(const std::string &name) const {
     LOOKUP_PTR(normals);
 }
 
@@ -407,8 +407,7 @@ Normal3f ParamSet::FindOneNormal3f(const std::string &name,
     LOOKUP_ONE(normals);
 }
 
-const Spectrum *ParamSet::FindSpectrum(const std::string &name,
-                                       int *nValues) const {
+ArraySlice<Spectrum> ParamSet::FindSpectrum(const std::string &name) const {
     LOOKUP_PTR(spectra);
 }
 
@@ -417,8 +416,7 @@ Spectrum ParamSet::FindOneSpectrum(const std::string &name,
     LOOKUP_ONE(spectra);
 }
 
-const std::string *ParamSet::FindString(const std::string &name,
-                                        int *nValues) const {
+ArraySlice<std::string> ParamSet::FindString(const std::string &name) const {
     LOOKUP_PTR(strings);
 }
 
@@ -750,10 +748,9 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
             return nullptr;
         }
     }
-    int count;
-    const Spectrum *val = geomParams.FindSpectrum(n, &count);
-    if (!val) val = materialParams.FindSpectrum(n, &count);
-    if (val) return std::make_shared<ConstantTexture<Spectrum>>(*val);
+    ArraySlice<Spectrum> val = geomParams.FindSpectrum(n);
+    if (val.empty()) val = materialParams.FindSpectrum(n);
+    if (!val.empty()) return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
 }
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
@@ -786,10 +783,10 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
             return nullptr;
         }
     }
-    int count;
-    const Float *val = geomParams.FindFloat(n, &count);
-    if (!val) val = materialParams.FindFloat(n, &count);
-    if (val) return std::make_shared<ConstantTexture<Float>>(*val);
+
+    ArraySlice<Float> val = geomParams.FindFloat(n);
+    if (val.empty()) val = materialParams.FindFloat(n);
+    if (!val.empty()) return std::make_shared<ConstantTexture<Float>>(val[0]);
     return nullptr;
 }
 

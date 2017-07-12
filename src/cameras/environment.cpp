@@ -36,6 +36,7 @@
 #include "paramset.h"
 #include "sampler.h"
 #include "stats.h"
+using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -83,10 +84,9 @@ EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    int swi;
-    const Float *sw = params.FindFloat("screenwindow", &swi);
-    if (sw) {
-        if (swi == 4) {
+    ArraySlice<Float> sw = params.FindFloat("screenwindow");
+    if (sw.size() > 0) {
+        if (sw.size() == 4) {
             screen.pMin.x = sw[0];
             screen.pMax.x = sw[1];
             screen.pMin.y = sw[2];

@@ -40,6 +40,8 @@
 
 // core/memory.h*
 #include "pbrt.h"
+#include "parallel.h"
+#include "ext/google/array_slice.h"
 #include "port.h"
 #include <list>
 #include <cstddef>

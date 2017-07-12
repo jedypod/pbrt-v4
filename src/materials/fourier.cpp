@@ -144,12 +144,15 @@ bool FourierBSDFTable::Read(const std::string &filename,
 
     int flags, nCoeffs, nBases, unused[4];
 
-    if (!read32(&flags, 1) || !read32(&bsdfTable->nMu, 1) ||
-        !read32(&nCoeffs, 1) || !read32(&bsdfTable->mMax, 1) ||
-        !read32(&bsdfTable->nChannels, 1) || !read32(&nBases, 1) ||
-        !read32(unused, 3) || !readfloat(&bsdfTable->eta, 1) ||
-        !read32(&unused, 4))
+    int nMu;
+    if (!read32(&flags, 1) || !read32(&nMu, 1) || !read32(&nCoeffs, 1) ||
+        !read32(&bsdfTable->mMax, 1) || !read32(&bsdfTable->nChannels, 1) ||
+        !read32(&nBases, 1) || !read32(unused, 3) ||
+        !readfloat(&bsdfTable->eta, 1) || !read32(&unused, 4))
         goto fail;
+    // Handle nMu specially, since it's stored as an int on disk, but
+    // we'd like it available as a size_t.
+    bsdfTable->nMu = nMu;
 
     /* Only a subset of BSDF files are supported for simplicity, in particular:
        monochromatic and

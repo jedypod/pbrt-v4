@@ -42,6 +42,7 @@
 #include "pbrt.h"
 #include "geometry.h"
 #include "rng.h"
+#include "ext/google/array_slice.h"
 #include <inttypes.h>
 
 namespace pbrt {
@@ -59,8 +60,8 @@ class Sampler {
     void Request1DArray(int n);
     void Request2DArray(int n);
     virtual int RoundCount(int n) const { return n; }
-    const Float *Get1DArray(int n);
-    const Point2f *Get2DArray(int n);
+    gtl::ArraySlice<Float> Get1DArray(int n);
+    gtl::ArraySlice<Point2f> Get2DArray(int n);
     virtual bool StartNextSample();
     virtual std::unique_ptr<Sampler> Clone(int seed) = 0;
     virtual bool SetSampleNumber(int64_t sampleNum);

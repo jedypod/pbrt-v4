@@ -41,6 +41,7 @@
 // samplers/maxmin.h*
 #include "sampler.h"
 #include "lowdiscrepancy.h"
+#include "ext/google/array_slice.h"
 
 namespace pbrt {
 
@@ -79,7 +80,7 @@ class MaxMinDistSampler : public PixelSampler {
 
   private:
     // MaxMinDistSampler Private Data
-    const uint32_t *CPixel;
+    gtl::ArraySlice<uint32_t> CPixel;
 };
 
 MaxMinDistSampler *CreateMaxMinDistSampler(const ParamSet &params);

@@ -198,7 +198,7 @@ void MLTIntegrator::Render(const Scene &scene) {
         }, nBootstrap, chunkSize);
         progress.Done();
     }
-    Distribution1D bootstrap(&bootstrapWeights[0], nBootstrapSamples);
+    Distribution1D bootstrap(bootstrapWeights);
     Float b = bootstrap.funcInt * (maxDepth + 1);
 
     // Run _nChains_ Markov chains in parallel

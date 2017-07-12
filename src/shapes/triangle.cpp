@@ -40,6 +40,8 @@
 #include "ext/rply.h"
 #include <array>
 
+using gtl::ArraySlice;
+
 namespace pbrt {
 
 STAT_PERCENT("Intersections/Ray-triangle intersection tests", nHits, nTests);
@@ -52,50 +54,54 @@ static void PlyErrorCallback(p_ply, const char *message) {
 // Triangle Method Definitions
 STAT_RATIO("Scene/Triangles per triangle mesh", nTris, nMeshes);
 TriangleMesh::TriangleMesh(
-    const Transform &ObjectToWorld, int nTriangles, const int *vertexIndices,
-    int nVertices, const Point3f *P, const Vector3f *S, const Normal3f *N,
-    const Point2f *UV, const std::shared_ptr<Texture<Float>> &alphaMask,
+    const Transform &ObjectToWorld, ArraySlice<int> vertexIndices,
+    ArraySlice<Point3f> P, ArraySlice<Vector3f> S, ArraySlice<Normal3f> N,
+    ArraySlice<Point2f> UV, const std::shared_ptr<Texture<Float>> &alphaMask,
     const std::shared_ptr<Texture<Float>> &shadowAlphaMask)
-    : nTriangles(nTriangles),
-      nVertices(nVertices),
-      vertexIndices(vertexIndices, vertexIndices + 3 * nTriangles),
+    : nTriangles(vertexIndices.size() / 3),
+      nVertices(P.size()),
+      vertexIndices(vertexIndices.begin(), vertexIndices.end()),
       alphaMask(alphaMask),
       shadowAlphaMask(shadowAlphaMask) {
+    CHECK_EQ((vertexIndices.size() % 3), 0);
     ++nMeshes;
     nTris += nTriangles;
-    triMeshBytes += sizeof(*this) + (3 * nTriangles * sizeof(int)) +
-                    nVertices * (sizeof(*P) + (N ? sizeof(*N) : 0) +
-                                 (S ? sizeof(*S) : 0) + (UV ? sizeof(*UV) : 0));
+    triMeshBytes +=
+        sizeof(*this) + (3 * nTriangles * sizeof(int)) +
+        nVertices * (sizeof(P[0]) + (N.size() > 0 ? sizeof(N[0]) : 0) +
+                     (S.size() > 0 ? sizeof(S[0]) : 0) +
+                     (UV.size() > 0 ? sizeof(UV[0]) : 0));
 
     // Transform mesh vertices to world space
-    p.reset(new Point3f[nVertices]);
+    p.resize(nVertices);
     for (int i = 0; i < nVertices; ++i) p[i] = ObjectToWorld(P[i]);
 
     // Copy _UV_, _N_, and _S_ vertex data, if present
-    if (UV) {
-        uv.reset(new Point2f[nVertices]);
-        memcpy(uv.get(), UV, nVertices * sizeof(Point2f));
+    if (UV.size() > 0) {
+        CHECK_GE(UV.size(), nVertices);
+        uv = {UV.begin(), UV.end()};
     }
-    if (N) {
-        n.reset(new Normal3f[nVertices]);
+    if (N.size() > 0) {
+        CHECK_GE(N.size(), nVertices);
+        n.resize(nVertices);
         for (int i = 0; i < nVertices; ++i) n[i] = ObjectToWorld(N[i]);
     }
-    if (S) {
-        s.reset(new Vector3f[nVertices]);
+    if (S.size() > 0) {
+        s.resize(nVertices);
         for (int i = 0; i < nVertices; ++i) s[i] = ObjectToWorld(S[i]);
     }
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform *ObjectToWorld, const Transform *WorldToObject,
-    bool reverseOrientation, int nTriangles, const int *vertexIndices,
-    int nVertices, const Point3f *p, const Vector3f *s, const Normal3f *n,
-    const Point2f *uv, const std::shared_ptr<Texture<Float>> &alphaMask,
+    bool reverseOrientation, ArraySlice<int> vertexIndices,
+    ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
+    ArraySlice<Point2f> uv, const std::shared_ptr<Texture<Float>> &alphaMask,
     const std::shared_ptr<Texture<Float>> &shadowAlphaMask) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
-        *ObjectToWorld, nTriangles, vertexIndices, nVertices, p, s, n, uv,
-        alphaMask, shadowAlphaMask);
+        *ObjectToWorld, vertexIndices, p, s, n, uv, alphaMask, shadowAlphaMask);
     std::vector<std::shared_ptr<Shape>> tris;
+    size_t nTriangles = vertexIndices.size() / 3;
     tris.reserve(nTriangles);
     for (int i = 0; i < nTriangles; ++i)
         tris.push_back(std::make_shared<Triangle>(ObjectToWorld, WorldToObject,
@@ -103,9 +109,12 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     return tris;
 }
 
-bool WritePlyFile(const std::string &filename, int nTriangles,
-                  const int *vertexIndices, int nVertices, const Point3f *P,
-                  const Vector3f *S, const Normal3f *N, const Point2f *UV) {
+bool WritePlyFile(const std::string &filename, ArraySlice<int> vertexIndices,
+                  ArraySlice<Point3f> P, ArraySlice<Vector3f> S,
+                  ArraySlice<Normal3f> N, ArraySlice<Point2f> UV) {
+    size_t nVertices = P.size();
+    size_t nTriangles = vertexIndices.size() / 3;
+    CHECK_EQ(vertexIndices.size() % 3, 0);
     p_ply plyFile =
         ply_create(filename.c_str(), PLY_DEFAULT, PlyErrorCallback, 0, nullptr);
     if (plyFile != nullptr) {
@@ -113,16 +122,16 @@ bool WritePlyFile(const std::string &filename, int nTriangles,
         ply_add_scalar_property(plyFile, "x", PLY_FLOAT);
         ply_add_scalar_property(plyFile, "y", PLY_FLOAT);
         ply_add_scalar_property(plyFile, "z", PLY_FLOAT);
-        if (N != nullptr) {
+        if (N.size() > 0) {
             ply_add_scalar_property(plyFile, "nx", PLY_FLOAT);
             ply_add_scalar_property(plyFile, "ny", PLY_FLOAT);
             ply_add_scalar_property(plyFile, "nz", PLY_FLOAT);
         }
-        if (UV != nullptr) {
+        if (UV.size() > 0) {
             ply_add_scalar_property(plyFile, "u", PLY_FLOAT);
             ply_add_scalar_property(plyFile, "v", PLY_FLOAT);
         }
-        if (S != nullptr)
+        if (S.size() > 0)
             Warning("PLY mesh in \"%s\" will be missing tangent vectors \"S\".",
                     filename.c_str());
 
@@ -134,12 +143,12 @@ bool WritePlyFile(const std::string &filename, int nTriangles,
             ply_write(plyFile, P[i].x);
             ply_write(plyFile, P[i].y);
             ply_write(plyFile, P[i].z);
-            if (N) {
+            if (N.size() > 0) {
                 ply_write(plyFile, N[i].x);
                 ply_write(plyFile, N[i].y);
                 ply_write(plyFile, N[i].z);
             }
-            if (UV) {
+            if (UV.size() > 0) {
                 ply_write(plyFile, UV[i].x);
                 ply_write(plyFile, UV[i].y);
             }
@@ -326,12 +335,12 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
 
     // Override surface normal in _isect_ for triangle
     isect->n = isect->shading.n = Normal3f(Normalize(Cross(dp02, dp12)));
-    if (mesh->n || mesh->s) {
+    if (mesh->n.size() || mesh->s.size()) {
         // Initialize _Triangle_ shading geometry
 
         // Compute shading normal _ns_ for triangle
         Normal3f ns;
-        if (mesh->n) {
+        if (mesh->n.size()) {
             ns = (b0 * mesh->n[v[0]] + b1 * mesh->n[v[1]] + b2 * mesh->n[v[2]]);
             if (ns.LengthSquared() > 0)
                 ns = Normalize(ns);
@@ -342,7 +351,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
 
         // Compute shading tangent _ss_ for triangle
         Vector3f ss;
-        if (mesh->s) {
+        if (mesh->s.size()) {
             ss = (b0 * mesh->s[v[0]] + b1 * mesh->s[v[1]] + b2 * mesh->s[v[2]]);
             if (ss.LengthSquared() > 0)
                 ss = Normalize(ss);
@@ -361,7 +370,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
 
         // Compute $\dndu$ and $\dndv$ for triangle shading geometry
         Normal3f dndu, dndv;
-        if (mesh->n) {
+        if (mesh->n.size()) {
             // Compute deltas for triangle partial derivatives of normal
             Vector2f duv02 = uv[0] - uv[2];
             Vector2f duv12 = uv[1] - uv[2];
@@ -382,7 +391,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     }
 
     // Ensure correct orientation of the geometric normal
-    if (mesh->n)
+    if (mesh->n.size())
         isect->n = Faceforward(isect->n, isect->shading.n);
     else if (reverseOrientation ^ transformSwapsHandedness)
         isect->n = isect->shading.n = -isect->n;
@@ -552,7 +561,7 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
     it.n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
     // Ensure correct orientation of the geometric normal; follow the same
     // approach as was used in Triangle::Intersect().
-    if (mesh->n) {
+    if (mesh->n.size()) {
         Normal3f ns(b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] +
                     (1 - b[0] - b[1]) * mesh->n[v[2]]);
         it.n = Faceforward(it.n, ns);
@@ -609,61 +618,61 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     const Transform *o2w, const Transform *w2o, bool reverseOrientation,
     const ParamSet &params,
     std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures) {
-    int nvi, npi, nuvi, nsi, nni;
-    const int *vi = params.FindInt("indices", &nvi);
-    const Point3f *P = params.FindPoint3f("P", &npi);
-    const Point2f *uvs = params.FindPoint2f("uv", &nuvi);
-    if (!uvs) uvs = params.FindPoint2f("st", &nuvi);
+    ArraySlice<int> vi = params.FindInt("indices");
+    ArraySlice<Point3f> P = params.FindPoint3f("P");
+    ArraySlice<Point2f> uvs = params.FindPoint2f("uv");
+    if (uvs.empty()) uvs = params.FindPoint2f("st");
     std::vector<Point2f> tempUVs;
-    if (!uvs) {
-        const Float *fuv = params.FindFloat("uv", &nuvi);
-        if (!fuv) fuv = params.FindFloat("st", &nuvi);
-        if (fuv) {
-            nuvi /= 2;
-            tempUVs.reserve(nuvi);
-            for (int i = 0; i < nuvi; ++i)
+    if (uvs.empty()) {
+        ArraySlice<Float> fuv = params.FindFloat("uv");
+        if (fuv.empty()) fuv = params.FindFloat("st");
+        if (!fuv.empty()) {
+            tempUVs.reserve(fuv.size() / 2);
+            for (size_t i = 0; i < fuv.size() / 2; ++i)
                 tempUVs.push_back(Point2f(fuv[2 * i], fuv[2 * i + 1]));
-            uvs = &tempUVs[0];
+            uvs = tempUVs;
         }
     }
-    if (uvs) {
-        if (nuvi < npi) {
+
+    if (!uvs.empty()) {
+        if (uvs.size() < P.size()) {
             Error(
                 "Not enough of \"uv\"s for triangle mesh.  Expected %d, "
                 "found %d.  Discarding.",
-                npi, nuvi);
-            uvs = nullptr;
-        } else if (nuvi > npi)
+                (int)P.size(), (int)uvs.size());
+            uvs = {};
+        } else if (uvs.size() > P.size())
             Warning(
                 "More \"uv\"s provided than will be used for triangle "
                 "mesh.  (%d expcted, %d found)",
-                npi, nuvi);
+                (int)P.size(), (int)uvs.size());
     }
-    if (!vi) {
+    if (vi.empty()) {
         Error(
             "Vertex indices \"indices\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    if (!P) {
+    if (P.empty()) {
         Error("Vertex positions \"P\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    const Vector3f *S = params.FindVector3f("S", &nsi);
-    if (S && nsi != npi) {
+    ArraySlice<Vector3f> S = params.FindVector3f("S");
+    if (!S.empty() && S.size() != P.size()) {
         Error("Number of \"S\"s for triangle mesh must match \"P\"s");
-        S = nullptr;
+        S = {};
     }
-    const Normal3f *N = params.FindNormal3f("N", &nni);
-    if (N && nni != npi) {
+    ArraySlice<Normal3f> N = params.FindNormal3f("N");
+    if (!N.empty() && N.size() != P.size()) {
         Error("Number of \"N\"s for triangle mesh must match \"P\"s");
-        N = nullptr;
+        N = {};
     }
-    for (int i = 0; i < nvi; ++i)
-        if (vi[i] >= npi) {
+
+    for (size_t i = 0; i < vi.size(); ++i)
+        if (vi[i] >= P.size()) {
             Error(
                 "trianglemesh has out of-bounds vertex index %d (%d \"P\" "
                 "values were given",
-                vi[i], npi);
+                vi[i], (int)P.size());
             return std::vector<std::shared_ptr<Shape>>();
         }
 
@@ -691,8 +700,8 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
         shadowAlphaTex.reset(new ConstantTexture<Float>(0.f));
 
-    return CreateTriangleMesh(o2w, w2o, reverseOrientation, nvi / 3, vi, npi, P,
-                              S, N, uvs, alphaTex, shadowAlphaTex);
+    return CreateTriangleMesh(o2w, w2o, reverseOrientation, vi, P, S, N, uvs,
+                              alphaTex, shadowAlphaTex);
 }
 
 }  // namespace pbrt
