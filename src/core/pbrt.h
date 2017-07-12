@@ -144,8 +144,6 @@ typedef float Float;
 class RNG;
 class ProgressReporter;
 class MemoryArena;
-template <typename T, int logBlockSize = 2>
-class BlockedArray;
 struct Matrix4x4;
 class ParamSet;
 template <typename T>
