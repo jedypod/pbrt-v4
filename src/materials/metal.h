@@ -57,8 +57,7 @@ class MetalMaterial : public Material {
                   const std::shared_ptr<Texture<Float>> &bump,
                   bool remapRoughness);
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // MetalMaterial Private Data

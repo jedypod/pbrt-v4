@@ -210,8 +210,7 @@ FourierMaterial::FourierMaterial(const std::string &filename,
 }
 
 void FourierMaterial::ComputeScatteringFunctions(
-    SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-    bool allowMultipleLobes) const {
+    SurfaceInteraction *si, MemoryArena &arena, TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
     si->bsdf = arena.Alloc<BSDF>(*si);

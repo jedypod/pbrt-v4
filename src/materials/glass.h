@@ -63,8 +63,7 @@ class GlassMaterial : public Material {
           bumpMap(bumpMap),
           remapRoughness(remapRoughness) {}
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // GlassMaterial Private Data

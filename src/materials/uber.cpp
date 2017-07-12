@@ -44,8 +44,7 @@ namespace pbrt {
 // UberMaterial Method Definitions
 void UberMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                               MemoryArena &arena,
-                                              TransportMode mode,
-                                              bool allowMultipleLobes) const {
+                                              TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
     Float e = eta->Evaluate(*si);

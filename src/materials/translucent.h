@@ -64,8 +64,7 @@ class TranslucentMaterial : public Material {
         remapRoughness = remap;
     }
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // TranslucentMaterial Private Data

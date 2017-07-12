@@ -74,8 +74,7 @@ class SubsurfaceMaterial : public Material {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // SubsurfaceMaterial Private Data

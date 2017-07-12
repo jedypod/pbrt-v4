@@ -58,8 +58,7 @@ class Primitive {
     virtual const Material *GetMaterial() const = 0;
     virtual void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                             MemoryArena &arena,
-                                            TransportMode mode,
-                                            bool allowMultipleLobes) const = 0;
+                                            TransportMode mode) const = 0;
 };
 
 // GeometricPrimitive Declarations
@@ -80,8 +79,7 @@ class GeometricPrimitive : public Primitive {
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
-                                    MemoryArena &arena, TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    MemoryArena &arena, TransportMode mode) const;
 
   private:
     // GeometricPrimitive Private Data
@@ -103,8 +101,7 @@ class TransformedPrimitive : public Primitive {
     const AreaLight *GetAreaLight() const { return nullptr; }
     const Material *GetMaterial() const { return nullptr; }
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
-                                    MemoryArena &arena, TransportMode mode,
-                                    bool allowMultipleLobes) const {
+                                    MemoryArena &arena, TransportMode mode) const {
         LOG(FATAL) <<
             "TransformedPrimitive::ComputeScatteringFunctions() shouldn't be "
             "called";
@@ -126,8 +123,7 @@ class Aggregate : public Primitive {
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
-                                    MemoryArena &arena, TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    MemoryArena &arena, TransportMode mode) const;
 };
 
 }  // namespace pbrt

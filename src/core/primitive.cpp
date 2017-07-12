@@ -57,8 +57,7 @@ const Material *Aggregate::GetMaterial() const {
 
 void Aggregate::ComputeScatteringFunctions(SurfaceInteraction *isect,
                                            MemoryArena &arena,
-                                           TransportMode mode,
-                                           bool allowMultipleLobes) const {
+                                           TransportMode mode) const {
     LOG(FATAL) <<
         "Aggregate::ComputeScatteringFunctions() method"
         "called; should have gone to GeometricPrimitive";
@@ -119,12 +118,10 @@ const Material *GeometricPrimitive::GetMaterial() const {
 }
 
 void GeometricPrimitive::ComputeScatteringFunctions(
-    SurfaceInteraction *isect, MemoryArena &arena, TransportMode mode,
-    bool allowMultipleLobes) const {
+    SurfaceInteraction *isect, MemoryArena &arena, TransportMode mode) const {
     ProfilePhase p(Prof::ComputeScatteringFuncs);
     if (material)
-        material->ComputeScatteringFunctions(isect, arena, mode,
-                                             allowMultipleLobes);
+        material->ComputeScatteringFunctions(isect, arena, mode);
     CHECK_GE(Dot(isect->n, isect->shading.n), 0.);
 }
 

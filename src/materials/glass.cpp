@@ -44,8 +44,7 @@ namespace pbrt {
 // GlassMaterial Method Definitions
 void GlassMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                MemoryArena &arena,
-                                               TransportMode mode,
-                                               bool allowMultipleLobes) const {
+                                               TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
     Float eta = index->Evaluate(*si);
@@ -59,7 +58,7 @@ void GlassMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (R.IsBlack() && T.IsBlack()) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
-    if (isSpecular && allowMultipleLobes) {
+    if (isSpecular) {
         si->bsdf->Add(arena.Alloc<FresnelSpecular>(R, T, 1.f, eta, mode));
     } else {
         if (remapRoughness) {
@@ -71,16 +70,10 @@ void GlassMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             : arena.Alloc<TrowbridgeReitzDistribution>(urough, vrough);
         if (!R.IsBlack()) {
             Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, eta);
-            if (isSpecular)
-                si->bsdf->Add(arena.Alloc<SpecularReflection>(R, fresnel));
-            else
-                si->bsdf->Add(arena.Alloc<MicrofacetReflection>(R, distrib, fresnel));
+            si->bsdf->Add(arena.Alloc<MicrofacetReflection>(R, distrib, fresnel));
         }
         if (!T.IsBlack()) {
-            if (isSpecular)
-                si->bsdf->Add(arena.Alloc<SpecularTransmission>(T, 1.f, eta, mode));
-            else
-                si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(T, distrib, 1.f, eta, mode));
+            si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(T, distrib, 1.f, eta, mode));
         }
     }
 }

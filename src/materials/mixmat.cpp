@@ -45,14 +45,13 @@ namespace pbrt {
 // MixMaterial Method Definitions
 void MixMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                              MemoryArena &arena,
-                                             TransportMode mode,
-                                             bool allowMultipleLobes) const {
+                                             TransportMode mode) const {
     // Compute weights and original _BxDF_s for mix material
     Spectrum s1 = scale->Evaluate(*si).Clamp();
     Spectrum s2 = (Spectrum(1.f) - s1).Clamp();
     SurfaceInteraction si2 = *si;
-    m1->ComputeScatteringFunctions(si, arena, mode, allowMultipleLobes);
-    m2->ComputeScatteringFunctions(&si2, arena, mode, allowMultipleLobes);
+    m1->ComputeScatteringFunctions(si, arena, mode);
+    m2->ComputeScatteringFunctions(&si2, arena, mode);
 
     // Initialize _si->bsdf_ with weighted mixture of _BxDF_s
     int n1 = si->bsdf->NumComponents(), n2 = si2.bsdf->NumComponents();

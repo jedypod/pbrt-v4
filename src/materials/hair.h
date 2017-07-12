@@ -74,8 +74,7 @@ class HairMaterial : public Material {
           beta_n(beta_n),
           alpha(alpha) {}
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // HairMaterial Private Data

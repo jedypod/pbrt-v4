@@ -139,8 +139,7 @@ static Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
 // HairMaterial Method Definitions
 void HairMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                               MemoryArena &arena,
-                                              TransportMode mode,
-                                              bool allowMultipleLobes) const {
+                                              TransportMode mode) const {
     Float bm = beta_m->Evaluate(*si);
     Float bn = beta_n->Evaluate(*si);
     Float a = Radians(alpha->Evaluate(*si));

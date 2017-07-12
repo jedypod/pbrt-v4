@@ -54,8 +54,7 @@ class MirrorMaterial : public Material {
         bumpMap = bump;
     }
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode,
-                                    bool allowMultipleLobes) const;
+                                    TransportMode mode) const;
 
   private:
     // MirrorMaterial Private Data
