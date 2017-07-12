@@ -168,23 +168,23 @@ class TextureParams;
 #define MaxFloat std::numeric_limits<Float>::max()
 #define Infinity std::numeric_limits<Float>::infinity()
 #else
-static PBRT_CONSTEXPR Float MaxFloat = std::numeric_limits<Float>::max();
-static PBRT_CONSTEXPR Float Infinity = std::numeric_limits<Float>::infinity();
+static constexpr Float MaxFloat = std::numeric_limits<Float>::max();
+static constexpr Float Infinity = std::numeric_limits<Float>::infinity();
 #endif
 #ifdef _MSC_VER
 #define MachineEpsilon (std::numeric_limits<Float>::epsilon() * 0.5)
 #else
-static PBRT_CONSTEXPR Float MachineEpsilon =
+static constexpr Float MachineEpsilon =
     std::numeric_limits<Float>::epsilon() * 0.5;
 #endif
-static PBRT_CONSTEXPR Float ShadowEpsilon = 0.0001f;
-static PBRT_CONSTEXPR Float Pi = 3.14159265358979323846;
-static PBRT_CONSTEXPR Float InvPi = 0.31830988618379067154;
-static PBRT_CONSTEXPR Float Inv2Pi = 0.15915494309189533577;
-static PBRT_CONSTEXPR Float Inv4Pi = 0.07957747154594766788;
-static PBRT_CONSTEXPR Float PiOver2 = 1.57079632679489661923;
-static PBRT_CONSTEXPR Float PiOver4 = 0.78539816339744830961;
-static PBRT_CONSTEXPR Float Sqrt2 = 1.41421356237309504880;
+static constexpr Float ShadowEpsilon = 0.0001f;
+static constexpr Float Pi = 3.14159265358979323846;
+static constexpr Float InvPi = 0.31830988618379067154;
+static constexpr Float Inv2Pi = 0.15915494309189533577;
+static constexpr Float Inv4Pi = 0.07957747154594766788;
+static constexpr Float PiOver2 = 1.57079632679489661923;
+static constexpr Float PiOver4 = 0.78539816339744830961;
+static constexpr Float Sqrt2 = 1.41421356237309504880;
 #if defined(PBRT_IS_MSVC)
 #define alloca _alloca
 #endif
@@ -338,7 +338,7 @@ inline int Log2Int(uint64_t v) {
 inline int Log2Int(int64_t v) { return Log2Int((uint64_t)v); }
 
 template <typename T>
-inline PBRT_CONSTEXPR bool IsPowerOf2(T v) {
+inline constexpr bool IsPowerOf2(T v) {
     return v && !(v & (v - 1));
 }
 

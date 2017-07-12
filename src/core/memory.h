@@ -55,11 +55,8 @@ T *AllocAligned(size_t count) {
 }
 
 void FreeAligned(void *);
-class
-#ifdef PBRT_HAVE_ALIGNAS
-alignas(PBRT_L1_CACHE_LINE_SIZE)
-#endif // PBRT_HAVE_ALIGNAS
-    MemoryArena {
+class alignas(PBRT_L1_CACHE_LINE_SIZE)
+MemoryArena {
   public:
     // MemoryArena Public Methods
     MemoryArena(size_t blockSize = 262144) : blockSize(blockSize) {}
@@ -73,14 +70,10 @@ alignas(PBRT_L1_CACHE_LINE_SIZE)
 #if __GNUC__ == 4 && __GNUC_MINOR__ < 9
         // gcc bug: max_align_t wasn't in std:: until 4.9.0
         const int align = alignof(::max_align_t);
-#elif !defined(PBRT_HAVE_ALIGNOF)
-        const int align = 16;
 #else
         const int align = alignof(std::max_align_t);
 #endif
-#ifndef PBRT_IS_MSVC2013
         static_assert(IsPowerOf2(align), "Minimum alignment not a power of two");
-#endif
         nBytes = (nBytes + align - 1) & ~(align - 1);
         if (currentBlockPos + nBytes > currentAllocSize) {
             // Add current block to _usedBlocks_ list
@@ -154,7 +147,7 @@ class BlockedArray {
             for (int v = 0; v < vRes; ++v)
                 for (int u = 0; u < uRes; ++u) (*this)(u, v) = d[v * uRes + u];
     }
-    PBRT_CONSTEXPR int BlockSize() const { return 1 << logBlockSize; }
+    constexpr int BlockSize() const { return 1 << logBlockSize; }
     int RoundUp(int x) const {
         return (x + BlockSize() - 1) & ~(BlockSize() - 1);
     }

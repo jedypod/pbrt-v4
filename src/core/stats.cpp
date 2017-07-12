@@ -319,7 +319,7 @@ void ReportProfilerResults(FILE *dest) {
 #ifdef PBRT_HAVE_ITIMER
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
 
-    PBRT_CONSTEXPR int NumProfCategories = (int)Prof::NumProfCategories;
+    constexpr int NumProfCategories = (int)Prof::NumProfCategories;
     uint64_t overallCount = 0;
     uint64_t eventCount[NumProfCategories] = {0};
     int used = 0;

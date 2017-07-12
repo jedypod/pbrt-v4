@@ -48,7 +48,7 @@ inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz);
 inline Float NoiseWeight(Float t);
 
 // Perlin Noise Data
-static PBRT_CONSTEXPR int NoisePermSize = 256;
+static constexpr int NoisePermSize = 256;
 static int NoisePerm[2 * NoisePermSize] = {
     151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140,
     36, 103, 30, 69, 142,

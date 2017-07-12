@@ -160,7 +160,7 @@ Spectrum ImageTexelProvider::BilerpSpectrum(int level, Point2f st) const {
 
 ///////////////////////////////////////////////////////////////////////////
 
-static PBRT_CONSTEXPR int WeightLUTSize = 128;
+static constexpr int WeightLUTSize = 128;
 static Float weightLut[WeightLUTSize];
 
 // MIPMap Method Definitions

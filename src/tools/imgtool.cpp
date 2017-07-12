@@ -144,7 +144,7 @@ int makesky(int argc, char *argv[]) {
         }
     }
 
-    PBRT_CONSTEXPR int num_channels = 9;
+    constexpr int num_channels = 9;
     // Three wavelengths around red, three around green, and three around blue.
     double lambda[num_channels] = {630, 680, 710, 500, 530, 560, 460, 480, 490};
 

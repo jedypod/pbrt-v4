@@ -107,7 +107,6 @@ struct LinearBVHNode {
 inline uint32_t LeftShift3(uint32_t x) {
     CHECK_LE(x, (1 << 10));
     if (x == (1 << 10)) --x;
-#ifdef PBRT_HAVE_BINARY_CONSTANTS
     x = (x | (x << 16)) & 0b00000011000000000000000011111111;
     // x = ---- --98 ---- ---- ---- ---- 7654 3210
     x = (x | (x << 8)) & 0b00000011000000001111000000001111;
@@ -116,16 +115,6 @@ inline uint32_t LeftShift3(uint32_t x) {
     // x = ---- --98 ---- 76-- --54 ---- 32-- --10
     x = (x | (x << 2)) & 0b00001001001001001001001001001001;
     // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-#else
-    x = (x | (x << 16)) & 0x30000ff;
-    // x = ---- --98 ---- ---- ---- ---- 7654 3210
-    x = (x | (x << 8)) & 0x300f00f;
-    // x = ---- --98 ---- ---- 7654 ---- ---- 3210
-    x = (x | (x << 4)) & 0x30c30c3;
-    // x = ---- --98 ---- 76-- --54 ---- 32-- --10
-    x = (x | (x << 2)) & 0x9249249;
-    // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-#endif // PBRT_HAVE_BINARY_CONSTANTS
     return x;
 }
 
@@ -138,11 +127,11 @@ inline uint32_t EncodeMorton3(const Vector3f &v) {
 
 static void RadixSort(std::vector<MortonPrimitive> *v) {
     std::vector<MortonPrimitive> tempVector(v->size());
-    PBRT_CONSTEXPR int bitsPerPass = 6;
-    PBRT_CONSTEXPR int nBits = 30;
+    constexpr int bitsPerPass = 6;
+    constexpr int nBits = 30;
     static_assert((nBits % bitsPerPass) == 0,
                   "Radix sort bitsPerPass must evenly divide nBits");
-    PBRT_CONSTEXPR int nPasses = nBits / bitsPerPass;
+    constexpr int nPasses = nBits / bitsPerPass;
 
     for (int pass = 0; pass < nPasses; ++pass) {
         // Perform one pass of radix sort, sorting _bitsPerPass_ bits
@@ -153,9 +142,9 @@ static void RadixSort(std::vector<MortonPrimitive> *v) {
         std::vector<MortonPrimitive> &out = (pass & 1) ? *v : tempVector;
 
         // Count number of zero bits in array for current radix sort bit
-        PBRT_CONSTEXPR int nBuckets = 1 << bitsPerPass;
+        constexpr int nBuckets = 1 << bitsPerPass;
         int bucketCount[nBuckets] = {0};
-        PBRT_CONSTEXPR int bitMask = (1 << bitsPerPass) - 1;
+        constexpr int bitMask = (1 << bitsPerPass) - 1;
         for (const MortonPrimitive &mp : in) {
             int bucket = (mp.mortonCode >> lowBit) & bitMask;
             CHECK_GE(bucket, 0);
@@ -314,7 +303,7 @@ BVHBuildNode *BVHAccel::recursiveBuild(
                                      });
                 } else {
                     // Allocate _BucketInfo_ for SAH partition buckets
-                    PBRT_CONSTEXPR int nBuckets = 12;
+                    constexpr int nBuckets = 12;
                     BucketInfo buckets[nBuckets];
 
                     // Initialize _BucketInfo_ for SAH partition buckets
@@ -411,8 +400,8 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
     std::vector<MortonPrimitive> mortonPrims(primitiveInfo.size());
     ParallelFor([&](int i) {
         // Initialize _mortonPrims[i]_ for _i_th primitive
-        PBRT_CONSTEXPR int mortonBits = 10;
-        PBRT_CONSTEXPR int mortonScale = 1 << mortonBits;
+        constexpr int mortonBits = 10;
+        constexpr int mortonScale = 1 << mortonBits;
         mortonPrims[i].primitiveIndex = primitiveInfo[i].primitiveNumber;
         Vector3f centroidOffset = bounds.Offset(primitiveInfo[i].centroid);
         mortonPrims[i].mortonCode = EncodeMorton3(centroidOffset * mortonScale);
@@ -426,11 +415,7 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
     // Find intervals of primitives for each treelet
     std::vector<LBVHTreelet> treeletsToBuild;
     for (int start = 0, end = 1; end <= (int)mortonPrims.size(); ++end) {
-#ifdef PBRT_HAVE_BINARY_CONSTANTS
       uint32_t mask = 0b00111111111111000000000000000000;
-#else
-      uint32_t mask = 0x3ffc0000;
-#endif
       if (end == (int)mortonPrims.size() ||
             ((mortonPrims[start].mortonCode & mask) !=
              (mortonPrims[end].mortonCode & mask))) {
@@ -561,7 +546,7 @@ BVHBuildNode *BVHAccel::buildUpperSAH(MemoryArena &arena,
     CHECK_NE(centroidBounds.pMax[dim], centroidBounds.pMin[dim]);
 
     // Allocate _BucketInfo_ for SAH partition buckets
-    PBRT_CONSTEXPR int nBuckets = 12;
+    constexpr int nBuckets = 12;
     struct BucketInfo {
         int count = 0;
         Bounds3f bounds;

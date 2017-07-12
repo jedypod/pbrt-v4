@@ -59,8 +59,8 @@
    #define PBRT_IS_MSVC2015
 #endif
 
-#if defined(_MSC_VER) && _MSC_VER == 1800
-  #define PBRT_IS_MSVC2013
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#error "MSVC Version must be 2015 or later"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////
@@ -68,8 +68,8 @@
 // various target-specific workarounds.
 
 #if !defined(PBRT_IS_MSVC)
+  // Only arriving in MSVC2017 :-p
   #define PBRT_HAVE_HEX_FP_CONSTANTS
-  #define PBRT_HAVE_BINARY_CONSTANTS
 #endif
 
 #if defined(PBRT_IS_LINUX) || defined(PBRT_IS_WINDOWS)
@@ -84,21 +84,6 @@
   #define PBRT_THREAD_LOCAL __declspec(thread)
 #else
   #define PBRT_THREAD_LOCAL __thread
-#endif
-
-#ifdef PBRT_IS_MSVC2013
-  #define PBRT_CONSTEXPR const
-#else
-  #define PBRT_CONSTEXPR constexpr
-#endif
-
-#if !defined(PBRT_IS_MSVC2013)
-  #define PBRT_HAVE_ALIGNAS
-  #define PBRT_HAVE_ALIGNOF
-#endif
-
-#ifdef PBRT_IS_MSVC2013
-  #define snprintf _snprintf
 #endif
 
 #ifndef PBRT_L1_CACHE_LINE_SIZE

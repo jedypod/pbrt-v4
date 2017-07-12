@@ -66,19 +66,15 @@ class TileHashTable;
 
 // Texture Cache Constants
 static const uint32_t tiledFileMagic = 0x65028088;
-static PBRT_CONSTEXPR int TileDiskAlignment = 4096;
+static constexpr int TileDiskAlignment = 4096;
 #ifdef PBRT_IS_LINUX
-static PBRT_CONSTEXPR int MaxOpenFiles = 4000;
+static constexpr int MaxOpenFiles = 4000;
 #else
-static PBRT_CONSTEXPR int MaxOpenFiles = 200;  // TODO: how big?
+static constexpr int MaxOpenFiles = 200;  // TODO: how big?
 #endif
 
 // ActiveFlag Declarations
-#ifdef PBRT_HAVE_ALIGNAS
 struct alignas(PBRT_L1_CACHE_LINE_SIZE) ActiveFlag {
-#else
-struct ActiveFlag { char pad[PBRT_L1_CACHE_LINE_SIZE];
-#endif
     std::atomic<bool> flag{false};
 };
 
@@ -223,7 +219,7 @@ class TextureCache {
     void FreeTiles();
 
     // TextureCache Private Data
-    static PBRT_CONSTEXPR int TileAllocSize = 3 * 64 * 64;
+    static constexpr int TileAllocSize = 3 * 64 * 64;
     std::unique_ptr<char[]> tileMemAlloc;
     std::unique_ptr<TextureTile[]> allTilesAlloc;
     std::mutex freeTilesMutex;
@@ -233,12 +229,7 @@ class TextureCache {
     std::vector<TiledImagePyramid> textures;
     std::vector<ActiveFlag> threadActiveFlags;
 
-#ifdef PBRT_HAVE_ALIGNAS
-    alignas(PBRT_L1_CACHE_LINE_SIZE)
-#else
-    char pad[PBRT_L1_CACHE_LINE_SIZE];
-#endif
-    std::mutex outstandingReadsMutex;
+    alignas(PBRT_L1_CACHE_LINE_SIZE) std::mutex outstandingReadsMutex;
 
     std::vector<TileId> outstandingReads;
     std::condition_variable outstandingReadsCondition;

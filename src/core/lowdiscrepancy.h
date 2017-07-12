@@ -49,7 +49,7 @@ namespace pbrt {
 // Low Discrepancy Declarations
 Float RadicalInverse(int baseIndex, uint64_t a);
 std::vector<uint16_t> ComputeRadicalInversePermutations(RNG &rng);
-static PBRT_CONSTEXPR int PrimeTableSize = 1000;
+static constexpr int PrimeTableSize = 1000;
 extern const int Primes[PrimeTableSize];
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const uint16_t *perm);
 extern const int PrimeSums[PrimeTableSize];
@@ -146,7 +146,6 @@ inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
     uint32_t scramble = rng.UniformUInt32();
     // Define _CVanDerCorput_ Generator Matrix
     const uint32_t CVanDerCorput[32] = {
-#ifdef PBRT_HAVE_BINARY_CONSTANTS
       // clang-format off
       0b10000000000000000000000000000000,
       0b1000000000000000000000000000000,
@@ -182,14 +181,6 @@ inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
       0b10,
       0b1,
       // clang-format on
-#else
-        0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x8000000, 0x4000000,
-        0x2000000,  0x1000000,  0x800000,   0x400000,   0x200000,  0x100000,
-        0x80000,    0x40000,    0x20000,    0x10000,    0x8000,    0x4000,
-        0x2000,     0x1000,     0x800,      0x400,      0x200,     0x100,
-        0x80,       0x40,       0x20,       0x10,       0x8,       0x4,
-        0x2,        0x1
-#endif  // PBRT_HAVE_BINARY_CONSTANTS
     };
     int totalSamples = nSamplesPerPixelSample * nPixelSamples;
     GrayCodeSample(CVanDerCorput, totalSamples, scramble, samples);

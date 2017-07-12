@@ -369,7 +369,7 @@ static bool ReadImageTGA(const std::string &name, bool gamma, Image *image) {
  * (http://people.csail.mit.edu/jiawen/)
  */
 
-static PBRT_CONSTEXPR bool hostLittleEndian =
+static constexpr bool hostLittleEndian =
 #if defined(__BYTE_ORDER__)
   #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     true
