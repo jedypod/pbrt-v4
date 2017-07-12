@@ -56,6 +56,7 @@
 #include "integrators/bdpt.h"
 #include "integrators/directlighting.h"
 #include "integrators/mlt.h"
+#include "integrators/ao.h"
 #include "integrators/path.h"
 #include "integrators/sppm.h"
 #include "integrators/volpath.h"
@@ -67,6 +68,7 @@
 #include "lights/point.h"
 #include "lights/projection.h"
 #include "lights/spot.h"
+#include "materials/disney.h"
 #include "materials/fourier.h"
 #include "materials/glass.h"
 #include "materials/hair.h"
@@ -423,6 +425,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         material = CreateMirrorMaterial(mp);
     else if (name == "hair")
         material = CreateHairMaterial(mp);
+    else if (name == "disney")
+        material = CreateDisneyMaterial(mp);
     else if (name == "mix") {
         std::string m1 = mp.FindString("namedmaterial1", "");
         std::string m2 = mp.FindString("namedmaterial2", "");
@@ -1456,6 +1460,8 @@ Integrator *RenderOptions::MakeIntegrator() const {
         integrator = CreateBDPTIntegrator(IntegratorParams, sampler, camera);
     } else if (IntegratorName == "mlt") {
         integrator = CreateMLTIntegrator(IntegratorParams, camera);
+    } else if (IntegratorName == "ambientocclusion") {
+        integrator = CreateAOIntegrator(IntegratorParams, sampler, camera);
     } else if (IntegratorName == "sppm") {
         integrator = CreateSPPMIntegrator(IntegratorParams, camera);
     } else {

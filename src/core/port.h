@@ -94,6 +94,7 @@
 
 #if !defined(PBRT_IS_MSVC2013)
   #define PBRT_HAVE_ALIGNAS
+  #define PBRT_HAVE_ALIGNOF
 #endif
 
 #ifdef PBRT_IS_MSVC2013
@@ -108,6 +109,11 @@
   #define PBRT_FORCEINLINE __forceinline
 #else
   #define PBRT_FORCEINLINE __attribute__((always_inline)) inline
+#endif
+
+// Is setitimer() available (and working)?
+#if !defined(PBRT_IS_WINDOWS) && !defined(__CYGWIN__)
+  #define PBRT_HAVE_ITIMER
 #endif
 
 #endif // PBRT_CORE_PORT_H
