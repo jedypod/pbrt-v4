@@ -58,16 +58,11 @@ T *AllocAligned(size_t count) {
 
 void FreeAligned(void *);
 
- class alignas(PBRT_L1_CACHE_LINE_SIZE)
+class alignas(PBRT_L1_CACHE_LINE_SIZE)
 MemoryArena {
   public:
     // MemoryArena Public Methods
     MemoryArena(size_t blockSize = 262144) : blockSize(blockSize) {}
-    ~MemoryArena() {
-        FreeAligned(currentBlock);
-        for (auto &block : usedBlocks) FreeAligned(block.second);
-        for (auto &block : availableBlocks) FreeAligned(block.second);
-    }
     void *Alloc(size_t nBytes) {
         // Round up _nBytes_ to minimum machine alignment
 #if __GNUC__ == 4 && __GNUC_MINOR__ < 9
@@ -82,7 +77,7 @@ MemoryArena {
             // Add current block to _usedBlocks_ list
             if (currentBlock) {
                 usedBlocks.push_back(
-                    std::make_pair(currentAllocSize, currentBlock));
+                    std::make_pair(currentAllocSize, std::move(currentBlock)));
                 currentBlock = nullptr;
                 currentAllocSize = 0;
             }
@@ -94,18 +89,18 @@ MemoryArena {
                  iter != availableBlocks.end(); ++iter) {
                 if (iter->first >= nBytes) {
                     currentAllocSize = iter->first;
-                    currentBlock = iter->second;
+                    currentBlock = std::move(iter->second);
                     availableBlocks.erase(iter);
                     break;
                 }
             }
             if (!currentBlock) {
                 currentAllocSize = std::max(nBytes, blockSize);
-                currentBlock = AllocAligned<uint8_t>(currentAllocSize);
+                currentBlock.reset(new char[currentAllocSize]);
             }
             currentBlockPos = 0;
         }
-        void *ret = currentBlock + currentBlockPos;
+        void *ret = currentBlock.get() + currentBlockPos;
         currentBlockPos += nBytes;
         return ret;
     }
@@ -137,8 +132,8 @@ MemoryArena {
     // MemoryArena Private Data
     const size_t blockSize;
     size_t currentBlockPos = 0, currentAllocSize = 0;
-    uint8_t *currentBlock = nullptr;
-    std::list<std::pair<size_t, uint8_t *>> usedBlocks, availableBlocks;
+    std::unique_ptr<char[]> currentBlock;
+    std::list<std::pair<size_t, std::unique_ptr<char[]>>> usedBlocks, availableBlocks;
 };
 
 }  // namespace pbrt
