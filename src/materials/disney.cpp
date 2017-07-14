@@ -480,7 +480,7 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                 MemoryArena &arena,
                                                 TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
-    if (bumpMap) Bump(bumpMap, si);
+    if (bumpMap) Bump(*bumpMap, si);
 
     // Evaluate textures for _DisneyMaterial_ material and allocate BRDF
     si->bsdf = arena.Alloc<BSDF>(*si);

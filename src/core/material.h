@@ -55,8 +55,7 @@ class Material {
                                             MemoryArena &arena,
                                             TransportMode mode) const = 0;
     virtual ~Material();
-    static void Bump(const std::shared_ptr<Texture<Float>> &d,
-                     SurfaceInteraction *si);
+    static void Bump(const Texture<Float> &d, SurfaceInteraction *si);
 };
 
 }  // namespace pbrt

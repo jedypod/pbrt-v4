@@ -45,7 +45,7 @@ namespace pbrt {
 void TranslucentMaterial::ComputeScatteringFunctions(
     SurfaceInteraction *si, MemoryArena &arena, TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
-    if (bumpMap) Bump(bumpMap, si);
+    if (bumpMap) Bump(*bumpMap, si);
     Float eta = 1.5f;
     si->bsdf = arena.Alloc<BSDF>(*si, eta);
 

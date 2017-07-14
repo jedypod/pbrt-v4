@@ -43,8 +43,7 @@ namespace pbrt {
 // Material Method Definitions
 Material::~Material() {}
 
-void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
-                    SurfaceInteraction *si) {
+void Material::Bump(const Texture<Float> &d, SurfaceInteraction *si) {
     // Compute offset positions and evaluate displacement texture
     SurfaceInteraction siEval = *si;
 
@@ -59,7 +58,7 @@ void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
     siEval.uv = si->uv + Vector2f(du, 0.f);
     siEval.n = Normalize((Normal3f)Cross(si->shading.dpdu, si->shading.dpdv) +
                          du * si->dndu);
-    Float uDisplace = d->Evaluate(siEval);
+    Float uDisplace = d.Evaluate(siEval);
 
     // Shift _siEval_ _dv_ in the $v$ direction
     Float dv = .5f * (std::abs(si->dvdx) + std::abs(si->dvdy));
@@ -68,8 +67,8 @@ void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
     siEval.uv = si->uv + Vector2f(0.f, dv);
     siEval.n = Normalize((Normal3f)Cross(si->shading.dpdu, si->shading.dpdv) +
                          dv * si->dndv);
-    Float vDisplace = d->Evaluate(siEval);
-    Float displace = d->Evaluate(*si);
+    Float vDisplace = d.Evaluate(siEval);
+    Float displace = d.Evaluate(*si);
 
     // Compute bump-mapped differential geometry
     Vector3f dpdu = si->shading.dpdu +

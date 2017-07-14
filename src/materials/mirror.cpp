@@ -46,7 +46,7 @@ void MirrorMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
                                                 MemoryArena &arena,
                                                 TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
-    if (bumpMap) Bump(bumpMap, si);
+    if (bumpMap) Bump(*bumpMap, si);
     si->bsdf = arena.Alloc<BSDF>(*si);
     Spectrum R = Kr->Evaluate(*si).Clamp();
     if (!R.IsBlack())

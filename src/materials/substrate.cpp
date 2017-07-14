@@ -45,7 +45,7 @@ namespace pbrt {
 void SubstrateMaterial::ComputeScatteringFunctions(
     SurfaceInteraction *si, MemoryArena &arena, TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
-    if (bumpMap) Bump(bumpMap, si);
+    if (bumpMap) Bump(*bumpMap, si);
     si->bsdf = arena.Alloc<BSDF>(*si);
     Spectrum d = Kd->Evaluate(*si).Clamp();
     Spectrum s = Ks->Evaluate(*si).Clamp();

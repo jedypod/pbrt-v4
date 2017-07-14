@@ -45,7 +45,7 @@ namespace pbrt {
 void PlasticMaterial::ComputeScatteringFunctions(
     SurfaceInteraction *si, MemoryArena &arena, TransportMode mode) const {
     // Perform bump mapping with _bumpMap_, if present
-    if (bumpMap) Bump(bumpMap, si);
+    if (bumpMap) Bump(*bumpMap, si);
     si->bsdf = arena.Alloc<BSDF>(*si);
     // Initialize diffuse component of plastic material
     Spectrum kd = Kd->Evaluate(*si).Clamp();
