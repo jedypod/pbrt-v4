@@ -44,10 +44,11 @@
 namespace pbrt {
 
 // Paraboloid Declarations
-class Paraboloid : public Shape {
+class Paraboloid : public TransformedShape {
   public:
     // Paraboloid Public Methods
-    Paraboloid(const Transform *o2w, const Transform *w2o,
+    Paraboloid(std::shared_ptr<const Transform> ObjectToWorld,
+               std::shared_ptr<const Transform> WorldToObject,
                bool reverseOrientation, Float radius, Float z0, Float z1,
                Float phiMax);
     Bounds3f ObjectBound() const;
@@ -62,10 +63,10 @@ class Paraboloid : public Shape {
     const Float radius, zMin, zMax, phiMax;
 };
 
-std::shared_ptr<Paraboloid> CreateParaboloidShape(const Transform *o2w,
-                                                  const Transform *w2o,
-                                                  bool reverseOrientation,
-                                                  const ParamSet &params);
+std::shared_ptr<Paraboloid> CreateParaboloidShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

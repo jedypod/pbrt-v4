@@ -92,7 +92,7 @@ TEST(Triangle, Watertight) {
 
     Transform identity;
     std::vector<std::shared_ptr<Shape>> tris =
-        CreateTriangleMesh(&identity, &identity, false, indices, vertices, {},
+        CreateTriangleMesh(identity, identity, false, indices, vertices, {},
                            {}, {}, nullptr, nullptr);
 
     for (int i = 0; i < 100000; ++i) {
@@ -142,7 +142,7 @@ std::shared_ptr<Triangle> GetRandomTriangle(std::function<Float()> value) {
     static Transform identity;
     int indices[3] = {0, 1, 2};
     std::vector<std::shared_ptr<Shape>> triVec =
-        CreateTriangleMesh(&identity, &identity, false, indices, v, {}, {}, {},
+        CreateTriangleMesh(identity, identity, false, indices, v, {}, {}, {},
                            nullptr, nullptr);
     EXPECT_EQ(1, triVec.size());
     std::shared_ptr<Triangle> tri =
@@ -330,9 +330,9 @@ static Float mcSolidAngle(const Point3f &p, const Shape &shape, int nSamples) {
 }
 
 TEST(Sphere, SolidAngle) {
-    Transform tr = Translate(Vector3f(1, .5, -.8)) * RotateX(30);
-    Transform trInv = Inverse(tr);
-    Sphere sphere(&tr, &trInv, false, 1, -1, 1, 360);
+    auto tr = std::make_shared<const Transform>(Translate(Vector3f(1, .5, -.8)) * RotateX(30));
+    auto trInv = std::make_shared<const Transform>(Inverse(*tr));
+    Sphere sphere(tr, trInv, false, 1, -1, 1, 360);
 
     // Make sure we get a subtended solid angle of 4pi for a point
     // inside the sphere.
@@ -349,9 +349,9 @@ TEST(Sphere, SolidAngle) {
 }
 
 TEST(Cylinder, SolidAngle) {
-    Transform tr = Translate(Vector3f(1, .5, -.8)) * RotateX(30);
-    Transform trInv = Inverse(tr);
-    Cylinder cyl(&tr, &trInv, false, .25, -1, 1, 360.);
+    auto tr = std::make_shared<const Transform>(Translate(Vector3f(1, .5, -.8)) * RotateX(30));
+    auto trInv = std::make_shared<const Transform>(Inverse(*tr));
+    Cylinder cyl(tr, trInv, false, .25, -1, 1, 360.);
 
     Point3f p(.5, .25, .5);
     const int nSamples = 128 * 1024;
@@ -360,9 +360,9 @@ TEST(Cylinder, SolidAngle) {
 }
 
 TEST(Disk, SolidAngle) {
-    Transform tr = Translate(Vector3f(1, .5, -.8)) * RotateX(30);
-    Transform trInv = Inverse(tr);
-    Disk disk(&tr, &trInv, false, 0, 1.25, 0, 360);
+    auto tr = std::make_shared<const Transform>(Translate(Vector3f(1, .5, -.8)) * RotateX(30));
+    auto trInv = std::make_shared<const Transform>(Inverse(*tr));
+    Disk disk(tr, trInv, false, 0, 1.25, 0, 360);
 
     Point3f p(.5, -.8, .5);
     const int nSamples = 128 * 1024;
@@ -428,12 +428,12 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
 TEST(FullSphere, Reintersect) {
     for (int i = 0; i < 100; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
         Float zMin = -radius;
         Float zMax = radius;
         Float phiMax = 360;
-        Sphere sphere(&identity, &identity, false, radius, zMin, zMax, phiMax);
+        Sphere sphere(identity, identity, false, radius, zMin, zMax, phiMax);
 
         TestReintersectConvex(sphere, rng);
     }
@@ -442,7 +442,7 @@ TEST(FullSphere, Reintersect) {
 TEST(ParialSphere, Normal) {
     for (int i = 0; i < 100; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
         Float zMin = rng.UniformFloat() < 0.5
                          ? -radius
@@ -452,7 +452,7 @@ TEST(ParialSphere, Normal) {
                          : Lerp(rng.UniformFloat(), -radius, radius);
         Float phiMax =
             rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
-        Sphere sphere(&identity, &identity, false, radius, zMin, zMax, phiMax);
+        Sphere sphere(identity, identity, false, radius, zMin, zMax, phiMax);
 
         // Ray origin
         Point3f o;
@@ -481,7 +481,7 @@ TEST(ParialSphere, Normal) {
 TEST(PartialSphere, Reintersect) {
     for (int i = 0; i < 100; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
         Float zMin = rng.UniformFloat() < 0.5
                          ? -radius
@@ -491,7 +491,7 @@ TEST(PartialSphere, Reintersect) {
                          : Lerp(rng.UniformFloat(), -radius, radius);
         Float phiMax =
             rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
-        Sphere sphere(&identity, &identity, false, radius, zMin, zMax, phiMax);
+        Sphere sphere(identity, identity, false, radius, zMin, zMax, phiMax);
 
         TestReintersectConvex(sphere, rng);
     }
@@ -500,13 +500,13 @@ TEST(PartialSphere, Reintersect) {
 TEST(Cylinder, Reintersect) {
     for (int i = 0; i < 100; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
         Float zMin = pExp(rng, 4) * (rng.UniformFloat() < 0.5 ? -1 : 1);
         Float zMax = pExp(rng, 4) * (rng.UniformFloat() < 0.5 ? -1 : 1);
         Float phiMax =
             rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
-        Cylinder cyl(&identity, &identity, false, radius, zMin, zMax, phiMax);
+        Cylinder cyl(identity, identity, false, radius, zMin, zMax, phiMax);
 
         TestReintersectConvex(cyl, rng);
     }
@@ -516,11 +516,11 @@ TEST(Cylinder, Reintersect) {
 TEST(Cone, Reintersect) {
     for (int i = 0; i < 1000; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float height = p(rng, 4);
         Float radius = p(rng, 4);
         Float phiMax = 360;
-        Cone cone(&identity, &identity, false, height, radius, phiMax);
+        Cone cone(identity, identity, false, height, radius, phiMax);
 
         TestReintersectConvex(cone, rng);
     }
@@ -529,12 +529,12 @@ TEST(Cone, Reintersect) {
 TEST(Paraboloid, Reintersect) {
     for (int i = 0; i < 1000; ++i) {
         RNG rng(i);
-        Transform identity;
+        auto identity = std::make_shared<const Transform>();
         Float radius = p(rng, 4);
         Float z0 = p(rng, 4);
         Float z1 = p(rng, 4);
         Float phiMax = 360;
-        Paraboloid paraboloid(&identity, &identity, false, radius,
+        Paraboloid paraboloid(identity, identity, false, radius,
                               z0, z1, phiMax);
 
         TestReintersectConvex(paraboloid, rng);

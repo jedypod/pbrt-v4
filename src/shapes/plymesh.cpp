@@ -139,7 +139,8 @@ int rply_face_callback(p_ply_argument argument) {
 }
 
 std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params,
     std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures) {
     const std::string filename = params.FindOneFilename("filename", "");
@@ -268,8 +269,9 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     if (context.uv) uv = {context.uv, vertexCount};
 
     return CreateTriangleMesh(
-        o2w, w2o, reverseOrientation, {context.indices, context.indexCtr},
-        {context.p, vertexCount}, {}, N, uv, alphaTex, shadowAlphaTex);
+        *ObjectToWorld, *WorldToObject, reverseOrientation,
+        {context.indices, context.indexCtr}, {context.p, vertexCount}, {}, N,
+        uv, alphaTex, shadowAlphaTex);
 }
 
 }  // namespace pbrt

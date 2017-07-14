@@ -44,10 +44,10 @@
 namespace pbrt {
 
 // Heightfield Declarations
-std::vector<std::shared_ptr<Shape>> CreateHeightfield(const Transform *o2w,
-                                                      const Transform *w2o,
-                                                      bool ro,
-                                                      const ParamSet &params);
+std::vector<std::shared_ptr<Shape>> CreateHeightfield(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

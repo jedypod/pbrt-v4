@@ -44,13 +44,14 @@
 namespace pbrt {
 
 // Cylinder Declarations
-class Cylinder : public Shape {
+class Cylinder : public TransformedShape {
   public:
     // Cylinder Public Methods
-    Cylinder(const Transform *ObjectToWorld, const Transform *WorldToObject,
+    Cylinder(std::shared_ptr<const Transform> ObjectToWorld,
+             std::shared_ptr<const Transform> WorldToObject,
              bool reverseOrientation, Float radius, Float zMin, Float zMax,
              Float phiMax)
-        : Shape(ObjectToWorld, WorldToObject, reverseOrientation),
+        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
           radius(radius),
           zMin(std::min(zMin, zMax)),
           zMax(std::max(zMin, zMax)),
@@ -67,10 +68,10 @@ class Cylinder : public Shape {
     const Float radius, zMin, zMax, phiMax;
 };
 
-std::shared_ptr<Cylinder> CreateCylinderShape(const Transform *o2w,
-                                              const Transform *w2o,
-                                              bool reverseOrientation,
-                                              const ParamSet &params);
+std::shared_ptr<Cylinder> CreateCylinderShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

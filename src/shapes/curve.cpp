@@ -75,8 +75,15 @@ static Point3f EvalBezier(const Point3f cp[4], Float u,
 
 // Curve Method Definitions
 CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
-                         CurveType type, ArraySlice<Normal3f> norm)
-    : type(type) {
+                         CurveType type, ArraySlice<Normal3f> norm,
+                         std::shared_ptr<const Transform> ObjectToWorld,
+                         std::shared_ptr<const Transform> WorldToObject,
+                         bool reverseOrientation)
+    : type(type),
+      ObjectToWorld(ObjectToWorld),
+      WorldToObject(WorldToObject),
+      reverseOrientation(reverseOrientation),
+      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()) {
     width[0] = width0;
     width[1] = width1;
     CHECK_EQ(c.size(), 4);
@@ -91,26 +98,27 @@ CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
 }
 
 std::vector<std::shared_ptr<Shape>> CreateCurve(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
     ArraySlice<Normal3f> norm, int splitDepth) {
     std::vector<std::shared_ptr<Shape>> segments;
     std::shared_ptr<CurveCommon> common =
-        std::make_shared<CurveCommon>(c, w0, w1, type, norm);
+        std::make_shared<CurveCommon>(c, w0, w1, type, norm, ObjectToWorld,
+                                      WorldToObject, reverseOrientation);
     const int nSegments = 1 << splitDepth;
     segments.reserve(nSegments);
     for (int i = 0; i < nSegments; ++i) {
         Float uMin = i / (Float)nSegments;
         Float uMax = (i + 1) / (Float)nSegments;
-        segments.push_back(std::make_shared<Curve>(o2w, w2o, reverseOrientation,
-                                                   common, uMin, uMax));
+        segments.push_back(std::make_shared<Curve>(common, uMin, uMax));
         ++nSplitCurves;
     }
     curveBytes += sizeof(CurveCommon) + nSegments * sizeof(Curve);
     return segments;
 }
 
-Bounds3f Curve::ObjectBound() const {
+Bounds3f Curve::WorldBound() const {
     // Compute object-space control points for curve segment, _cpObj_
     Point3f cpObj[4];
     cpObj[0] = BlossomBezier(common->cpObj, uMin, uMin, uMin);
@@ -121,7 +129,8 @@ Bounds3f Curve::ObjectBound() const {
         Union(Bounds3f(cpObj[0], cpObj[1]), Bounds3f(cpObj[2], cpObj[3]));
     Float width[2] = {Lerp(uMin, common->width[0], common->width[1]),
                       Lerp(uMax, common->width[0], common->width[1])};
-    return Expand(b, std::max(width[0], width[1]) * 0.5f);
+    return (*common->ObjectToWorld)(
+        Expand(b, std::max(width[0], width[1]) * 0.5f));
 }
 
 bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
@@ -130,7 +139,7 @@ bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
     ++nTests;
     // Transform _Ray_ to object space
     Vector3f oErr, dErr;
-    Ray ray = (*WorldToObject)(r, &oErr, &dErr);
+    Ray ray = (*common->WorldToObject)(r, &oErr, &dErr);
 
     // Compute object-space control points for curve segment, _cpObj_
     Point3f cpObj[4];
@@ -264,6 +273,8 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
             if (std::max(std::max(cps[0].z, cps[1].z),
                          std::max(cps[2].z, cps[3].z)) +
                         0.5 * maxWidth < 0 ||
+                        0.5 * maxWidth <
+                    0 ||
                 std::min(std::min(cps[0].z, cps[1].z),
                          std::min(cps[2].z, cps[3].z)) -
                         0.5 * maxWidth > zMax)
@@ -350,7 +361,7 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
                 }
                 dpdv = rayToObject(dpdvPlane);
             }
-            *isect = (*ObjectToWorld)(SurfaceInteraction(
+            *isect = (*common->ObjectToWorld)(SurfaceInteraction(
                 ray(pc.z), pError, Point2f(u, v), -ray.d, dpdu, dpdv,
                 Normal3f(0, 0, 0), Normal3f(0, 0, 0), ray.time, this));
         }
@@ -380,10 +391,10 @@ Interaction Curve::Sample(const Point2f &u, Float *pdf) const {
     return Interaction();
 }
 
-std::vector<std::shared_ptr<Shape>> CreateCurveShape(const Transform *o2w,
-                                                     const Transform *w2o,
-                                                     bool reverseOrientation,
-                                                     const ParamSet &params) {
+std::vector<std::shared_ptr<Shape>> CreateCurveShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float width = params.FindOneFloat("width", 1.f);
     Float width0 = params.FindOneFloat("width0", width);
     Float width1 = params.FindOneFloat("width1", width);
@@ -433,8 +444,8 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(const Transform *o2w,
             "curves.");
         return std::vector<std::shared_ptr<Shape>>();
     } else
-        return CreateCurve(o2w, w2o, reverseOrientation, cp, width0, width1,
-                           type, n, sd);
+        return CreateCurve(ObjectToWorld, WorldToObject, reverseOrientation, cp,
+                           width0, width1, type, n, sd);
 }
 
 }  // namespace pbrt

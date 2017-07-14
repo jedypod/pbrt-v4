@@ -394,18 +394,17 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
                 ++vp;
             }
         }
-        return CreateTriangleMesh(ObjectToWorld, WorldToObject,
+        return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
                                   reverseOrientation, verts, pLimit, {}, Ns, {},
                                   nullptr, nullptr);
     }
 }
 
-std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(const Transform *o2w,
-                                                     const Transform *w2o,
-                                                     bool reverseOrientation,
-                                                     const ParamSet &params) {
-    int nLevels = params.FindOneInt("levels",
-                                    params.FindOneInt("nlevels", 3));
+std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
+    int nLevels = params.FindOneInt("levels", params.FindOneInt("nlevels", 3));
     ArraySlice<int> vertexIndices = params.FindInt("indices");
     ArraySlice<Point3f> P = params.FindPoint3f("P");
     if (vertexIndices.empty()) {
@@ -419,8 +418,8 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(const Transform *o2w,
 
     // don't actually use this for now...
     std::string scheme = params.FindOneString("scheme", "loop");
-    return LoopSubdivide(o2w, w2o, reverseOrientation, nLevels, vertexIndices,
-                         P);
+    return LoopSubdivide(ObjectToWorld.get(), WorldToObject.get(),
+                         reverseOrientation, nLevels, vertexIndices, P);
 }
 
 static Point3f weightOneRing(SDVertex *vert, Float beta) {

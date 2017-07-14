@@ -44,7 +44,8 @@
 namespace pbrt {
 
 std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params,
     std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures =
         nullptr);

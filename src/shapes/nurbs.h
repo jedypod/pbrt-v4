@@ -45,10 +45,10 @@
 
 namespace pbrt {
 
-std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
-                                                const Transform *w2o,
-                                                bool reverseOrientation,
-                                                const ParamSet &params);
+std::vector<std::shared_ptr<Shape>> CreateNURBS(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

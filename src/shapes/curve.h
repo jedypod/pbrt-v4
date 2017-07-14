@@ -50,30 +50,36 @@ enum class CurveType { Flat, Cylinder, Ribbon };
 // CurveCommon Declarations
 struct CurveCommon {
     CurveCommon(gtl::ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
-                gtl::ArraySlice<Normal3f> norm);
+                gtl::ArraySlice<Normal3f> norm,
+                std::shared_ptr<const Transform> ObjectToWorld,
+                std::shared_ptr<const Transform> WorldToObject,
+                bool reverseOrientation);
+
     const CurveType type;
     Point3f cpObj[4];
     Float width[2];
     Normal3f n[2];
     Float normalAngle, invSinNormalAngle;
+    std::shared_ptr<const Transform> ObjectToWorld, WorldToObject;
+    const bool reverseOrientation, transformSwapsHandedness;
 };
 
 // Curve Declarations
 class Curve : public Shape {
   public:
     // Curve Public Methods
-    Curve(const Transform *ObjectToWorld, const Transform *WorldToObject,
-          bool reverseOrientation, const std::shared_ptr<CurveCommon> &common,
-          Float uMin, Float uMax)
-        : Shape(ObjectToWorld, WorldToObject, reverseOrientation),
-          common(common),
-          uMin(uMin),
-          uMax(uMax) {}
-    Bounds3f ObjectBound() const;
+    Curve(const std::shared_ptr<CurveCommon> &common, Float uMin, Float uMax)
+        : common(common), uMin(uMin), uMax(uMax) {}
+    Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
                    bool testAlphaTexture) const;
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
+
+    bool ReverseOrientation() const { return common->reverseOrientation; }
+    bool TransformSwapsHandedness() const {
+        return common->transformSwapsHandedness;
+    }
 
   private:
     // Curve Private Methods
@@ -87,10 +93,10 @@ class Curve : public Shape {
     const Float uMin, uMax;
 };
 
-std::vector<std::shared_ptr<Shape>> CreateCurveShape(const Transform *o2w,
-                                                     const Transform *w2o,
-                                                     bool reverseOrientation,
-                                                     const ParamSet &params);
+std::vector<std::shared_ptr<Shape>> CreateCurveShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

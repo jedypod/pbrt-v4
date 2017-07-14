@@ -137,16 +137,17 @@ Interaction Disk::Sample(const Point2f &u, Float *pdf) const {
     return it;
 }
 
-std::shared_ptr<Disk> CreateDiskShape(const Transform *o2w,
-                                      const Transform *w2o,
-                                      bool reverseOrientation,
-                                      const ParamSet &params) {
+std::shared_ptr<Disk> CreateDiskShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float height = params.FindOneFloat("height", 0.);
     Float radius = params.FindOneFloat("radius", 1);
-    Float inner_radius = params.FindOneFloat("innerradius", 0);
+    Float innerRadius = params.FindOneFloat("innerradius", 0);
     Float phimax = params.FindOneFloat("phimax", 360);
-    return std::make_shared<Disk>(o2w, w2o, reverseOrientation, height, radius,
-                                  inner_radius, phimax);
+    return std::make_shared<Disk>(ObjectToWorld, WorldToObject,
+                                  reverseOrientation, height, radius,
+                                  innerRadius, phimax);
 }
 
 }  // namespace pbrt

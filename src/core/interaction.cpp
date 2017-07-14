@@ -62,7 +62,7 @@ SurfaceInteraction::SurfaceInteraction(
 
     // Adjust normal based on orientation and handedness
     if (shape &&
-        (shape->reverseOrientation ^ shape->transformSwapsHandedness)) {
+        (shape->ReverseOrientation() ^ shape->TransformSwapsHandedness())) {
         n *= -1;
         shading.n *= -1;
     }
@@ -75,7 +75,7 @@ void SurfaceInteraction::SetShadingGeometry(const Vector3f &dpdus,
                                             bool orientationIsAuthoritative) {
     // Compute _shading.n_ for _SurfaceInteraction_
     shading.n = Normalize((Normal3f)Cross(dpdus, dpdvs));
-    if (shape && (shape->reverseOrientation ^ shape->transformSwapsHandedness))
+    if (shape && (shape->ReverseOrientation() ^ shape->TransformSwapsHandedness()))
         shading.n = -shading.n;
     if (orientationIsAuthoritative)
         n = Faceforward(n, shading.n);

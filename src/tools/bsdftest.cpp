@@ -168,13 +168,13 @@ int main(int argc, char* argv[]) {
         // create BSDF which requires creating a Shape, casting a Ray
         // that hits the shape to get a SurfaceInteraction object.
         {
-            Transform t = RotateX(-90);
+            auto t = std::make_shared<const Transform>(RotateX(-90));
+            auto tInv = std::make_shared<const Transform>(Inverse(*t));
             bool reverseOrientation = false;
             ParamSet p;
 
-            std::shared_ptr<Shape> disk(
-                new Disk(new Transform(t), new Transform(Inverse(t)),
-                         reverseOrientation, 0., 1., 0, 360.));
+            std::shared_ptr<Shape> disk =
+                std::make_shared<Disk>(t, tInv, reverseOrientation, 0., 1., 0, 360.);
             Point3f origin(
                 0.1, 1, 0);  // offset slightly so we don't hit center of disk
             Vector3f direction(0, -1, 0);

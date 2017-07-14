@@ -40,9 +40,11 @@
 namespace pbrt {
 
 // Paraboloid Method Definitions
-Paraboloid::Paraboloid(const Transform *o2w, const Transform *w2o, bool ro,
-                       Float radius, Float z0, Float z1, Float phiMax)
-    : Shape(o2w, w2o, ro),
+Paraboloid::Paraboloid(std::shared_ptr<const Transform> ObjectToWorld,
+                       std::shared_ptr<const Transform> WorldToObject,
+                       bool reverseOrientation, Float radius, Float z0,
+                       Float z1, Float phiMax)
+    : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
       radius(radius),
       zMin(std::min(z0, z1)),
       zMax(std::max(z0, z1)),
@@ -213,16 +215,17 @@ Interaction Paraboloid::Sample(const Point2f &u, Float *pdf) const {
     return Interaction();
 }
 
-std::shared_ptr<Paraboloid> CreateParaboloidShape(const Transform *o2w,
-                                                  const Transform *w2o,
-                                                  bool reverseOrientation,
-                                                  const ParamSet &params) {
+std::shared_ptr<Paraboloid> CreateParaboloidShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float radius = params.FindOneFloat("radius", 1);
     Float zmin = params.FindOneFloat("zmin", 0);
     Float zmax = params.FindOneFloat("zmax", 1);
     Float phimax = params.FindOneFloat("phimax", 360);
-    return std::make_shared<Paraboloid>(o2w, w2o, reverseOrientation, radius,
-                                        zmin, zmax, phimax);
+    return std::make_shared<Paraboloid>(ObjectToWorld, WorldToObject,
+                                        reverseOrientation, radius, zmin, zmax,
+                                        phimax);
 }
 
 }  // namespace pbrt

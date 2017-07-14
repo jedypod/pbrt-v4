@@ -43,8 +43,9 @@ namespace pbrt {
 
 // Heightfield Definitions
 std::vector<std::shared_ptr<Shape>> CreateHeightfield(
-    const Transform *ObjectToWorld, const Transform *WorldToObject,
-    bool reverseOrientation, const ParamSet &params) {
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     int nx = params.FindOneInt("nu", -1);
     int ny = params.FindOneInt("nv", -1);
     ArraySlice<Float> z = params.FindFloat("Pz");
@@ -83,8 +84,9 @@ std::vector<std::shared_ptr<Shape>> CreateHeightfield(
 #undef VERT
     }
 
-    return CreateTriangleMesh(ObjectToWorld, WorldToObject, reverseOrientation,
-                              indices, P, {}, {}, uvs, nullptr, nullptr);
+    return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
+                              reverseOrientation, indices, P, {}, {}, uvs,
+                              nullptr, nullptr);
 }
 
 }  // namespace pbrt

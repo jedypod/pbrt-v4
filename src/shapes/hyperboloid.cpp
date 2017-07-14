@@ -40,9 +40,11 @@
 namespace pbrt {
 
 // Hyperboloid Method Definitions
-Hyperboloid::Hyperboloid(const Transform *o2w, const Transform *w2o, bool ro,
-                         const Point3f &point1, const Point3f &point2, Float tm)
-    : Shape(o2w, w2o, ro) {
+Hyperboloid::Hyperboloid(std::shared_ptr<const Transform> ObjectToWorld,
+                         std::shared_ptr<const Transform> WorldToObject,
+                         bool reverseOrientation, const Point3f &point1,
+                         const Point3f &point2, Float tm)
+    : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation) {
     p1 = point1;
     p2 = point2;
     phiMax = Radians(Clamp(tm, 0, 360));
@@ -249,15 +251,15 @@ Interaction Hyperboloid::Sample(const Point2f &u, Float *pdf) const {
     return Interaction();
 }
 
-std::shared_ptr<Shape> CreateHyperboloidShape(const Transform *o2w,
-                                              const Transform *w2o,
-                                              bool reverseOrientation,
-                                              const ParamSet &params) {
+std::shared_ptr<Shape> CreateHyperboloidShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Point3f p1 = params.FindOnePoint3f("p1", Point3f(0, 0, 0));
     Point3f p2 = params.FindOnePoint3f("p2", Point3f(1, 1, 1));
     Float phimax = params.FindOneFloat("phimax", 360);
-    return std::make_shared<Hyperboloid>(o2w, w2o, reverseOrientation, p1, p2,
-                                         phimax);
+    return std::make_shared<Hyperboloid>(ObjectToWorld, WorldToObject,
+                                         reverseOrientation, p1, p2, phimax);
 }
 
 }  // namespace pbrt

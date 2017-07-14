@@ -144,10 +144,10 @@ static Point3f NURBSEvaluateSurface(int uOrder, const Float *uKnot, int ucp,
     return Point3f(P.x / P.w, P.y / P.w, P.z / P.w);
 }
 
-std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
-                                                const Transform *w2o,
-                                                bool reverseOrientation,
-                                                const ParamSet &params) {
+std::vector<std::shared_ptr<Shape>> CreateNURBS(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     int nu = params.FindOneInt("nu", -1);
     if (nu == -1) {
         Error("Must provide number of control points \"nu\" with NURBS shape.");
@@ -302,8 +302,9 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(const Transform *o2w,
     }
     int nVerts = diceu * dicev;
 
-    return CreateTriangleMesh(o2w, w2o, reverseOrientation, vertices, evalPs,
-                              {}, evalNs, uvs, nullptr, nullptr);
+    return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
+                              reverseOrientation, vertices, evalPs, {}, evalNs,
+                              uvs, nullptr, nullptr);
 }
 
 }  // namespace pbrt

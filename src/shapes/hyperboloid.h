@@ -44,11 +44,13 @@
 namespace pbrt {
 
 // Hyperboloid Declarations
-class Hyperboloid : public Shape {
+class Hyperboloid : public TransformedShape {
   public:
     // Hyperboloid Public Methods
-    Hyperboloid(const Transform *o2w, const Transform *w2o, bool ro,
-                const Point3f &point1, const Point3f &point2, Float tm);
+    Hyperboloid(std::shared_ptr<const Transform> ObjectToWorld,
+                std::shared_ptr<const Transform> WorldToObject,
+                bool reverseOrientation, const Point3f &point1,
+                const Point3f &point2, Float tm);
     Bounds3f ObjectBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
                    bool testAlphaTexture) const;
@@ -65,10 +67,10 @@ class Hyperboloid : public Shape {
     Float ah, ch;
 };
 
-std::shared_ptr<Shape> CreateHyperboloidShape(const Transform *o2w,
-                                              const Transform *w2o,
-                                              bool reverseOrientation,
-                                              const ParamSet &params);
+std::shared_ptr<Shape> CreateHyperboloidShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

@@ -206,29 +206,29 @@ struct GraphicsState {
 class TransformCache {
   public:
     // TransformCache Public Methods
-    void Lookup(const Transform &t, Transform **tCached,
-                Transform **tCachedInverse) {
+    void Lookup(const Transform &t, std::shared_ptr<const Transform> *tCached,
+                std::shared_ptr<const Transform> *tCachedInverse) {
         auto iter = cache.find(t);
         if (iter == cache.end()) {
-            Transform *tr = arena.Alloc<Transform>();
-            *tr = t;
-            Transform *tinv = arena.Alloc<Transform>();
-            *tinv = Transform(Inverse(t));
-            cache[t] = std::make_pair(tr, tinv);
+            std::shared_ptr<const Transform> tr =
+                std::make_shared<const Transform>(t);
+            std::shared_ptr<const Transform> tinv =
+                std::make_shared<const Transform>(Inverse(t));
+            cache[t] = CacheItem{tr, tinv};
             iter = cache.find(t);
         }
         if (tCached) *tCached = iter->second.first;
         if (tCachedInverse) *tCachedInverse = iter->second.second;
     }
     void Clear() {
-        arena.Reset();
         cache.erase(cache.begin(), cache.end());
     }
 
   private:
     // TransformCache Private Data
-    std::map<Transform, std::pair<Transform *, Transform *>> cache;
-    MemoryArena arena;
+    using CacheItem = std::pair<std::shared_ptr<const Transform>,
+                                std::shared_ptr<const Transform>>;
+    std::map<Transform, CacheItem> cache;
 };
 
 // API Static Data
@@ -298,8 +298,8 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
 
 // Object Creation Function Definitions
 std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
-                                               const Transform *object2world,
-                                               const Transform *world2object,
+                                               std::shared_ptr<const Transform> object2world,
+                                               std::shared_ptr<const Transform> world2object,
                                                bool reverseOrientation,
                                                const ParamSet &paramSet) {
     std::vector<std::shared_ptr<Shape>> shapes;
@@ -327,8 +327,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
 
     // Create multiple-_Shape_ types
     else if (name == "curve")
-        shapes = CreateCurveShape(object2world, world2object,
-                                  reverseOrientation, paramSet);
+        shapes = CreateCurveShape(object2world, world2object, reverseOrientation, paramSet);
     else if (name == "trianglemesh") {
         if (PbrtOptions.toPly) {
             static int count = 1;
@@ -654,7 +653,7 @@ Camera *MakeCamera(const std::string &name, const ParamSet &paramSet,
     MediumInterface mediumInterface = graphicsState.CreateMediumInterface();
     static_assert(MaxTransforms == 2,
                   "TransformCache assumes only two transforms");
-    Transform *cam2world[2];
+    std::shared_ptr<const Transform> cam2world[2];
     transformCache.Lookup(cam2worldSet[0], &cam2world[0], nullptr);
     transformCache.Lookup(cam2worldSet[1], &cam2world[1], nullptr);
     AnimatedTransform animatedCam2World(cam2world[0], transformStart,
@@ -1167,7 +1166,7 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
         // Initialize _prims_ and _areaLights_ for static shape
 
         // Create shapes for shape _name_
-        Transform *ObjToWorld, *WorldToObj;
+        std::shared_ptr<const Transform> ObjToWorld, WorldToObj;
         transformCache.Lookup(curTransform[0], &ObjToWorld, &WorldToObj);
         std::vector<std::shared_ptr<Shape>> shapes =
             MakeShapes(name, ObjToWorld, WorldToObj,
@@ -1195,7 +1194,7 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
             Warning(
                 "Ignoring currently set area light when creating "
                 "animated shape");
-        Transform *identity;
+        std::shared_ptr<const Transform> identity;
         transformCache.Lookup(Transform(), &identity, nullptr);
         std::vector<std::shared_ptr<Shape>> shapes = MakeShapes(
             name, identity, identity, graphicsState.reverseOrientation, params);
@@ -1214,7 +1213,7 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
         // Get _animatedObjectToWorld_ transform for shape
         static_assert(MaxTransforms == 2,
                       "TransformCache assumes only two transforms");
-        Transform *ObjToWorld[2];
+        std::shared_ptr<const Transform> ObjToWorld[2];
         transformCache.Lookup(curTransform[0], &ObjToWorld[0], nullptr);
         transformCache.Lookup(curTransform[1], &ObjToWorld[1], nullptr);
         AnimatedTransform animatedObjectToWorld(
@@ -1346,7 +1345,7 @@ void pbrtObjectInstance(const std::string &name) {
     static_assert(MaxTransforms == 2,
                   "TransformCache assumes only two transforms");
     // Create _animatedInstanceToWorld_ transform for instance
-    Transform *InstanceToWorld[2];
+    std::shared_ptr<const Transform> InstanceToWorld[2];
     transformCache.Lookup(curTransform[0], &InstanceToWorld[0], nullptr);
     transformCache.Lookup(curTransform[1], &InstanceToWorld[1], nullptr);
     AnimatedTransform animatedInstanceToWorld(

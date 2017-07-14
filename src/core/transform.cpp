@@ -392,9 +392,9 @@ void IntervalFindZeros(Float c1, Float c2, Float c3, Float c4, Float c5,
 }
 
 // AnimatedTransform Method Definitions
-AnimatedTransform::AnimatedTransform(const Transform *startTransform,
+AnimatedTransform::AnimatedTransform(std::shared_ptr<const Transform> startTransform,
                                      Float startTime,
-                                     const Transform *endTransform,
+                                     std::shared_ptr<const Transform> endTransform,
                                      Float endTime)
     : startTransform(startTransform),
       endTransform(endTransform),

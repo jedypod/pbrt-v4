@@ -39,10 +39,10 @@
 #define PBRT_CORE_SHAPE_H
 
 // core/shape.h*
-#include "pbrt.h"
 #include "geometry.h"
 #include "interaction.h"
 #include "memory.h"
+#include "pbrt.h"
 #include "transform.h"
 
 namespace pbrt {
@@ -51,11 +51,9 @@ namespace pbrt {
 class Shape {
   public:
     // Shape Interface
-    Shape(const Transform *ObjectToWorld, const Transform *WorldToObject,
-          bool reverseOrientation);
+    Shape();
     virtual ~Shape();
-    virtual Bounds3f ObjectBound() const = 0;
-    virtual Bounds3f WorldBound() const;
+    virtual Bounds3f WorldBound() const = 0;
     virtual bool Intersect(const Ray &ray, Float *tHit,
                            SurfaceInteraction *isect,
                            bool testAlphaTexture = true) const = 0;
@@ -82,8 +80,25 @@ class Shape {
     // used in this case.
     virtual Float SolidAngle(const Point3f &p, int nSamples = 512) const;
 
+    virtual bool ReverseOrientation() const = 0;
+    virtual bool TransformSwapsHandedness() const = 0;
+};
+
+class TransformedShape : public Shape {
+  public:
+    TransformedShape(std::shared_ptr<const Transform> ObjectToWorld,
+                     std::shared_ptr<const Transform> WorldToObject,
+                     bool reverseOrientation);
+
+    Bounds3f WorldBound() const;
+    virtual Bounds3f ObjectBound() const = 0;
+
+    bool ReverseOrientation() const { return reverseOrientation; }
+    bool TransformSwapsHandedness() const { return transformSwapsHandedness; }
+
+  protected:
     // Shape Public Data
-    const Transform *ObjectToWorld, *WorldToObject;
+    std::shared_ptr<const Transform> ObjectToWorld, WorldToObject;
     const bool reverseOrientation;
     const bool transformSwapsHandedness;
 };

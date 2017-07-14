@@ -44,13 +44,14 @@
 namespace pbrt {
 
 // Disk Declarations
-class Disk : public Shape {
+class Disk : public TransformedShape {
   public:
     // Disk Public Methods
-    Disk(const Transform *ObjectToWorld, const Transform *WorldToObject,
+    Disk(std::shared_ptr<const Transform> ObjectToWorld,
+         std::shared_ptr<const Transform> WorldToObject,
          bool reverseOrientation, Float height, Float radius, Float innerRadius,
          Float phiMax)
-        : Shape(ObjectToWorld, WorldToObject, reverseOrientation),
+        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
           height(height),
           radius(radius),
           innerRadius(innerRadius),
@@ -67,10 +68,10 @@ class Disk : public Shape {
     const Float height, radius, innerRadius, phiMax;
 };
 
-std::shared_ptr<Disk> CreateDiskShape(const Transform *o2w,
-                                      const Transform *w2o,
-                                      bool reverseOrientation,
-                                      const ParamSet &params);
+std::shared_ptr<Disk> CreateDiskShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

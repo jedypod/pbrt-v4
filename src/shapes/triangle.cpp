@@ -54,11 +54,14 @@ static void PlyErrorCallback(p_ply, const char *message) {
 // Triangle Method Definitions
 STAT_RATIO("Scene/Triangles per triangle mesh", nTris, nMeshes);
 TriangleMesh::TriangleMesh(
-    const Transform &ObjectToWorld, ArraySlice<int> vertexIndices,
-    ArraySlice<Point3f> P, ArraySlice<Vector3f> S, ArraySlice<Normal3f> N,
-    ArraySlice<Point2f> UV, const std::shared_ptr<Texture<Float>> &alphaMask,
+    const Transform &ObjectToWorld, bool reverseOrientation,
+    ArraySlice<int> vertexIndices, ArraySlice<Point3f> P,
+    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV,
+    const std::shared_ptr<Texture<Float>> &alphaMask,
     const std::shared_ptr<Texture<Float>> &shadowAlphaMask)
-    : nTriangles(vertexIndices.size() / 3),
+    : reverseOrientation(reverseOrientation),
+      transformSwapsHandedness(ObjectToWorld.SwapsHandedness()),
+      nTriangles(vertexIndices.size() / 3),
       nVertices(P.size()),
       vertexIndices(vertexIndices.begin(), vertexIndices.end()),
       alphaMask(alphaMask),
@@ -93,19 +96,19 @@ TriangleMesh::TriangleMesh(
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
-    const Transform *ObjectToWorld, const Transform *WorldToObject,
+    const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, ArraySlice<int> vertexIndices,
     ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
     ArraySlice<Point2f> uv, const std::shared_ptr<Texture<Float>> &alphaMask,
     const std::shared_ptr<Texture<Float>> &shadowAlphaMask) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
-        *ObjectToWorld, vertexIndices, p, s, n, uv, alphaMask, shadowAlphaMask);
+        ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv,
+        alphaMask, shadowAlphaMask);
     std::vector<std::shared_ptr<Shape>> tris;
     size_t nTriangles = vertexIndices.size() / 3;
     tris.reserve(nTriangles);
     for (int i = 0; i < nTriangles; ++i)
-        tris.push_back(std::make_shared<Triangle>(ObjectToWorld, WorldToObject,
-                                                  reverseOrientation, mesh, i));
+        tris.push_back(std::make_shared<Triangle>(mesh, i));
     return tris;
 }
 
@@ -166,15 +169,6 @@ bool WritePlyFile(const std::string &filename, ArraySlice<int> vertexIndices,
     return false;
 }
 
-Bounds3f Triangle::ObjectBound() const {
-    // Get triangle vertices in _p0_, _p1_, and _p2_
-    const Point3f &p0 = mesh->p[v[0]];
-    const Point3f &p1 = mesh->p[v[1]];
-    const Point3f &p2 = mesh->p[v[2]];
-    return Union(Bounds3f((*WorldToObject)(p0), (*WorldToObject)(p1)),
-                 (*WorldToObject)(p2));
-}
-
 Bounds3f Triangle::WorldBound() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
     const Point3f &p0 = mesh->p[v[0]];
@@ -207,10 +201,10 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     if (kx == 3) kx = 0;
     int ky = kx + 1;
     if (ky == 3) ky = 0;
-    Vector3f d = Permute(ray.d, { kx, ky, kz });
-    p0t = Permute(p0t, { kx, ky, kz });
-    p1t = Permute(p1t, { kx, ky, kz });
-    p2t = Permute(p2t, { kx, ky, kz });
+    Vector3f d = Permute(ray.d, {kx, ky, kz});
+    p0t = Permute(p0t, {kx, ky, kz});
+    p1t = Permute(p1t, {kx, ky, kz});
+    p2t = Permute(p2t, {kx, ky, kz});
 
     // Apply shear transformation to translated vertex positions
     Float Sx = -d.x / d.z;
@@ -393,7 +387,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     // Ensure correct orientation of the geometric normal
     if (mesh->n.size())
         isect->n = Faceforward(isect->n, isect->shading.n);
-    else if (reverseOrientation ^ transformSwapsHandedness)
+    else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
         isect->n = isect->shading.n = -isect->n;
     *tHit = t;
     ++nHits;
@@ -423,10 +417,10 @@ bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
     if (kx == 3) kx = 0;
     int ky = kx + 1;
     if (ky == 3) ky = 0;
-    Vector3f d = Permute(ray.d, { kx, ky, kz });
-    p0t = Permute(p0t, { kx, ky, kz });
-    p1t = Permute(p1t, { kx, ky, kz });
-    p2t = Permute(p2t, { kx, ky, kz });
+    Vector3f d = Permute(ray.d, {kx, ky, kz});
+    p0t = Permute(p0t, {kx, ky, kz});
+    p1t = Permute(p1t, {kx, ky, kz});
+    p2t = Permute(p2t, {kx, ky, kz});
 
     // Apply shear transformation to translated vertex positions
     Float Sx = -d.x / d.z;
@@ -565,7 +559,7 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
         Normal3f ns(b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] +
                     (1 - b[0] - b[1]) * mesh->n[v[2]]);
         it.n = Faceforward(it.n, ns);
-    } else if (reverseOrientation ^ transformSwapsHandedness)
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
         it.n *= -1;
 
     // Compute error bounds for sampled point on triangle
@@ -578,10 +572,9 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
 
 Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // Project the vertices into the unit sphere around p.
-    std::array<Vector3f, 3> pSphere = {
-        Normalize(mesh->p[v[0]] - p), Normalize(mesh->p[v[1]] - p),
-        Normalize(mesh->p[v[2]] - p)
-    };
+    std::array<Vector3f, 3> pSphere = {Normalize(mesh->p[v[0]] - p),
+                                       Normalize(mesh->p[v[1]] - p),
+                                       Normalize(mesh->p[v[2]] - p)};
 
     // http://math.stackexchange.com/questions/9819/area-of-a-spherical-triangle
     // Girard's theorem: surface area of a spherical triangle on a unit
@@ -608,14 +601,14 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // We only need to do three cross products to evaluate the angles at
     // all three vertices, though, since we can take advantage of the fact
     // that Cross(a, b) = -Cross(b, a).
-    return std::abs(
-        std::acos(Clamp(Dot(cross01, -cross12), -1, 1)) +
-        std::acos(Clamp(Dot(cross12, -cross20), -1, 1)) +
-        std::acos(Clamp(Dot(cross20, -cross01), -1, 1)) - Pi);
+    return std::abs(std::acos(Clamp(Dot(cross01, -cross12), -1, 1)) +
+                    std::acos(Clamp(Dot(cross12, -cross20), -1, 1)) +
+                    std::acos(Clamp(Dot(cross20, -cross01), -1, 1)) - Pi);
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params,
     std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures) {
     ArraySlice<int> vi = params.FindInt("indices");
@@ -700,8 +693,9 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
         shadowAlphaTex.reset(new ConstantTexture<Float>(0.f));
 
-    return CreateTriangleMesh(o2w, w2o, reverseOrientation, vi, P, S, N, uvs,
-                              alphaTex, shadowAlphaTex);
+    return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
+                              reverseOrientation, vi, P, S, N, uvs, alphaTex,
+                              shadowAlphaTex);
 }
 
 }  // namespace pbrt

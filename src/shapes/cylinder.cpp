@@ -220,16 +220,17 @@ Interaction Cylinder::Sample(const Point2f &u, Float *pdf) const {
     return it;
 }
 
-std::shared_ptr<Cylinder> CreateCylinderShape(const Transform *o2w,
-                                              const Transform *w2o,
-                                              bool reverseOrientation,
-                                              const ParamSet &params) {
+std::shared_ptr<Cylinder> CreateCylinderShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float radius = params.FindOneFloat("radius", 1);
     Float zmin = params.FindOneFloat("zmin", -1);
     Float zmax = params.FindOneFloat("zmax", 1);
     Float phimax = params.FindOneFloat("phimax", 360);
-    return std::make_shared<Cylinder>(o2w, w2o, reverseOrientation, radius,
-                                      zmin, zmax, phimax);
+    return std::make_shared<Cylinder>(ObjectToWorld, WorldToObject,
+                                      reverseOrientation, radius, zmin, zmax,
+                                      phimax);
 }
 
 }  // namespace pbrt

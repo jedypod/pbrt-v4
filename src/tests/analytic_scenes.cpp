@@ -67,12 +67,12 @@ void CheckSceneAverage(const char *filename, float expected) {
 std::vector<TestScene> GetScenes() {
     std::vector<TestScene> scenes;
 
+    auto id = std::make_shared<const Transform>();
     {
         // Unit sphere, Kd = 0.5, point light I = 3.1415 at center
         // -> With GI, should have radiance of 1.
-        static Transform id;
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            &id, &id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
@@ -99,9 +99,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, 4 point lights I = 3.1415/4 at center
         // -> With GI, should have radiance of 1.
-        static Transform id;
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            &id, &id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
@@ -134,9 +133,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, Le = 0.5
         // -> With GI, should have radiance of 1.
-        static Transform id;
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            &id, &id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
@@ -166,9 +164,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.25, Kr = .5, point light I = 7.4 at center
         // -> With GI, should have radiance of ~1.
-        static Transform id;
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            &id, &id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.25));
@@ -205,9 +202,8 @@ std::vector<TestScene> GetScenes() {
   {
     // Unit sphere, Kd = 0.25, Kr = .5, Le .587
     // -> With GI, should have radiance of ~1.
-    static Transform id;
     std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-        &id, &id, true /* reverse orientation */, 1, -1, 1, 360);
+        id, id, true /* reverse orientation */, 1, -1, 1, 360);
 
     std::shared_ptr<Texture<Spectrum>> Kd =
         std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.25));
@@ -269,7 +265,8 @@ std::vector<TestIntegrator> GetIntegrators() {
     std::vector<TestIntegrator> integrators;
 
     Point2i resolution(10, 10);
-    AnimatedTransform identity(new Transform, 0, new Transform, 1);
+    auto id = std::make_shared<const Transform>();
+    AnimatedTransform identity(id, 0, id, 1);
 
     for (auto scene : GetScenes()) {
         // Path tracing integrators

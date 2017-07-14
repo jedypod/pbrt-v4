@@ -34,9 +34,9 @@ TEST(AnimatedTransform, Randoms) {
 
     for (int i = 0; i < 200; ++i) {
         // Generate a pair of random transformation matrices.
-        Transform t0 = RandomTransform(rng);
-        Transform t1 = RandomTransform(rng);
-        AnimatedTransform at(&t0, 0., &t1, 1.);
+        auto t0 = std::make_shared<const Transform>(RandomTransform(rng));
+        auto t1 = std::make_shared<const Transform>(RandomTransform(rng));
+        AnimatedTransform at(t0, 0., t1, 1.);
 
         for (int j = 0; j < 5; ++j) {
             // Generate a random bounding box and find the bounds of its motion.

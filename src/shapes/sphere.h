@@ -44,13 +44,14 @@
 namespace pbrt {
 
 // Sphere Declarations
-class Sphere : public Shape {
+class Sphere : public TransformedShape {
   public:
     // Sphere Public Methods
-    Sphere(const Transform *ObjectToWorld, const Transform *WorldToObject,
+    Sphere(std::shared_ptr<const Transform> ObjectToWorld,
+           std::shared_ptr<const Transform> WorldToObject,
            bool reverseOrientation, Float radius, Float zMin, Float zMax,
            Float phiMax)
-        : Shape(ObjectToWorld, WorldToObject, reverseOrientation),
+        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
           radius(radius),
           zMin(Clamp(std::min(zMin, zMax), -radius, radius)),
           zMax(Clamp(std::max(zMin, zMax), -radius, radius)),
@@ -75,10 +76,10 @@ class Sphere : public Shape {
     const Float thetaMin, thetaMax, phiMax;
 };
 
-std::shared_ptr<Shape> CreateSphereShape(const Transform *o2w,
-                                         const Transform *w2o,
-                                         bool reverseOrientation,
-                                         const ParamSet &params);
+std::shared_ptr<Shape> CreateSphereShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

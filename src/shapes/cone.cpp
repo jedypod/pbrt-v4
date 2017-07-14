@@ -40,12 +40,14 @@
 namespace pbrt {
 
 // Cone Method Definitions
-Cone::Cone(const Transform *o2w, const Transform *w2o, bool ro, Float height,
-           Float radius, Float phiMax)
-    : Shape(o2w, w2o, ro),
+Cone::Cone(std::shared_ptr<const Transform> ObjectToWorld,
+           std::shared_ptr<const Transform> WorldToObject,
+           bool reverseOrientation, Float height, Float radius, Float phiMax)
+    : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
       radius(radius),
       height(height),
       phiMax(Radians(Clamp(phiMax, 0, 360))) {}
+
 Bounds3f Cone::ObjectBound() const {
     Point3f p1 = Point3f(-radius, -radius, 0);
     Point3f p2 = Point3f(radius, radius, height);
@@ -207,15 +209,15 @@ Interaction Cone::Sample(const Point2f &u, Float *pdf) const {
     return Interaction();
 }
 
-std::shared_ptr<Cone> CreateConeShape(const Transform *o2w,
-                                      const Transform *w2o,
-                                      bool reverseOrientation,
-                                      const ParamSet &params) {
+std::shared_ptr<Cone> CreateConeShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float radius = params.FindOneFloat("radius", 1);
     Float height = params.FindOneFloat("height", 1);
     Float phimax = params.FindOneFloat("phimax", 360);
-    return std::make_shared<Cone>(o2w, w2o, reverseOrientation, height, radius,
-                                  phimax);
+    return std::make_shared<Cone>(ObjectToWorld, WorldToObject,
+                                  reverseOrientation, height, radius, phimax);
 }
 
 }  // namespace pbrt

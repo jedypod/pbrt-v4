@@ -44,11 +44,12 @@
 namespace pbrt {
 
 // Cone Declarations
-class Cone : public Shape {
+class Cone : public TransformedShape {
   public:
     // Cone Public Methods
-    Cone(const Transform *o2w, const Transform *w2o, bool reverseOrientation,
-         Float height, Float radius, Float phiMax);
+    Cone(std::shared_ptr<const Transform> ObjectToWorld,
+         std::shared_ptr<const Transform> WorldToObject,
+         bool reverseOrientation, Float height, Float radius, Float phiMax);
     Bounds3f ObjectBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
                    bool testAlphaTexture) const;
@@ -61,10 +62,10 @@ class Cone : public Shape {
     const Float radius, height, phiMax;
 };
 
-std::shared_ptr<Cone> CreateConeShape(const Transform *o2w,
-                                      const Transform *w2o,
-                                      bool reverseOrientation,
-                                      const ParamSet &params);
+std::shared_ptr<Cone> CreateConeShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params);
 
 }  // namespace pbrt
 

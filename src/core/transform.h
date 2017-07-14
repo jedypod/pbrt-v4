@@ -412,8 +412,9 @@ inline Ray Transform::operator()(const Ray &r, const Vector3f &oErrorIn,
 class AnimatedTransform {
   public:
     // AnimatedTransform Public Methods
-    AnimatedTransform(const Transform *startTransform, Float startTime,
-                      const Transform *endTransform, Float endTime);
+    AnimatedTransform(std::shared_ptr<const Transform> startTransform,
+                      Float startTime,
+                      std::shared_ptr<const Transform> endTransform, Float endTime);
     static void Decompose(const Matrix4x4 &m, Vector3f *T, Quaternion *R,
                           Matrix4x4 *S);
     void Interpolate(Float time, Transform *t) const;
@@ -429,7 +430,7 @@ class AnimatedTransform {
 
   private:
     // AnimatedTransform Private Data
-    const Transform *startTransform, *endTransform;
+    std::shared_ptr<const Transform> startTransform, endTransform;
     const Float startTime, endTime;
     const bool actuallyAnimated;
     Vector3f T[2];

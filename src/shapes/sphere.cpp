@@ -314,16 +314,17 @@ Float Sphere::SolidAngle(const Point3f &p, int nSamples) const {
     return (2 * Pi * (1 - cosTheta));
 }
 
-std::shared_ptr<Shape> CreateSphereShape(const Transform *o2w,
-                                         const Transform *w2o,
-                                         bool reverseOrientation,
-                                         const ParamSet &params) {
+std::shared_ptr<Shape> CreateSphereShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const ParamSet &params) {
     Float radius = params.FindOneFloat("radius", 1.f);
     Float zmin = params.FindOneFloat("zmin", -radius);
     Float zmax = params.FindOneFloat("zmax", radius);
     Float phimax = params.FindOneFloat("phimax", 360.f);
-    return std::make_shared<Sphere>(o2w, w2o, reverseOrientation, radius, zmin,
-                                    zmax, phimax);
+    return std::make_shared<Sphere>(ObjectToWorld, WorldToObject,
+                                    reverseOrientation, radius, zmin, zmax,
+                                    phimax);
 }
 
 }  // namespace pbrt

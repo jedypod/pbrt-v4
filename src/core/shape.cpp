@@ -38,20 +38,12 @@
 
 namespace pbrt {
 
-// Shape Method Definitions
-Shape::~Shape() {}
-
 STAT_COUNTER("Scene/Shapes created", nShapesCreated);
-Shape::Shape(const Transform *ObjectToWorld, const Transform *WorldToObject,
-             bool reverseOrientation)
-    : ObjectToWorld(ObjectToWorld),
-      WorldToObject(WorldToObject),
-      reverseOrientation(reverseOrientation),
-      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()) {
-    ++nShapesCreated;
-}
 
-Bounds3f Shape::WorldBound() const { return (*ObjectToWorld)(ObjectBound()); }
+// Shape Method Definitions
+Shape::Shape() { ++nShapesCreated; }
+
+Shape::~Shape() {}
 
 Interaction Shape::Sample(const Interaction &ref, const Point2f &u,
                           Float *pdf) const {
@@ -99,6 +91,18 @@ Float Shape::SolidAngle(const Point3f &p, int nSamples) const {
         }
     }
     return solidAngle / nSamples;
+}
+
+TransformedShape::TransformedShape(
+    std::shared_ptr<const Transform> ObjectToWorld,
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation)
+    : ObjectToWorld(ObjectToWorld),
+      WorldToObject(WorldToObject),
+      reverseOrientation(reverseOrientation),
+      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()) {}
+
+Bounds3f TransformedShape::WorldBound() const {
+    return (*ObjectToWorld)(ObjectBound());
 }
 
 }  // namespace pbrt
