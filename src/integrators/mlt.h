@@ -119,7 +119,7 @@ class MLTIntegrator : public Integrator {
           largeStepProbability(largeStepProbability) {}
     void Render(const Scene &scene);
     Spectrum L(const Scene &scene, MemoryArena &arena,
-               const std::unique_ptr<Distribution1D> &lightDistr,
+               const Distribution1D &lightDistr,
                const std::unordered_map<const Light *, size_t> &lightToIndex,
                MLTSampler &sampler, int k, Point2f *pRaster);
 
