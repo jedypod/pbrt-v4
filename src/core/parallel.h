@@ -104,7 +104,6 @@ void ParallelFor(std::function<void(int64_t)> func, int64_t count,
 extern PBRT_THREAD_LOCAL int ThreadIndex;
 void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count);
 int MaxThreadIndex();
-int NumSystemCores();
 
 void ParallelInit();
 void ParallelCleanup();

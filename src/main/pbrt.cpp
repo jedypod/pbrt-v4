@@ -142,8 +142,7 @@ int main(int argc, char *argv[]) {
 
     // Print welcome banner
     if (!options.quiet && !options.cat && !options.toPly) {
-        printf("pbrt version 3 (built %s at %s) [Detected %d cores]\n",
-               __DATE__, __TIME__, NumSystemCores());
+        printf("pbrt version 3 (built %s at %s)\n", __DATE__, __TIME__);
 #ifndef NDEBUG
         LOG(INFO) << "Running debug build";
         printf("*** DEBUG BUILD ***\n");

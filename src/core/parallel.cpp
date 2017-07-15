@@ -241,8 +241,12 @@ void ParallelFor(std::function<void(int64_t)> func, int64_t count,
 
 PBRT_THREAD_LOCAL int ThreadIndex;
 
+static int AvailableCores() {
+    return std::max(1u, std::thread::hardware_concurrency());
+}
+
 int MaxThreadIndex() {
-    return PbrtOptions.nThreads == 0 ? NumSystemCores() : PbrtOptions.nThreads;
+    return PbrtOptions.nThreads == 0 ? AvailableCores() : PbrtOptions.nThreads;
 }
 
 void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count) {
@@ -298,10 +302,6 @@ void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count) {
         // Update _loop_ to reflect completion of iterations
         loop.activeWorkers--;
     }
-}
-
-int NumSystemCores() {
-    return std::max(1u, std::thread::hardware_concurrency());
 }
 
 void ParallelInit() {
