@@ -64,7 +64,7 @@ class Light {
     // Light Interface
     virtual ~Light();
     Light(int flags, const Transform &LightToWorld,
-          const MediumInterface &mediumInterface, int nSamples = 1);
+          const MediumInterface &mediumInterface);
     virtual Spectrum Sample_Li(const Interaction &ref, const Point2f &u,
                                Vector3f *wi, Float *pdf,
                                VisibilityTester *vis) const = 0;
@@ -80,7 +80,6 @@ class Light {
 
     // Light Public Data
     const int flags;
-    const int nSamples;
     const MediumInterface mediumInterface;
 
   protected:
@@ -106,8 +105,7 @@ class VisibilityTester {
 class AreaLight : public Light {
   public:
     // AreaLight Interface
-    AreaLight(const Transform &LightToWorld, const MediumInterface &medium,
-              int nSamples);
+    AreaLight(const Transform &LightToWorld, const MediumInterface &medium);
     virtual Spectrum L(const Interaction &intr, const Vector3f &w) const = 0;
 };
 

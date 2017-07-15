@@ -47,7 +47,7 @@ void DirectLightingIntegrator::Preprocess(const Scene &scene,
     if (strategy == LightStrategy::UniformSampleAll) {
         // Compute number of samples to use for each light
         for (const auto &light : scene.lights)
-            nLightSamples.push_back(sampler.RoundCount(light->nSamples));
+            nLightSamples.push_back(1);  // nSamples parameter removed
 
         // Request samples for sampling all lights
         for (int i = 0; i < maxDepth; ++i) {

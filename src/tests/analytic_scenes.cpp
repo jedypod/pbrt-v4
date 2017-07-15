@@ -145,7 +145,7 @@ std::vector<TestScene> GetScenes() {
 
         std::shared_ptr<AreaLight> areaLight =
             std::make_shared<DiffuseAreaLight>(Transform(), nullptr,
-                                               Spectrum(0.5), 1, sphere);
+                                               Spectrum(0.5), sphere);
 
         std::vector<std::shared_ptr<Light>> lights;
         lights.push_back(areaLight);

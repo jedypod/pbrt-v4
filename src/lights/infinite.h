@@ -53,7 +53,7 @@ class InfiniteAreaLight : public Light {
   public:
     // InfiniteAreaLight Public Methods
     InfiniteAreaLight(const Transform &LightToWorld, const Spectrum &power,
-                      int nSamples, const std::string &texmap);
+                      const std::string &texmap);
     void Preprocess(const Scene &scene) {
         scene.WorldBound().BoundingSphere(&worldCenter, &worldRadius);
     }
