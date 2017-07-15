@@ -59,26 +59,22 @@ LightDistribution::~LightDistribution() {}
 std::unique_ptr<LightDistribution> CreateLightSampleDistribution(
     const std::string &name, const Scene &scene) {
     if (name == "uniform" || scene.lights.size() == 1)
-        return std::unique_ptr<LightDistribution>{
-            new UniformLightDistribution(scene)};
+        return std::make_unique<UniformLightDistribution>(scene);
     else if (name == "power")
-        return std::unique_ptr<LightDistribution>{
-            new PowerLightDistribution(scene)};
+        return std::make_unique<PowerLightDistribution>(scene);
     else if (name == "spatial")
-        return std::unique_ptr<LightDistribution>{
-            new SpatialLightDistribution(scene)};
+        return std::make_unique<SpatialLightDistribution>(scene);
     else {
         Error(
             "Light sample distribution type \"%s\" unknown. Using \"spatial\".",
             name.c_str());
-        return std::unique_ptr<LightDistribution>{
-            new SpatialLightDistribution(scene)};
+        return std::make_unique<SpatialLightDistribution>(scene);
     }
 }
 
 UniformLightDistribution::UniformLightDistribution(const Scene &scene) {
     std::vector<Float> prob(scene.lights.size(), Float(1));
-    distrib.reset(new Distribution1D(prob));
+    distrib = std::make_unique<Distribution1D>(prob);
 }
 
 const Distribution1D *UniformLightDistribution::Lookup(const Point3f &p) const {
@@ -122,7 +118,7 @@ SpatialLightDistribution::SpatialLightDistribution(const Scene &scene,
     }
 
     hashTableSize = 4 * nVoxels[0] * nVoxels[1] * nVoxels[2];
-    hashTable.reset(new HashEntry[hashTableSize]);
+    hashTable = std::make_unique<HashEntry[]>(hashTableSize);
     for (int i = 0; i < hashTableSize; ++i) {
         hashTable[i].packedPos.store(invalidPackedPos);
         hashTable[i].distribution.store(nullptr);

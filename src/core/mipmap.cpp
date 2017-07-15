@@ -70,8 +70,7 @@ std::unique_ptr<CachedTexelProvider> CachedTexelProvider::CreateFromFile(
                 filename.c_str(), WrapModeString(textureCache->GetWrapMode(id)),
                 WrapModeString(wrapMode));
 
-    return std::unique_ptr<CachedTexelProvider>(
-        new CachedTexelProvider(filename, wrapMode, id));
+    return std::make_unique<CachedTexelProvider>(filename, wrapMode, id);
 }
 
 CachedTexelProvider::CachedTexelProvider(const std::string &filename,
@@ -189,15 +188,15 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(
     if (HasExtension(filename, "txp")) {
         std::unique_ptr<TexelProvider> tp =
             CachedTexelProvider::CreateFromFile(filename, wrapMode);
-        return std::unique_ptr<MIPMap>(new MIPMap(std::move(tp), options));
+        return std::make_unique<MIPMap>(std::move(tp), options);
     } else {
         Image image;
         if (!Image::Read(filename, &image, gamma)) return nullptr;
 
         // TODO: make spectrum type configurable, or eliminate...
-        std::unique_ptr<TexelProvider> tp(new ImageTexelProvider(
-            std::move(image), wrapMode, SpectrumType::Reflectance));
-        return std::unique_ptr<MIPMap>(new MIPMap(std::move(tp), options));
+        std::unique_ptr<TexelProvider> tp = std::make_unique<ImageTexelProvider>(
+            std::move(image), wrapMode, SpectrumType::Reflectance);
+        return std::make_unique<MIPMap>(std::move(tp), options);
     }
 }
 

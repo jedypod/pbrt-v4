@@ -735,7 +735,7 @@ void pbrtInit(const Options &opt) {
     if (currentApiState != APIState::Uninitialized)
         Error("pbrtInit() has already been called.");
     currentApiState = APIState::OptionsBlock;
-    renderOptions.reset(new RenderOptions);
+    renderOptions = std::make_unique<RenderOptions>();
     graphicsState = GraphicsState();
     catIndentCount = 0;
 
@@ -754,7 +754,7 @@ void pbrtCleanup() {
         Error("pbrtCleanup() called while inside world block.");
     currentApiState = APIState::Uninitialized;
     ParallelCleanup();
-    renderOptions.reset(nullptr);
+    renderOptions = nullptr;
     CleanupProfiler();
 }
 

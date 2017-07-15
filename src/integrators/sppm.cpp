@@ -115,7 +115,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
     // Initialize _pixelBounds_ and _pixels_ array for SPPM
     Bounds2i pixelBounds = camera->film->croppedPixelBounds;
     int nPixels = pixelBounds.Area();
-    std::unique_ptr<SPPMPixel[]> pixels(new SPPMPixel[nPixels]);
+    std::unique_ptr<SPPMPixel[]> pixels = std::make_unique<SPPMPixel[]>(nPixels);
     for (int i = 0; i < nPixels; ++i) pixels[i].radius = initialSearchRadius;
     const Float invSqrtSPP = 1.f / std::sqrt(nIterations);
     pixelMemoryBytes = nPixels * sizeof(SPPMPixel);

@@ -127,7 +127,7 @@ Float HaltonSampler::SampleDimension(int64_t index, int dim) const {
 }
 
 std::unique_ptr<Sampler> HaltonSampler::Clone(int seed) {
-    return std::unique_ptr<Sampler>(new HaltonSampler(*this));
+    return std::make_unique<HaltonSampler>(*this);
 }
 
 HaltonSampler *CreateHaltonSampler(const ParamSet &params,

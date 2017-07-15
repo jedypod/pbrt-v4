@@ -68,9 +68,9 @@ void MaxMinDistSampler::StartPixel(const Point2i &p) {
 }
 
 std::unique_ptr<Sampler> MaxMinDistSampler::Clone(int seed) {
-    MaxMinDistSampler *mmds = new MaxMinDistSampler(*this);
+    auto mmds = std::make_unique<MaxMinDistSampler>(*this);
     mmds->rng.SetSequence(seed);
-    return std::unique_ptr<Sampler>(mmds);
+    return std::move(mmds);
 }
 
 MaxMinDistSampler *CreateMaxMinDistSampler(const ParamSet &params) {

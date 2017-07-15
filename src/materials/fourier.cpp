@@ -136,7 +136,7 @@ bool FourierBSDFTable::Read(const std::string &filename,
     auto readfloat = [&](Float *target, size_t count) -> bool {
         if (sizeof(*target) == sizeof(float)) return read32(target, count);
 
-        std::unique_ptr<float[]> buf(new float[count]);
+        std::unique_ptr<float[]> buf = std::make_unique<float[]>(count);
         bool ret = read32(buf.get(), count);
         for (size_t i = 0; i < count; ++i) target[i] = buf[i];
         return ret;
@@ -171,7 +171,7 @@ bool FourierBSDFTable::Read(const std::string &filename,
     bsdfTable->mu = new Float[bsdfTable->nMu];
     bsdfTable->cdf = new Float[bsdfTable->nMu * bsdfTable->nMu];
     bsdfTable->a0 = new Float[bsdfTable->nMu * bsdfTable->nMu];
-    offsetAndLength.reset(new int[bsdfTable->nMu * bsdfTable->nMu * 2]);
+    offsetAndLength = std::make_unique<int[]>(bsdfTable->nMu * bsdfTable->nMu * 2);
     bsdfTable->aOffset = new int[bsdfTable->nMu * bsdfTable->nMu];
     bsdfTable->m = new int[bsdfTable->nMu * bsdfTable->nMu];
     bsdfTable->a = new Float[nCoeffs];
@@ -212,7 +212,7 @@ FourierMaterial::FourierMaterial(const std::string &filename,
                                  const std::shared_ptr<Texture<Float>> &bumpMap)
     : bumpMap(bumpMap) {
     if (loadedBSDFs.find(filename) == loadedBSDFs.end()) {
-        std::unique_ptr<FourierBSDFTable> table(new FourierBSDFTable);
+        std::unique_ptr<FourierBSDFTable> table = std::make_unique<FourierBSDFTable>();
         FourierBSDFTable::Read(filename, table.get());
         loadedBSDFs[filename] = std::move(table);
     }

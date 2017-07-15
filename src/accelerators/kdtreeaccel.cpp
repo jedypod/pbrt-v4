@@ -110,12 +110,12 @@ KdTreeAccel::KdTreeAccel(const std::vector<std::shared_ptr<Primitive>> &p,
     // Allocate working memory for kd-tree construction
     std::unique_ptr<BoundEdge[]> edges[3];
     for (int i = 0; i < 3; ++i)
-        edges[i].reset(new BoundEdge[2 * primitives.size()]);
-    std::unique_ptr<int[]> prims0(new int[primitives.size()]);
-    std::unique_ptr<int[]> prims1(new int[(maxDepth + 1) * primitives.size()]);
+        edges[i] = std::make_unique<BoundEdge[]>(2 * primitives.size());
+    std::unique_ptr<int[]> prims0 = std::make_unique<int[]>(primitives.size());
+    std::unique_ptr<int[]> prims1 = std::make_unique<int[]>((maxDepth + 1) * primitives.size());
 
     // Initialize _primNums_ for kd-tree construction
-    std::unique_ptr<int[]> primNums(new int[primitives.size()]);
+    std::unique_ptr<int[]> primNums = std::make_unique<int[]>(primitives.size());
     for (size_t i = 0; i < primitives.size(); ++i) primNums[i] = i;
 
     // Start recursive construction of kd-tree

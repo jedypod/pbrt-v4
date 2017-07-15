@@ -703,7 +703,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
             if (type == PARAM_TYPE_INT) {
                 // parser doesn't handle ints, so convert from doubles here....
                 int nAlloc = nItems;
-                std::unique_ptr<int[]> idata(new int[nAlloc]);
+                std::unique_ptr<int[]> idata = std::make_unique<int[]>(nAlloc);
                 double *fdata = (double *)cur_paramlist[i].arg;
                 for (int j = 0; j < nAlloc; ++j)
                     idata[j] = int(fdata[j]);
@@ -712,7 +712,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
             else if (type == PARAM_TYPE_BOOL) {
                 // strings -> bools
                 int nAlloc = cur_paramlist[i].size;
-                std::unique_ptr<bool[]> bdata(new bool[nAlloc]);
+                std::unique_ptr<bool[]> bdata = std::make_unique<bool[]>(nAlloc);
                 for (int j = 0; j < nAlloc; ++j) {
                     std::string s(((const char **)data)[j]);
                     if (s == "true") bdata[j] = true;
@@ -726,7 +726,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                 ps.AddBool(name, std::move(bdata), nItems);
             }
             else if (type == PARAM_TYPE_FLOAT) {
-                std::unique_ptr<Float[]> floats(new Float[nItems]);
+                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
                 for (int i = 0; i < nItems; ++i)
                     floats[i] = ((double *)data)[i];
                 ps.AddFloat(name, std::move(floats), nItems);
@@ -734,7 +734,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                 if ((nItems % 2) != 0)
                     Warning("Excess values given with point2 parameter \"%s\". "
                             "Ignoring last one of them.", cur_paramlist[i].name);
-                std::unique_ptr<Point2f[]> pts(new Point2f[nItems / 2]);
+                std::unique_ptr<Point2f[]> pts = std::make_unique<Point2f[]>(nItems/ 2);
                 for (int i = 0; i < nItems / 2; ++i) {
                     pts[i].x = ((double *)data)[2 * i];
                     pts[i].y = ((double *)data)[2 * i + 1];
@@ -744,7 +744,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                 if ((nItems % 2) != 0)
                     Warning("Excess values given with vector2 parameter \"%s\". "
                             "Ignoring last one of them.", cur_paramlist[i].name);
-                std::unique_ptr<Vector2f[]> vecs(new Vector2f[nItems / 2]);
+                std::unique_ptr<Vector2f[]> vecs = std::make_unique<Vector2f[]>(nItems/ 2);
                 for (int i = 0; i < nItems / 2; ++i) {
                     vecs[i].x = ((double *)data)[2 * i];
                     vecs[i].y = ((double *)data)[2 * i + 1];
@@ -755,7 +755,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                     Warning("Excess values given with point3 parameter \"%s\". "
                             "Ignoring last %d of them.", cur_paramlist[i].name,
                             nItems % 3);
-                std::unique_ptr<Point3f[]> pts(new Point3f[nItems / 3]);
+                std::unique_ptr<Point3f[]> pts = std::make_unique<Point3f[]>(nItems/ 3);
                 for (int i = 0; i < nItems / 3; ++i) {
                     pts[i].x = ((double *)data)[3 * i];
                     pts[i].y = ((double *)data)[3 * i + 1];
@@ -767,7 +767,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                     Warning("Excess values given with vector3 parameter \"%s\". "
                             "Ignoring last %d of them.", cur_paramlist[i].name,
                             nItems % 3);
-                std::unique_ptr<Vector3f[]> vecs(new Vector3f[nItems / 3]);
+                std::unique_ptr<Vector3f[]> vecs = std::make_unique<Vector3f[]>(nItems/ 3);
                 for (int j = 0; j < nItems / 3; ++j) {
                     vecs[j].x = ((double *)data)[3 * j];
                     vecs[j].y = ((double *)data)[3 * j + 1];
@@ -779,7 +779,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                     Warning("Excess values given with \"normal\" parameter \"%s\". "
                             "Ignoring last %d of them.", cur_paramlist[i].name,
                             nItems % 3);
-                std::unique_ptr<Normal3f[]> normals(new Normal3f[nItems / 3]);
+                std::unique_ptr<Normal3f[]> normals = std::make_unique<Normal3f[]>(nItems/ 3);
                 for (int j = 0; j < nItems / 3; ++j) {
                     normals[j].x = ((double *)data)[3 * j];
                     normals[j].y = ((double *)data)[3 * j + 1];
@@ -793,7 +793,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                             nItems % 3);
                     nItems -= nItems % 3;
                 }
-                std::unique_ptr<Float[]> floats(new Float[nItems]);
+                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
                 for (int j = 0; j < nItems; ++j)
                     floats[j] = ((double *)data)[j];
                 ps.AddRGBSpectrum(name, std::move(floats), nItems);
@@ -804,7 +804,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                             nItems % 3);
                     nItems -= nItems % 3;
                 }
-                std::unique_ptr<Float[]> floats(new Float[nItems]);
+                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
                 for (int j = 0; j < nItems; ++j)
                     floats[j] = ((double *)data)[j];
                 ps.AddXYZSpectrum(name, std::move(floats), nItems);
@@ -814,7 +814,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                             "Ignoring extra one.", cur_paramlist[i].name);
                     nItems -= nItems % 2;
                 }
-                std::unique_ptr<Float[]> floats(new Float[nItems]);
+                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
                 for (int j = 0; j < nItems; ++j)
                     floats[j] = ((double *)data)[j];
                 ps.AddBlackbodySpectrum(name, std::move(floats), nItems);
@@ -829,13 +829,13 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                                 cur_paramlist[i].name);
                         nItems -= nItems % 2;
                     }
-                    std::unique_ptr<Float[]> floats(new Float[nItems]);
+                    std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
                     for (int j = 0; j < nItems; ++j)
                         floats[j] = ((double *)data)[j];
                     ps.AddSampledSpectrum(name, std::move(floats), nItems);
                 }
             } else if (type == PARAM_TYPE_STRING) {
-                std::unique_ptr<std::string[]> strings(new std::string[nItems]);
+                std::unique_ptr<std::string[]> strings = std::make_unique<std::string[]>(nItems);
                 for (int j = 0; j < nItems; ++j)
                     strings[j] = std::string(((const char **)data)[j]);
                 ps.AddString(name, std::move(strings), nItems);

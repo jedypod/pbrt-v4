@@ -46,7 +46,7 @@ namespace pbrt {
 
 // ParamSet Macros
 #define ADD_PARAM_TYPE(T, vec) \
-    (vec).emplace_back(new ParamSetItem<T>(name, std::move(values), nValues));
+    (vec).push_back(std::make_shared<ParamSetItem<T>>(name, std::move(values), nValues));
 #define LOOKUP_PTR(vec)                           \
     for (const auto &v : vec)                     \
         if (v->name == name) {                    \
@@ -66,8 +66,7 @@ namespace pbrt {
 void ParamSet::AddFloat(const std::string &name,
                         std::unique_ptr<Float[]> values, int nValues) {
     EraseFloat(name);
-    floats.emplace_back(
-        new ParamSetItem<Float>(name, std::move(values), nValues));
+    floats.push_back(std::make_shared<ParamSetItem<Float>>(name, std::move(values), nValues));
 }
 
 void ParamSet::AddInt(const std::string &name, std::unique_ptr<int[]> values,
@@ -119,8 +118,7 @@ void ParamSet::AddRGBSpectrum(const std::string &name,
     nValues /= 3;
     std::unique_ptr<Spectrum[]> s(new Spectrum[nValues]);
     for (int i = 0; i < nValues; ++i) s[i] = Spectrum::FromRGB(&values[3 * i]);
-    std::shared_ptr<ParamSetItem<Spectrum>> psi(
-        new ParamSetItem<Spectrum>(name, std::move(s), nValues));
+    auto psi = std::make_shared<ParamSetItem<Spectrum>>(name, std::move(s), nValues);
     spectra.push_back(psi);
 }
 
@@ -131,8 +129,7 @@ void ParamSet::AddXYZSpectrum(const std::string &name,
     nValues /= 3;
     std::unique_ptr<Spectrum[]> s(new Spectrum[nValues]);
     for (int i = 0; i < nValues; ++i) s[i] = Spectrum::FromXYZ(&values[3 * i]);
-    std::shared_ptr<ParamSetItem<Spectrum>> psi(
-        new ParamSetItem<Spectrum>(name, std::move(s), nValues));
+    auto psi = std::make_shared<ParamSetItem<Spectrum>>(name, std::move(s), nValues);
     spectra.push_back(psi);
 }
 
@@ -148,8 +145,7 @@ void ParamSet::AddBlackbodySpectrum(const std::string &name,
         BlackbodyNormalized(CIE_lambda, values[2 * i], &v);
         s[i] = values[2 * i + 1] * Spectrum::FromSampled(CIE_lambda, v);
     }
-    std::shared_ptr<ParamSetItem<Spectrum>> psi(
-        new ParamSetItem<Spectrum>(name, std::move(s), nValues));
+    auto psi = std::make_shared<ParamSetItem<Spectrum>>(name, std::move(s), nValues);
     spectra.push_back(psi);
 }
 
@@ -167,8 +163,7 @@ void ParamSet::AddSampledSpectrum(const std::string &name,
     }
     std::unique_ptr<Spectrum[]> s(new Spectrum[1]);
     s[0] = Spectrum::FromSampled(wl, v);
-    std::shared_ptr<ParamSetItem<Spectrum>> psi(
-        new ParamSetItem<Spectrum>(name, std::move(s), 1));
+    auto psi = std::make_shared<ParamSetItem<Spectrum>>(name, std::move(s), 1);
     spectra.push_back(psi);
 }
 
@@ -206,8 +201,7 @@ void ParamSet::AddSampledSpectrumFiles(const std::string &name,
         cachedSpectra[fn] = s[i];
     }
 
-    std::shared_ptr<ParamSetItem<Spectrum>> psi(
-        new ParamSetItem<Spectrum>(name, std::move(s), nValues));
+    auto psi = std::make_shared<ParamSetItem<Spectrum>>(name, std::move(s), nValues);
     spectra.push_back(psi);
 }
 
@@ -222,8 +216,7 @@ void ParamSet::AddTexture(const std::string &name, const std::string &value) {
     EraseTexture(name);
     std::unique_ptr<std::string[]> str(new std::string[1]);
     str[0] = value;
-    std::shared_ptr<ParamSetItem<std::string>> psi(
-        new ParamSetItem<std::string>(name, std::move(str), 1));
+    auto psi = std::make_shared<ParamSetItem<std::string>>(name, std::move(str), 1);
     textures.push_back(psi);
 }
 

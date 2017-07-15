@@ -54,9 +54,9 @@ Point2f RandomSampler::Get2D() {
 }
 
 std::unique_ptr<Sampler> RandomSampler::Clone(int seed) {
-    RandomSampler *rs = new RandomSampler(*this);
+    auto rs = std::make_unique<RandomSampler>(*this);
     rs->rng.SetSequence(seed);
-    return std::unique_ptr<Sampler>(rs);
+    return std::move(rs);
 }
 
 void RandomSampler::StartPixel(const Point2i &p) {

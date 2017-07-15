@@ -250,7 +250,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
             Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
                   alphaTexName.c_str());
     } else if (params.FindOneFloat("alpha", 1.f) == 0.f) {
-        alphaTex.reset(new ConstantTexture<Float>(0.f));
+        alphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
     }
 
     std::shared_ptr<Texture<Float>> shadowAlphaTex;
@@ -264,7 +264,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
                 "parameter",
                 shadowAlphaTexName.c_str());
     } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
-        shadowAlphaTex.reset(new ConstantTexture<Float>(0.f));
+        shadowAlphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
 
     ArraySlice<Normal3f> N;
     if (context.n) N = {context.n, vertexCount};

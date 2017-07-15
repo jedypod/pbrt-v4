@@ -149,7 +149,7 @@ bool Image::WriteEXR(const std::string &name, const Bounds2i &pixelBounds,
     // require the caller to explicitly downcast/ask for float16 if
     // desired?
 
-    std::unique_ptr<Rgba[]> hrgba(new Rgba[resolution.x * resolution.y]);
+    std::unique_ptr<Rgba[]> hrgba = std::make_unique<Rgba[]>(resolution.x * resolution.y);
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
             // TODO: skip the half -> float -> half round trip...
@@ -224,8 +224,8 @@ bool Image::WritePNG(const std::string &name) const {
     case PixelFormat::RGB8:
     case PixelFormat::RGB16:
     case PixelFormat::RGB32: {
-        std::unique_ptr<uint8_t[]> rgb8(
-            new uint8_t[3 * resolution.x * resolution.y]);
+        std::unique_ptr<uint8_t[]> rgb8 =
+            std::make_unique<uint8_t[]>(3 * resolution.x * resolution.y);
         for (int y = 0; y < resolution.y; ++y)
             for (int x = 0; x < resolution.x; ++x)
                 for (int c = 0; c < 3; ++c)
@@ -239,7 +239,8 @@ bool Image::WritePNG(const std::string &name) const {
     case PixelFormat::Y8:
     case PixelFormat::Y16:
     case PixelFormat::Y32: {
-        std::unique_ptr<uint8_t[]> y8(new uint8_t[resolution.x * resolution.y]);
+        std::unique_ptr<uint8_t[]> y8 =
+            std::make_unique<uint8_t[]>(resolution.x * resolution.y);
         for (int y = 0; y < resolution.y; ++y)
             for (int x = 0; x < resolution.x; ++x)
                 y8[y * resolution.x + x] = FloatToSRGB(GetChannel({x, y}, 0));
@@ -263,8 +264,8 @@ bool Image::WritePNG(const std::string &name) const {
 
 bool Image::WriteTGA(const std::string &name) const {
     int nc = nChannels();
-    std::unique_ptr<uint8_t[]> outBuf(
-        new uint8_t[nc * resolution.x * resolution.y]);
+    std::unique_ptr<uint8_t[]> outBuf =
+        std::make_unique<uint8_t[]>(nc * resolution.x * resolution.y);
     uint8_t *dst = outBuf.get();
     for (int y = 0; y < resolution.y; ++y) {
         for (int x = 0; x < resolution.x; ++x) {
@@ -507,7 +508,7 @@ bool Image::WritePFM(const std::string &filename) const {
         return false;
     }
 
-    std::unique_ptr<float[]> scanline(new float[3 * resolution.x]);
+    std::unique_ptr<float[]> scanline = std::make_unique<float[]>(3 * resolution.x);
 
     // only write 3 channel PFMs here...
     if (fprintf(fp, "PF\n") < 0) goto fail;

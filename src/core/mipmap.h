@@ -105,6 +105,7 @@ class ImageTexelProvider : public TexelProvider {
 
 class CachedTexelProvider : public TexelProvider {
   public:
+    CachedTexelProvider(const std::string &filename, WrapMode wrapMode, int id);
     static std::unique_ptr<CachedTexelProvider> CreateFromFile(
         const std::string &filename, WrapMode wrapMode);
     ~CachedTexelProvider();
@@ -119,8 +120,6 @@ class CachedTexelProvider : public TexelProvider {
     static TextureCache *textureCache;
 
   private:
-    CachedTexelProvider(const std::string &filename, WrapMode wrapMode, int id);
-
     const std::string filename;
     const WrapMode wrapMode;
     const int id;

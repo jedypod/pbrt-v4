@@ -152,7 +152,7 @@ bool TiledImagePyramid::Create(std::vector<Image> images,
     int logTileSize = Log2Int(tileSize);
     int bufSize = tileSize * tileSize * TexelBytes(format);
     bufSize = (bufSize + TileDiskAlignment - 1) & ~(TileDiskAlignment - 1);
-    std::unique_ptr<char[]> buf(new char[bufSize]);
+    std::unique_ptr<char[]> buf = std::make_unique<char[]>(bufSize);
     int64_t filePos;
     int firstInMemoryLevel;
     // Write tiled texture file header
@@ -296,7 +296,7 @@ bool TiledImagePyramid::Read(const std::string &filename,
                          TexelBytes(tex->pixelFormat);
         topLevelBytes += levelBytes;
         // TODO: single allocation for all of these
-        std::unique_ptr<char[]> buf(new char[levelBytes]);
+        std::unique_ptr<char[]> buf = std::make_unique<char[]>(levelBytes);
         // TODO: endian
         if (!fread(buf.get(), levelBytes, 1, file)) {
             Error("%s: %s", filename.c_str(), strerror(errno));
@@ -342,8 +342,9 @@ class TileHashTable {
 };
 
 // TileHashTable Method Definitions
-TileHashTable::TileHashTable(size_t size) : size(size) {
-    table.reset(new std::atomic<TextureTile *>[ size ]);
+TileHashTable::TileHashTable(size_t size)
+    : table(std::make_unique<std::atomic<TextureTile *>[]>(size)),
+      size(size) {
     for (size_t i = 0; i < size; ++i) table[i] = nullptr;
     hashEntryCopied.resize(size);
 }
@@ -498,7 +499,7 @@ FdCache::FdCache(int fdsSpared) {
     // TODO: figure out the right thing to do here, especially for windows.
     int maxFds = 500;
 #endif
-    allocPtr.reset(new FdEntry[maxFds]);
+    allocPtr = std::make_unique<FdEntry[]>(maxFds);
     for (int i = 0; i < maxFds; ++i) {
         FdEntry *entry = &allocPtr[i];
         entry->next = freeList;
@@ -632,12 +633,12 @@ TextureCache::TextureCache() {
     size_t nTiles = maxTextureBytes / TileAllocSize;
 
     // Allocate tile memory for texture cache
-    tileMemAlloc.reset(new char[nTiles * TileAllocSize]);
+    tileMemAlloc = std::make_unique<char[]>(nTiles * TileAllocSize);
     char *tilePtr = tileMemAlloc.get();
     LOG(INFO) << "Allocating " << nTiles << " TextureTile objects";
 
     // Allocate _TextureTile_s and initialize free list
-    allTilesAlloc.reset(new TextureTile[nTiles]);
+    allTilesAlloc = std::make_unique<TextureTile[]>(nTiles);
     for (int i = 0; i < nTiles; ++i) {
         allTilesAlloc[i].texels = tilePtr + i * TileAllocSize;
         freeTiles.push_back(&allTilesAlloc[i]);

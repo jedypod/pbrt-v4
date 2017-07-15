@@ -45,6 +45,8 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
+constexpr int Film::filterTableWidth;
+
 // Film Method Definitions
 Film::Film(const Point2i &resolution, const Bounds2f &cropWindow,
            std::unique_ptr<Filter> filt, Float diagonal,
@@ -66,7 +68,7 @@ Film::Film(const Point2i &resolution, const Bounds2f &cropWindow,
         croppedPixelBounds;
 
     // Allocate film image storage
-    pixels = std::unique_ptr<Pixel[]>(new Pixel[croppedPixelBounds.Area()]);
+    pixels = std::make_unique<Pixel[]>(croppedPixelBounds.Area());
     filmPixelMemory += croppedPixelBounds.Area() * sizeof(Pixel);
 
     // Precompute filter weight table
@@ -104,9 +106,9 @@ std::unique_ptr<FilmTile> Film::GetFilmTile(const Bounds2i &sampleBounds) {
     Point2i p1 = (Point2i)Floor(floatBounds.pMax - halfPixel + filter->radius) +
                  Point2i(1, 1);
     Bounds2i tilePixelBounds = Intersect(Bounds2i(p0, p1), croppedPixelBounds);
-    return std::unique_ptr<FilmTile>(new FilmTile(
+    return std::make_unique<FilmTile>(
         tilePixelBounds, filter->radius, filterTable, filterTableWidth,
-        maxSampleLuminance));
+        maxSampleLuminance);
 }
 
 void Film::Clear() {

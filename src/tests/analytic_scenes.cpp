@@ -91,7 +91,7 @@ std::vector<TestScene> GetScenes() {
         lights.push_back(
             std::make_shared<PointLight>(Transform(), nullptr, Spectrum(Pi)));
 
-        std::unique_ptr<Scene> scene(new Scene(bvh, lights));
+        std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
         scenes.push_back({std::move(scene), "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -125,7 +125,7 @@ std::vector<TestScene> GetScenes() {
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
                                                       Spectrum(Pi / 4)));
 
-        std::unique_ptr<Scene> scene(new Scene(bvh, lights));
+        std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
         scenes.push_back({std::move(scene), "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -156,7 +156,7 @@ std::vector<TestScene> GetScenes() {
             sphere, material, areaLight, mediumInterface));
         std::shared_ptr<BVHAccel> bvh = std::make_shared<BVHAccel>(prims);
 
-        std::unique_ptr<Scene> scene(new Scene(bvh, lights));
+        std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
         scenes.push_back({std::move(scene), "Sphere, Kd = 0.5, Le = 0.5", 1.0});
     }
@@ -192,7 +192,7 @@ std::vector<TestScene> GetScenes() {
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
                                                       Spectrum(3. * Pi)));
 
-        std::unique_ptr<Scene> scene(new Scene(bvh, lights));
+        std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
         scenes.push_back(
             {std::move(scene), "Sphere, 1 light, Kd = 0.25 Kr = 0.5", 1.0});
@@ -232,7 +232,7 @@ std::vector<TestScene> GetScenes() {
     std::vector<std::shared_ptr<Light>> lights;
     lights.push_back(areaLight);
 
-    std::unique_ptr<Scene> scene(new Scene(bvh, lights));
+    std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
     scenes.push_back({std::move(scene),
             "Sphere, Kd = 0.25 Kr = 0.5, Le = 0.587", 1.0});
@@ -271,7 +271,7 @@ std::vector<TestIntegrator> GetIntegrators() {
     for (auto scene : GetScenes()) {
         // Path tracing integrators
         for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
@@ -291,7 +291,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
 
         for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
@@ -311,7 +311,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // Volume path tracing integrators
         for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
@@ -330,7 +330,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                                    scene});
         }
         for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
@@ -351,7 +351,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // BDPT
         for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
@@ -372,7 +372,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 #if 0
     // Ortho camera not currently supported with BDPT.
     for (auto sampler : GetSamplers(Bounds2i(Point2i(0,0), resolution))) {
-      std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+      std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
       Film *film = new Film(resolution, Bounds2f(Point2f(0,0), Point2f(1,1)),
                             std::move(filter), 1., "test.exr", 1.);
       std::shared_ptr<Camera> camera = std::make_shared<OrthographicCamera>(
@@ -389,7 +389,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // MLT
         {
-            std::unique_ptr<Filter> filter(new BoxFilter(Vector2f(0.5, 0.5)));
+            std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             Film *film =
                 new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);

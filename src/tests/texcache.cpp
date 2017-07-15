@@ -76,7 +76,7 @@ static Image GetImage(PixelFormat format, Point2i res) {
 static void TestFormat(PixelFormat format) {
     ParallelInit();
 
-    std::unique_ptr<TextureCache> cache(new TextureCache);
+    std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
     Image image = GetImage(format, {129, 60});
 
     char filename[64];
@@ -148,7 +148,7 @@ TEST(Texcache, ThreadInsanity) {
     }
 
     PbrtOptions.texCacheMB = 32;
-    std::unique_ptr<TextureCache> cache(new TextureCache);
+    std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
     ASSERT_TRUE(cache.get() != nullptr);
 
     // Supply textures to texture cache.

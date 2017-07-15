@@ -69,7 +69,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
         }, height, 32);
 
     // Compute sampling distributions for rows and columns of image
-    distribution.reset(new Distribution2D(img, width, height));
+    distribution = std::make_unique<Distribution2D>(img, width, height);
 }
 
 Spectrum InfiniteAreaLight::Power() const {

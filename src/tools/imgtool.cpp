@@ -516,7 +516,7 @@ int info(int argc, char *argv[]) {
     int err = 0;
     for (int i = 0; i < argc; ++i) {
         if (HasExtension(argv[i], "txp")) {
-            std::unique_ptr<TextureCache> cache(new TextureCache);
+            std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
             int id = cache->AddTexture(argv[i]);
             if (id < 0) {
                 err = 1;
@@ -727,7 +727,7 @@ int convert(int argc, char *argv[]) {
     const char *inFilename = argv[i], *outFilename = argv[i + 1];
     Image image;
     if (HasExtension(inFilename, "txp")) {
-        std::unique_ptr<TextureCache> cache(new TextureCache);
+        std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
         int id = cache->AddTexture(inFilename);
         if (id < 0) {
             fprintf(stderr, "%s: unable to read image\n", inFilename);

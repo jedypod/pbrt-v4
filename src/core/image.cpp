@@ -297,7 +297,7 @@ struct ResampleWeight {
 static std::unique_ptr<ResampleWeight[]> resampleWeights(int oldRes,
                                                          int newRes) {
     CHECK_GE(newRes, oldRes);
-    std::unique_ptr<ResampleWeight[]> wt(new ResampleWeight[newRes]);
+    std::unique_ptr<ResampleWeight[]> wt = std::make_unique<ResampleWeight[]>(newRes);
     Float filterwidth = 2.f;
     for (int i = 0; i < newRes; ++i) {
         // Compute image resampling weights for _i_th texel

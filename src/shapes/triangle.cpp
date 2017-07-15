@@ -680,7 +680,7 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
             Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
                   alphaTexName.c_str());
     } else if (params.FindOneFloat("alpha", 1.f) == 0.f)
-        alphaTex.reset(new ConstantTexture<Float>(0.f));
+        alphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
 
     std::shared_ptr<Texture<Float>> shadowAlphaTex;
     std::string shadowAlphaTexName = params.FindTexture("shadowalpha");
@@ -693,7 +693,7 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
                 "parameter",
                 shadowAlphaTexName.c_str());
     } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
-        shadowAlphaTex.reset(new ConstantTexture<Float>(0.f));
+        shadowAlphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
 
     return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
                               reverseOrientation, vi, P, S, N, uvs, alphaTex,

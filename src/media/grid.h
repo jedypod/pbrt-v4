@@ -68,7 +68,7 @@ class GridDensityMedium : public Medium {
           ny(ny),
           nz(nz),
           WorldToMedium(Inverse(mediumToWorld)),
-          density(new Float[nx * ny * nz]) {
+          density(std::make_unique<Float[]>(nx * ny * nz)) {
         densityBytes += nx * ny * nz * sizeof(Float);
         std::memcpy((Float *)density.get(), d.data(), sizeof(Float) * nx * ny * nz);
         // Precompute values for Monte Carlo sampling of _GridDensityMedium_

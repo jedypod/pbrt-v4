@@ -225,7 +225,7 @@ std::unique_ptr<Distribution1D> ComputeLightPowerDistribution(
     std::vector<Float> lightPower;
     for (const auto &light : scene.lights)
         lightPower.push_back(light->Power().y());
-    return std::unique_ptr<Distribution1D>(new Distribution1D(lightPower));
+    return std::make_unique<Distribution1D>(lightPower);
 }
 
 // SamplerIntegrator Method Definitions

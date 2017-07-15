@@ -161,13 +161,13 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     std::vector<SDVertex *> vertices;
     std::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
-    std::unique_ptr<SDVertex[]> verts(new SDVertex[p.size()]);
+    std::unique_ptr<SDVertex[]> verts = std::make_unique<SDVertex[]>(p.size());
     for (int i = 0; i < p.size(); ++i) {
         verts[i] = SDVertex(p[i]);
         vertices.push_back(&verts[i]);
     }
     size_t nFaces = vertexIndices.size() / 3;
-    std::unique_ptr<SDFace[]> fs(new SDFace[nFaces]);
+    std::unique_ptr<SDFace[]> fs = std::make_unique<SDFace[]>(nFaces);
     for (int i = 0; i < nFaces; ++i) faces.push_back(&fs[i]);
 
     // Set face to vertex pointers

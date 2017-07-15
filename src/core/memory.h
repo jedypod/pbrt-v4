@@ -110,7 +110,7 @@ MemoryArena {
             }
             if (!currentBlock) {
                 currentAllocSize = std::max(nBytes, blockSize);
-                currentBlock.reset(new char[currentAllocSize]);
+                currentBlock = std::make_unique<char[]>(currentAllocSize);
             }
             currentBlockPos = 0;
         }

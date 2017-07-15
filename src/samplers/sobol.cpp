@@ -59,7 +59,7 @@ Float SobolSampler::SampleDimension(int64_t index, int dim) const {
 }
 
 std::unique_ptr<Sampler> SobolSampler::Clone(int seed) {
-    return std::unique_ptr<Sampler>(new SobolSampler(*this));
+    return std::make_unique<SobolSampler>(*this);
 }
 
 SobolSampler *CreateSobolSampler(const ParamSet &params,
