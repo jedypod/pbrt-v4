@@ -76,10 +76,10 @@ class Vector3 : public Tuple3<Vector3, T> {
     explicit Vector3(const Normal3<T> &n);
 };
 
-typedef Vector2<Float> Vector2f;
-typedef Vector2<int> Vector2i;
-typedef Vector3<Float> Vector3f;
-typedef Vector3<int> Vector3i;
+using Vector2f = Vector2<Float>;
+using Vector2i = Vector2<int>;
+using Vector3f = Vector3<Float>;
+using Vector3i = Vector3<int>;
 
 // Point Declarations
 template <typename T>
@@ -187,10 +187,10 @@ class Point3 : public Tuple3<Point3, T> {
     }
 };
 
-typedef Point2<Float> Point2f;
-typedef Point2<int> Point2i;
-typedef Point3<Float> Point3f;
-typedef Point3<int> Point3i;
+using Point2f = Point2<Float>;
+using Point2i = Point2<int>;
+using Point3f = Point3<Float>;
+using Point3i = Point3<int>;
 
 // Normal Declarations
 template <typename T>
@@ -209,7 +209,7 @@ class Normal3 : public Tuple3<Normal3, T> {
         : Tuple3<Normal3::template Normal3, T>(v.x, v.y, v.z) { }
 };
 
-typedef Normal3<Float> Normal3f;
+using Normal3f = Normal3<Float>;
 
 // Ray Declarations
 class Ray {

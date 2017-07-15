@@ -194,10 +194,10 @@ class Bounds3 {
     Point3<T> pMin, pMax;
 };
 
-typedef Bounds2<Float> Bounds2f;
-typedef Bounds2<int> Bounds2i;
-typedef Bounds3<Float> Bounds3f;
-typedef Bounds3<int> Bounds3i;
+using Bounds2f = Bounds2<Float>;
+using Bounds2i = Bounds2<int>;
+using Bounds3f = Bounds3<Float>;
+using Bounds3i = Bounds3<int>;
 
 class Bounds2iIterator : public std::forward_iterator_tag {
   public:
