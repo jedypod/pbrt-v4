@@ -98,16 +98,11 @@ class Triangle : public Shape {
 
   private:
     // Triangle Private Methods
-    void GetUVs(Point2f uv[3]) const {
-        if (mesh->uv.size() > 0) {
-            uv[0] = mesh->uv[v[0]];
-            uv[1] = mesh->uv[v[1]];
-            uv[2] = mesh->uv[v[2]];
-        } else {
-            uv[0] = Point2f(0, 0);
-            uv[1] = Point2f(1, 0);
-            uv[2] = Point2f(1, 1);
-        }
+    std::array<Point2f, 3> GetUVs() const {
+        if (mesh->uv.size() > 0)
+            return { mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]] };
+        else
+            return { Point2f(0, 0), Point2f(1, 0), Point2f(1, 1) };
     }
 
     // Triangle Private Data

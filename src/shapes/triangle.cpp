@@ -284,8 +284,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
 
     // Compute triangle partial derivatives
     Vector3f dpdu, dpdv;
-    Point2f uv[3];
-    GetUVs(uv);
+    std::array<Point2f, 3> uv = GetUVs();
 
     // Compute deltas for triangle partial derivatives
     Vector2f duv02 = uv[0] - uv[2], duv12 = uv[1] - uv[2];
@@ -502,8 +501,7 @@ bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
     if (testAlphaTexture && (mesh->alphaMask || mesh->shadowAlphaMask)) {
         // Compute triangle partial derivatives
         Vector3f dpdu, dpdv;
-        Point2f uv[3];
-        GetUVs(uv);
+        std::array<Point2f, 3> uv = GetUVs();
 
         // Compute deltas for triangle partial derivatives
         Vector2f duv02 = uv[0] - uv[2], duv12 = uv[1] - uv[2];
