@@ -51,7 +51,7 @@ Interaction Shape::Sample(const Interaction &ref, const Point2f &u,
                           Float *pdf) const {
     Interaction intr = Sample(u, pdf);
     Vector3f wi = intr.p - ref.p;
-    if (wi.LengthSquared() == 0)
+    if (LengthSquared(wi) == 0)
         *pdf = 0;
     else {
         wi = Normalize(wi);

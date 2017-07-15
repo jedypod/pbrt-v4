@@ -560,7 +560,7 @@ Bounds2f RealisticCamera::BoundExitPupil(Float pFilmX0, Float pFilmX1) const {
     }
 
     // Expand bounds to account for sample spacing
-    pupilBounds = Expand(pupilBounds, 2 * projRearBounds.Diagonal().Length() /
+    pupilBounds = Expand(pupilBounds, 2 * Length(projRearBounds.Diagonal()) /
                                           std::sqrt(nSamples));
     return pupilBounds;
 }

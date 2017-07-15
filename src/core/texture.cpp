@@ -213,7 +213,7 @@ inline Float NoiseWeight(Float t) {
 Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
           Float omega, int maxOctaves) {
     // Compute number of octaves for antialiased FBm
-    Float len2 = std::max(dpdx.LengthSquared(), dpdy.LengthSquared());
+    Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);
     int nInt = std::floor(n);
 
@@ -232,7 +232,7 @@ Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
 Float Turbulence(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
                  Float omega, int maxOctaves) {
     // Compute number of octaves for antialiased FBm
-    Float len2 = std::max(dpdx.LengthSquared(), dpdy.LengthSquared());
+    Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);
     int nInt = std::floor(n);
 

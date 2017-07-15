@@ -241,7 +241,7 @@ Interaction Sphere::Sample(const Interaction &ref, const Point2f &u,
     if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
         Interaction intr = Sample(u, pdf);
         Vector3f wi = intr.p - ref.p;
-        if (wi.LengthSquared() == 0)
+        if (LengthSquared(wi) == 0)
             *pdf = 0;
         else {
             // Convert from area measure returned by Sample() call above to

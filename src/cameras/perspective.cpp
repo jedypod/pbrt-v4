@@ -215,7 +215,7 @@ Spectrum PerspectiveCamera::Sample_Wi(const Interaction &ref, const Point2f &u,
     // Populate arguments and compute the importance value
     *vis = VisibilityTester(ref, lensIntr);
     *wi = lensIntr.p - ref.p;
-    Float dist = wi->Length();
+    Float dist = Length(*wi);
     *wi /= dist;
 
     // Compute PDF for importance arriving at _ref_

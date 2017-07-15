@@ -223,7 +223,7 @@ struct Vertex {
     bool IsOnSurface() const { return ng() != Normal3f(); }
     Spectrum f(const Vertex &next, TransportMode mode) const {
         Vector3f wi = next.p() - p();
-        if (wi.LengthSquared() == 0) return 0.;
+        if (LengthSquared(wi) == 0) return 0.;
         wi = Normalize(wi);
         switch (type) {
         case VertexType::Surface:
@@ -268,7 +268,7 @@ struct Vertex {
     Spectrum Le(const Scene &scene, const Vertex &v) const {
         if (!IsLight()) return Spectrum(0.f);
         Vector3f w = v.p() - p();
-        if (w.LengthSquared() == 0) return 0.;
+        if (LengthSquared(w) == 0) return 0.;
         w = Normalize(w);
         if (IsInfiniteLight()) {
             // Return emitted radiance for infinite light sources
@@ -328,8 +328,8 @@ struct Vertex {
         // Return solid angle density if _next_ is an infinite area light
         if (next.IsInfiniteLight()) return pdf;
         Vector3f w = next.p() - p();
-        if (w.LengthSquared() == 0) return 0;
-        Float invDist2 = 1 / w.LengthSquared();
+        if (LengthSquared(w) == 0) return 0;
+        Float invDist2 = 1 / LengthSquared(w);
         if (next.IsOnSurface())
             pdf *= AbsDot(next.ng(), w * std::sqrt(invDist2));
         return pdf * invDist2;
@@ -339,12 +339,12 @@ struct Vertex {
         if (type == VertexType::Light) return PdfLight(scene, next);
         // Compute directions to preceding and next vertex
         Vector3f wn = next.p() - p();
-        if (wn.LengthSquared() == 0) return 0;
+        if (LengthSquared(wn) == 0) return 0;
         wn = Normalize(wn);
         Vector3f wp;
         if (prev) {
             wp = prev->p() - p();
-            if (wp.LengthSquared() == 0) return 0;
+            if (LengthSquared(wp) == 0) return 0;
             wp = Normalize(wp);
         } else
             CHECK(type == VertexType::Camera);
@@ -365,7 +365,7 @@ struct Vertex {
     }
     Float PdfLight(const Scene &scene, const Vertex &v) const {
         Vector3f w = v.p() - p();
-        Float invDist2 = 1 / w.LengthSquared();
+        Float invDist2 = 1 / LengthSquared(w);
         w *= std::sqrt(invDist2);
         Float pdf;
         if (IsInfiniteLight()) {
@@ -395,7 +395,7 @@ struct Vertex {
                          const std::unordered_map<const Light *, size_t>
                              &lightToDistrIndex) const {
         Vector3f w = v.p() - p();
-        if (w.LengthSquared() == 0) return 0.;
+        if (LengthSquared(w) == 0) return 0.;
         w = Normalize(w);
         if (IsInfiniteLight()) {
             // Return solid angle density for infinite light sources

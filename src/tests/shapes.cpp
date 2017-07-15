@@ -137,7 +137,7 @@ std::shared_ptr<Triangle> GetRandomTriangle(std::function<Float()> value) {
     for (int j = 0; j < 3; ++j)
         for (int k = 0; k < 3; ++k) v[j][k] = value();
 
-    if ((Cross(v[1] - v[0], v[2] - v[0]).LengthSquared()) < 1e-20)
+    if (LengthSquared(Cross(v[1] - v[0], v[2] - v[0])) < 1e-20)
         // Don't into trouble with ~degenerate triangles.
         return nullptr;
 

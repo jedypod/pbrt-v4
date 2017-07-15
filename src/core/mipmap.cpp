@@ -253,9 +253,9 @@ T MIPMap::Lookup(const Point2f &st, Vector2f dst0, Vector2f dst1) const {
     ++nEWALookups;
     ProfilePhase p(Prof::TexFiltEWA);
     // Compute ellipse minor and major axes
-    if (dst0.LengthSquared() < dst1.LengthSquared()) std::swap(dst0, dst1);
-    Float majorLength = dst0.Length();
-    Float minorLength = dst1.Length();
+    if (LengthSquared(dst0) < LengthSquared(dst1)) std::swap(dst0, dst1);
+    Float majorLength = Length(dst0);
+    Float minorLength = Length(dst1);
 
     // Clamp ellipse eccentricity if too large
     if (minorLength * options.maxAnisotropy < majorLength && minorLength > 0) {

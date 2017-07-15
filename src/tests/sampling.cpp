@@ -203,7 +203,7 @@ TEST(MaxMinDist, MinDist) {
             Vector2f d = Abs(p1 - p0);
             if (d.x > 0.5) d.x = 1. - d.x;
             if (d.y > 0.5) d.y = 1. - d.y;
-            return d.Length();
+            return Length(d);
         };
 
         Float minDist = Infinity;

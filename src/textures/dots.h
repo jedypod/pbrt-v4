@@ -74,7 +74,7 @@ class DotsTexture : public Texture<T> {
             Float tCenter =
                 tCell + maxShift * Noise(sCell + 4.5f, tCell + 9.8f);
             Vector2f dst = st - Point2f(sCenter, tCenter);
-            if (dst.LengthSquared() < radius * radius)
+            if (LengthSquared(dst) < radius * radius)
                 return insideDot->Evaluate(si);
         }
         return outsideDot->Evaluate(si);

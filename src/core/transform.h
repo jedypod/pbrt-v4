@@ -162,9 +162,9 @@ class Transform {
     const Matrix4x4 &GetMatrix() const { return m; }
     const Matrix4x4 &GetInverseMatrix() const { return mInv; }
     bool HasScale() const {
-        Float la2 = (*this)(Vector3f(1, 0, 0)).LengthSquared();
-        Float lb2 = (*this)(Vector3f(0, 1, 0)).LengthSquared();
-        Float lc2 = (*this)(Vector3f(0, 0, 1)).LengthSquared();
+        Float la2 = LengthSquared((*this)(Vector3f(1, 0, 0)));
+        Float lb2 = LengthSquared((*this)(Vector3f(0, 1, 0)));
+        Float lc2 = LengthSquared((*this)(Vector3f(0, 0, 1)));
 #define NOT_ONE(x) ((x) < .999f || (x) > 1.001f)
         return (NOT_ONE(la2) || NOT_ONE(lb2) || NOT_ONE(lc2));
 #undef NOT_ONE
@@ -259,7 +259,7 @@ inline Ray Transform::operator()(const Ray &r) const {
     Point3f o = (*this)(r.o, &oError);
     Vector3f d = (*this)(r.d);
     // Offset ray origin to edge of error bounds and compute _tMax_
-    Float lengthSquared = d.LengthSquared();
+    Float lengthSquared = LengthSquared(d);
     Float tMax = r.tMax;
     if (lengthSquared > 0) {
         Float dt = Dot(Abs(d), oError) / lengthSquared;
@@ -390,7 +390,7 @@ inline Ray Transform::operator()(const Ray &r, Vector3f *oError,
     Point3f o = (*this)(r.o, oError);
     Vector3f d = (*this)(r.d, dError);
     Float tMax = r.tMax;
-    Float lengthSquared = d.LengthSquared();
+    Float lengthSquared = LengthSquared(d);
     if (lengthSquared > 0) {
         Float dt = Dot(Abs(d), *oError) / lengthSquared;
         o += d * dt;
@@ -405,7 +405,7 @@ inline Ray Transform::operator()(const Ray &r, const Vector3f &oErrorIn,
     Point3f o = (*this)(r.o, oErrorIn, oErrorOut);
     Vector3f d = (*this)(r.d, dErrorIn, dErrorOut);
     Float tMax = r.tMax;
-    Float lengthSquared = d.LengthSquared();
+    Float lengthSquared = LengthSquared(d);
     if (lengthSquared > 0) {
         Float dt = Dot(Abs(d), *oErrorOut) / lengthSquared;
         o += d * dt;

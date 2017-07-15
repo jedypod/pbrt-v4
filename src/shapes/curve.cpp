@@ -162,7 +162,7 @@ bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
     // we get curve bounds with minimal extent in y, which in turn lets us
     // early out more quickly in recursiveIntersect().
     Vector3f dx = Cross(ray.d, cpObj[3] - cpObj[0]);
-    if (dx.LengthSquared() == 0) {
+    if (LengthSquared(dx) == 0) {
         // If the ray and the vector between the first and last control
         // points are parallel, dx will be zero.  Generate an arbitrary xy
         // orientation for the ray coordinate system so that intersection
@@ -195,7 +195,7 @@ bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
         return false;
 
     // Check for non-overlap in z.
-    Float rayLength = ray.d.Length();
+    Float rayLength = Length(ray.d);
     Float zMax = rayLength * ray.tMax;
     if (std::max(std::max(cp[0].z, cp[1].z), std::max(cp[2].z, cp[3].z)) +
             0.5f * maxWidth < 0 ||
@@ -235,7 +235,7 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
                                SurfaceInteraction *isect, const Point3f cp[4],
                                const Transform &rayToObject, Float u0, Float u1,
                                int depth) const {
-    Float rayLength = ray.d.Length();
+    Float rayLength = Length(ray.d);
 
     if (depth > 0) {
         // Split curve segment into sub-segments and test for intersection
@@ -306,7 +306,7 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
 
         // Compute line $w$ that gives minimum distance to sample point
         Vector2f segmentDirection = Point2f(cp[3].x, cp[3].y) - Point2f(cp[0].x, cp[0].y);
-        Float denom = segmentDirection.LengthSquared();
+        Float denom = LengthSquared(segmentDirection);
         if (denom == 0) return false;
         Float w = Dot(-Vector2f(cp[0].x, cp[0].y), segmentDirection) / denom;
 

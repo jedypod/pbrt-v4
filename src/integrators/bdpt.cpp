@@ -219,7 +219,7 @@ int RandomWalk(const Scene &scene, RayDifferential ray, Sampler &sampler,
 Spectrum G(const Scene &scene, Sampler &sampler, const Vertex &v0,
            const Vertex &v1) {
     Vector3f d = v0.p() - v1.p();
-    Float g = 1 / d.LengthSquared();
+    Float g = 1 / LengthSquared(d);
     d *= std::sqrt(g);
     if (v0.IsOnSurface()) g *= AbsDot(v0.ns(), d);
     if (v1.IsOnSurface()) g *= AbsDot(v1.ns(), d);

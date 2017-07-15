@@ -46,7 +46,7 @@ namespace pbrt {
 // HomogeneousMedium Method Definitions
 Spectrum HomogeneousMedium::Tr(const Ray &ray, Sampler &sampler) const {
     ProfilePhase _(Prof::MediumTr);
-    return Exp(-sigma_t * std::min(ray.tMax * ray.d.Length(), MaxFloat));
+    return Exp(-sigma_t * std::min(ray.tMax * Length(ray.d), MaxFloat));
 }
 
 Spectrum HomogeneousMedium::Sample(const Ray &ray, Sampler &sampler,
@@ -57,14 +57,14 @@ Spectrum HomogeneousMedium::Sample(const Ray &ray, Sampler &sampler,
     int channel = std::min((int)(sampler.Get1D() * Spectrum::nSamples),
                            Spectrum::nSamples - 1);
     Float dist = -std::log(1 - sampler.Get1D()) / sigma_t[channel];
-    Float t = std::min(dist * ray.d.Length(), ray.tMax);
+    Float t = std::min(dist * Length(ray.d), ray.tMax);
     bool sampledMedium = t < ray.tMax;
     if (sampledMedium)
         *mi = MediumInteraction(ray(t), -ray.d, ray.time, this,
                                 arena.Alloc<HenyeyGreenstein>(g));
 
     // Compute the transmittance and sampling density
-    Spectrum Tr = Exp(-sigma_t * std::min(t, MaxFloat) * ray.d.Length());
+    Spectrum Tr = Exp(-sigma_t * std::min(t, MaxFloat) * Length(ray.d));
 
     // Return weighting factor for scattering from homogeneous medium
     Spectrum density = sampledMedium ? (sigma_t * Tr) : Tr;

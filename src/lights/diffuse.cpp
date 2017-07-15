@@ -73,7 +73,7 @@ Spectrum DiffuseAreaLight::Sample_Li(const Interaction &ref, const Point2f &u,
     ProfilePhase _(Prof::LightSample);
     Interaction pShape = shape->Sample(ref, u, pdf);
     pShape.mediumInterface = mediumInterface;
-    if (*pdf == 0 || (pShape.p - ref.p).LengthSquared() == 0) {
+    if (*pdf == 0 || LengthSquared(pShape.p - ref.p) == 0) {
         *pdf = 0;
         return 0.f;
     }

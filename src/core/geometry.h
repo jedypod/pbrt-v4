@@ -61,9 +61,6 @@ class Vector2 : public Tuple2<Vector2, T> {
     template <typename U> explicit Vector2(const Point2<U> &p);
     template <typename U> explicit Vector2(const Vector2<U> &v)
         : Tuple2<Vector2::template Vector2, T>(T(v.x), T(v.y)) { }
-
-    T LengthSquared() const { return x * x + y * y; }
-    Float Length() const { return std::sqrt(LengthSquared()); }
 };
 
 template <typename T>
@@ -77,9 +74,6 @@ class Vector3 : public Tuple3<Vector3, T> {
     Vector3(T x, T y, T z) : Tuple3<Vector3::template Vector3, T>(x, y, z) { }
     explicit Vector3(const Point3<T> &p);
     explicit Vector3(const Normal3<T> &n);
-
-    T LengthSquared() const { return x * x + y * y + z * z; }
-    Float Length() const { return std::sqrt(LengthSquared()); }
 };
 
 typedef Vector2<Float> Vector2f;
@@ -213,9 +207,6 @@ class Normal3 : public Tuple3<Normal3, T> {
     Normal3(T x, T y, T z) : Tuple3<Normal3::template Normal3, T>(x, y, z) { }
     explicit Normal3<T>(const Vector3<T> &v)
         : Tuple3<Normal3::template Normal3, T>(v.x, v.y, v.z) { }
-
-    T LengthSquared() const { return x * x + y * y + z * z; }
-    Float Length() const { return std::sqrt(LengthSquared()); }
 };
 
 typedef Normal3<Float> Normal3f;
@@ -324,9 +315,17 @@ inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2) {
                       (v1x * v2y) - (v1y * v2x));
 }
 
+template <typename T> T LengthSquared(const Vector3<T> &v) {
+    return Dot(v, v);
+ }
+
+template <typename T> T Length(const Vector3<T> &v) {
+    return std::sqrt(LengthSquared(v));
+}
+
 template <typename T>
 inline Vector3<T> Normalize(const Vector3<T> &v) {
-    return v / v.Length();
+    return v / Length(v);
 }
 
 template <typename T>
@@ -355,34 +354,50 @@ inline Float AbsDot(const Vector2<T> &v1, const Vector2<T> &v2) {
     return std::abs(Dot(v1, v2));
 }
 
+template <typename T> T LengthSquared(const Vector2<T> &v) {
+    return Dot(v, v);
+ }
+
+template <typename T> T Length(const Vector2<T> &v) {
+    return std::sqrt(LengthSquared(v));
+}
+
 template <typename T>
 inline Vector2<T> Normalize(const Vector2<T> &v) {
-    return v / v.Length();
+    return v / Length(v);
 }
 
 template <typename T>
 inline Float Distance(const Point3<T> &p1, const Point3<T> &p2) {
-    return (p1 - p2).Length();
+    return Length(p1 - p2);
 }
 
 template <typename T>
 inline T DistanceSquared(const Point3<T> &p1, const Point3<T> &p2) {
-    return (p1 - p2).LengthSquared();
+    return LengthSquared(p1 - p2);
 }
 
 template <typename T>
 inline Float Distance(const Point2<T> &p1, const Point2<T> &p2) {
-    return (p1 - p2).Length();
+    return Length(p1 - p2);
 }
 
 template <typename T>
 inline T DistanceSquared(const Point2<T> &p1, const Point2<T> &p2) {
-    return (p1 - p2).LengthSquared();
+    return LengthSquared(p1 - p2);
+}
+
+template <typename T> T LengthSquared(const Normal3<T> &n) {
+    return Dot(n, n);
+ }
+
+template <typename T> T Length(const Normal3<T> &n) {
+    return std::sqrt(LengthSquared(n));
 }
 
 template <typename T>
 inline Normal3<T> Normalize(const Normal3<T> &n) {
-    return n / n.Length();
+    return n / Length(n);
 }
 
 template <typename T>

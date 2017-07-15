@@ -300,7 +300,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
         dpdu = (duv12[1] * dp02 - duv02[1] * dp12) * invdet;
         dpdv = (-duv12[0] * dp02 + duv02[0] * dp12) * invdet;
     }
-    if (degenerateUV || Cross(dpdu, dpdv).LengthSquared() == 0)
+    if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0)
         // Handle zero determinant for triangle partial derivative matrix
         CoordinateSystem(Normalize(Cross(p2 - p0, p1 - p0)), &dpdu, &dpdv);
 
@@ -339,7 +339,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
         Normal3f ns;
         if (mesh->n.size()) {
             ns = (b0 * mesh->n[v[0]] + b1 * mesh->n[v[1]] + b2 * mesh->n[v[2]]);
-            if (ns.LengthSquared() > 0)
+            if (LengthSquared(ns) > 0)
                 ns = Normalize(ns);
             else
                 ns = isect->n;
@@ -350,7 +350,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
         Vector3f ss;
         if (mesh->s.size()) {
             ss = (b0 * mesh->s[v[0]] + b1 * mesh->s[v[1]] + b2 * mesh->s[v[2]]);
-            if (ss.LengthSquared() > 0)
+            if (LengthSquared(ss) > 0)
                 ss = Normalize(ss);
             else
                 ss = Normalize(isect->dpdu);
@@ -359,7 +359,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
 
         // Compute shading bitangent _ts_ for triangle and adjust _ss_
         Vector3f ts = Cross(ss, ns);
-        if (ts.LengthSquared() > 0.f) {
+        if (LengthSquared(ts) > 0) {
             ts = Normalize(ts);
             ss = Cross(ts, ns);
         } else
@@ -517,7 +517,7 @@ bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
             dpdu = (duv12[1] * dp02 - duv02[1] * dp12) * invdet;
             dpdv = (-duv12[0] * dp02 + duv02[0] * dp12) * invdet;
         }
-        if (degenerateUV || Cross(dpdu, dpdv).LengthSquared() == 0)
+        if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0)
             // Handle zero determinant for triangle partial derivative matrix
             CoordinateSystem(Normalize(Cross(p2 - p0, p1 - p0)), &dpdu, &dpdv);
 
@@ -542,7 +542,7 @@ Float Triangle::Area() const {
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
-    return 0.5 * Cross(p1 - p0, p2 - p0).Length();
+    return 0.5 * Length(Cross(p1 - p0, p2 - p0));
 }
 
 Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
@@ -596,9 +596,9 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // Some of these vectors may be degenerate. In this case, we don't want
     // to normalize them so that we don't hit an assert. This is fine,
     // since the corresponding dot products below will be zero.
-    if (cross01.LengthSquared() > 0) cross01 = Normalize(cross01);
-    if (cross12.LengthSquared() > 0) cross12 = Normalize(cross12);
-    if (cross20.LengthSquared() > 0) cross20 = Normalize(cross20);
+    if (LengthSquared(cross01) > 0) cross01 = Normalize(cross01);
+    if (LengthSquared(cross12) > 0) cross12 = Normalize(cross12);
+    if (LengthSquared(cross20) > 0) cross20 = Normalize(cross20);
 
     // We only need to do three cross products to evaluate the angles at
     // all three vertices, though, since we can take advantage of the fact

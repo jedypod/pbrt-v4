@@ -217,7 +217,7 @@ Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up) {
 
     // Initialize first three columns of viewing matrix
     Vector3f dir = Normalize(look - pos);
-    if (Cross(Normalize(up), dir).Length() == 0) {
+    if (Length(Cross(Normalize(up), dir)) == 0) {
         Error(
             "\"up\" vector (%f, %f, %f) and viewing direction (%f, %f, %f) "
             "passed to LookAt are pointing in the same direction.  Using "
