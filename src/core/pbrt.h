@@ -66,7 +66,7 @@ class Bounds2;
 template <typename T>
 class Bounds3;
 class Transform;
-struct Interaction;
+class Interaction;
 class SurfaceInteraction;
 class Shape;
 class Primitive;
@@ -100,7 +100,7 @@ struct BSSRDFTable;
 class Light;
 class VisibilityTester;
 class AreaLight;
-struct Distribution1D;
+class Distribution1D;
 class Distribution2D;
 //#define PBRT_FLOAT_AS_DOUBLE
 #ifdef PBRT_FLOAT_AS_DOUBLE
@@ -111,7 +111,7 @@ using Float = float;
 class RNG;
 class ProgressReporter;
 class MemoryArena;
-struct Matrix4x4;
+class Matrix4x4;
 class ParamSet;
 template <typename T>
 struct ParamSetItem;

@@ -59,7 +59,9 @@ void StratifiedSample1D(gtl::MutableArraySlice<Float> samples, RNG &rng,
 void StratifiedSample2D(gtl::MutableArraySlice<Point2f> samples, int nx, int ny,
                         RNG &rng, bool jitter = true);
 void LatinHypercube(gtl::MutableArraySlice<Float> samples, int nDim, RNG &rng);
-struct Distribution1D {
+
+class Distribution1D {
+ public:
     // Distribution1D Public Methods
     Distribution1D(gtl::ArraySlice<Float> f)
         : func(f.begin(), f.end()), cdf(f.size() + 1) {

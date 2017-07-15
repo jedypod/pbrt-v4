@@ -48,7 +48,8 @@
 namespace pbrt {
 
 // Interaction Declarations
-struct Interaction {
+class Interaction {
+ public:
     // Interaction Public Methods
     Interaction() : time(0) {}
     Interaction(const Point3f &p, const Normal3f &n, const Vector3f &pError,
