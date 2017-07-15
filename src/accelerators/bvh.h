@@ -41,7 +41,10 @@
 // accelerators/bvh.h*
 #include "pbrt.h"
 #include "primitive.h"
+
 #include <atomic>
+#include <memory>
+#include <vector>
 
 namespace pbrt {
 struct BVHBuildNode;

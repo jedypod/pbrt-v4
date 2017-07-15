@@ -40,12 +40,26 @@
 
 // core/memory.h*
 #include "pbrt.h"
-#include "parallel.h"
+
+#include "mathutil.h"
 #include "ext/google/array_slice.h"
-#include "port.h"
+
 #include <list>
 #include <cstddef>
 #include <utility>
+
+#ifdef PBRT_HAVE_MALLOC_H
+#include <malloc.h>  // for _alloca, memalign
+#endif
+#ifdef PBRT_HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
+
+#if defined(PBRT_IS_MSVC)
+#define alloca _alloca
+#endif
+
+#define ALLOCA(TYPE, COUNT) (TYPE *) alloca((COUNT) * sizeof(TYPE))
 
 namespace pbrt {
 

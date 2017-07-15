@@ -32,14 +32,13 @@
 
 // core/reflection.cpp*
 #include "reflection.h"
-#include "spectrum.h"
-#include "sampler.h"
-#include "sampling.h"
+
 #include "interpolation.h"
-#include "scene.h"
-#include "interaction.h"
-#include "stats.h"
-#include <stdarg.h>
+#include "microfacet.h"
+#include "memory.h"
+#include "sampling.h"
+
+#include <glog/logging.h>
 
 namespace pbrt {
 

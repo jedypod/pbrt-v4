@@ -34,6 +34,9 @@
 // textures/uv.cpp*
 #include "textures/uv.h"
 
+#include "error.h"
+#include "paramset.h"
+
 namespace pbrt {
 
 // UVTexture Method Definitions

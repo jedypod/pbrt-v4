@@ -33,12 +33,15 @@
 
 // shapes/plymesh.cpp*
 #include "shapes/triangle.h"
+
+#include "error.h"
 #include "textures/constant.h"
 #include "paramset.h"
 #include "ext/rply.h"
-using gtl::ArraySlice;
 
 #include <iostream>
+
+using gtl::ArraySlice;
 
 namespace pbrt {
 using namespace std;

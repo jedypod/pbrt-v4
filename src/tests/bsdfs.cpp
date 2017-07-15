@@ -6,6 +6,7 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
+#include "microfacet.h"
 #include "reflection.h"
 #include "sampling.h"
 #include "memory.h"

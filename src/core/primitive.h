@@ -40,9 +40,12 @@
 
 // core/primitive.h*
 #include "pbrt.h"
-#include "shape.h"
+
 #include "material.h"
 #include "medium.h"
+#include "transform.h"
+
+#include <memory>
 
 namespace pbrt {
 

@@ -33,6 +33,8 @@
 
 // integrators/sppm.cpp*
 #include "integrators/sppm.h"
+
+#include "reflection.h"
 #include "parallel.h"
 #include "scene.h"
 #include "image.h"

@@ -40,10 +40,9 @@
 
 // core/texture.h*
 #include "pbrt.h"
-#include "spectrum.h"
+
 #include "geometry.h"
 #include "transform.h"
-#include "memory.h"
 
 namespace pbrt {
 

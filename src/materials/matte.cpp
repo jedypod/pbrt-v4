@@ -33,11 +33,14 @@
 
 // materials/matte.cpp*
 #include "materials/matte.h"
+
+#include "interaction.h"
+#include "interaction.h"
+#include "mathutil.h"
+#include "memory.h"
 #include "paramset.h"
 #include "reflection.h"
-#include "interaction.h"
 #include "texture.h"
-#include "interaction.h"
 
 namespace pbrt {
 

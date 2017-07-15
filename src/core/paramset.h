@@ -40,12 +40,15 @@
 
 // core/paramset.h*
 #include "pbrt.h"
-#include "fileutil.h"
+
 #include "geometry.h"
 #include "texture.h"
 #include "spectrum.h"
 #include "ext/google/array_slice.h"
-#include <stdio.h>
+
+#include <string>
+#include <memory>
+#include <vector>
 #include <map>
 
 namespace pbrt {

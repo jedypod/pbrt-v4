@@ -33,9 +33,15 @@
 
 // shapes/loopsubdiv.cpp*
 #include "shapes/loopsubdiv.h"
+
 #include "shapes/triangle.h"
+#include "transform.h"
+#include "memory.h"
+#include "geometry.h"
 #include "paramset.h"
+#include "error.h"
 #include "ext/google/array_slice.h"
+
 #include <set>
 #include <map>
 

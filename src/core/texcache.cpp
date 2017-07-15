@@ -31,6 +31,13 @@
  */
 
 // core/texcache.cpp*
+#include "texcache.h"
+
+#include "error.h"
+#include "parallel.h"
+#include "stats.h"
+#include "stringprint.h"
+
 #include <fcntl.h>
 #if defined(PBRT_IS_LINUX) || defined(PBRT_IS_OSX)
 #include <sys/time.h>
@@ -41,12 +48,10 @@
 #include <io.h>
 #endif
 
-#include <ratio>
-#include <set>
+#include <chrono>
+#include <memory>
 #include <thread>
-#include "parallel.h"
-#include "stats.h"
-#include "texcache.h"
+#include <stdio.h>
 
 namespace pbrt {
 
@@ -198,7 +203,7 @@ bool TiledImagePyramid::Create(std::vector<Image> images,
         Bounds2i tileBounds({0, 0}, nTiles(resolution, logTileSize));
         for (Point2i tile : tileBounds) {
             // Write texels for _tile_ to disk
-            memset(buf.get(), 0, bufSize);
+            std::memset(buf.get(), 0, bufSize);
 
             // Compute image-space bounds for this tile
             Point2i pMin(tile[0] * tileSize, tile[1] * tileSize);
@@ -210,8 +215,8 @@ bool TiledImagePyramid::Create(std::vector<Image> images,
                 for (int x = pMin.x; x < pMax.x; ++x) {
                     int outOffset = TexelBytes(format) *
                                     ((y - pMin.y) * tileSize + (x - pMin.x));
-                    memcpy(&buf[outOffset], image.RawPointer({x, y}),
-                           TexelBytes(format));
+                    std::memcpy(&buf[outOffset], image.RawPointer({x, y}),
+                                TexelBytes(format));
                 }
             if (fwrite(buf.get(), 1, bufSize, f) != bufSize) goto fail;
         }

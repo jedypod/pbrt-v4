@@ -40,8 +40,11 @@
 
 // core/scene.h*
 #include "pbrt.h"
+
+#include "light.h"
 #include "primitive.h"
-#include "integrator.h"
+
+#include <memory>
 
 namespace pbrt {
 

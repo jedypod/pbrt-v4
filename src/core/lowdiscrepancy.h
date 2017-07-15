@@ -40,10 +40,16 @@
 
 // core/lowdiscrepancy.h*
 #include "pbrt.h"
-#include "rng.h"
+
+#include "mathutil.h"
+#include "geometry.h"
 #include "sampling.h"
 #include "sobolmatrices.h"
+#include "rng.h"
 #include "ext/google/array_slice.h"
+
+#include <algorithm>
+#include <cstdint>
 
 namespace pbrt {
 

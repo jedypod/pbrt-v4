@@ -33,7 +33,6 @@
 
 // core/spectrum.cpp*
 #include "spectrum.h"
-#include <algorithm>
 
 using gtl::ArraySlice;
 using gtl::MutableArraySlice;

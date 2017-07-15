@@ -41,6 +41,8 @@
 // core/parser.h*
 #include "pbrt.h"
 
+#include <string>
+
 namespace pbrt {
 
 bool ParseFile(const std::string &filename);

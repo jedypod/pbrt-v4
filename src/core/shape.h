@@ -39,11 +39,12 @@
 #define PBRT_CORE_SHAPE_H
 
 // core/shape.h*
-#include "geometry.h"
-#include "interaction.h"
-#include "memory.h"
 #include "pbrt.h"
+
+#include "geometry.h"
 #include "transform.h"
+
+#include <memory>
 
 namespace pbrt {
 

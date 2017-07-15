@@ -33,12 +33,13 @@
 
 // core/scene.cpp*
 #include "scene.h"
-#include "camera.h"
-#include "film.h"
-#include "sampler.h"
-#include "parallel.h"
-#include "progressreporter.h"
+
+#include "geometry.h"
+#include "medium.h"
+#include "spectrum.h"
 #include "stats.h"
+
+#include <glog/logging.h>
 
 namespace pbrt {
 

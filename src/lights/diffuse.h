@@ -40,8 +40,13 @@
 
 // lights/diffuse.h*
 #include "pbrt.h"
+
 #include "light.h"
+#include "geometry.h"
+#include "spectrum.h"
 #include "primitive.h"
+
+#include <memory>
 
 namespace pbrt {
 

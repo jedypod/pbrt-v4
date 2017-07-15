@@ -41,6 +41,12 @@
 // core/rng.h*
 #include "pbrt.h"
 
+#include "mathutil.h"
+#include <glog/logging.h>
+
+#include <algorithm>
+#include <cstdint>
+
 namespace pbrt {
 
 // Random Number Declarations

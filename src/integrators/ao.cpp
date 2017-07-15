@@ -32,7 +32,10 @@
 
 // integrators/ao.cpp*
 #include "integrators/ao.h"
+
+#include "error.h"
 #include "sampling.h"
+#include "sampler.h"
 #include "interaction.h"
 #include "paramset.h"
 #include "camera.h"

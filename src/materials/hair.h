@@ -46,8 +46,9 @@ http://pbrt.org/hair.pdf for a description of the implementation here.
 #define PBRT_MATERIALS_HAIR_H
 
 // materials/hair.h*
-#include "material.h"
 #include "pbrt.h"
+
+#include "material.h"
 #include "reflection.h"
 #include <array>
 

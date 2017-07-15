@@ -33,10 +33,14 @@
 
 // shapes/nurbs.cpp*
 #include "shapes/nurbs.h"
+
+#include "error.h"
+#include "memory.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
 #include "texture.h"
 #include "ext/google/array_slice.h"
+
 using gtl::ArraySlice;
 
 namespace pbrt {

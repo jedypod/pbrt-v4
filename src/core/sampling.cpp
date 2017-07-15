@@ -33,8 +33,6 @@
 
 // core/sampling.cpp*
 #include "sampling.h"
-#include "geometry.h"
-#include "shape.h"
 
 using gtl::ArraySlice;
 using gtl::MutableArraySlice;

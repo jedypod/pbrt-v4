@@ -35,7 +35,8 @@
 #define PBRT_CORE_HALF_H
 
 #include "pbrt.h"
-#include <stdint.h>
+
+#include <cstdint>
 
 namespace pbrt {
 

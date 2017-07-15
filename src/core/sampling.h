@@ -40,10 +40,16 @@
 
 // core/sampling.h*
 #include "pbrt.h"
+
 #include "geometry.h"
+#include "mathutil.h"
 #include "rng.h"
 #include "ext/google/array_slice.h"
+#include <glog/logging.h>
+
 #include <algorithm>
+#include <memory>
+#include <vector>
 
 namespace pbrt {
 

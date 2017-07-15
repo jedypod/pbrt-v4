@@ -40,8 +40,11 @@
 
 // core/geometry.h*
 #include "pbrt.h"
+
+#include "mathutil.h"
 #include "stringprint.h"
 #include "tuple.h"
+
 #include <iterator>
 
 namespace pbrt {

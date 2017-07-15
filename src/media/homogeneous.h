@@ -41,6 +41,8 @@
 // media/homogeneous.h*
 #include "medium.h"
 
+#include "spectrum.h"
+
 namespace pbrt {
 
 // HomogeneousMedium Declarations

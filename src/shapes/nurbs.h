@@ -40,8 +40,7 @@
 
 // shapes/nurbs.h*
 #include "pbrt.h"
-#include "shape.h"
-#include "geometry.h"
+#include "transform.h"
 
 namespace pbrt {
 

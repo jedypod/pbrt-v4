@@ -33,8 +33,13 @@
 
 // core/progressreporter.cpp*
 #include "progressreporter.h"
+
 #include "parallel.h"
 #include "stats.h"
+
+#include <memory>
+#include <stdio.h>
+
 #ifdef PBRT_IS_WINDOWS
 #include <windows.h>
 #else

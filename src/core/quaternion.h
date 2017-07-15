@@ -43,6 +43,9 @@
 #include "stringprint.h"
 #include "geometry.h"
 
+#include <iostream>
+#include <string>
+
 namespace pbrt {
 
 // Quaternion Declarations

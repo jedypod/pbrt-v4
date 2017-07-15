@@ -33,9 +33,12 @@
 
 // cameras/environment.cpp*
 #include "cameras/environment.h"
+
+#include "error.h"
 #include "paramset.h"
 #include "sampler.h"
 #include "stats.h"
+
 using gtl::ArraySlice;
 
 namespace pbrt {

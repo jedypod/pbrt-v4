@@ -41,6 +41,8 @@
 // core/api.h*
 #include "pbrt.h"
 
+#include <string>
+
 namespace pbrt {
 
 // API Function Declarations

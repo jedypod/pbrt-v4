@@ -34,13 +34,13 @@
 #define PBRT_CORE_LIGHTDISTRIB_H
 
 #include "pbrt.h"
+
 #include "geometry.h"
 #include "sampling.h"
-#include <atomic>
-#include <functional>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
+
+#include <cstdint>
+#include <memory>
+#include <string>
 
 namespace pbrt {
 

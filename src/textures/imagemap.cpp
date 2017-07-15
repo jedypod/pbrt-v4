@@ -33,7 +33,11 @@
 
 // textures/imagemap.cpp*
 #include "textures/imagemap.h"
+
+#include "error.h"
+#include "fileutil.h"
 #include "imageio.h"
+#include "paramset.h"
 #include "stats.h"
 
 namespace pbrt {

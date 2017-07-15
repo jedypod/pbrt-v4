@@ -41,7 +41,6 @@
 // textures/bilerp.h*
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
 
 namespace pbrt {
 

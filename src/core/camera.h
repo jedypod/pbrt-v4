@@ -40,9 +40,13 @@
 
 // core/camera.h*
 #include "pbrt.h"
+
+#include "film.h"
 #include "geometry.h"
 #include "transform.h"
-#include "film.h"
+#include "stringprint.h"
+
+#include <iostream>
 
 namespace pbrt {
 

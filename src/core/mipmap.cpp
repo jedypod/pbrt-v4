@@ -31,14 +31,18 @@
  */
 
 #include "mipmap.h"
+
+#include "error.h"
+#include "fileutil.h"
+#include "imageio.h"
+#include "mathutil.h"
+#include "spectrum.h"
+#include "stats.h"
+#include <glog/logging.h>
+
 #include <algorithm>
 #include <array>
-#include "fileutil.h"
-#include "fp16.h"
-#include "imageio.h"
-#include "parallel.h"
-#include "stats.h"
-#include "texture.h"
+#include <cmath>
 
 namespace pbrt {
 

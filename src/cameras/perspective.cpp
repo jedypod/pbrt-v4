@@ -33,6 +33,8 @@
 
 // cameras/perspective.cpp*
 #include "cameras/perspective.h"
+
+#include "error.h"
 #include "paramset.h"
 #include "sampler.h"
 #include "sampling.h"

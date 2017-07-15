@@ -33,9 +33,17 @@
 
 // core/bssrdf.cpp*
 #include "bssrdf.h"
+
+#include "memory.h"
+#include "interaction.h"
 #include "interpolation.h"
+#include "mathutil.h"
 #include "parallel.h"
+#include "reflection.h"
 #include "scene.h"
+#include "stats.h"
+
+#include <cmath>
 
 namespace pbrt {
 

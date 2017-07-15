@@ -33,7 +33,12 @@
 
 // core/texture.cpp*
 #include "texture.h"
-#include "shape.h"
+
+#include "interaction.h"
+#include "mathutil.h"
+
+#include <algorithm>
+#include <cmath>
 
 namespace pbrt {
 

@@ -32,6 +32,8 @@
 
 // integrators/bdpt.cpp*
 #include "integrators/bdpt.h"
+
+#include "error.h"
 #include "film.h"
 #include "filters/box.h"
 #include "integrator.h"

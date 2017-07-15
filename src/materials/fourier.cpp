@@ -32,8 +32,15 @@
 
 // materials/fourier.cpp*
 #include "materials/fourier.h"
+
 #include "interaction.h"
+#include "memory.h"
 #include "paramset.h"
+#include "error.h"
+
+#include <map>
+#include <string>
+#include <memory>
 
 namespace pbrt {
 

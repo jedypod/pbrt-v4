@@ -40,10 +40,15 @@
 
 // materials/fourier.h*
 #include "pbrt.h"
+
 #include "material.h"
 #include "reflection.h"
+#include "texture.h"
 #include "interpolation.h"
+
 #include <map>
+#include <memory>
+#include <string>
 
 namespace pbrt {
 

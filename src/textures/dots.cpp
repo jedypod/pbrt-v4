@@ -34,6 +34,9 @@
 // textures/dots.cpp*
 #include "textures/dots.h"
 
+#include "error.h"
+#include "paramset.h"
+
 namespace pbrt {
 
 // DotsTexture Method Definitions

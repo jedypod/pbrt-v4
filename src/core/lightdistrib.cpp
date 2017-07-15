@@ -34,11 +34,23 @@
 // low res image first?
 
 #include "lightdistrib.h"
+
+#include "error.h"
+#include "interaction.h"
+#include "integrator.h" // FIXME only for ComputeLightPowerDistribution()
+#include "light.h"
 #include "lowdiscrepancy.h"
-#include "parallel.h"
+#include "mathutil.h"
+#include "sampling.h"
 #include "scene.h"
+#include "spectrum.h"
 #include "stats.h"
+#include <glog/logging.h>
+
+#include <atomic>
 #include <numeric>
+#include <cstdint>
+#include <vector>
 
 namespace pbrt {
 

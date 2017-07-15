@@ -33,9 +33,12 @@
 
 // core/primitive.cpp*
 #include "primitive.h"
-#include "light.h"
-#include "interaction.h"
+
 #include "stats.h"
+#include "geometry.h"
+#include "interaction.h"
+#include "shape.h"
+#include <glog/logging.h>
 
 namespace pbrt {
 

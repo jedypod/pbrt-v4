@@ -40,10 +40,16 @@
 
 // core/reflection.h*
 #include "pbrt.h"
+
 #include "geometry.h"
-#include "microfacet.h"
-#include "shape.h"
+#include "interaction.h"
+#include "mathutil.h"
 #include "spectrum.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <string>
 
 namespace pbrt {
 

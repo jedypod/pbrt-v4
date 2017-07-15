@@ -40,9 +40,13 @@
 
 // core/medium.h*
 #include "pbrt.h"
+
 #include "geometry.h"
-#include "spectrum.h"
-#include <memory>
+#include "mathutil.h"
+#include "stats.h"
+#include "stringprint.h"
+
+#include <cmath>
 
 namespace pbrt {
 

@@ -5,6 +5,7 @@
 
 #include "pbrt.h"
 #include "reflection.h"
+#include "microfacet.h"
 #include "sampling.h"
 #include "memory.h"
 #include "api.h"
@@ -235,8 +236,8 @@ int main(int argc, char* argv[]) {
                     int histoCosTheta = (int)(wiCosTheta * numHistoBins);
                     if (histoCosTheta == numHistoBins)
                       --histoCosTheta;
-                    assert(histoPhi >= 0 && histoPhi < numHistoBins);
-                    assert(histoCosTheta >= 0 && histoCosTheta < numHistoBins);
+                    CHECK(histoPhi >= 0 && histoPhi < numHistoBins);
+                    CHECK(histoCosTheta >= 0 && histoCosTheta < numHistoBins);
                     histogram[histoCosTheta][histoPhi] += 1.0 / pdf;
                 }
 

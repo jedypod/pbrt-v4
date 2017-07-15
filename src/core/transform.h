@@ -40,9 +40,14 @@
 
 // core/transform.h*
 #include "pbrt.h"
-#include "stringprint.h"
+
 #include "geometry.h"
+#include "mathutil.h"
 #include "quaternion.h"
+#include "stringprint.h"
+
+#include <cmath>
+#include <stdio.h>
 
 namespace pbrt {
 

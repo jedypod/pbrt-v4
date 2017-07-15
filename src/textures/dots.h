@@ -40,8 +40,11 @@
 
 // textures/dots.h*
 #include "pbrt.h"
+
 #include "texture.h"
-#include "paramset.h"
+#include "geometry.h"
+
+#include <memory>
 
 namespace pbrt {
 

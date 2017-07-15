@@ -40,8 +40,11 @@
 
 // lights/spot.h*
 #include "pbrt.h"
+
 #include "light.h"
-#include "shape.h"
+#include "spectrum.h"
+
+#include <memory>
 
 namespace pbrt {
 

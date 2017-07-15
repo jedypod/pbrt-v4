@@ -33,8 +33,10 @@
 
 // core/shape.cpp*
 #include "shape.h"
-#include "stats.h"
+
+#include "interaction.h"
 #include "lowdiscrepancy.h"
+#include "stats.h"
 
 namespace pbrt {
 

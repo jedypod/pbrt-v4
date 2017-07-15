@@ -32,15 +32,18 @@
 
 // core/integrator.cpp*
 #include "integrator.h"
-#include "scene.h"
-#include "interaction.h"
-#include "sampling.h"
-#include "parallel.h"
-#include "film.h"
-#include "sampler.h"
-#include "integrator.h"
-#include "progressreporter.h"
+
 #include "camera.h"
+#include "film.h"
+#include "integrator.h"
+#include "interaction.h"
+#include "memory.h"
+#include "parallel.h"
+#include "progressreporter.h"
+#include "reflection.h"
+#include "sampler.h"
+#include "sampling.h"
+#include "scene.h"
 #include "stats.h"
 
 namespace pbrt {

@@ -33,8 +33,9 @@
 
 // core/camera.cpp*
 #include "camera.h"
-#include "sampling.h"
-#include "sampler.h"
+
+#include "error.h"
+#include "film.h"
 
 namespace pbrt {
 

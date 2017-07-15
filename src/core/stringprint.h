@@ -42,7 +42,7 @@
 #include <stdio.h>
 #include <string>
 #include <string.h>
-#include <inttypes.h>
+#include <glog/logging.h>
 
 #ifdef __GNUG__
 #pragma GCC diagnostic push

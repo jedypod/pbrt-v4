@@ -40,7 +40,13 @@
 
 // core/microfacet.h*
 #include "pbrt.h"
+
 #include "geometry.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <string>
 
 namespace pbrt {
 

@@ -33,10 +33,14 @@
 
 // accelerators/bvh.cpp*
 #include "accelerators/bvh.h"
+
+#include "error.h"
 #include "interaction.h"
+#include "memory.h"
+#include "parallel.h"
 #include "paramset.h"
 #include "stats.h"
-#include "parallel.h"
+
 #include <algorithm>
 
 namespace pbrt {

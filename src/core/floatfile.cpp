@@ -32,8 +32,13 @@
 
 // core/floatfile.cpp*
 #include "floatfile.h"
+
+#include "error.h"
+#include <glog/logging.h>
+
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 namespace pbrt {
 

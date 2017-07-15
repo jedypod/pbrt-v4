@@ -39,10 +39,16 @@
 #define PBRT_MEDIA_GRID_H
 
 // media/grid.h*
+#include "pbrt.h"
+
+#include "error.h"
 #include "medium.h"
-#include "transform.h"
+#include "spectrum.h"
 #include "stats.h"
+#include "transform.h"
 #include "ext/google/array_slice.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -64,7 +70,7 @@ class GridDensityMedium : public Medium {
           WorldToMedium(Inverse(mediumToWorld)),
           density(new Float[nx * ny * nz]) {
         densityBytes += nx * ny * nz * sizeof(Float);
-        memcpy((Float *)density.get(), d.data(), sizeof(Float) * nx * ny * nz);
+        std::memcpy((Float *)density.get(), d.data(), sizeof(Float) * nx * ny * nz);
         // Precompute values for Monte Carlo sampling of _GridDensityMedium_
         sigma_t = (sigma_a + sigma_s)[0];
         if (Spectrum(sigma_t) != sigma_a + sigma_s)

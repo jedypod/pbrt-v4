@@ -33,6 +33,8 @@
 
 // shapes/cylinder.cpp*
 #include "shapes/cylinder.h"
+
+#include "interaction.h"
 #include "paramset.h"
 #include "efloat.h"
 #include "stats.h"

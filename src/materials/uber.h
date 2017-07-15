@@ -40,7 +40,11 @@
 
 // materials/uber.h*
 #include "pbrt.h"
+
 #include "material.h"
+#include "texture.h"
+
+#include <memory>
 
 namespace pbrt {
 

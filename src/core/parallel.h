@@ -40,12 +40,17 @@
 
 // core/parallel.h*
 #include "pbrt.h"
+
+#include "mathutil.h"
 #include "geometry.h"
 #include "stats.h"
-#include <mutex>
-#include <condition_variable>
-#include <functional>
+#include <glog/logging.h>
+
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <mutex>
 
 namespace pbrt {
 

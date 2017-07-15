@@ -40,9 +40,14 @@
 
 // lights/distant.h*
 #include "pbrt.h"
+
 #include "light.h"
+#include "geometry.h"
+#include "spectrum.h"
 #include "shape.h"
 #include "scene.h"
+
+#include <memory>
 
 namespace pbrt {
 

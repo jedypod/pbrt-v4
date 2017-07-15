@@ -40,8 +40,11 @@
 
 // integrators/path.h*
 #include "pbrt.h"
+
 #include "integrator.h"
 #include "lightdistrib.h"
+
+#include <memory>
 
 namespace pbrt {
 

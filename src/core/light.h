@@ -40,8 +40,10 @@
 
 // core/light.h*
 #include "pbrt.h"
-#include "memory.h"
+
 #include "interaction.h"
+#include "medium.h"
+#include "transform.h"
 
 namespace pbrt {
 

@@ -33,10 +33,14 @@
 
 // integrators/whitted.cpp*
 #include "integrators/whitted.h"
-#include "interaction.h"
+
 #include "camera.h"
+#include "error.h"
 #include "film.h"
+#include "interaction.h"
 #include "paramset.h"
+#include "reflection.h"
+#include "sampler.h"
 
 namespace pbrt {
 

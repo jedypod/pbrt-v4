@@ -34,6 +34,8 @@
 // core/memory.cpp*
 #include "memory.h"
 
+#include <stdlib.h>
+
 namespace pbrt {
 
 // Memory Allocation Functions

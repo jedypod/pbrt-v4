@@ -35,8 +35,14 @@
 %{
 
 #include "pbrt.h"
+
 #include "api.h"
+#include "error.h"
 #include "fileutil.h"
+
+#include <string>
+#include <vector>
+#include <stdio.h>
 
 #if defined(PBRT_IS_MSVC)
 #include <io.h>

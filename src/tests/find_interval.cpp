@@ -1,6 +1,7 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
+#include "mathutil.h"
 #include <vector>
 
 using namespace pbrt;

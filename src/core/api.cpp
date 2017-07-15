@@ -32,6 +32,8 @@
 
 // core/api.cpp*
 #include "api.h"
+
+#include "error.h"
 #include "parallel.h"
 #include "paramset.h"
 #include "spectrum.h"

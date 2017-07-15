@@ -40,8 +40,11 @@
 
 // core/progressreporter.h*
 #include "pbrt.h"
+
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <string>
 #include <thread>
 
 namespace pbrt {

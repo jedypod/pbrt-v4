@@ -33,10 +33,13 @@
 
 // core/film.cpp*
 #include "film.h"
-#include "paramset.h"
-#include "imageio.h"
-#include "stats.h"
+
+#include "error.h"
 #include "image.h"
+#include "imageio.h"
+#include "memory.h"
+#include "paramset.h"
+#include "stats.h"
 
 namespace pbrt {
 

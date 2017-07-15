@@ -40,10 +40,16 @@
 
 // core/image.h*
 #include "pbrt.h"
+
 #include "geometry.h"
 #include "fp16.h"
 #include "spectrum.h"
+#include <glog/logging.h>
+
 #include <array>
+#include <cstdint>
+#include <cstring>
+#include <vector>
 
 namespace pbrt {
 

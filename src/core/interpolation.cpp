@@ -33,6 +33,9 @@
 // core/interpolation.cpp*
 #include "interpolation.h"
 
+#include "mathutil.h"
+#include <glog/logging.h>
+
 using gtl::ArraySlice;
 using gtl::MutableArraySlice;
 

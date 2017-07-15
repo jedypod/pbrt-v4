@@ -33,6 +33,9 @@
 
 // shapes/curve.cpp*
 #include "shapes/curve.h"
+
+#include "error.h"
+#include "interaction.h"
 #include "paramset.h"
 #include "stats.h"
 

@@ -33,10 +33,13 @@
 
 // core/material.cpp*
 #include "material.h"
-#include "primitive.h"
-#include "texture.h"
+
+#include "geometry.h"
+#include "interaction.h"
 #include "spectrum.h"
-#include "reflection.h"
+#include "texture.h"
+
+#include <cmath>
 
 namespace pbrt {
 

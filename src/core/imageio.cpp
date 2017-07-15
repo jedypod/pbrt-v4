@@ -32,11 +32,13 @@
 
 // core/imageio.cpp*
 #include "imageio.h"
+
+#include "error.h"
+#include "fileutil.h"
+#include "fp16.h"
 #include "geometry.h"
 #include "image.h"
-#include "fileutil.h"
 #include "spectrum.h"
-#include "fp16.h"
 
 #include "ext/lodepng.h"
 #include "ext/targa.h"

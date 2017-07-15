@@ -40,10 +40,10 @@
 
 // core/interaction.h*
 #include "pbrt.h"
+
 #include "geometry.h"
 #include "transform.h"
 #include "medium.h"
-#include "material.h"
 
 namespace pbrt {
 

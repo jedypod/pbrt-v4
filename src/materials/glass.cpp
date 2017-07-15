@@ -33,6 +33,9 @@
 
 // materials/glass.cpp*
 #include "materials/glass.h"
+
+#include "memory.h"
+#include "microfacet.h"
 #include "spectrum.h"
 #include "reflection.h"
 #include "paramset.h"

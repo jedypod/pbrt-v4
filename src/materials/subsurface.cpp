@@ -33,7 +33,11 @@
 
 // materials/subsurface.cpp*
 #include "materials/subsurface.h"
+
 #include "textures/constant.h"
+#include "error.h"
+#include "memory.h"
+#include "microfacet.h"
 #include "spectrum.h"
 #include "texture.h"
 #include "interpolation.h"

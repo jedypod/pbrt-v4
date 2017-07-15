@@ -32,12 +32,16 @@
 
 // shapes/triangle.cpp*
 #include "shapes/triangle.h"
+
 #include "texture.h"
 #include "textures/constant.h"
 #include "paramset.h"
+#include "error.h"
+#include "interaction.h"
 #include "sampling.h"
 #include "efloat.h"
 #include "ext/rply.h"
+
 #include <array>
 
 using gtl::ArraySlice;

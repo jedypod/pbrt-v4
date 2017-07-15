@@ -40,9 +40,13 @@
 
 // core/mipmap.h*
 #include "pbrt.h"
-#include "image.h"
-#include "spectrum.h"
+
+#include "geometry.h"
 #include "texcache.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace pbrt {
 

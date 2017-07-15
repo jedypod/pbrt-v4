@@ -34,6 +34,9 @@
 // textures/bilerp.cpp*
 #include "textures/bilerp.h"
 
+#include "error.h"
+#include "paramset.h"
+
 namespace pbrt {
 
 // BilerpTexture Method Definitions

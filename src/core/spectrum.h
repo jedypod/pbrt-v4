@@ -40,9 +40,17 @@
 
 // core/spectrum.h*
 #include "pbrt.h"
-#include "parallel.h"
-#include "ext/google/array_slice.h"
+
+#include "mathutil.h"
 #include "stringprint.h"
+#include "ext/google/array_slice.h"
+#include <glog/logging.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <string>
+#include <stdio.h>
 
 namespace pbrt {
 

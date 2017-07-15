@@ -63,6 +63,14 @@
 #error "MSVC Version must be 2015 or later"
 #endif
 
+#if defined(PBRT_IS_MSVC)
+#include <float.h>
+#include <intrin.h>
+#pragma warning(disable : 4305)  // double constant assigned to float
+#pragma warning(disable : 4244)  // int -> float conversion
+#pragma warning(disable : 4843)  // double -> float conversion
+#endif
+
 ///////////////////////////////////////////////////////////////////////////
 // Now, use what we've figured out to do #defines for features and to do
 // various target-specific workarounds.

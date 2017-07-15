@@ -34,6 +34,8 @@
 // textures/checkerboard.cpp*
 #include "textures/checkerboard.h"
 
+#include "error.h"
+
 namespace pbrt {
 
 // CheckerboardTexture Method Definitions

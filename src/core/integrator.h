@@ -40,12 +40,11 @@
 
 // core/integrator.h*
 #include "pbrt.h"
-#include "primitive.h"
-#include "spectrum.h"
-#include "light.h"
-#include "reflection.h"
-#include "sampler.h"
-#include "material.h"
+
+#include "geometry.h"
+#include "sampling.h"
+
+#include <memory>
 
 namespace pbrt {
 

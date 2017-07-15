@@ -33,8 +33,8 @@
 
 // core/sampler.cpp*
 #include "sampler.h"
+
 #include "sampling.h"
-#include "camera.h"
 #include "stats.h"
 
 namespace pbrt {

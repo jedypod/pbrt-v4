@@ -33,7 +33,10 @@
 
 // materials/substrate.cpp*
 #include "materials/substrate.h"
+
+#include "microfacet.h"
 #include "spectrum.h"
+#include "memory.h"
 #include "reflection.h"
 #include "paramset.h"
 #include "texture.h"

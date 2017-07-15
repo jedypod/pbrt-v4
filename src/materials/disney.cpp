@@ -49,8 +49,11 @@ licensed under a slightly-modified Apache 2.0 license.
 
 // materials/disney.cpp*
 #include "materials/disney.h"
+
 #include "bssrdf.h"
 #include "interaction.h"
+#include "memory.h"
+#include "microfacet.h"
 #include "paramset.h"
 #include "reflection.h"
 #include "stats.h"

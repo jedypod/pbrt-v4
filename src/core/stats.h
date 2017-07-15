@@ -40,10 +40,14 @@
 
 // core/stats.h*
 #include "pbrt.h"
-#include <map>
+
 #include <chrono>
-#include <string>
+#include <cstdint>
 #include <functional>
+#include <map>
+#include <stdio.h>
+#include <string>
+#include <vector>
 
 namespace pbrt {
 

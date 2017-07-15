@@ -33,6 +33,8 @@
 
 // shapes/disk.cpp*
 #include "shapes/disk.h"
+
+#include "interaction.h"
 #include "paramset.h"
 #include "sampling.h"
 #include "stats.h"

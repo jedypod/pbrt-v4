@@ -32,6 +32,8 @@
 
 // lights/diffuse.cpp*
 #include "lights/diffuse.h"
+
+#include "error.h"
 #include "paramset.h"
 #include "sampling.h"
 #include "shapes/triangle.h"

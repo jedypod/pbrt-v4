@@ -32,7 +32,10 @@
 
 // core/microfacet.cpp*
 #include "microfacet.h"
-#include "reflection.h"
+
+#include "mathutil.h"
+#include "reflection.h" // Frame stuff only
+#include <glog/logging.h>
 
 namespace pbrt {
 

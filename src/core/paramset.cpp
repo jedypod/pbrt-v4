@@ -33,8 +33,12 @@
 
 // core/paramset.cpp*
 #include "paramset.h"
+
+#include "error.h"
+#include "fileutil.h"
 #include "floatfile.h"
 #include "textures/constant.h"
+#include <glog/logging.h>
 
 using gtl::ArraySlice;
 

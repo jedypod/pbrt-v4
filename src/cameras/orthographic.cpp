@@ -33,10 +33,13 @@
 
 // cameras/orthographic.cpp*
 #include "cameras/orthographic.h"
+
+#include "error.h"
 #include "paramset.h"
 #include "sampler.h"
 #include "sampling.h"
 #include "stats.h"
+
 using gtl::ArraySlice;
 
 namespace pbrt {

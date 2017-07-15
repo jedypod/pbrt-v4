@@ -40,8 +40,13 @@
 
 // core/tuple.h*
 #include "pbrt.h"
+
+#include <glog/logging.h>
+
+#include <algorithm>
 #include <array>
-#include <type_traits>
+#include <cmath>
+//#include <type_traits>
 
 namespace pbrt {
 

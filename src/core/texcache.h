@@ -39,15 +39,23 @@
 #define PBRT_CORE_TEXCACHE_H
 
 // core/texcache.h*
-#include <cstddef>
-#include <cstring>
-#include <mutex>
-#include <unordered_map>
+#include "pbrt.h"
+
 #include "geometry.h"
 #include "image.h"
-#include "memory.h"
 #include "parallel.h"
-#include "pbrt.h"
+#include <glog/logging.h>
+
+#include <atomic>
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <condition_variable>
+#include <mutex>
+#include <memory>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 /*
 TODO (future);

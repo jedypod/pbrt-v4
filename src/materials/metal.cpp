@@ -33,6 +33,9 @@
 
 // materials/metal.cpp*
 #include "materials/metal.h"
+
+#include "memory.h"
+#include "microfacet.h"
 #include "reflection.h"
 #include "paramset.h"
 #include "texture.h"

@@ -39,9 +39,16 @@
 #define PBRT_CORE_BSSRDF_H
 
 // core/bssrdf.h*
+#include "pbrt.h"
+
+#include "geometry.h"
 #include "interaction.h"
 #include "reflection.h"
+#include "spectrum.h"
 #include "stats.h"
+
+#include <string>
+#include <vector>
 
 namespace pbrt {
 

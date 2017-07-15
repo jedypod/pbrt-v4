@@ -33,9 +33,12 @@
 
 // accelerators/kdtreeaccel.cpp*
 #include "accelerators/kdtreeaccel.h"
-#include "paramset.h"
+
 #include "interaction.h"
+#include "memory.h"
+#include "paramset.h"
 #include "stats.h"
+
 #include <algorithm>
 
 namespace pbrt {

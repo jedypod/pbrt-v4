@@ -40,10 +40,12 @@
 
 // textures/imagemap.h*
 #include "pbrt.h"
+
 #include "texture.h"
 #include "mipmap.h"
-#include "paramset.h"
+
 #include <map>
+#include <memory>
 
 namespace pbrt {
 

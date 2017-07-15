@@ -32,11 +32,14 @@
 
 // core/interaction.cpp*
 #include "interaction.h"
+
 #include "light.h"
+#include "mathutil.h"
 #include "primitive.h"
 #include "reflection.h"
 #include "shape.h"
-#include "transform.h"
+
+#include <cmath>
 
 namespace pbrt {
 

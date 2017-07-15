@@ -33,8 +33,10 @@
 
 // shapes/paraboloid.cpp*
 #include "shapes/paraboloid.h"
-#include "paramset.h"
+
 #include "efloat.h"
+#include "interaction.h"
+#include "paramset.h"
 #include "stats.h"
 
 namespace pbrt {

@@ -40,6 +40,8 @@
 
 // core/efloat.h*
 #include "pbrt.h"
+
+#include "mathutil.h"
 #include "stringprint.h"
 
 namespace pbrt {

@@ -33,7 +33,10 @@
 
 // materials/translucent.cpp*
 #include "materials/translucent.h"
+
 #include "spectrum.h"
+#include "microfacet.h"
+#include "memory.h"
 #include "reflection.h"
 #include "paramset.h"
 #include "texture.h"

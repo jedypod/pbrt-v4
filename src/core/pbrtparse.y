@@ -31,10 +31,16 @@
  */
 
 %{
-#include "api.h"
 #include "pbrt.h"
+
+#include "api.h"
+#include "error.h"
 #include "paramset.h"
-#include <stdarg.h>
+
+#include <memory>
+#include <stdlib.h>
+#include <string>
+#include <vector>
 
 #ifdef PBRT_IS_MSVC
 #pragma warning(disable:4065)

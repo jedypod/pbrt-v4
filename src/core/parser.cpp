@@ -33,7 +33,11 @@
 
 // core/parser.cpp*
 #include "parser.h"
+
 #include "fileutil.h"
+#include <glog/logging.h>
+
+#include <stdio.h>
 
 extern FILE *yyin;
 extern int yyparse(void);

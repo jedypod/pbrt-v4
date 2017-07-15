@@ -40,8 +40,12 @@
 
 // samplers/maxmin.h*
 #include "sampler.h"
+#include "error.h"
 #include "lowdiscrepancy.h"
 #include "ext/google/array_slice.h"
+#include <glog/logging.h>
+
+#include <memory>
 
 namespace pbrt {
 

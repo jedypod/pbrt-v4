@@ -2,8 +2,11 @@
 #include "tests/gtest/gtest.h"
 #include <cmath>
 #include <functional>
+
 #include "pbrt.h"
+
 #include "rng.h"
+#include "interaction.h"
 #include "shape.h"
 #include "lowdiscrepancy.h"
 #include "sampling.h"

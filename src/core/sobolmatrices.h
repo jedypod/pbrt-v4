@@ -41,6 +41,8 @@
 // core/sobolmatrices.h*
 #include "pbrt.h"
 
+#include <cstdint>
+
 namespace pbrt {
 
 // Sobol Matrix Declarations

@@ -40,10 +40,17 @@
 
 // core/sampler.h*
 #include "pbrt.h"
+
+#include "camera.h"
 #include "geometry.h"
 #include "rng.h"
+#include "stringprint.h"
 #include "ext/google/array_slice.h"
-#include <inttypes.h>
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace pbrt {
 

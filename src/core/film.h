@@ -40,12 +40,19 @@
 
 // core/film.h*
 #include "pbrt.h"
+
 #include "geometry.h"
 #include "spectrum.h"
 #include "filter.h"
+#include "memory.h"
+#include "parallel.h"
 #include "stats.h"
 #include "ext/google/array_slice.h"
-#include "parallel.h"
+#include <glog/logging.h>
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace pbrt {
 

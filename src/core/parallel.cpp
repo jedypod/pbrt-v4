@@ -33,11 +33,13 @@
 
 // core/parallel.cpp*
 #include "parallel.h"
+
 #include "memory.h"
 #include "stats.h"
+
 #include <list>
 #include <thread>
-#include <condition_variable>
+#include <vector>
 
 namespace pbrt {
 

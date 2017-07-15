@@ -41,6 +41,8 @@
 // shapes/loopsubdiv.h*
 #include "shape.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // LoopSubdiv Declarations

@@ -2,6 +2,7 @@
 #include "tests/gtest/gtest.h"
 #include <stdint.h>
 #include "pbrt.h"
+#include "mathutil.h"
 
 using namespace pbrt;
 

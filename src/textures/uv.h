@@ -40,8 +40,11 @@
 
 // textures/uv.h*
 #include "pbrt.h"
+
 #include "texture.h"
-#include "paramset.h"
+#include "spectrum.h"
+
+#include <memory>
 
 namespace pbrt {
 

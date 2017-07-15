@@ -31,16 +31,22 @@
  */
 
 // materials/hair.cpp*
-#include <array>
-#include <numeric>
-#include "interaction.h"
 #include "materials/hair.h"
+
+#include "error.h"
+#include "interaction.h"
+#include "mathutil.h"
+#include "memory.h"
 #include "paramset.h"
 #include "reflection.h"
 #include "sampling.h"
 #include "spectrum.h"
 #include "texture.h"
 #include "textures/constant.h"
+
+#include <array>
+#include <cmath>
+#include <numeric>
 
 namespace pbrt {
 

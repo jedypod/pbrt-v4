@@ -41,6 +41,8 @@
 // core/floatfile.h*
 #include "pbrt.h"
 
+#include <vector>
+
 namespace pbrt {
 
 bool ReadFloatFile(const char *filename, std::vector<Float> *values);

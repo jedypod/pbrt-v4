@@ -41,6 +41,11 @@
 // samplers/sobol.h*
 #include "sampler.h"
 
+#include "geometry.h"
+#include "mathutil.h"
+#include "error.h"
+#include <glog/logging.h>
+
 namespace pbrt {
 
 // SobolSampler Declarations

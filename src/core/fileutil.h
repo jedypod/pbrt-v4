@@ -40,9 +40,9 @@
 
 // core/fileutil.h*
 #include "pbrt.h"
+
 #include <string>
 #include <cctype>
-#include <string.h>
 
 namespace pbrt {
 
