@@ -282,7 +282,7 @@ Spectrum HairBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
     Float cosThetaT = SafeSqrt(1 - Sqr(sinThetaT));
 
     // Compute $\gammat$ for refracted ray
-    Float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
+    Float etap = SafeSqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
     Float sinGammaT = h / etap;
     Float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
     Float gammaT = SafeASin(sinGammaT);
@@ -337,7 +337,7 @@ std::array<Float, pMax + 1> HairBSDF::ComputeApPdf(Float cosThetaO) const {
     Float cosThetaT = SafeSqrt(1 - Sqr(sinThetaT));
 
     // Compute $\gammat$ for refracted ray
-    Float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
+    Float etap = SafeSqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
     Float sinGammaT = h / etap;
     Float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
     Float gammaT = SafeASin(sinGammaT);
@@ -400,7 +400,7 @@ Spectrum HairBSDF::Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u2,
     // Sample $N_p$ to compute $\Delta\phi$
 
     // Compute $\gammat$ for refracted ray
-    Float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
+    Float etap = SafeSqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
     Float sinGammaT = h / etap;
     Float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
     Float gammaT = SafeASin(sinGammaT);
@@ -465,7 +465,7 @@ Float HairBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
     Float cosThetaT = SafeSqrt(1 - Sqr(sinThetaT));
 
     // Compute $\gammat$ for refracted ray
-    Float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
+    Float etap = SafeSqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
     Float sinGammaT = h / etap;
     Float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
     Float gammaT = SafeASin(sinGammaT);

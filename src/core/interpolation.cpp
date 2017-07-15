@@ -142,7 +142,7 @@ Float SampleCatmullRom(ArraySlice<Float> x, ArraySlice<Float> f,
     // Set initial guess for $t$ by importance sampling a linear interpolant
     Float t;
     if (f0 != f1)
-        t = (f0 - std::sqrt(std::max((Float)0, f0 * f0 + 2 * u * (f1 - f0)))) /
+        t = (f0 - SafeSqrt(f0 * f0 + 2 * u * (f1 - f0))) /
             (f0 - f1);
     else
         t = u / f0;
@@ -229,7 +229,7 @@ Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
     // Set initial guess for $t$ by importance sampling a linear interpolant
     Float t;
     if (f0 != f1)
-        t = (f0 - std::sqrt(std::max((Float)0, f0 * f0 + 2 * u * (f1 - f0)))) /
+        t = (f0 - SafeSqrt(f0 * f0 + 2 * u * (f1 - f0))) /
             (f0 - f1);
     else
         t = u / f0;
@@ -386,7 +386,7 @@ Float SampleFourier(ArraySlice<Float> ak, ArraySlice<Float> recip, Float u,
 
         // Initialize sine and cosine iterates
         double cosPhi = std::cos(phi);
-        double sinPhi = std::sqrt(std::max(0., 1 - cosPhi * cosPhi));
+        double sinPhi = SafeSqrt(1 - cosPhi * cosPhi);
         double cosPhiPrev = cosPhi, cosPhiCur = 1;
         double sinPhiPrev = -sinPhi, sinPhiCur = 0;
 

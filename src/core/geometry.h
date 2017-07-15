@@ -873,7 +873,7 @@ inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta, Float phi,
 }
 
 inline Float SphericalTheta(const Vector3f &v) {
-    return std::acos(Clamp(v.z, -1, 1));
+    return SafeACos(v.z);
 }
 
 inline Float SphericalPhi(const Vector3f &v) {

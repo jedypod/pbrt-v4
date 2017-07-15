@@ -117,34 +117,6 @@ class HairBSDF : public BxDF {
     Float sin2kAlpha[3], cos2kAlpha[3];
 };
 
-// General Utility Functions
-inline Float Sqr(Float v) { return v * v; }
-template <int n>
-static Float Pow(Float v) {
-    static_assert(n > 0, "Power can't be negative");
-    Float n2 = Pow<n / 2>(v);
-    return n2 * n2 * Pow<n & 1>(v);
-}
-
-template <>
-inline Float Pow<1>(Float v) {
-    return v;
-}
-template <>
-inline Float Pow<0>(Float v) {
-    return 1;
-}
-
-inline Float SafeASin(Float x) {
-    CHECK(x >= -1.0001 && x <= 1.0001);
-    return std::asin(Clamp(x, -1, 1));
-}
-
-inline Float SafeSqrt(Float x) {
-    CHECK_GE(x, -1e-4);
-    return std::sqrt(std::max(Float(0), x));
-}
-
 // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
 static uint32_t Compact1By1(uint32_t x) {
     // TODO: as of Haswell, the PEXT instruction could do all this in a

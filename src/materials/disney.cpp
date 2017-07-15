@@ -52,6 +52,7 @@ licensed under a slightly-modified Apache 2.0 license.
 
 #include "bssrdf.h"
 #include "interaction.h"
+#include "mathutil.h"
 #include "memory.h"
 #include "microfacet.h"
 #include "paramset.h"
@@ -73,7 +74,7 @@ inline Float sqr(Float x) { return x * x; }
 // where R(0) is the reflectance at normal indicence.
 inline Float SchlickWeight(Float cosTheta) {
     Float m = Clamp(1 - cosTheta, 0, 1);
-    return (m * m) * (m * m) * m;
+    return Pow<5>(m);
 }
 
 inline Float FrSchlick(Float R0, Float cosTheta) {
@@ -281,7 +282,7 @@ inline Float GTR1(Float cosTheta, Float alpha) {
 inline Float smithG_GGX(Float cosTheta, Float alpha) {
     Float alpha2 = alpha * alpha;
     Float cosTheta2 = cosTheta * cosTheta;
-    return 1 / (cosTheta + sqrt(alpha2 + cosTheta2 - alpha2 * cosTheta2));
+    return 1 / (cosTheta + SafeSqrt(alpha2 + cosTheta2 - alpha2 * cosTheta2));
 }
 
 Spectrum DisneyClearcoat::f(const Vector3f &wo, const Vector3f &wi) const {
@@ -311,9 +312,8 @@ Spectrum DisneyClearcoat::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     Float alpha = 0.25;
     Float alpha2 = alpha * alpha;
-    Float cosTheta = std::sqrt(
-        std::max(Float(0), (1 - std::pow(alpha2, 1 - u[0])) / (1 - alpha2)));
-    Float sinTheta = std::sqrt(std::max((Float)0, 1 - cosTheta * cosTheta));
+    Float cosTheta = SafeSqrt((1 - std::pow(alpha2, 1 - u[0])) / (1 - alpha2));
+    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
     Float phi = 2 * Pi * u[1];
     Vector3f wh = SphericalDirection(sinTheta, cosTheta, phi);
     if (!SameHemisphere(wo, wh)) wh = -wh;
@@ -403,7 +403,7 @@ Spectrum DisneyBSSRDF::S(const SurfaceInteraction &pi, const Vector3f &wi) {
     Float cosTheta = Dot(a, n);
     if (cosTheta > 0) {
         // Point on or above surface plane
-        Float sinTheta = std::sqrt(std::max(Float(0), 1 - cosTheta * cosTheta));
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         Vector3f a2 = n * sinTheta - (a - n * cosTheta) * cosTheta / sinTheta;
         fade = std::max(Float(0), Dot(pi.shading.n, a2));
     }

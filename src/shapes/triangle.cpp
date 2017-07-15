@@ -603,9 +603,9 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // We only need to do three cross products to evaluate the angles at
     // all three vertices, though, since we can take advantage of the fact
     // that Cross(a, b) = -Cross(b, a).
-    return std::abs(std::acos(Clamp(Dot(cross01, -cross12), -1, 1)) +
-                    std::acos(Clamp(Dot(cross12, -cross20), -1, 1)) +
-                    std::acos(Clamp(Dot(cross20, -cross01), -1, 1)) - Pi);
+    return std::abs(SafeACos(Dot(cross01, -cross12)) +
+                    SafeACos(Dot(cross12, -cross20)) +
+                    SafeACos(Dot(cross20, -cross01)) - Pi);
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(

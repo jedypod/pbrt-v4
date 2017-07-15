@@ -174,7 +174,7 @@ int makesky(int argc, char *argv[]) {
                            std::sin(phi) * std::sin(theta));
                 // Compute the angle between the pixel's direction and the sun
                 // direction.
-                Float gamma = std::acos(Clamp(Dot(v, sunDir), -1, 1));
+                Float gamma = SafeACos(Dot(v, sunDir));
                 CHECK(gamma >= 0 && gamma <= Pi);
 
                 Float rgb[3] = {Float(0), Float(0), Float(0)};

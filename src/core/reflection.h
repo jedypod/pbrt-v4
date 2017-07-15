@@ -108,7 +108,7 @@ inline bool Refract(const Vector3f &wi, const Normal3f &n, Float eta,
 
     // Handle total internal reflection for transmission
     if (sin2ThetaT >= 1) return false;
-    Float cosThetaT = std::sqrt(1 - sin2ThetaT);
+    Float cosThetaT = SafeSqrt(1 - sin2ThetaT);
     *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * Vector3f(n);
     return true;
 }
@@ -489,8 +489,7 @@ class FresnelBlend : public BxDF {
                  MicrofacetDistribution *distrib);
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
     Spectrum SchlickFresnel(Float cosTheta) const {
-        auto pow5 = [](Float v) { return (v * v) * (v * v) * v; };
-        return Rs + pow5(1 - cosTheta) * (Spectrum(1.) - Rs);
+        return Rs + Pow<5>(1 - cosTheta) * (Spectrum(1.) - Rs);
     }
     Spectrum Sample_f(const Vector3f &wi, Vector3f *sampled_f, const Point2f &u,
                       Float *pdf, BxDFType *sampledType) const;

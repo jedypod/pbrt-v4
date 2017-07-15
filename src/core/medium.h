@@ -72,7 +72,7 @@ bool GetMediumScatteringProperties(const std::string &name, Spectrum *sigma_a,
 // Media Inline Functions
 inline Float PhaseHG(Float cosTheta, Float g) {
     Float denom = 1 + g * g + 2 * g * cosTheta;
-    return Inv4Pi * (1 - g * g) / (denom * std::sqrt(denom));
+    return Inv4Pi * (1 - g * g) / (denom * SafeSqrt(denom));
 }
 
 // Medium Declarations

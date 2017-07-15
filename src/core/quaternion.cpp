@@ -82,7 +82,7 @@ Quaternion::Quaternion(const Transform &t) {
         if (m.m[2][2] > m.m[i][i]) i = 2;
         int j = nxt[i];
         int k = nxt[j];
-        Float s = std::sqrt((m.m[i][i] - (m.m[j][j] + m.m[k][k])) + 1.0f);
+        Float s = SafeSqrt((m.m[i][i] - (m.m[j][j] + m.m[k][k])) + 1.0f);
         q[i] = s * 0.5f;
         if (s != 0.f) s = 0.5f / s;
         w = (m.m[k][j] - m.m[j][k]) * s;
@@ -99,7 +99,7 @@ Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2) {
     if (cosTheta > .9995f)
         return Normalize((1 - t) * q1 + t * q2);
     else {
-        Float theta = std::acos(Clamp(cosTheta, -1, 1));
+        Float theta = SafeACos(cosTheta);
         Float thetap = theta * t;
         Quaternion qperp = Normalize(q2 - q1 * cosTheta);
         return q1 * std::cos(thetap) + qperp * std::sin(thetap);

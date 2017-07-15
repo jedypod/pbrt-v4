@@ -41,6 +41,8 @@
 // core/mathutil.h*
 #include "pbrt.h"
 
+#include <glog/logging.h>
+
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -139,7 +141,7 @@ inline double NextFloatDown(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-inline Float gamma(int n) {
+inline constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
@@ -154,7 +156,7 @@ inline Float InverseGammaCorrect(Float value) {
 }
 
 template <typename T, typename U, typename V>
-inline T Clamp(T val, U low, V high) {
+inline constexpr T Clamp(T val, U low, V high) {
     if (val < low)
         return low;
     else if (val > high)
@@ -219,7 +221,7 @@ inline constexpr bool IsPowerOf2(T v) {
     return v && !(v & (v - 1));
 }
 
-inline int32_t RoundUpPow2(int32_t v) {
+inline constexpr int32_t RoundUpPow2(int32_t v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -229,7 +231,7 @@ inline int32_t RoundUpPow2(int32_t v) {
     return v + 1;
 }
 
-inline int64_t RoundUpPow2(int64_t v) {
+inline constexpr int64_t RoundUpPow2(int64_t v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -267,7 +269,46 @@ int FindInterval(int size, const Predicate &pred) {
     return Clamp(first - 1, 0, size - 2);
 }
 
-inline Float Lerp(Float t, Float v1, Float v2) { return (1 - t) * v1 + t * v2; }
+inline constexpr Float Lerp(Float t, Float v1, Float v2) { return (1 - t) * v1 + t * v2; }
+
+inline Float Sqr(Float v) { return v * v; }
+
+inline Float SafeASin(Float x) {
+    DCHECK(x >= -1.0001 && x <= 1.0001);
+    return std::asin(Clamp(x, -1, 1));
+}
+
+inline Float SafeACos(Float x) {
+    DCHECK(x >= -1.0001 && x <= 1.0001);
+    return std::acos(Clamp(x, -1, 1));
+}
+
+inline float SafeSqrt(float x) {
+    DCHECK_GE(x, -1e-4f);  // not too negative
+    return std::sqrt(std::max(0.f, x));
+}
+
+inline double SafeSqrt(double x) {
+    DCHECK_GE(x, -1e-4);  // not too negative
+    return std::sqrt(std::max(0., x));
+}
+
+template <int n>
+static Float Pow(Float v) {
+    static_assert(n > 0, "Power can't be negative");
+    Float n2 = Pow<n / 2>(v);
+    return n2 * n2 * Pow<n & 1>(v);
+}
+
+template <>
+inline Float Pow<1>(Float v) {
+    return v;
+}
+
+ template <>
+inline Float Pow<0>(Float v) {
+    return 1;
+}
 
 inline bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1) {
     // Find quadratic discriminant

@@ -416,7 +416,7 @@ AnimatedTransform::AnimatedTransform(std::shared_ptr<const Transform> startTrans
     // Compute terms of motion derivative function
     if (hasRotation) {
         Float cosTheta = Dot(R[0], R[1]);
-        Float theta = std::acos(Clamp(cosTheta, -1, 1));
+        Float theta = SafeACos(cosTheta);
         Quaternion qperp = Normalize(R[1] - R[0] * cosTheta);
 
         Float t0x = T[0].x;
@@ -1231,7 +1231,7 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
     if (!actuallyAnimated) return Bounds3f((*startTransform)(p));
     Bounds3f bounds((*startTransform)(p), (*endTransform)(p));
     Float cosTheta = Dot(R[0], R[1]);
-    Float theta = std::acos(Clamp(cosTheta, -1, 1));
+    Float theta = SafeACos(cosTheta);
     for (int c = 0; c < 3; ++c) {
         // Find any motion derivative zeros for the component _c_
         Float zeros[8];

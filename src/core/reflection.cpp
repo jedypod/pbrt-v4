@@ -53,12 +53,12 @@ Float FrDielectric(Float cosThetaI, Float etaI, Float etaT) {
     }
 
     // Compute _cosThetaT_ using Snell's law
-    Float sinThetaI = std::sqrt(std::max((Float)0, 1 - cosThetaI * cosThetaI));
+    Float sinThetaI = SafeSqrt(1 - cosThetaI * cosThetaI);
     Float sinThetaT = etaI / etaT * sinThetaI;
 
     // Handle total internal reflection
     if (sinThetaT >= 1) return 1;
-    Float cosThetaT = std::sqrt(std::max((Float)0, 1 - sinThetaT * sinThetaT));
+    Float cosThetaT = SafeSqrt(1 - sinThetaT * sinThetaT);
     Float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
                   ((etaT * cosThetaI) + (etaI * cosThetaT));
     Float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
@@ -569,7 +569,7 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     // Compute the scattered direction for _FourierBSDF_
     Float sin2ThetaI = std::max((Float)0, 1 - muI * muI);
-    Float norm = std::sqrt(sin2ThetaI / Sin2Theta(wo));
+    Float norm = SafeSqrt(sin2ThetaI / Sin2Theta(wo));
     if (std::isinf(norm)) norm = 0;
     Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
     *wi = -Vector3f(norm * (cosPhi * wo.x - sinPhi * wo.y),

@@ -189,7 +189,7 @@ void FrequencyTable(const BSDF* bsdf, const Vector3f& wo, RNG& rng,
 
         Vector3f wiL = bsdf->WorldToLocal(wi);
 
-        Point2f coords(std::acos(Clamp(wiL.z, -1, 1)) * factorTheta,
+        Point2f coords(SafeACos(wiL.z) * factorTheta,
                        std::atan2(wiL.y, wiL.x) * factorPhi);
 
         if (coords.y < 0) coords.y += 2 * Pi * factorPhi;

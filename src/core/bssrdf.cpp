@@ -90,7 +90,7 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta,
     Float D_g = (2 * sigma_a + sigmap_s) / (3 * sigmap_t * sigmap_t);
 
     // Compute effective transport coefficient $\sigmatr$ based on $D_\roman{G}$
-    Float sigma_tr = std::sqrt(sigma_a / D_g);
+    Float sigma_tr = SafeSqrt(sigma_a / D_g);
 
     // Determine linear extrapolation distance $\depthextrapolation$ using
     // Equation (15.28)
@@ -131,7 +131,7 @@ Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta,
                       Float r) {
     // Compute material parameters and minimum $t$ below the critical angle
     Float sigma_t = sigma_a + sigma_s, rho = sigma_s / sigma_t;
-    Float tCrit = r * std::sqrt(eta * eta - 1);
+    Float tCrit = r * SafeSqrt(eta * eta - 1);
     Float Ess = 0;
     const int nSamples = 100;
     for (int i = 0; i < nSamples; ++i) {

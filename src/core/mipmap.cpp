@@ -330,7 +330,7 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     // Compute the ellipse's $(s,t)$ bounding box in texture space
     Float det = -B * B + 4 * A * C;
     Float invDet = 1 / det;
-    Float uSqrt = std::sqrt(det * C), vSqrt = std::sqrt(A * det);
+    Float uSqrt = SafeSqrt(det * C), vSqrt = SafeSqrt(A * det);
     int s0 = std::ceil(st[0] - 2 * invDet * uSqrt);
     int s1 = std::floor(st[0] + 2 * invDet * uSqrt);
     int t0 = std::ceil(st[1] - 2 * invDet * vSqrt);

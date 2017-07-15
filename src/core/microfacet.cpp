@@ -44,7 +44,7 @@ static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
                              Float *slope_x, Float *slope_y) {
     /* Special case (normal incidence) */
     if (cosThetaI > .9999) {
-        Float r = std::sqrt(-std::log(1.0f - U1));
+        Float r = std::sqrt(-std::log(1 - U1));
         Float sinPhi = std::sin(2 * Pi * U2);
         Float cosPhi = std::cos(2 * Pi * U2);
         *slope_x = r * cosPhi;
@@ -56,8 +56,7 @@ static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
        discontinuities, which causes issues for QMC integration
        and techniques like Kelemen-style MLT. The following code
        performs a numerical inversion with better behavior */
-    Float sinThetaI =
-        std::sqrt(std::max((Float)0, (Float)1 - cosThetaI * cosThetaI));
+    Float sinThetaI = SafeSqrt(1 - cosThetaI * cosThetaI);
     Float tanThetaI = sinThetaI / cosThetaI;
     Float cotThetaI = 1 / tanThetaI;
 
@@ -71,7 +70,7 @@ static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
 
     /* We can do better (inverse of an approximation computed in
      * Mathematica) */
-    Float thetaI = std::acos(cosThetaI);
+    Float thetaI = SafeACos(cosThetaI);
     Float fit = 1 + thetaI * (-0.876f + thetaI * (0.4265f - 0.0594f * thetaI));
     Float b = c - (1 + c) * std::pow(1 - sample_x, fit);
 
@@ -169,8 +168,7 @@ Float BeckmannDistribution::Lambda(const Vector3f &w) const {
     Float absTanTheta = std::abs(TanTheta(w));
     if (std::isinf(absTanTheta)) return 0.;
     // Compute _alpha_ for direction _w_
-    Float alpha =
-        std::sqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
+    Float alpha = SafeSqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
     Float a = 1 / (alpha * absTanTheta);
     if (a >= 1.6f) return 0;
     return (1 - 1.259f * a + 0.396f * a * a) / (3.535f * a + 2.181f * a * a);
@@ -180,8 +178,7 @@ Float TrowbridgeReitzDistribution::Lambda(const Vector3f &w) const {
     Float absTanTheta = std::abs(TanTheta(w));
     if (std::isinf(absTanTheta)) return 0.;
     // Compute _alpha_ for direction _w_
-    Float alpha =
-        std::sqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
+    Float alpha = SafeSqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
     Float alpha2Tan2Theta = (alpha * absTanTheta) * (alpha * absTanTheta);
     return (-1 + std::sqrt(1.f + alpha2Tan2Theta)) / 2;
 }
@@ -223,8 +220,8 @@ Vector3f BeckmannDistribution::Sample_wh(const Vector3f &wo,
         }
 
         // Map sampled Beckmann angles to normal direction _wh_
-        Float cosTheta = 1 / std::sqrt(1 + tan2Theta);
-        Float sinTheta = std::sqrt(std::max((Float)0, 1 - cosTheta * cosTheta));
+        Float cosTheta = 1 / SafeSqrt(1 + tan2Theta);
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         Vector3f wh = SphericalDirection(sinTheta, cosTheta, phi);
         if (!SameHemisphere(wo, wh)) wh = -wh;
         return wh;
@@ -242,26 +239,24 @@ static void TrowbridgeReitzSample11(Float cosTheta, Float U1, Float U2,
                                     Float *slope_x, Float *slope_y) {
     // special case (normal incidence)
     if (cosTheta > .9999) {
-        Float r = sqrt(U1 / (1 - U1));
+        Float r = SafeSqrt(U1 / (1 - U1));
         Float phi = 6.28318530718 * U2;
         *slope_x = r * cos(phi);
         *slope_y = r * sin(phi);
         return;
     }
 
-    Float sinTheta =
-        std::sqrt(std::max((Float)0, (Float)1 - cosTheta * cosTheta));
+    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
     Float tanTheta = sinTheta / cosTheta;
     Float a = 1 / tanTheta;
-    Float G1 = 2 / (1 + std::sqrt(1.f + 1.f / (a * a)));
+    Float G1 = 2 / (1 + SafeSqrt(1 + 1 / (a * a)));
 
     // sample slope_x
     Float A = 2 * U1 / G1 - 1;
     Float tmp = 1.f / (A * A - 1.f);
     if (tmp > 1e10) tmp = 1e10;
     Float B = tanTheta;
-    Float D = std::sqrt(
-        std::max(Float(B * B * tmp * tmp - (A * A - B * B) * tmp), Float(0)));
+    Float D = SafeSqrt(B * B * tmp * tmp - (A * A - B * B) * tmp);
     Float slope_x_1 = B * tmp - D;
     Float slope_x_2 = B * tmp + D;
     *slope_x = (A < 0 || slope_x_2 > 1.f / tanTheta) ? slope_x_1 : slope_x_2;
@@ -314,7 +309,7 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
         Float cosTheta = 0, phi = (2 * Pi) * u[1];
         if (alphax == alphay) {
             Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
-            cosTheta = 1 / std::sqrt(1 + tanTheta2);
+            cosTheta = 1 / SafeSqrt(1 + tanTheta2);
         } else {
             phi =
                 std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
@@ -326,8 +321,7 @@ Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo,
             Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
             cosTheta = 1 / std::sqrt(1 + tanTheta2);
         }
-        Float sinTheta =
-            std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         wh = SphericalDirection(sinTheta, cosTheta, phi);
         if (!SameHemisphere(wo, wh)) wh = -wh;
     } else {

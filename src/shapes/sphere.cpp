@@ -108,7 +108,7 @@ bool Sphere::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
 
     // Find parametric representation of sphere hit
     Float u = phi / phiMax;
-    Float theta = std::acos(Clamp(pHit.z / radius, -1, 1));
+    Float theta = SafeACos(pHit.z / radius);
     Float v = (theta - thetaMin) / (thetaMax - thetaMin);
 
     // Compute sphere $\dpdu$ and $\dpdv$
@@ -262,18 +262,17 @@ Interaction Sphere::Sample(const Interaction &ref, const Point2f &u,
 
     // Compute $\theta$ and $\phi$ values for sample in cone
     Float sinThetaMax2 = radius * radius / DistanceSquared(ref.p, pCenter);
-    Float cosThetaMax = std::sqrt(std::max((Float)0, 1 - sinThetaMax2));
+    Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
     Float cosTheta = (1 - u[0]) + u[0] * cosThetaMax;
-    Float sinTheta = std::sqrt(std::max((Float)0, 1 - cosTheta * cosTheta));
+    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
     Float phi = u[1] * 2 * Pi;
 
     // Compute angle $\alpha$ from center of sphere to sampled point on surface
     Float dc = Distance(ref.p, pCenter);
     Float ds = dc * cosTheta -
-               std::sqrt(std::max(
-                   (Float)0, radius * radius - dc * dc * sinTheta * sinTheta));
+               SafeSqrt(radius * radius - dc * dc * sinTheta * sinTheta);
     Float cosAlpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
-    Float sinAlpha = std::sqrt(std::max((Float)0, 1 - cosAlpha * cosAlpha));
+    Float sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
 
     // Compute surface normal and sampled point on sphere
     Vector3f nWorld =
@@ -303,7 +302,7 @@ Float Sphere::Pdf(const Interaction &ref, const Vector3f &wi) const {
 
     // Compute general sphere PDF
     Float sinThetaMax2 = radius * radius / DistanceSquared(ref.p, pCenter);
-    Float cosThetaMax = std::sqrt(std::max((Float)0, 1 - sinThetaMax2));
+    Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
     return UniformConePdf(cosThetaMax);
 }
 
@@ -312,7 +311,7 @@ Float Sphere::SolidAngle(const Point3f &p, int nSamples) const {
     if (DistanceSquared(p, pCenter) <= radius * radius)
         return 4 * Pi;
     Float sinTheta2 = radius * radius / DistanceSquared(p, pCenter);
-    Float cosTheta = std::sqrt(std::max((Float)0, 1 - sinTheta2));
+    Float cosTheta = SafeSqrt(1 - sinTheta2);
     return (2 * Pi * (1 - cosTheta));
 }
 

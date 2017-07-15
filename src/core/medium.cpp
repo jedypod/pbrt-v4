@@ -205,7 +205,7 @@ Float HenyeyGreenstein::Sample_p(const Vector3f &wo, Vector3f *wi,
     }
 
     // Compute direction _wi_ for Henyey--Greenstein sample
-    Float sinTheta = std::sqrt(std::max((Float)0, 1 - cosTheta * cosTheta));
+    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
     Float phi = 2 * Pi * u[1];
     Vector3f v1, v2;
     CoordinateSystem(wo, &v1, &v2);

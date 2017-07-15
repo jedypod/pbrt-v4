@@ -170,7 +170,7 @@ void Shuffle(gtl::MutableArraySlice<T> samples, int nDimensions, RNG &rng) {
 
 inline Vector3f CosineSampleHemisphere(const Point2f &u) {
     Point2f d = ConcentricSampleDisk(u);
-    Float z = std::sqrt(std::max((Float)0, 1 - d.x * d.x - d.y * d.y));
+    Float z = SafeSqrt(1 - d.x * d.x - d.y * d.y);
     return Vector3f(d.x, d.y, z);
 }
 

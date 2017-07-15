@@ -230,7 +230,7 @@ void RealisticCamera::DrawLensSystem() const {
             printf("Line[{{%f, %f}, {%f, %f}}]}, ", z, -element.apertureRadius,
                    z, -2 * element.apertureRadius);
         } else {
-            Float theta = std::abs(std::asin(element.apertureRadius / r));
+            Float theta = std::abs(SafeASin(element.apertureRadius / r));
             if (r > 0) {
                 // convex as seen from front of lens
                 Float t0 = Pi - theta;
@@ -263,7 +263,7 @@ void RealisticCamera::DrawLensSystem() const {
                 Float nextCurvatureRadius =
                     elementInterfaces[i + 1].curvatureRadius;
                 Float nextTheta = std::abs(
-                    std::asin(nextApertureRadius / nextCurvatureRadius));
+                    SafeASin(nextApertureRadius / nextCurvatureRadius));
                 if (nextCurvatureRadius > 0) {
                     zp1 = z + element.thickness + nextCurvatureRadius -
                           nextApertureRadius / std::tan(nextTheta);

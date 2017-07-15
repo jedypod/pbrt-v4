@@ -94,7 +94,7 @@ CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
     if (norm.size() == 2) {
         n[0] = Normalize(norm[0]);
         n[1] = Normalize(norm[1]);
-        normalAngle = std::acos(Clamp(Dot(n[0], n[1]), 0, 1));
+        normalAngle = SafeACos(Dot(n[0], n[1]));
         invSinNormalAngle = 1 / std::sin(normalAngle);
     }
     ++nCurves;
