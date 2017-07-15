@@ -1,6 +1,7 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
+#include "bounds.h"
 #include "geometry.h"
 
 using namespace pbrt;

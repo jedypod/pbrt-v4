@@ -41,10 +41,12 @@
 // core/integrator.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "geometry.h"
 #include "sampling.h"
 
 #include <memory>
+#include <vector>
 
 namespace pbrt {
 

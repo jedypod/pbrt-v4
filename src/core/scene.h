@@ -41,6 +41,7 @@
 // core/scene.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "light.h"
 #include "primitive.h"
 

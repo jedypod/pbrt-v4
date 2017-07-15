@@ -41,6 +41,7 @@
 // core/film.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "geometry.h"
 #include "spectrum.h"
 #include "filter.h"

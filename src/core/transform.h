@@ -41,6 +41,7 @@
 // core/transform.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "geometry.h"
 #include "mathutil.h"
 #include "quaternion.h"

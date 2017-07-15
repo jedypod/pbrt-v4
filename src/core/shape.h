@@ -41,6 +41,7 @@
 // core/shape.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "geometry.h"
 #include "transform.h"
 
