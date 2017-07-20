@@ -386,11 +386,10 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
             printf("\n");
         } else
             shapes = CreateTriangleMeshShape(object2world, world2object,
-                                             reverseOrientation, paramSet,
-                                             &graphicsState.floatTextures);
+                                             reverseOrientation, paramSet);
     } else if (name == "plymesh")
         shapes = CreatePLYMesh(object2world, world2object, reverseOrientation,
-                               paramSet, &graphicsState.floatTextures);
+                               paramSet);
     else if (name == "loopsubdiv")
         shapes = CreateLoopSubdiv(object2world, world2object,
                                   reverseOrientation, paramSet);
@@ -399,7 +398,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                              paramSet);
     else
         Warning("Shape \"%s\" unknown.", name.c_str());
-    paramSet.ReportUnused();
+
     return shapes;
 }
 
@@ -1160,6 +1159,30 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
         printf("\n");
     }
 
+    std::shared_ptr<Texture<Float>> alphaTex;
+    std::string alphaTexName = params.FindTexture("alpha");
+    if (alphaTexName != "") {
+        if (graphicsState.floatTextures.find(alphaTexName) != graphicsState.floatTextures.end())
+            alphaTex = graphicsState.floatTextures[alphaTexName];
+        else
+            Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
+                  alphaTexName.c_str());
+    } else if (params.FindOneFloat("alpha", 1.f) == 0.f)
+        alphaTex = std::make_shared<ConstantTexture<Float>>(0.f);
+
+    std::shared_ptr<Texture<Float>> shadowAlphaTex;
+    std::string shadowAlphaTexName = params.FindTexture("shadowalpha");
+    if (shadowAlphaTexName != "") {
+        if (graphicsState.floatTextures.find(shadowAlphaTexName) != graphicsState.floatTextures.end())
+            shadowAlphaTex = graphicsState.floatTextures[shadowAlphaTexName];
+        else
+            Error(
+                "Couldn't find float texture \"%s\" for \"shadowalpha\" "
+                "parameter",
+                shadowAlphaTexName.c_str());
+    } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
+        shadowAlphaTex = std::make_shared<ConstantTexture<Float>>(0.f);
+
     if (!curTransform.IsAnimated()) {
         // Initialize _prims_ and _areaLights_ for static shape
 
@@ -1171,9 +1194,8 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
                        graphicsState.reverseOrientation, params);
         if (shapes.empty()) return;
         std::shared_ptr<Material> mtl = graphicsState.CreateMaterial(params);
-        params.ReportUnused();
         MediumInterface mi = graphicsState.CreateMediumInterface();
-        for (auto s : shapes) {
+        for (auto &s : shapes) {
             // Possibly create area light for shape
             std::shared_ptr<AreaLight> area;
             if (graphicsState.areaLight != "") {
@@ -1182,8 +1204,10 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
                 if (area) areaLights.push_back(area);
             }
             prims.push_back(
-                std::make_shared<GeometricPrimitive>(s, mtl, area, mi));
+                std::make_shared<GeometricPrimitive>(s, mtl, area, mi,
+                                                     alphaTex, shadowAlphaTex));
         }
+        params.ReportUnused();
     } else {
         // Initialize _prims_ and _areaLights_ for animated shape
 
@@ -1200,11 +1224,13 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
 
         // Create _GeometricPrimitive_(s) for animated shape
         std::shared_ptr<Material> mtl = graphicsState.CreateMaterial(params);
-        params.ReportUnused();
         MediumInterface mi = graphicsState.CreateMediumInterface();
-        for (auto s : shapes)
+
+        for (auto &s : shapes)
             prims.push_back(
-                std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi));
+                std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi,
+                                                     alphaTex, shadowAlphaTex));
+        params.ReportUnused();
 
         // Create single _TransformedPrimitive_ for _prims_
 

@@ -60,9 +60,8 @@ class Cylinder : public TransformedShape {
           zMax(std::max(zMin, zMax)),
           phiMax(Radians(Clamp(phiMax, 0, 360))) {}
     Bounds3f ObjectBound() const;
-    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
-                   bool testAlphaTexture) const;
-    bool IntersectP(const Ray &ray, bool testAlphaTexture) const;
+    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
+    bool IntersectP(const Ray &ray) const;
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 

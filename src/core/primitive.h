@@ -43,6 +43,7 @@
 
 #include "material.h"
 #include "medium.h"
+#include "texture.h"
 #include "transform.h"
 
 #include <memory>
@@ -74,11 +75,15 @@ class GeometricPrimitive : public Primitive {
     GeometricPrimitive(const std::shared_ptr<Shape> &shape,
                        const std::shared_ptr<Material> &material,
                        const std::shared_ptr<AreaLight> &areaLight,
-                       const MediumInterface &mediumInterface)
+                       const MediumInterface &mediumInterface,
+                       const std::shared_ptr<Texture<Float>> &alpha = nullptr,
+                       const std::shared_ptr<Texture<Float>> &shadowAlpha = nullptr)
         : shape(shape),
           material(material),
           areaLight(areaLight),
-          mediumInterface(mediumInterface) {}
+        mediumInterface(mediumInterface),
+        alpha(alpha),
+        shadowAlpha(shadowAlpha) {}
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
@@ -90,6 +95,7 @@ class GeometricPrimitive : public Primitive {
     std::shared_ptr<Material> material;
     std::shared_ptr<AreaLight> areaLight;
     MediumInterface mediumInterface;
+    std::shared_ptr<Texture<Float>> alpha, shadowAlpha;
 };
 
 // TransformedPrimitive Declarations

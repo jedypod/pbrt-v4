@@ -93,22 +93,51 @@ bool TransformedPrimitive::IntersectP(const Ray &r) const {
 Bounds3f GeometricPrimitive::WorldBound() const { return shape->WorldBound(); }
 
 bool GeometricPrimitive::IntersectP(const Ray &r) const {
-    return shape->IntersectP(r);
+    if (alpha || shadowAlpha) {
+        // We need to do a full intersection test to see if the point is
+        // alpha-masked.
+        SurfaceInteraction isect;
+        // Intersect() checks the regular alpha texture.
+        if (!Intersect(r, &isect)) return false;
+
+        // But what it thinks is an intersection may be masked by the
+        // shadow alpha texture..
+        if (shadowAlpha && shadowAlpha->Evaluate(isect) == 0)
+            return IntersectP(isect.SpawnRay(r.d));
+        else
+            return true;
+    } else
+        return shape->IntersectP(r);
 }
 
 bool GeometricPrimitive::Intersect(const Ray &r,
-                                   SurfaceInteraction *isect) const {
+                                   SurfaceInteraction *isectOut) const {
     Float tHit;
-    if (!shape->Intersect(r, &tHit, isect)) return false;
+    SurfaceInteraction isect;
+    if (!shape->Intersect(r, &tHit, &isect)) return false;
+
+    // Test intersection against alpha texture, if present
+    if (alpha && alpha->Evaluate(isect) == 0) {
+        // Ignore this hit and trace a new ray.
+        Ray rNext = isect.SpawnRay(r.d);
+        if (Intersect(rNext, isectOut)) {
+            // The returned t value has to account for both ray segments.
+            r.tMax = tHit + rNext.tMax;
+            return true;
+        } else
+            return false;
+    }
+
     r.tMax = tHit;
-    isect->primitive = this;
-    CHECK_GE(Dot(isect->n, isect->shading.n), 0.);
+    isect.primitive = this;
+    CHECK_GE(Dot(isect.n, isect.shading.n), 0.);
     // Initialize _SurfaceInteraction::mediumInterface_ after _Shape_
     // intersection
     if (mediumInterface.IsMediumTransition())
-        isect->mediumInterface = mediumInterface;
+        isect.mediumInterface = mediumInterface;
     else
-        isect->mediumInterface = MediumInterface(r.medium);
+        isect.mediumInterface = MediumInterface(r.medium);
+    *isectOut = isect;
     return true;
 }
 

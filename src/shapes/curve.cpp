@@ -136,8 +136,7 @@ Bounds3f Curve::WorldBound() const {
         Expand(b, std::max(width[0], width[1]) * 0.5f));
 }
 
-bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect,
-                      bool testAlphaTexture) const {
+bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect) const {
     ProfilePhase p(isect ? Prof::CurveIntersect : Prof::CurveIntersectP);
     ++nTests;
     // Transform _Ray_ to object space

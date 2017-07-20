@@ -71,8 +71,7 @@ class Curve : public Shape {
     Curve(const std::shared_ptr<CurveCommon> &common, Float uMin, Float uMax)
         : common(common), uMin(uMin), uMax(uMax) {}
     Bounds3f WorldBound() const;
-    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
-                   bool testAlphaTexture) const;
+    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 

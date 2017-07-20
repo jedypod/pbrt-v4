@@ -40,10 +40,14 @@
 
 // shapes/triangle.h*
 #include "shape.h"
+#include "geometry.h"
 #include "stats.h"
+#include "transform.h"
 #include "ext/google/array_slice.h"
 
 #include <map>
+#include <memory>
+#include <vector>
 
 namespace pbrt {
 
@@ -55,9 +59,7 @@ struct TriangleMesh {
     TriangleMesh(const Transform &ObjectToWorld, bool reverseOrientation,
                  gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
                  gtl::ArraySlice<Vector3f> S, gtl::ArraySlice<Normal3f> N,
-                 gtl::ArraySlice<Point2f> uv,
-                 const std::shared_ptr<Texture<Float>> &alphaMask,
-                 const std::shared_ptr<Texture<Float>> &shadowAlphaMask);
+                 gtl::ArraySlice<Point2f> uv);
 
     // TriangleMesh Data
     const bool reverseOrientation, transformSwapsHandedness;
@@ -67,7 +69,6 @@ struct TriangleMesh {
     std::vector<Normal3f> n;
     std::vector<Vector3f> s;
     std::vector<Point2f> uv;
-    std::shared_ptr<Texture<Float>> alphaMask, shadowAlphaMask;
 };
 
 class Triangle : public Shape {
@@ -79,9 +80,8 @@ class Triangle : public Shape {
         triMeshBytes += sizeof(*this);
     }
     Bounds3f WorldBound() const;
-    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
-                   bool testAlphaTexture = true) const;
-    bool IntersectP(const Ray &ray, bool testAlphaTexture = true) const;
+    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
+    bool IntersectP(const Ray &ray) const;
     Float Area() const;
 
     using Shape::Sample;  // Bring in the other Sample() overload.
@@ -114,16 +114,12 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, gtl::ArraySlice<int> vertexIndices,
     gtl::ArraySlice<Point3f> p, gtl::ArraySlice<Vector3f> s,
-    gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv,
-    const std::shared_ptr<Texture<Float>> &alphaTexture,
-    const std::shared_ptr<Texture<Float>> &shadowAlphaTexture);
+    gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv);
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures =
-        nullptr);
+    const ParamSet &params);
 
 bool WritePlyFile(const std::string &filename,
                   gtl::ArraySlice<int> vertexIndices,

@@ -57,11 +57,9 @@ class Shape {
     virtual ~Shape();
     virtual Bounds3f WorldBound() const = 0;
     virtual bool Intersect(const Ray &ray, Float *tHit,
-                           SurfaceInteraction *isect,
-                           bool testAlphaTexture = true) const = 0;
-    virtual bool IntersectP(const Ray &ray,
-                            bool testAlphaTexture = true) const {
-        return Intersect(ray, nullptr, nullptr, testAlphaTexture);
+                           SurfaceInteraction *isect) const = 0;
+    virtual bool IntersectP(const Ray &ray) const {
+        return Intersect(ray, nullptr, nullptr);
     }
     virtual Float Area() const = 0;
     // Sample a point on the surface of the shape and return the PDF with

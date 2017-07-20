@@ -52,9 +52,8 @@ class Paraboloid : public TransformedShape {
                bool reverseOrientation, Float radius, Float z0, Float z1,
                Float phiMax);
     Bounds3f ObjectBound() const;
-    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
-                   bool testAlphaTexture) const;
-    bool IntersectP(const Ray &ray, bool testAlphaTexture) const;
+    bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
+    bool IntersectP(const Ray &ray) const;
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 

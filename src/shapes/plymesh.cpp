@@ -35,7 +35,6 @@
 #include "shapes/triangle.h"
 
 #include "error.h"
-#include "textures/constant.h"
 #include "paramset.h"
 #include "ext/rply.h"
 
@@ -144,8 +143,7 @@ int rply_face_callback(p_ply_argument argument) {
 std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures) {
+    const ParamSet &params) {
     const std::string filename = params.FindOneFilename("filename", "");
     p_ply ply = ply_open(filename.c_str(), rply_message_callback, 0, nullptr);
     if (!ply) {
@@ -240,32 +238,6 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
 
     if (context.error) return std::vector<std::shared_ptr<Shape>>();
 
-    // Look up an alpha texture, if applicable
-    std::shared_ptr<Texture<Float>> alphaTex;
-    std::string alphaTexName = params.FindTexture("alpha");
-    if (alphaTexName != "") {
-        if (floatTextures->find(alphaTexName) != floatTextures->end())
-            alphaTex = (*floatTextures)[alphaTexName];
-        else
-            Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
-                  alphaTexName.c_str());
-    } else if (params.FindOneFloat("alpha", 1.f) == 0.f) {
-        alphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
-    }
-
-    std::shared_ptr<Texture<Float>> shadowAlphaTex;
-    std::string shadowAlphaTexName = params.FindTexture("shadowalpha");
-    if (shadowAlphaTexName != "") {
-        if (floatTextures->find(shadowAlphaTexName) != floatTextures->end())
-            shadowAlphaTex = (*floatTextures)[shadowAlphaTexName];
-        else
-            Error(
-                "Couldn't find float texture \"%s\" for \"shadowalpha\" "
-                "parameter",
-                shadowAlphaTexName.c_str());
-    } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
-        shadowAlphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
-
     ArraySlice<Normal3f> N;
     if (context.n) N = {context.n, vertexCount};
     ArraySlice<Point2f> uv;
@@ -274,7 +246,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     return CreateTriangleMesh(
         *ObjectToWorld, *WorldToObject, reverseOrientation,
         {context.indices, context.indexCtr}, {context.p, vertexCount}, {}, N,
-        uv, alphaTex, shadowAlphaTex);
+        uv);
 }
 
 }  // namespace pbrt

@@ -38,7 +38,6 @@
 #include "memory.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
-#include "texture.h"
 #include "ext/google/array_slice.h"
 
 using gtl::ArraySlice;
@@ -308,7 +307,7 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
 
     return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
                               reverseOrientation, vertices, evalPs, {}, evalNs,
-                              uvs, nullptr, nullptr);
+                              uvs);
 }
 
 }  // namespace pbrt

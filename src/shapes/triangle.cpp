@@ -33,8 +33,6 @@
 // shapes/triangle.cpp*
 #include "shapes/triangle.h"
 
-#include "texture.h"
-#include "textures/constant.h"
 #include "paramset.h"
 #include "error.h"
 #include "interaction.h"
@@ -60,16 +58,12 @@ STAT_RATIO("Scene/Triangles per triangle mesh", nTris, nMeshes);
 TriangleMesh::TriangleMesh(
     const Transform &ObjectToWorld, bool reverseOrientation,
     ArraySlice<int> vertexIndices, ArraySlice<Point3f> P,
-    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV,
-    const std::shared_ptr<Texture<Float>> &alphaMask,
-    const std::shared_ptr<Texture<Float>> &shadowAlphaMask)
+    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV)
     : reverseOrientation(reverseOrientation),
       transformSwapsHandedness(ObjectToWorld.SwapsHandedness()),
       nTriangles(vertexIndices.size() / 3),
       nVertices(P.size()),
-      vertexIndices(vertexIndices.begin(), vertexIndices.end()),
-      alphaMask(alphaMask),
-      shadowAlphaMask(shadowAlphaMask) {
+      vertexIndices(vertexIndices.begin(), vertexIndices.end()) {
     CHECK_EQ((vertexIndices.size() % 3), 0);
     ++nMeshes;
     nTris += nTriangles;
@@ -103,11 +97,9 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, ArraySlice<int> vertexIndices,
     ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
-    ArraySlice<Point2f> uv, const std::shared_ptr<Texture<Float>> &alphaMask,
-    const std::shared_ptr<Texture<Float>> &shadowAlphaMask) {
+    ArraySlice<Point2f> uv) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
-        ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv,
-        alphaMask, shadowAlphaMask);
+        ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv);
     std::vector<std::shared_ptr<Shape>> tris;
     size_t nTriangles = vertexIndices.size() / 3;
     tris.reserve(nTriangles);
@@ -181,8 +173,7 @@ Bounds3f Triangle::WorldBound() const {
     return Union(Bounds3f(p0, p1), p2);
 }
 
-bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
-                         bool testAlphaTexture) const {
+bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const {
     ProfilePhase p(Prof::TriIntersect);
     ++nTests;
     // Get triangle vertices in _p0_, _p1_, and _p2_
@@ -317,14 +308,6 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     Point3f pHit = b0 * p0 + b1 * p1 + b2 * p2;
     Point2f uvHit = b0 * uv[0] + b1 * uv[1] + b2 * uv[2];
 
-    // Test intersection against alpha texture, if present
-    if (testAlphaTexture && mesh->alphaMask) {
-        SurfaceInteraction isectLocal(pHit, Vector3f(0, 0, 0), uvHit, -ray.d,
-                                      dpdu, dpdv, Normal3f(0, 0, 0),
-                                      Normal3f(0, 0, 0), ray.time, this);
-        if (mesh->alphaMask->Evaluate(isectLocal) == 0) return false;
-    }
-
     // Fill in _SurfaceInteraction_ from triangle hit
     *isect = SurfaceInteraction(pHit, pError, uvHit, -ray.d, dpdu, dpdv,
                                 Normal3f(0, 0, 0), Normal3f(0, 0, 0), ray.time,
@@ -397,7 +380,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
     return true;
 }
 
-bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
+bool Triangle::IntersectP(const Ray &ray) const {
     ProfilePhase p(Prof::TriIntersectP);
     ++nTests;
     // Get triangle vertices in _p0_, _p1_, and _p2_
@@ -501,38 +484,6 @@ bool Triangle::IntersectP(const Ray &ray, bool testAlphaTexture) const {
                    std::abs(invDet);
     if (t <= deltaT) return false;
 
-    // Test shadow ray intersection against alpha texture, if present
-    if (testAlphaTexture && (mesh->alphaMask || mesh->shadowAlphaMask)) {
-        // Compute triangle partial derivatives
-        Vector3f dpdu, dpdv;
-        std::array<Point2f, 3> uv = GetUVs();
-
-        // Compute deltas for triangle partial derivatives
-        Vector2f duv02 = uv[0] - uv[2], duv12 = uv[1] - uv[2];
-        Vector3f dp02 = p0 - p2, dp12 = p1 - p2;
-        Float determinant = duv02[0] * duv12[1] - duv02[1] * duv12[0];
-        bool degenerateUV = std::abs(determinant) < 1e-8;
-        if (!degenerateUV) {
-            Float invdet = 1 / determinant;
-            dpdu = (duv12[1] * dp02 - duv02[1] * dp12) * invdet;
-            dpdv = (-duv12[0] * dp02 + duv02[0] * dp12) * invdet;
-        }
-        if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0)
-            // Handle zero determinant for triangle partial derivative matrix
-            CoordinateSystem(Normalize(Cross(p2 - p0, p1 - p0)), &dpdu, &dpdv);
-
-        // Interpolate $(u,v)$ parametric coordinates and hit point
-        Point3f pHit = b0 * p0 + b1 * p1 + b2 * p2;
-        Point2f uvHit = b0 * uv[0] + b1 * uv[1] + b2 * uv[2];
-        SurfaceInteraction isectLocal(pHit, Vector3f(0, 0, 0), uvHit, -ray.d,
-                                      dpdu, dpdv, Normal3f(0, 0, 0),
-                                      Normal3f(0, 0, 0), ray.time, this);
-        if (mesh->alphaMask && mesh->alphaMask->Evaluate(isectLocal) == 0)
-            return false;
-        if (mesh->shadowAlphaMask &&
-            mesh->shadowAlphaMask->Evaluate(isectLocal) == 0)
-            return false;
-    }
     ++nHits;
     return true;
 }
@@ -611,8 +562,7 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures) {
+    const ParamSet &params) {
     ArraySlice<int> vi = params.FindInt("indices");
     ArraySlice<Point3f> P = params.FindPoint3f("P");
     ArraySlice<Point2f> uvs = params.FindPoint2f("uv");
@@ -671,33 +621,8 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
             return std::vector<std::shared_ptr<Shape>>();
         }
 
-    std::shared_ptr<Texture<Float>> alphaTex;
-    std::string alphaTexName = params.FindTexture("alpha");
-    if (alphaTexName != "") {
-        if (floatTextures->find(alphaTexName) != floatTextures->end())
-            alphaTex = (*floatTextures)[alphaTexName];
-        else
-            Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
-                  alphaTexName.c_str());
-    } else if (params.FindOneFloat("alpha", 1.f) == 0.f)
-        alphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
-
-    std::shared_ptr<Texture<Float>> shadowAlphaTex;
-    std::string shadowAlphaTexName = params.FindTexture("shadowalpha");
-    if (shadowAlphaTexName != "") {
-        if (floatTextures->find(shadowAlphaTexName) != floatTextures->end())
-            shadowAlphaTex = (*floatTextures)[shadowAlphaTexName];
-        else
-            Error(
-                "Couldn't find float texture \"%s\" for \"shadowalpha\" "
-                "parameter",
-                shadowAlphaTexName.c_str());
-    } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
-        shadowAlphaTex = std::make_unique<ConstantTexture<Float>>(0.f);
-
     return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
-                              reverseOrientation, vi, P, S, N, uvs, alphaTex,
-                              shadowAlphaTex);
+                              reverseOrientation, vi, P, S, N, uvs);
 }
 
 }  // namespace pbrt

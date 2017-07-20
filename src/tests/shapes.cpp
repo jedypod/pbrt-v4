@@ -96,7 +96,7 @@ TEST(Triangle, Watertight) {
     Transform identity;
     std::vector<std::shared_ptr<Shape>> tris =
         CreateTriangleMesh(identity, identity, false, indices, vertices, {},
-                           {}, {}, nullptr, nullptr);
+                           {}, {});
 
     for (int i = 0; i < 100000; ++i) {
         RNG rng(i);
@@ -114,7 +114,7 @@ TEST(Triangle, Watertight) {
         for (const auto &tri : tris) {
             Float tHit;
             SurfaceInteraction isect;
-            if (tri->Intersect(r, &tHit, &isect, false)) ++nHits;
+            if (tri->Intersect(r, &tHit, &isect)) ++nHits;
         }
         EXPECT_GE(nHits, 1);
 
@@ -125,7 +125,7 @@ TEST(Triangle, Watertight) {
         for (const auto &tri : tris) {
             Float tHit;
             SurfaceInteraction isect;
-            if (tri->Intersect(r, &tHit, &isect, false)) ++nHits;
+            if (tri->Intersect(r, &tHit, &isect)) ++nHits;
         }
         EXPECT_GE(nHits, 1) << pVertex;
     }
@@ -145,8 +145,7 @@ std::shared_ptr<Triangle> GetRandomTriangle(std::function<Float()> value) {
     static Transform identity;
     int indices[3] = {0, 1, 2};
     std::vector<std::shared_ptr<Shape>> triVec =
-        CreateTriangleMesh(identity, identity, false, indices, v, {}, {}, {},
-                           nullptr, nullptr);
+        CreateTriangleMesh(identity, identity, false, indices, v, {}, {}, {});
     EXPECT_EQ(1, triVec.size());
     std::shared_ptr<Triangle> tri =
         std::dynamic_pointer_cast<Triangle>(triVec[0]);
@@ -176,7 +175,7 @@ TEST(Triangle, Reintersect) {
         Ray r(o, pTri.p - o);
         Float tHit;
         SurfaceInteraction isect;
-        if (!tri->Intersect(r, &tHit, &isect, false))
+        if (!tri->Intersect(r, &tHit, &isect))
             // We should almost always find an intersection, but rarely
             // miss, due to round-off error. Just do another go-around in
             // this case.
@@ -194,7 +193,7 @@ TEST(Triangle, Reintersect) {
 
             SurfaceInteraction spawnIsect;
             Float tHit;
-            EXPECT_FALSE(tri->Intersect(rOut, &tHit, &isect, false));
+            EXPECT_FALSE(tri->Intersect(rOut, &tHit, &isect));
 
             // Choose a random point to trace rays to.
             Point3f p2;
@@ -202,7 +201,7 @@ TEST(Triangle, Reintersect) {
             rOut = isect.SpawnRayTo(p2);
 
             EXPECT_FALSE(tri->IntersectP(rOut));
-            EXPECT_FALSE(tri->Intersect(rOut, &tHit, &isect, false));
+            EXPECT_FALSE(tri->Intersect(rOut, &tHit, &isect));
         }
     }
 }
@@ -327,7 +326,7 @@ static Float mcSolidAngle(const Point3f &p, const Shape &shape, int nSamples) {
     for (int i = 0; i < nSamples; ++i) {
         Point2f u{RadicalInverse(0, i), RadicalInverse(1, i)};
         Vector3f w = UniformSampleSphere(u);
-        if (shape.IntersectP(Ray(p, w), false)) ++nHits;
+        if (shape.IntersectP(Ray(p, w))) ++nHits;
     }
     return nHits / (UniformSpherePdf() * nSamples);
 }
@@ -395,7 +394,7 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
     // We should usually (but not always) find an intersection.
     SurfaceInteraction isect;
     Float tHit;
-    if (!shape.Intersect(r, &tHit, &isect, false)) return;
+    if (!shape.Intersect(r, &tHit, &isect)) return;
 
     // Now trace a bunch of rays leaving the intersection point.
     for (int j = 0; j < 10000; ++j) {
@@ -407,11 +406,11 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
         // Make sure it's in the same hemisphere as the surface normal.
         w = Faceforward(w, isect.n);
         Ray rOut = isect.SpawnRay(w);
-        EXPECT_FALSE(shape.IntersectP(rOut, false));
+        EXPECT_FALSE(shape.IntersectP(rOut));
 
         SurfaceInteraction spawnIsect;
         Float spawnTHit;
-        EXPECT_FALSE(shape.Intersect(rOut, &spawnTHit, &spawnIsect, false));
+        EXPECT_FALSE(shape.Intersect(rOut, &spawnTHit, &spawnIsect));
 
         // Choose a random point to trace rays to.
         Point3f p2;
@@ -423,8 +422,8 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
         p2 = isect.p + w;
         rOut = isect.SpawnRayTo(p2);
 
-        EXPECT_FALSE(shape.IntersectP(rOut, false));
-        EXPECT_FALSE(shape.Intersect(rOut, &tHit, &isect, false));
+        EXPECT_FALSE(shape.IntersectP(rOut));
+        EXPECT_FALSE(shape.Intersect(rOut, &tHit, &isect));
     }
 }
 
@@ -474,7 +473,7 @@ TEST(ParialSphere, Normal) {
         // We should usually (but not always) find an intersection.
         SurfaceInteraction isect;
         Float tHit;
-        if (!sphere.Intersect(r, &tHit, &isect, false)) continue;
+        if (!sphere.Intersect(r, &tHit, &isect)) continue;
 
         Float dot = Dot(Normalize(isect.n), Normalize(Vector3f(isect.p)));
         EXPECT_FLOAT_EQ(1., dot);
