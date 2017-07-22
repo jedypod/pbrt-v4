@@ -75,11 +75,9 @@ struct TriangleMesh {
 class Triangle : public Shape {
   public:
     // Triangle Public Methods
-    Triangle(const std::shared_ptr<TriangleMesh> &mesh, int triNumber)
-        : mesh(mesh) {
-        v = &mesh->vertexIndices[3 * triNumber];
+    Triangle(const std::shared_ptr<TriangleMesh> &mesh, int triIndex)
+        : mesh(mesh), triIndex(triIndex) {
         triMeshBytes += sizeof(*this);
-        faceIndex = mesh->faceIndices.size() ? mesh->faceIndices[triNumber] : 0;
     }
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
@@ -101,16 +99,16 @@ class Triangle : public Shape {
   private:
     // Triangle Private Methods
     std::array<Point2f, 3> GetUVs() const {
-        if (mesh->uv.size() > 0)
+        if (mesh->uv.size() > 0) {
+            const int *v = &mesh->vertexIndices[3 * triIndex];
             return { mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]] };
-        else
+        } else
             return { Point2f(0, 0), Point2f(1, 0), Point2f(1, 1) };
     }
 
     // Triangle Private Data
     std::shared_ptr<TriangleMesh> mesh;
-    const int *v;
-    int faceIndex;
+    int triIndex;
 };
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(

@@ -170,6 +170,7 @@ bool WritePlyFile(const std::string &filename, ArraySlice<int> vertexIndices,
 
 Bounds3f Triangle::WorldBound() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
@@ -180,6 +181,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect)
     ProfilePhase p(Prof::TriIntersect);
     ++nTests;
     // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
@@ -312,6 +314,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect)
     Point2f uvHit = b0 * uv[0] + b1 * uv[1] + b2 * uv[2];
 
     // Fill in _SurfaceInteraction_ from triangle hit
+    int faceIndex = mesh->faceIndices.size() ? mesh->faceIndices[triIndex] : 0;
     *isect = SurfaceInteraction(pHit, pError, uvHit, -ray.d, dpdu, dpdv,
                                 Normal3f(0, 0, 0), Normal3f(0, 0, 0), ray.time,
                                 this, faceIndex);
@@ -387,6 +390,7 @@ bool Triangle::IntersectP(const Ray &ray) const {
     ProfilePhase p(Prof::TriIntersectP);
     ++nTests;
     // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
@@ -493,6 +497,7 @@ bool Triangle::IntersectP(const Ray &ray) const {
 
 Float Triangle::Area() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
@@ -502,6 +507,7 @@ Float Triangle::Area() const {
 Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
     Point2f b = UniformSampleTriangle(u);
     // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
@@ -528,6 +534,7 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
 
 Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // Project the vertices into the unit sphere around p.
+    const int *v = &mesh->vertexIndices[3 * triIndex];
     std::array<Vector3f, 3> pSphere = {Normalize(mesh->p[v[0]] - p),
                                        Normalize(mesh->p[v[1]] - p),
                                        Normalize(mesh->p[v[2]] - p)};
