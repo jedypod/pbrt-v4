@@ -610,7 +610,7 @@ std::shared_ptr<Light> MakeLight(const std::string &name,
                                       paramSet);
     else if (name == "distant")
         light = CreateDistantLight(light2world, paramSet);
-    else if (name == "infinite" || name == "exinfinite")
+    else if (name == "infinite")
         light = CreateInfiniteLight(light2world, paramSet);
     else
         Warning("Light \"%s\" unknown.", name.c_str());
@@ -624,7 +624,7 @@ std::shared_ptr<AreaLight> MakeAreaLight(const std::string &name,
                                          const ParamSet &paramSet,
                                          const std::shared_ptr<Shape> &shape) {
     std::shared_ptr<AreaLight> area;
-    if (name == "area" || name == "diffuse")
+    if (name == "diffuse")
         area = CreateDiffuseAreaLight(light2world, mediumInterface.outside,
                                       paramSet, shape);
     else
@@ -682,7 +682,7 @@ std::shared_ptr<Sampler> MakeSampler(const std::string &name,
                                      const ParamSet &paramSet,
                                      const Film *film) {
     Sampler *sampler = nullptr;
-    if (name == "lowdiscrepancy" || name == "02sequence")
+    if (name == "02sequence")
         sampler = CreateZeroTwoSequenceSampler(paramSet);
     else if (name == "maxmindist")
         sampler = CreateMaxMinDistSampler(paramSet);
