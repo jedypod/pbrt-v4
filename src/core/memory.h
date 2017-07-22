@@ -44,8 +44,9 @@
 #include "mathutil.h"
 #include "ext/google/array_slice.h"
 
-#include <list>
 #include <cstddef>
+#include <list>
+#include <memory>
 #include <utility>
 
 #ifdef PBRT_HAVE_MALLOC_H

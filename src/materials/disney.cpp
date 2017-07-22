@@ -87,9 +87,7 @@ inline Spectrum FrSchlick(const Spectrum &R0, Float cosTheta) {
 
 // For a dielectric, R(0) = (eta - 1)^2 / (eta + 1)^2, assuming we're
 // coming from air..
-inline Float SchlickR0FromEta(Float eta) {
-    return sqr(eta - 1) / sqr(eta + 1);
-}
+inline Float SchlickR0FromEta(Float eta) { return sqr(eta - 1) / sqr(eta + 1); }
 
 ///////////////////////////////////////////////////////////////////////////
 // DisneyDiffuse
@@ -97,15 +95,10 @@ inline Float SchlickR0FromEta(Float eta) {
 class DisneyDiffuse : public BxDF {
   public:
     DisneyDiffuse(const Spectrum &R)
-        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)),
-          R(R) { }
+        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, int, const Point2f *) const {
-        return R;
-    }
-    Spectrum rho(int, const Point2f *, const Point2f *) const {
-        return R;
-    }
+    Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
+    Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
 
   private:
@@ -137,12 +130,8 @@ class DisneyFakeSS : public BxDF {
           R(R),
           roughness(roughness) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, int, const Point2f *) const {
-        return R;
-    }
-    Spectrum rho(int, const Point2f *, const Point2f *) const {
-        return R;
-    }
+    Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
+    Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
 
   private:
@@ -162,7 +151,8 @@ Spectrum DisneyFakeSS::f(const Vector3f &wo, const Vector3f &wi) const {
           Fi = SchlickWeight(AbsCosTheta(wi));
     Float Fss = Lerp(Fo, 1.0, Fss90) * Lerp(Fi, 1.0, Fss90);
     // 1.25 scale is used to (roughly) preserve albedo
-    Float ss = 1.25f * (Fss * (1 / (AbsCosTheta(wo) + AbsCosTheta(wi)) - .5f) + .5f);
+    Float ss =
+        1.25f * (Fss * (1 / (AbsCosTheta(wo) + AbsCosTheta(wi)) - .5f) + .5f);
 
     return R * InvPi * ss;
 }
@@ -182,12 +172,8 @@ class DisneyRetro : public BxDF {
           R(R),
           roughness(roughness) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, int, const Point2f *) const {
-        return R;
-    }
-    Spectrum rho(int, const Point2f *, const Point2f *) const {
-        return R;
-    }
+    Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
+    Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
 
   private:
@@ -222,16 +208,10 @@ enum class SheenMode { Reflect, Transmit };
 class DisneySheen : public BxDF {
   public:
     DisneySheen(const Spectrum &R, SheenMode mode)
-        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)),
-          R(R),
-          mode(mode) {}
+        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R), mode(mode) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, int, const Point2f *) const {
-        return R;
-    }
-    Spectrum rho(int, const Point2f *, const Point2f *) const {
-        return R;
-    }
+    Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
+    Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
 
   private:
@@ -341,28 +321,31 @@ Float DisneyClearcoat::Pdf(const Vector3f &wo, const Vector3f &wi) const {
 }
 
 std::string DisneyClearcoat::ToString() const {
-    return StringPrintf("[ DisneyClearcoat weight: %f gloss: %f ]",
-                        weight, gloss);
+    return StringPrintf("[ DisneyClearcoat weight: %f gloss: %f ]", weight,
+                        gloss);
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// SchlickFresnel
+// DisneyFresnel
 
 // Specialized Fresnel function used for the specular component, based on
-// the Schlick Fresnel approximation.
-class SchlickFresnel : public Fresnel {
+// a mixture between dielectric and the Schlick Fresnel approximation.
+class DisneyFresnel : public Fresnel {
   public:
-    SchlickFresnel(const Spectrum &R0)
-        : R0(R0) {}
+    DisneyFresnel(const Spectrum &R0, Float metallic, Float eta)
+        : R0(R0), metallic(metallic), eta(eta) {}
     Spectrum Evaluate(Float cosI) const {
-        return FrSchlick(R0, cosI);
+        return Lerp(metallic, Spectrum(FrDielectric(cosI, 1, eta)),
+                    FrSchlick(R0, cosI));
     }
     std::string ToString() const {
-        return StringPrintf("[ SchlickFresnel R0: %s ]", R0.ToString().c_str());
+        return StringPrintf("[ DisneyFresnel R0: %s metallic: %f eta: %f ]",
+                            R0.ToString().c_str(), metallic, eta);
     }
 
   private:
-    Spectrum R0;
+    const Spectrum R0;
+    const Float metallic, eta;
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -417,8 +400,7 @@ Spectrum DisneyBSSRDF::S(const SurfaceInteraction &pi, const Vector3f &wi) {
 Spectrum DisneyBSSRDF::Sr(Float r) const {
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     if (r < 1e-6f) r = 1e-6f;  // Avoid singularity at r == 0.
-    return R *
-           (Exp(-Spectrum(r) / d) + Exp(-Spectrum(r) / (3 * d))) /
+    return R * (Exp(-Spectrum(r) / d) + Exp(-Spectrum(r) / (3 * d))) /
            (8 * Pi * d * r);
 }
 
@@ -494,7 +476,8 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     Float e = eta->Evaluate(*si);
     Float strans = specTrans->Evaluate(*si);
     Float diffuseWeight = (1 - metallicWeight) * (1 - strans);
-    Float dt = diffTrans->Evaluate(*si) / 2;  // 0: all diffuse is reflected -> 1, transmitted
+    Float dt = diffTrans->Evaluate(*si) /
+               2;  // 0: all diffuse is reflected -> 1, transmitted
     Float rough = roughness->Evaluate(*si);
     Float lum = c.y();
     // normalize lum. to isolate hue+sat
@@ -544,17 +527,13 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     MicrofacetDistribution *distrib =
         arena.Alloc<TrowbridgeReitzDistribution>(ax, ay);
 
-    // Specular is Trowbridge-Reitz with the Schlick Fresnel function.
-    // TODO: Cspec0 will actually be non-black with metallicWeight == 0.
-    // Should we always include this term?
-    if (metallicWeight > 0) {
-        Spectrum Cspec0 =
-            Lerp(metallicWeight,
-                 SchlickR0FromEta(e) * Lerp(specularTint->Evaluate(*si), Spectrum(1.), Ctint), c);
-
-        Fresnel *fresnel = arena.Alloc<SchlickFresnel>(Cspec0);
-        si->bsdf->Add(arena.Alloc<MicrofacetReflection>(c, distrib, fresnel));
-    }
+    // Specular is Trowbridge-Reitz with a modified Fresnel function.
+    Float specTint = specularTint->Evaluate(*si);
+    Spectrum Cspec0 =
+        Lerp(metallicWeight,
+             SchlickR0FromEta(e) * Lerp(specTint, Spectrum(1.), Ctint), c);
+    Fresnel *fresnel = arena.Alloc<DisneyFresnel>(Cspec0, metallicWeight, e);
+    si->bsdf->Add(arena.Alloc<MicrofacetReflection>(c, distrib, fresnel));
 
     // Clearcoat
     Float cc = clearcoat->Evaluate(*si);
@@ -592,8 +571,7 @@ DisneyMaterial *CreateDisneyMaterial(const TextureParams &mp) {
         mp.GetSpectrumTexture("color", Spectrum(0.5f));
     std::shared_ptr<Texture<Float>> metallic =
         mp.GetFloatTexture("metallic", 0.f);
-    std::shared_ptr<Texture<Float>> eta =
-        mp.GetFloatTexture("eta", 1.5f);
+    std::shared_ptr<Texture<Float>> eta = mp.GetFloatTexture("eta", 1.5f);
     std::shared_ptr<Texture<Float>> roughness =
         mp.GetFloatTexture("roughness", .5f);
     std::shared_ptr<Texture<Float>> specularTint =
@@ -620,8 +598,8 @@ DisneyMaterial *CreateDisneyMaterial(const TextureParams &mp) {
         mp.GetFloatTextureOrNull("bumpmap");
     return new DisneyMaterial(color, metallic, eta, roughness, specularTint,
                               anisotropic, sheen, sheenTint, clearcoat,
-                              clearcoatGloss, specTrans, scatterDistance,
-                              thin, flatness, diffTrans, bumpMap);
+                              clearcoatGloss, specTrans, scatterDistance, thin,
+                              flatness, diffTrans, bumpMap);
 }
 
 }  // namespace pbrt

@@ -30,34 +30,41 @@
 
  */
 
+#if defined(_MSC_VER)
+#define NOMINMAX
+#pragma once
+#endif
 
-// core/memory.cpp*
-#include "memory.h"
+#ifndef PBRT_TEXTURES_PTEX_H
+#define PBRT_TEXTURES_PTEX_H
 
-#include <stdlib.h>
+// textures/ptex.h*
+#include "pbrt.h"
+#include "texture.h"
+
+#include <string>
 
 namespace pbrt {
 
-// Memory Allocation Functions
-void *AllocAligned(size_t size) {
-#if defined(PBRT_HAVE__ALIGNED_MALLOC)
-    return _aligned_malloc(size, PBRT_L1_CACHE_LINE_SIZE);
-#elif defined(PBRT_HAVE_POSIX_MEMALIGN)
-    void *ptr;
-    if (posix_memalign(&ptr, PBRT_L1_CACHE_LINE_SIZE, size) != 0) ptr = nullptr;
-    return ptr;
-#else
-    return memalign(PBRT_L1_CACHE_LINE_SIZE, size);
-#endif
-}
+// PtexTexture Declarations
+template <typename T>
+class PtexTexture : public Texture<T> {
+  public:
+    // PtexTexture Public Methods
+    PtexTexture(const std::string &filename);
+    ~PtexTexture();
+    T Evaluate(const SurfaceInteraction &) const;
 
-void FreeAligned(void *ptr) {
-    if (!ptr) return;
-#if defined(PBRT_HAVE__ALIGNED_MALLOC)
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
-}
+  private:
+    bool valid;
+    const std::string filename;
+};
+
+PtexTexture<Float> *CreatePtexFloatTexture(const Transform &tex2world,
+                                           const TextureParams &tp);
+PtexTexture<Spectrum> *CreatePtexSpectrumTexture(const Transform &tex2world,
+                                                 const TextureParams &tp);
 
 }  // namespace pbrt
+
+#endif  // PBRT_TEXTURES_PTEX_H

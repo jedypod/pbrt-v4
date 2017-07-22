@@ -189,6 +189,7 @@ enum class Prof {
     TexCacheGetTile,
     TexCacheReadTile,
     TexCacheFree,
+    TexFiltPtex,
     NumProfCategories
 };
 
@@ -247,6 +248,7 @@ static const char *ProfNames[] = {
     "TextureCache::GetTile()",
     "TextureCache::ReadTile()",
     "TextureCache::FreeMemory()",
+    "Ptex lookup",
 };
 
 static_assert((int)Prof::NumProfCategories ==
@@ -301,18 +303,10 @@ void CleanupProfiler();
     }                                                      \
     static StatRegisterer STATS_REG##var(STATS_FUNC##var)
 
-// Work around lack of support for constexpr in VS2013.
-#ifdef PBRT_IS_MSVC2013
-#define STATS_INT64_T_MIN LLONG_MAX
-#define STATS_INT64_T_MAX _I64_MIN
-#define STATS_DBL_T_MIN DBL_MAX
-#define STATS_DBL_T_MAX -DBL_MAX
-#else
 #define STATS_INT64_T_MIN std::numeric_limits<int64_t>::max()
 #define STATS_INT64_T_MAX std::numeric_limits<int64_t>::lowest()
 #define STATS_DBL_T_MIN std::numeric_limits<double>::max()
 #define STATS_DBL_T_MAX std::numeric_limits<double>::lowest()
-#endif
 
 #define STAT_INT_DISTRIBUTION(title, var)                                  \
     static PBRT_THREAD_LOCAL int64_t var##sum;                             \

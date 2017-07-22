@@ -58,12 +58,14 @@ STAT_RATIO("Scene/Triangles per triangle mesh", nTris, nMeshes);
 TriangleMesh::TriangleMesh(
     const Transform &ObjectToWorld, bool reverseOrientation,
     ArraySlice<int> vertexIndices, ArraySlice<Point3f> P,
-    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV)
+    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV,
+    ArraySlice<int> faceIndices)
     : reverseOrientation(reverseOrientation),
       transformSwapsHandedness(ObjectToWorld.SwapsHandedness()),
       nTriangles(vertexIndices.size() / 3),
       nVertices(P.size()),
-      vertexIndices(vertexIndices.begin(), vertexIndices.end()) {
+      vertexIndices(vertexIndices.begin(), vertexIndices.end()),
+      faceIndices(faceIndices.begin(), faceIndices.end()) {
     CHECK_EQ((vertexIndices.size() % 3), 0);
     ++nMeshes;
     nTris += nTriangles;
@@ -97,9 +99,10 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, ArraySlice<int> vertexIndices,
     ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
-    ArraySlice<Point2f> uv) {
+    ArraySlice<Point2f> uv, ArraySlice<int> faceIndices) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
-        ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv);
+        ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv,
+        faceIndices);
     std::vector<std::shared_ptr<Shape>> tris;
     size_t nTriangles = vertexIndices.size() / 3;
     tris.reserve(nTriangles);
@@ -311,7 +314,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect)
     // Fill in _SurfaceInteraction_ from triangle hit
     *isect = SurfaceInteraction(pHit, pError, uvHit, -ray.d, dpdu, dpdv,
                                 Normal3f(0, 0, 0), Normal3f(0, 0, 0), ray.time,
-                                this);
+                                this, faceIndex);
 
     // Override surface normal in _isect_ for triangle
     isect->n = isect->shading.n = Normal3f(Normalize(Cross(dp02, dp12)));
@@ -592,11 +595,17 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
                 "mesh.  (%d expcted, %d found)",
                 (int)P.size(), (int)uvs.size());
     }
+
     if (vi.empty()) {
         Error(
             "Vertex indices \"indices\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
+    } else if (vi.size() % 3) {
+        Error("Number of vertex indices %d not a multiple of 3.",
+              int(vi.size()));
+        return {};
     }
+
     if (P.empty()) {
         Error("Vertex positions \"P\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
@@ -621,8 +630,16 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
             return std::vector<std::shared_ptr<Shape>>();
         }
 
+    ArraySlice<int> faceIndices = params.FindInt("faceIndices");
+    if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
+        Error("Number of face indices %d != number of triangles %d",
+              int(faceIndices.size()), int(vi.size() / 3));
+        faceIndices = {};
+    }
+
     return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
-                              reverseOrientation, vi, P, S, N, uvs);
+                              reverseOrientation, vi, P, S, N, uvs,
+                              faceIndices);
 }
 
 }  // namespace pbrt

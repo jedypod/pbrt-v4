@@ -59,7 +59,7 @@ struct TriangleMesh {
     TriangleMesh(const Transform &ObjectToWorld, bool reverseOrientation,
                  gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
                  gtl::ArraySlice<Vector3f> S, gtl::ArraySlice<Normal3f> N,
-                 gtl::ArraySlice<Point2f> uv);
+                 gtl::ArraySlice<Point2f> uv, gtl::ArraySlice<int> faceIndices);
 
     // TriangleMesh Data
     const bool reverseOrientation, transformSwapsHandedness;
@@ -69,6 +69,7 @@ struct TriangleMesh {
     std::vector<Normal3f> n;
     std::vector<Vector3f> s;
     std::vector<Point2f> uv;
+    std::vector<int> faceIndices;
 };
 
 class Triangle : public Shape {
@@ -78,6 +79,7 @@ class Triangle : public Shape {
         : mesh(mesh) {
         v = &mesh->vertexIndices[3 * triNumber];
         triMeshBytes += sizeof(*this);
+        faceIndex = mesh->faceIndices.size() ? mesh->faceIndices[triNumber] : 0;
     }
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
@@ -108,13 +110,15 @@ class Triangle : public Shape {
     // Triangle Private Data
     std::shared_ptr<TriangleMesh> mesh;
     const int *v;
+    int faceIndex;
 };
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, gtl::ArraySlice<int> vertexIndices,
     gtl::ArraySlice<Point3f> p, gtl::ArraySlice<Vector3f> s,
-    gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv);
+    gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv,
+    gtl::ArraySlice<int> faceIndices = {});
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
