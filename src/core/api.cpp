@@ -1208,9 +1208,13 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
                                      mi, graphicsState.areaLightParams, s);
                 if (area) areaLights.push_back(area);
             }
-            prims.push_back(
-                std::make_shared<GeometricPrimitive>(s, mtl, area, mi,
-                                                     alphaTex, shadowAlphaTex));
+            if (!area && !mi.IsMediumTransition() && !alphaTex &&
+                !shadowAlphaTex)
+                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
+            else
+                prims.push_back(
+                    std::make_shared<GeometricPrimitive>(s, mtl, area, mi,
+                                                         alphaTex, shadowAlphaTex));
         }
         params.ReportUnused();
     } else {
@@ -1231,10 +1235,14 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
         std::shared_ptr<Material> mtl = graphicsState.CreateMaterial(params);
         MediumInterface mi = graphicsState.CreateMediumInterface();
 
-        for (auto &s : shapes)
-            prims.push_back(
-                std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi,
-                                                     alphaTex, shadowAlphaTex));
+        for (auto &s : shapes) {
+            if (!mi.IsMediumTransition() && !alphaTex && !shadowAlphaTex)
+                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
+            else
+                prims.push_back(
+                    std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi,
+                                                         alphaTex, shadowAlphaTex));
+        }
         params.ReportUnused();
 
         // Create single _TransformedPrimitive_ for _prims_

@@ -42,6 +42,8 @@
 
 namespace pbrt {
 
+STAT_MEMORY_COUNTER("Memory/Primitives", primitiveMemory);
+
 // Primitive Method Definitions
 Primitive::~Primitive() {}
 const AreaLight *Aggregate::GetAreaLight() const {
@@ -67,6 +69,12 @@ void Aggregate::ComputeScatteringFunctions(SurfaceInteraction *isect,
 }
 
 // TransformedPrimitive Method Definitions
+TransformedPrimitive::TransformedPrimitive(std::shared_ptr<Primitive> &primitive,
+                                           const AnimatedTransform &PrimitiveToWorld)
+    : primitive(primitive), PrimitiveToWorld(PrimitiveToWorld) {
+    primitiveMemory += sizeof(*this);
+}
+
 bool TransformedPrimitive::Intersect(const Ray &r,
                                      SurfaceInteraction *isect) const {
     // Compute _ray_ after transformation by _PrimitiveToWorld_
@@ -90,6 +98,21 @@ bool TransformedPrimitive::IntersectP(const Ray &r) const {
 }
 
 // GeometricPrimitive Method Definitions
+GeometricPrimitive::GeometricPrimitive(const std::shared_ptr<Shape> &shape,
+                                       const std::shared_ptr<Material> &material,
+                                       const std::shared_ptr<AreaLight> &areaLight,
+                                       const MediumInterface &mediumInterface,
+                                       const std::shared_ptr<Texture<Float>> &alpha,
+                                       const std::shared_ptr<Texture<Float>> &shadowAlpha)
+    : shape(shape),
+      material(material),
+      areaLight(areaLight),
+      mediumInterface(mediumInterface),
+      alpha(alpha),
+      shadowAlpha(shadowAlpha) {
+    primitiveMemory += sizeof(*this);
+}
+
 Bounds3f GeometricPrimitive::WorldBound() const { return shape->WorldBound(); }
 
 bool GeometricPrimitive::IntersectP(const Ray &r) const {
@@ -154,6 +177,49 @@ void GeometricPrimitive::ComputeScatteringFunctions(
     ProfilePhase p(Prof::ComputeScatteringFuncs);
     if (material)
         material->ComputeScatteringFunctions(isect, arena, mode);
+    CHECK_GE(Dot(isect->n, isect->shading.n), 0.);
+}
+
+// SimplePrimitive Method Definitions
+SimplePrimitive::SimplePrimitive(const std::shared_ptr<Shape> &shape,
+                                 const std::shared_ptr<Material> &material)
+    : shape(shape),
+      material(material) {
+    primitiveMemory += sizeof(*this);
+}
+
+Bounds3f SimplePrimitive::WorldBound() const { return shape->WorldBound(); }
+
+bool SimplePrimitive::IntersectP(const Ray &r) const {
+    return shape->IntersectP(r);
+}
+
+bool SimplePrimitive::Intersect(const Ray &r,
+                                SurfaceInteraction *isectOut) const {
+    Float tHit;
+    SurfaceInteraction isect;
+    if (!shape->Intersect(r, &tHit, &isect)) return false;
+
+    r.tMax = tHit;
+    isect.primitive = this;
+    CHECK_GE(Dot(isect.n, isect.shading.n), 0.);
+    isect.mediumInterface = MediumInterface(r.medium);
+    *isectOut = isect;
+    return true;
+}
+
+const AreaLight *SimplePrimitive::GetAreaLight() const {
+    return nullptr;
+}
+
+const Material *SimplePrimitive::GetMaterial() const {
+    return material.get();
+}
+
+void SimplePrimitive::ComputeScatteringFunctions(
+    SurfaceInteraction *isect, MemoryArena &arena, TransportMode mode) const {
+    ProfilePhase p(Prof::ComputeScatteringFuncs);
+    material->ComputeScatteringFunctions(isect, arena, mode);
     CHECK_GE(Dot(isect->n, isect->shading.n), 0.);
 }
 

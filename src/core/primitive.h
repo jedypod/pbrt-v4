@@ -77,13 +77,7 @@ class GeometricPrimitive : public Primitive {
                        const std::shared_ptr<AreaLight> &areaLight,
                        const MediumInterface &mediumInterface,
                        const std::shared_ptr<Texture<Float>> &alpha = nullptr,
-                       const std::shared_ptr<Texture<Float>> &shadowAlpha = nullptr)
-        : shape(shape),
-          material(material),
-          areaLight(areaLight),
-        mediumInterface(mediumInterface),
-        alpha(alpha),
-        shadowAlpha(shadowAlpha) {}
+                       const std::shared_ptr<Texture<Float>> &shadowAlpha = nullptr);
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
@@ -98,13 +92,34 @@ class GeometricPrimitive : public Primitive {
     std::shared_ptr<Texture<Float>> alpha, shadowAlpha;
 };
 
+// SimplePrimitive Declarations
+// More compact representation for the common case of only a shape and
+// a material, with everything else null.
+class SimplePrimitive : public Primitive {
+  public:
+    // SimplePrimitive Public Methods
+    virtual Bounds3f WorldBound() const;
+    virtual bool Intersect(const Ray &r, SurfaceInteraction *isect) const;
+    virtual bool IntersectP(const Ray &r) const;
+    SimplePrimitive(const std::shared_ptr<Shape> &shape,
+                    const std::shared_ptr<Material> &material);
+    const AreaLight *GetAreaLight() const;
+    const Material *GetMaterial() const;
+    void ComputeScatteringFunctions(SurfaceInteraction *isect,
+                                    MemoryArena &arena, TransportMode mode) const;
+
+  private:
+    // SimplePrimitive Private Data
+    std::shared_ptr<Shape> shape;
+    std::shared_ptr<Material> material;
+};
+
 // TransformedPrimitive Declarations
 class TransformedPrimitive : public Primitive {
   public:
     // TransformedPrimitive Public Methods
     TransformedPrimitive(std::shared_ptr<Primitive> &primitive,
-                         const AnimatedTransform &PrimitiveToWorld)
-        : primitive(primitive), PrimitiveToWorld(PrimitiveToWorld) {}
+                         const AnimatedTransform &PrimitiveToWorld);
     bool Intersect(const Ray &r, SurfaceInteraction *in) const;
     bool IntersectP(const Ray &r) const;
     const AreaLight *GetAreaLight() const { return nullptr; }
