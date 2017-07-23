@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // MixMaterial Declarations
@@ -61,9 +63,9 @@ class MixMaterial : public Material {
     std::shared_ptr<Texture<Spectrum>> scale;
 };
 
-MixMaterial *CreateMixMaterial(const TextureParams &mp,
-                               const std::shared_ptr<Material> &m1,
-                               const std::shared_ptr<Material> &m2);
+std::shared_ptr<MixMaterial> CreateMixMaterial(
+    const TextureParams &mp, const std::shared_ptr<Material> &m1,
+    const std::shared_ptr<Material> &m2);
 
 }  // namespace pbrt
 

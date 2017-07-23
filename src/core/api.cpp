@@ -189,17 +189,20 @@ struct RenderOptions {
 
 struct GraphicsState {
     // Graphics State Methods
-    std::shared_ptr<Material> CreateMaterial(const ParamSet &params);
+    GraphicsState() {
+        ParamSet params;
+        std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
+        std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
+        material = CreateMatteMaterial(TextureParams(params, floatTextures, spectrumTextures));
+    }
     MediumInterface CreateMediumInterface();
 
     // Graphics State
     std::string currentInsideMedium, currentOutsideMedium;
     std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
-    ParamSet materialParams;
-    std::string material = "matte";
+    std::shared_ptr<Material> material;
     std::map<std::string, std::shared_ptr<Material>> namedMaterials;
-    std::string currentNamedMaterial;
     ParamSet areaLightParams;
     std::string areaLight;
     bool reverseOrientation = false;
@@ -407,7 +410,7 @@ STAT_COUNTER("Scene/Materials created", nMaterialsCreated);
 
 std::shared_ptr<Material> MakeMaterial(const std::string &name,
                                        const TextureParams &mp) {
-    Material *material = nullptr;
+    std::shared_ptr<Material> material;
     if (name == "" || name == "none")
         return nullptr;
     else if (name == "matte")
@@ -432,12 +435,12 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         if (!mat1) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m1.c_str());
-            mat1 = MakeMaterial("matte", mp);
+            mat1 = CreateMatteMaterial(mp);
         }
         if (!mat2) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m2.c_str());
-            mat2 = MakeMaterial("matte", mp);
+            mat2 = CreateMatteMaterial(mp);
         }
 
         material = CreateMixMaterial(mp, mat1, mat2);
@@ -468,9 +471,9 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             name.c_str(), renderOptions->IntegratorName.c_str());
 
     mp.ReportUnused();
-    if (!material) Error("Unable to create material \"%s\"", name.c_str());
-    else ++nMaterialsCreated;
-    return std::shared_ptr<Material>(material);
+    CHECK(material);
+    ++nMaterialsCreated;
+    return material;
 }
 
 std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
@@ -1053,7 +1056,7 @@ void pbrtTransformEnd() {
 void pbrtTexture(const std::string &name, const std::string &type,
                  const std::string &texname, const ParamSet &params) {
     VERIFY_WORLD("Texture");
-    TextureParams tp(params, params, graphicsState.floatTextures,
+    TextureParams tp(params, graphicsState.floatTextures,
                      graphicsState.spectrumTextures);
     if (type == "float") {
         // Create _Float_ texture and store in _floatTextures_
@@ -1085,9 +1088,9 @@ void pbrtTexture(const std::string &name, const std::string &type,
 
 void pbrtMaterial(const std::string &name, const ParamSet &params) {
     VERIFY_WORLD("Material");
-    graphicsState.material = name;
-    graphicsState.materialParams = params;
-    graphicsState.currentNamedMaterial = "";
+    graphicsState.material =
+        MakeMaterial(name, TextureParams(params, graphicsState.floatTextures,
+                                         graphicsState.spectrumTextures));
     if (PbrtOptions.cat || PbrtOptions.toPly) {
         printf("%*sMaterial \"%s\" ", catIndentCount, "", name.c_str());
         params.Print(catIndentCount);
@@ -1098,8 +1101,7 @@ void pbrtMaterial(const std::string &name, const ParamSet &params) {
 void pbrtMakeNamedMaterial(const std::string &name, const ParamSet &params) {
     VERIFY_WORLD("MakeNamedMaterial");
     // error checking, warning if replace, what to use for transform?
-    ParamSet emptyParams;
-    TextureParams mp(params, emptyParams, graphicsState.floatTextures,
+    TextureParams mp(params, graphicsState.floatTextures,
                      graphicsState.spectrumTextures);
     std::string matName = mp.FindString("type");
     WARN_IF_ANIMATED_TRANSFORM("MakeNamedMaterial");
@@ -1122,9 +1124,19 @@ void pbrtMakeNamedMaterial(const std::string &name, const ParamSet &params) {
 
 void pbrtNamedMaterial(const std::string &name) {
     VERIFY_WORLD("NamedMaterial");
-    graphicsState.currentNamedMaterial = name;
     if (PbrtOptions.cat || PbrtOptions.toPly)
         printf("%*sNamedMaterial \"%s\"\n", catIndentCount, "", name.c_str());
+    else {
+        if (graphicsState.namedMaterials.find(name) ==
+            graphicsState.namedMaterials.end()) {
+            Error("Named material \"%s\" not defined. Using \"matte\"", name.c_str());
+            ParamSet params;
+            std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
+            std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
+            graphicsState.material = CreateMatteMaterial(TextureParams(params, floatTextures, spectrumTextures));
+        } else
+            graphicsState.material = graphicsState.namedMaterials[name];
+    }
 }
 
 void pbrtLightSource(const std::string &name, const ParamSet &params) {
@@ -1198,7 +1210,6 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
             MakeShapes(name, ObjToWorld, WorldToObj,
                        graphicsState.reverseOrientation, params);
         if (shapes.empty()) return;
-        std::shared_ptr<Material> mtl = graphicsState.CreateMaterial(params);
         MediumInterface mi = graphicsState.CreateMediumInterface();
         for (auto &s : shapes) {
             // Possibly create area light for shape
@@ -1210,10 +1221,10 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
             }
             if (!area && !mi.IsMediumTransition() && !alphaTex &&
                 !shadowAlphaTex)
-                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
+                prims.push_back(std::make_shared<SimplePrimitive>(s, graphicsState.material));
             else
                 prims.push_back(
-                    std::make_shared<GeometricPrimitive>(s, mtl, area, mi,
+                    std::make_shared<GeometricPrimitive>(s, graphicsState.material, area, mi,
                                                          alphaTex, shadowAlphaTex));
         }
         params.ReportUnused();
@@ -1232,15 +1243,14 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
         if (shapes.empty()) return;
 
         // Create _GeometricPrimitive_(s) for animated shape
-        std::shared_ptr<Material> mtl = graphicsState.CreateMaterial(params);
         MediumInterface mi = graphicsState.CreateMediumInterface();
 
         for (auto &s : shapes) {
             if (!mi.IsMediumTransition() && !alphaTex && !shadowAlphaTex)
-                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
+                prims.push_back(std::make_shared<SimplePrimitive>(s, graphicsState.material));
             else
                 prims.push_back(
-                    std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi,
+                    std::make_shared<GeometricPrimitive>(s, graphicsState.material, nullptr, mi,
                                                          alphaTex, shadowAlphaTex));
         }
         params.ReportUnused();
@@ -1277,26 +1287,6 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
             renderOptions->lights.insert(renderOptions->lights.end(),
                                          areaLights.begin(), areaLights.end());
     }
-}
-
-std::shared_ptr<Material> GraphicsState::CreateMaterial(
-    const ParamSet &params) {
-    TextureParams mp(params, materialParams, floatTextures, spectrumTextures);
-    std::shared_ptr<Material> mtl;
-    if (currentNamedMaterial != "") {
-        if (namedMaterials.find(currentNamedMaterial) != namedMaterials.end())
-            mtl = namedMaterials[graphicsState.currentNamedMaterial];
-        else {
-            Error("Named material \"%s\" not defined. Using \"matte\".",
-                  currentNamedMaterial.c_str());
-            mtl = MakeMaterial("matte", mp);
-        }
-    } else {
-        mtl = MakeMaterial(material, mp);
-        if (!mtl && material != "" && material != "none")
-            mtl = MakeMaterial("matte", mp);
-    }
-    return mtl;
 }
 
 MediumInterface GraphicsState::CreateMediumInterface() {

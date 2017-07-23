@@ -54,12 +54,12 @@ void MirrorMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         si->bsdf->Add(arena.Alloc<SpecularReflection>(R, arena.Alloc<FresnelNoOp>()));
 }
 
-MirrorMaterial *CreateMirrorMaterial(const TextureParams &mp) {
+std::shared_ptr<MirrorMaterial> CreateMirrorMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kr =
         mp.GetSpectrumTexture("Kr", Spectrum(0.9f));
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    return new MirrorMaterial(Kr, bumpMap);
+    return std::make_shared<MirrorMaterial>(Kr, bumpMap);
 }
 
 }  // namespace pbrt

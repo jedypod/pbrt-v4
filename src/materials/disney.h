@@ -42,6 +42,8 @@
 #include "material.h"
 #include "pbrt.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // DisneyMaterial Declarations
@@ -60,8 +62,7 @@ class DisneyMaterial : public Material {
                    const std::shared_ptr<Texture<Float>> &clearcoatGloss,
                    const std::shared_ptr<Texture<Float>> &specTrans,
                    const std::shared_ptr<Texture<Spectrum>> &scatterDistance,
-                   bool thin,
-                   const std::shared_ptr<Texture<Float>> &flatness,
+                   bool thin, const std::shared_ptr<Texture<Float>> &flatness,
                    const std::shared_ptr<Texture<Float>> &diffTrans,
                    const std::shared_ptr<Texture<Float>> &bumpMap)
         : color(color),
@@ -95,7 +96,7 @@ class DisneyMaterial : public Material {
     std::shared_ptr<Texture<Float>> flatness, diffTrans, bumpMap;
 };
 
-DisneyMaterial *CreateDisneyMaterial(const TextureParams &mp);
+std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

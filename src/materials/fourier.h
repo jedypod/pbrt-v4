@@ -68,7 +68,7 @@ class FourierMaterial : public Material {
     static std::map<std::string, std::unique_ptr<FourierBSDFTable>> loadedBSDFs;
 };
 
-FourierMaterial *CreateFourierMaterial(const TextureParams &mp);
+std::shared_ptr<FourierMaterial> CreateFourierMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

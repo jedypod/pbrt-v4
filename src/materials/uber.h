@@ -85,7 +85,7 @@ class UberMaterial : public Material {
     bool remapRoughness;
 };
 
-UberMaterial *CreateUberMaterial(const TextureParams &mp);
+std::shared_ptr<UberMaterial> CreateUberMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

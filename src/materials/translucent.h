@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // TranslucentMaterial Declarations
@@ -75,7 +77,8 @@ class TranslucentMaterial : public Material {
     bool remapRoughness;
 };
 
-TranslucentMaterial *CreateTranslucentMaterial(const TextureParams &mp);
+std::shared_ptr<TranslucentMaterial> CreateTranslucentMaterial(
+    const TextureParams &mp);
 
 }  // namespace pbrt
 

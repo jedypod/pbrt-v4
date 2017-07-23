@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // GlassMaterial Declarations
@@ -74,7 +76,7 @@ class GlassMaterial : public Material {
     bool remapRoughness;
 };
 
-GlassMaterial *CreateGlassMaterial(const TextureParams &mp);
+std::shared_ptr<GlassMaterial> CreateGlassMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

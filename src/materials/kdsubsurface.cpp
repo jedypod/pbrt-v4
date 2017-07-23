@@ -87,7 +87,8 @@ void KdSubsurfaceMaterial::ComputeScatteringFunctions(
                                               sig_a, sig_s, table);
 }
 
-KdSubsurfaceMaterial *CreateKdSubsurfaceMaterial(const TextureParams &mp) {
+std::shared_ptr<KdSubsurfaceMaterial> CreateKdSubsurfaceMaterial(
+    const TextureParams &mp) {
     Float Kd[3] = {.5, .5, .5};
     std::shared_ptr<Texture<Spectrum>> kd =
         mp.GetSpectrumTexture("Kd", Spectrum::FromRGB(Kd));
@@ -107,8 +108,9 @@ KdSubsurfaceMaterial *CreateKdSubsurfaceMaterial(const TextureParams &mp) {
     Float scale = mp.FindFloat("scale", 1.0f);
     Float g = mp.FindFloat("g", 0.0f);
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new KdSubsurfaceMaterial(scale, kd, kr, kt, mfp, g, eta, roughu,
-                                    roughv, bumpMap, remapRoughness);
+    return std::make_shared<KdSubsurfaceMaterial>(scale, kd, kr, kt, mfp, g,
+                                                  eta, roughu, roughv, bumpMap,
+                                                  remapRoughness);
 }
 
 }  // namespace pbrt

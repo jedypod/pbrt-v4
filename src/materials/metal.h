@@ -43,6 +43,8 @@
 #include "material.h"
 #include "spectrum.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // MetalMaterial Declarations
@@ -67,7 +69,7 @@ class MetalMaterial : public Material {
     bool remapRoughness;
 };
 
-MetalMaterial *CreateMetalMaterial(const TextureParams &mp);
+std::shared_ptr<MetalMaterial> CreateMetalMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

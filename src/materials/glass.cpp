@@ -81,7 +81,7 @@ void GlassMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
 }
 
-GlassMaterial *CreateGlassMaterial(const TextureParams &mp) {
+std::shared_ptr<GlassMaterial> CreateGlassMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kr =
         mp.GetSpectrumTexture("Kr", Spectrum(1.f));
     std::shared_ptr<Texture<Spectrum>> Kt =
@@ -95,8 +95,8 @@ GlassMaterial *CreateGlassMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new GlassMaterial(Kr, Kt, roughu, roughv, eta, bumpMap,
-                             remapRoughness);
+    return std::make_shared<GlassMaterial>(Kr, Kt, roughu, roughv, eta, bumpMap,
+                                           remapRoughness);
 }
 
 }  // namespace pbrt

@@ -715,8 +715,7 @@ void ParamSet::Print(int indent) const {
 // TextureParams Method Definitions
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &n, const Spectrum &def) const {
-    std::string name = geomParams.FindTexture(n);
-    if (name == "") name = materialParams.FindTexture(n);
+    std::string name = params.FindTexture(n);
     if (name != "") {
         if (spectrumTextures.find(name) != spectrumTextures.end())
             return spectrumTextures[name];
@@ -726,15 +725,13 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
                 "for parameter \"%s\"",
                 name.c_str(), n.c_str());
     }
-    Spectrum val = materialParams.FindOneSpectrum(n, def);
-    val = geomParams.FindOneSpectrum(n, val);
+    Spectrum val = params.FindOneSpectrum(n, def);
     return std::make_shared<ConstantTexture<Spectrum>>(val);
 }
 
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
     const std::string &n) const {
-    std::string name = geomParams.FindTexture(n);
-    if (name == "") name = materialParams.FindTexture(n);
+    std::string name = params.FindTexture(n);
     if (name != "") {
         if (spectrumTextures.find(name) != spectrumTextures.end())
             return spectrumTextures[name];
@@ -745,15 +742,13 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
             return nullptr;
         }
     }
-    ArraySlice<Spectrum> val = geomParams.FindSpectrum(n);
-    if (val.empty()) val = materialParams.FindSpectrum(n);
+    ArraySlice<Spectrum> val = params.FindSpectrum(n);
     if (!val.empty()) return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
 }
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
     const std::string &n, Float def) const {
-    std::string name = geomParams.FindTexture(n);
-    if (name == "") name = materialParams.FindTexture(n);
+    std::string name = params.FindTexture(n);
     if (name != "") {
         if (floatTextures.find(name) != floatTextures.end())
             return floatTextures[name];
@@ -762,14 +757,13 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
                 "Couldn't find float texture named \"%s\" for parameter \"%s\"",
                 name.c_str(), n.c_str());
     }
-    Float val = geomParams.FindOneFloat(n, materialParams.FindOneFloat(n, def));
+    Float val = params.FindOneFloat(n, def);
     return std::make_shared<ConstantTexture<Float>>(val);
 }
 
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
     const std::string &n) const {
-    std::string name = geomParams.FindTexture(n);
-    if (name == "") name = materialParams.FindTexture(n);
+    std::string name = params.FindTexture(n);
     if (name != "") {
         if (floatTextures.find(name) != floatTextures.end())
             return floatTextures[name];
@@ -781,8 +775,7 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
         }
     }
 
-    ArraySlice<Float> val = geomParams.FindFloat(n);
-    if (val.empty()) val = materialParams.FindFloat(n);
+    ArraySlice<Float> val = params.FindFloat(n);
     if (!val.empty()) return std::make_shared<ConstantTexture<Float>>(val[0]);
     return nullptr;
 }

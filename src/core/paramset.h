@@ -164,13 +164,12 @@ class TextureParams {
   public:
     // TextureParams Public Methods
     TextureParams(
-        const ParamSet &geomParams, const ParamSet &materialParams,
+        const ParamSet &params,
         std::map<std::string, std::shared_ptr<Texture<Float>>> &fTex,
         std::map<std::string, std::shared_ptr<Texture<Spectrum>>> &sTex)
         : floatTextures(fTex),
           spectrumTextures(sTex),
-          geomParams(geomParams),
-          materialParams(materialParams) {}
+          params(params) {}
     std::shared_ptr<Texture<Spectrum>> GetSpectrumTexture(
         const std::string &name, const Spectrum &def) const;
     std::shared_ptr<Texture<Spectrum>> GetSpectrumTextureOrNull(
@@ -179,52 +178,44 @@ class TextureParams {
                                                     Float def) const;
     std::shared_ptr<Texture<Float>> GetFloatTextureOrNull(
         const std::string &name) const;
-    Float FindFloat(const std::string &n, Float d) const {
-        return geomParams.FindOneFloat(n, materialParams.FindOneFloat(n, d));
+    Float FindFloat(const std::string &name, Float def) const {
+        return params.FindOneFloat(name, def);
     }
-    std::string FindString(const std::string &n,
-                           const std::string &d = "") const {
-        return geomParams.FindOneString(n, materialParams.FindOneString(n, d));
+    std::string FindString(const std::string &name,
+                           const std::string &def = "") const {
+        return params.FindOneString(name, def);
     }
-    std::string FindFilename(const std::string &n,
-                             const std::string &d = "") const {
-        return geomParams.FindOneFilename(n,
-                                          materialParams.FindOneFilename(n, d));
+    std::string FindFilename(const std::string &name,
+                             const std::string &def = "") const {
+        return params.FindOneFilename(name, def);
     }
-    int FindInt(const std::string &n, int d) const {
-        return geomParams.FindOneInt(n, materialParams.FindOneInt(n, d));
+    int FindInt(const std::string &name, int def) const {
+        return params.FindOneInt(name, def);
     }
-    bool FindBool(const std::string &n, bool d) const {
-        return geomParams.FindOneBool(n, materialParams.FindOneBool(n, d));
+    bool FindBool(const std::string &name, bool def) const {
+        return params.FindOneBool(name, def);
     }
-    Point3f FindPoint3f(const std::string &n, const Point3f &d) const {
-        return geomParams.FindOnePoint3f(n,
-                                         materialParams.FindOnePoint3f(n, d));
+    Point3f FindPoint3f(const std::string &name, const Point3f &def) const {
+        return params.FindOnePoint3f(name, def);
     }
-    Vector3f FindVector3f(const std::string &n, const Vector3f &d) const {
-        return geomParams.FindOneVector3f(n,
-                                          materialParams.FindOneVector3f(n, d));
+    Vector3f FindVector3f(const std::string &name, const Vector3f &def) const {
+        return params.FindOneVector3f(name, def);
     }
-    Normal3f FindNormal3f(const std::string &n, const Normal3f &d) const {
-        return geomParams.FindOneNormal3f(n,
-                                          materialParams.FindOneNormal3f(n, d));
+    Normal3f FindNormal3f(const std::string &name, const Normal3f &def) const {
+        return params.FindOneNormal3f(name, def);
     }
-    Spectrum FindSpectrum(const std::string &n, const Spectrum &d) const {
-        return geomParams.FindOneSpectrum(n,
-                                          materialParams.FindOneSpectrum(n, d));
+    Spectrum FindSpectrum(const std::string &name, const Spectrum &def) const {
+        return params.FindOneSpectrum(name, def);
     }
     void ReportUnused() const {
-        geomParams.ReportUnused();
-        materialParams.ReportUnused();
+        params.ReportUnused();
     }
-    const ParamSet &GetGeomParams() const { return geomParams; }
-    const ParamSet &GetMaterialParams() const { return materialParams; }
 
   private:
     // TextureParams Private Data
     std::map<std::string, std::shared_ptr<Texture<Float>>> &floatTextures;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> &spectrumTextures;
-    const ParamSet &geomParams, &materialParams;
+    const ParamSet &params;
 };
 
 }  // namespace pbrt

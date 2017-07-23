@@ -63,12 +63,12 @@ void MixMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         si->bsdf->Add(arena.Alloc<ScaledBxDF>(si2.bsdf->bxdfs[i], s2));
 }
 
-MixMaterial *CreateMixMaterial(const TextureParams &mp,
-                               const std::shared_ptr<Material> &m1,
-                               const std::shared_ptr<Material> &m2) {
+std::shared_ptr<MixMaterial> CreateMixMaterial(
+    const TextureParams &mp, const std::shared_ptr<Material> &m1,
+    const std::shared_ptr<Material> &m2) {
     std::shared_ptr<Texture<Spectrum>> scale =
         mp.GetSpectrumTexture("amount", Spectrum(0.5f));
-    return new MixMaterial(m1, m2, scale);
+    return std::make_shared<MixMaterial>(m1, m2, scale);
 }
 
 }  // namespace pbrt

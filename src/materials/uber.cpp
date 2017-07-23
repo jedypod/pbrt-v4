@@ -101,7 +101,7 @@ void UberMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         si->bsdf->Add(arena.Alloc<SpecularTransmission>(kt, 1.f, e, mode));
 }
 
-UberMaterial *CreateUberMaterial(const TextureParams &mp) {
+std::shared_ptr<UberMaterial> CreateUberMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kd =
         mp.GetSpectrumTexture("Kd", Spectrum(0.25f));
     std::shared_ptr<Texture<Spectrum>> Ks =
@@ -123,8 +123,9 @@ UberMaterial *CreateUberMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new UberMaterial(Kd, Ks, Kr, Kt, roughness, uroughness, vroughness,
-                            opacity, eta, bumpMap, remapRoughness);
+    return std::make_shared<UberMaterial>(Kd, Ks, Kr, Kt, roughness, uroughness,
+                                          vroughness, opacity, eta, bumpMap,
+                                          remapRoughness);
 }
 
 }  // namespace pbrt

@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // MirrorMaterial Declarations
@@ -62,7 +64,7 @@ class MirrorMaterial : public Material {
     std::shared_ptr<Texture<Float>> bumpMap;
 };
 
-MirrorMaterial *CreateMirrorMaterial(const TextureParams &mp);
+std::shared_ptr<MirrorMaterial> CreateMirrorMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

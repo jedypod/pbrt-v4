@@ -81,7 +81,8 @@ void TranslucentMaterial::ComputeScatteringFunctions(
     }
 }
 
-TranslucentMaterial *CreateTranslucentMaterial(const TextureParams &mp) {
+std::shared_ptr<TranslucentMaterial> CreateTranslucentMaterial(
+    const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kd =
         mp.GetSpectrumTexture("Kd", Spectrum(0.25f));
     std::shared_ptr<Texture<Spectrum>> Ks =
@@ -95,8 +96,8 @@ TranslucentMaterial *CreateTranslucentMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new TranslucentMaterial(Kd, Ks, roughness, reflect, transmit,
-                                   bumpMap, remapRoughness);
+    return std::make_shared<TranslucentMaterial>(
+        Kd, Ks, roughness, reflect, transmit, bumpMap, remapRoughness);
 }
 
 }  // namespace pbrt

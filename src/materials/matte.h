@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // MatteMaterial Declarations
@@ -61,7 +63,7 @@ class MatteMaterial : public Material {
     std::shared_ptr<Texture<Float>> sigma, bumpMap;
 };
 
-MatteMaterial *CreateMatteMaterial(const TextureParams &mp);
+std::shared_ptr<MatteMaterial> CreateMatteMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

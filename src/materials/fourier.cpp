@@ -40,7 +40,6 @@
 
 #include <map>
 #include <string>
-#include <memory>
 
 namespace pbrt {
 
@@ -230,10 +229,12 @@ void FourierMaterial::ComputeScatteringFunctions(
         si->bsdf->Add(arena.Alloc<FourierBSDF>(*bsdfTable, mode));
 }
 
-FourierMaterial *CreateFourierMaterial(const TextureParams &mp) {
+std::shared_ptr<FourierMaterial> CreateFourierMaterial(
+    const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    return new FourierMaterial(mp.FindFilename("bsdffile"), bumpMap);
+    return std::make_shared<FourierMaterial>(mp.FindFilename("bsdffile"),
+                                             bumpMap);
 }
 
 }  // namespace pbrt

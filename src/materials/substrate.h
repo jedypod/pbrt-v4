@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // SubstrateMaterial Declarations
@@ -71,7 +73,8 @@ class SubstrateMaterial : public Material {
     bool remapRoughness;
 };
 
-SubstrateMaterial *CreateSubstrateMaterial(const TextureParams &mp);
+std::shared_ptr<SubstrateMaterial> CreateSubstrateMaterial(
+    const TextureParams &mp);
 
 }  // namespace pbrt
 

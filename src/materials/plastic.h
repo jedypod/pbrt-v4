@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "material.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // PlasticMaterial Declarations
@@ -68,7 +70,7 @@ class PlasticMaterial : public Material {
     const bool remapRoughness;
 };
 
-PlasticMaterial *CreatePlasticMaterial(const TextureParams &mp);
+std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(const TextureParams &mp);
 
 }  // namespace pbrt
 

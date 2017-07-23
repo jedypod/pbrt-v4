@@ -63,13 +63,13 @@ void MatteMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
 }
 
-MatteMaterial *CreateMatteMaterial(const TextureParams &mp) {
+std::shared_ptr<MatteMaterial> CreateMatteMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kd =
         mp.GetSpectrumTexture("Kd", Spectrum(0.5f));
     std::shared_ptr<Texture<Float>> sigma = mp.GetFloatTexture("sigma", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    return new MatteMaterial(Kd, sigma, bumpMap);
+    return std::make_shared<MatteMaterial>(Kd, sigma, bumpMap);
 }
 
 }  // namespace pbrt

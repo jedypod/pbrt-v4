@@ -66,7 +66,8 @@ void SubstrateMaterial::ComputeScatteringFunctions(
     }
 }
 
-SubstrateMaterial *CreateSubstrateMaterial(const TextureParams &mp) {
+std::shared_ptr<SubstrateMaterial> CreateSubstrateMaterial(
+    const TextureParams &mp) {
     std::shared_ptr<Texture<Spectrum>> Kd =
         mp.GetSpectrumTexture("Kd", Spectrum(.5f));
     std::shared_ptr<Texture<Spectrum>> Ks =
@@ -78,8 +79,8 @@ SubstrateMaterial *CreateSubstrateMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new SubstrateMaterial(Kd, Ks, uroughness, vroughness, bumpMap,
-                                 remapRoughness);
+    return std::make_shared<SubstrateMaterial>(Kd, Ks, uroughness, vroughness,
+                                               bumpMap, remapRoughness);
 }
 
 }  // namespace pbrt

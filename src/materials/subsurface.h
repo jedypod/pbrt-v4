@@ -44,6 +44,8 @@
 #include "reflection.h"
 #include "bssrdf.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // SubsurfaceMaterial Declarations
@@ -87,7 +89,8 @@ class SubsurfaceMaterial : public Material {
     BSSRDFTable table;
 };
 
-SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp);
+std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
+    const TextureParams &mp);
 
 }  // namespace pbrt
 

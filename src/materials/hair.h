@@ -50,7 +50,9 @@ http://pbrt.org/hair.pdf for a description of the implementation here.
 
 #include "material.h"
 #include "reflection.h"
+
 #include <array>
+#include <memory>
 
 namespace pbrt {
 
@@ -84,7 +86,7 @@ class HairMaterial : public Material {
     std::shared_ptr<Texture<Float>> beta_m, beta_n, alpha;
 };
 
-HairMaterial *CreateHairMaterial(const TextureParams &mp);
+std::shared_ptr<HairMaterial> CreateHairMaterial(const TextureParams &mp);
 
 // HairBSDF Constants
 static const int pMax = 3;
