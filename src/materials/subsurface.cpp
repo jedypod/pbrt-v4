@@ -94,9 +94,9 @@ std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
           sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
              sig_s = Spectrum::FromRGB(sig_s_rgb);
-    std::string name = mp.FindString("name");
+    std::string name = mp.FindOneString("name", "");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
-    Float g = mp.FindFloat("g", 0.0f);
+    Float g = mp.FindOneFloat("g", 0.0f);
     if (name != "") {
         if (!found)
             Warning("Named material \"%s\" not found.  Using defaults.",
@@ -105,8 +105,8 @@ std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
             g = 0; /* Enforce g=0 (the database specifies reduced scattering
                       coefficients) */
     }
-    Float scale = mp.FindFloat("scale", 1.f);
-    Float eta = mp.FindFloat("eta", 1.33f);
+    Float scale = mp.FindOneFloat("scale", 1.f);
+    Float eta = mp.FindOneFloat("eta", 1.33f);
 
     std::shared_ptr<Texture<Spectrum>> sigma_a, sigma_s;
     sigma_a = mp.GetSpectrumTexture("sigma_a", sig_a);
@@ -121,7 +121,7 @@ std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
         mp.GetFloatTexture("vroughness", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindBool("remaproughness", true);
+    bool remapRoughness = mp.FindOneBool("remaproughness", true);
     return std::make_shared<SubsurfaceMaterial>(scale, Kr, Kt, sigma_a, sigma_s,
                                                 g, eta, roughu, roughv, bumpMap,
                                                 remapRoughness);

@@ -46,10 +46,10 @@ MarbleTexture *CreateMarbleSpectrumTexture(const Transform &tex2world,
                                            const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new MarbleTexture(std::move(map), tp.FindInt("octaves", 8),
-                             tp.FindFloat("roughness", .5f),
-                             tp.FindFloat("scale", 1.f),
-                             tp.FindFloat("variation", .2f));
+    return new MarbleTexture(std::move(map), tp.FindOneInt("octaves", 8),
+                             tp.FindOneFloat("roughness", .5f),
+                             tp.FindOneFloat("scale", 1.f),
+                             tp.FindOneFloat("variation", .2f));
 }
 
 }  // namespace pbrt

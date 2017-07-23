@@ -128,7 +128,7 @@ std::shared_ptr<MetalMaterial> CreateMetalMaterial(const TextureParams &mp) {
         mp.GetFloatTextureOrNull("vroughness");
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindBool("remaproughness", true);
+    bool remapRoughness = mp.FindOneBool("remaproughness", true);
     return std::make_shared<MetalMaterial>(eta, k, roughness, uRoughness,
                                            vRoughness, bumpMap, remapRoughness);
 }

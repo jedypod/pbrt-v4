@@ -41,7 +41,7 @@ namespace pbrt {
 // CheckerboardTexture Method Definitions
 Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
                                                const TextureParams &tp) {
-    int dim = tp.FindInt("dimension", 2);
+    int dim = tp.FindOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
         Error("%d dimensional checkerboard texture not supported", dim);
         return nullptr;
@@ -51,12 +51,12 @@ Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
     if (dim == 2) {
         // Initialize 2D texture mapping _map_ from _tp_
         std::unique_ptr<TextureMapping2D> map;
-        std::string type = tp.FindString("mapping", "uv");
+        std::string type = tp.FindOneString("mapping", "uv");
         if (type == "uv") {
-            Float su = tp.FindFloat("uscale", 1.);
-            Float sv = tp.FindFloat("vscale", 1.);
-            Float du = tp.FindFloat("udelta", 0.);
-            Float dv = tp.FindFloat("vdelta", 0.);
+            Float su = tp.FindOneFloat("uscale", 1.);
+            Float sv = tp.FindOneFloat("vscale", 1.);
+            Float du = tp.FindOneFloat("udelta", 0.);
+            Float dv = tp.FindOneFloat("vdelta", 0.);
             map = std::make_unique<UVMapping2D>(su, sv, du, dv);
         } else if (type == "spherical")
             map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -64,16 +64,16 @@ Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
             map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
         else if (type == "planar")
             map = std::make_unique<PlanarMapping2D>(
-                tp.FindVector3f("v1", Vector3f(1, 0, 0)),
-                tp.FindVector3f("v2", Vector3f(0, 1, 0)),
-                tp.FindFloat("udelta", 0.f), tp.FindFloat("vdelta", 0.f));
+                tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
+                tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
+                tp.FindOneFloat("udelta", 0.f), tp.FindOneFloat("vdelta", 0.f));
         else {
             Error("2D texture mapping \"%s\" unknown", type.c_str());
             map = std::make_unique<UVMapping2D>();
         }
 
         // Compute _aaMethod_ for _CheckerboardTexture_
-        std::string aa = tp.FindString("aamode", "closedform");
+        std::string aa = tp.FindOneString("aamode", "closedform");
         AAMethod aaMethod;
         if (aa == "none")
             aaMethod = AAMethod::None;
@@ -97,7 +97,7 @@ Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
 
 Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
                                                      const TextureParams &tp) {
-    int dim = tp.FindInt("dimension", 2);
+    int dim = tp.FindOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
         Error("%d dimensional checkerboard texture not supported", dim);
         return nullptr;
@@ -109,12 +109,12 @@ Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
     if (dim == 2) {
         // Initialize 2D texture mapping _map_ from _tp_
         std::unique_ptr<TextureMapping2D> map;
-        std::string type = tp.FindString("mapping", "uv");
+        std::string type = tp.FindOneString("mapping", "uv");
         if (type == "uv") {
-            Float su = tp.FindFloat("uscale", 1.);
-            Float sv = tp.FindFloat("vscale", 1.);
-            Float du = tp.FindFloat("udelta", 0.);
-            Float dv = tp.FindFloat("vdelta", 0.);
+            Float su = tp.FindOneFloat("uscale", 1.);
+            Float sv = tp.FindOneFloat("vscale", 1.);
+            Float du = tp.FindOneFloat("udelta", 0.);
+            Float dv = tp.FindOneFloat("vdelta", 0.);
             map = std::make_unique<UVMapping2D>(su, sv, du, dv);
         } else if (type == "spherical")
             map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -122,16 +122,16 @@ Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
             map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
         else if (type == "planar")
             map = std::make_unique<PlanarMapping2D>(
-                tp.FindVector3f("v1", Vector3f(1, 0, 0)),
-                tp.FindVector3f("v2", Vector3f(0, 1, 0)),
-                tp.FindFloat("udelta", 0.f), tp.FindFloat("vdelta", 0.f));
+                tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
+                tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
+                tp.FindOneFloat("udelta", 0.f), tp.FindOneFloat("vdelta", 0.f));
         else {
             Error("2D texture mapping \"%s\" unknown", type.c_str());
             map = std::make_unique<UVMapping2D>();
         }
 
         // Compute _aaMethod_ for _CheckerboardTexture_
-        std::string aa = tp.FindString("aamode", "closedform");
+        std::string aa = tp.FindOneString("aamode", "closedform");
         AAMethod aaMethod;
         if (aa == "none")
             aaMethod = AAMethod::None;

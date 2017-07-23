@@ -94,7 +94,7 @@ std::shared_ptr<GlassMaterial> CreateGlassMaterial(const TextureParams &mp) {
         mp.GetFloatTexture("vroughness", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindBool("remaproughness", true);
+    bool remapRoughness = mp.FindOneBool("remaproughness", true);
     return std::make_shared<GlassMaterial>(Kr, Kt, roughu, roughv, eta, bumpMap,
                                            remapRoughness);
 }

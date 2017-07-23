@@ -35,6 +35,8 @@
 
 #include "api.h"
 #include "error.h"
+#include "fileutil.h"
+#include "floatfile.h"
 #include "paramset.h"
 
 #include <memory>
@@ -150,7 +152,7 @@ enum { PARAM_TYPE_INT, PARAM_TYPE_BOOL, PARAM_TYPE_FLOAT,
     PARAM_TYPE_BLACKBODY, PARAM_TYPE_SPECTRUM,
     PARAM_TYPE_STRING, PARAM_TYPE_TEXTURE };
 static const char *paramTypeToName(int type);
-static void InitParamSet(ParamSet &ps, SpectrumType);
+static ParamSet ParseParameters(SpectrumType);
 static bool lookupType(const char *name, int *type, std::string &sname);
 #define YYPRINT(file, type, value)  { \
     if ((type) == ID || (type) == STRING) \
@@ -361,9 +363,8 @@ pbrt_stmt_list: pbrt_stmt_list pbrt_stmt
 
 pbrt_stmt: ACCELERATOR STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtAccelerator($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtAccelerator($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -388,9 +389,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | AREALIGHTSOURCE STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Illuminant);
-    pbrt::pbrtAreaLightSource($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Illuminant);
+    pbrt::pbrtAreaLightSource($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -409,9 +409,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | CAMERA STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtCamera($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtCamera($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -442,9 +441,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | FILM STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtFilm($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtFilm($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -463,9 +461,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | LIGHTSOURCE STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Illuminant);
-    pbrt::pbrtLightSource($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Illuminant);
+    pbrt::pbrtLightSource($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -478,27 +475,24 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | MAKENAMEDMATERIAL STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtMakeNamedMaterial($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtMakeNamedMaterial($2, std::move(params));
     pbrt::FreeArgs();
 }
 
 
 | MAKENAMEDMEDIUM STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtMakeNamedMedium($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtMakeNamedMedium($2, std::move(params));
     pbrt::FreeArgs();
 }
 
 
 | MATERIAL STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtMaterial($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtMaterial($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -541,9 +535,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | PIXELFILTER STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtPixelFilter($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtPixelFilter($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -562,9 +555,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | SAMPLER STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtSampler($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtSampler($2, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -577,27 +569,24 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 
 | SHAPE STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtShape($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtShape($2, std::move(params));
     pbrt::FreeArgs();
 }
 
 
 | INTEGRATOR STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtIntegrator($2, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtIntegrator($2, std::move(params));
     pbrt::FreeArgs();
 }
 
 
 | TEXTURE STRING STRING STRING paramlist
 {
-    pbrt::ParamSet params;
-    pbrt::InitParamSet(params, pbrt::SpectrumType::Reflectance);
-    pbrt::pbrtTexture($2, $3, $4, params);
+    pbrt::ParamSet params = pbrt::ParseParameters(pbrt::SpectrumType::Reflectance);
+    pbrt::pbrtTexture($2, $3, $4, std::move(params));
     pbrt::FreeArgs();
 }
 
@@ -675,8 +664,8 @@ static const char *paramTypeToName(int type) {
 }
 
 
-static void InitParamSet(ParamSet &ps, SpectrumType type) {
-    ps.Clear();
+static ParamSet ParseParameters(SpectrumType spectrumType) {
+    ParamSet ps;
     for (size_t i = 0; i < cur_paramlist.size(); ++i) {
         int type;
         std::string name;
@@ -793,10 +782,14 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                             nItems % 3);
                     nItems -= nItems % 3;
                 }
-                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
-                for (int j = 0; j < nItems; ++j)
-                    floats[j] = ((double *)data)[j];
-                ps.AddRGBSpectrum(name, std::move(floats), nItems);
+
+                int nSpectra = nItems / 3;
+                std::unique_ptr<Spectrum[]> spectra = std::make_unique<Spectrum[]>(nSpectra);
+                for (int j = 0; j < nSpectra; ++j) {
+                    Float rgb[3] = { Float(((double *)data)[3*j]), Float(((double *)data)[3*j+1]), Float(((double *)data)[3*j+2]) };
+                    spectra[j] = Spectrum::FromRGB(rgb, spectrumType);
+                }
+                ps.AddSpectrum(name, std::move(spectra), nSpectra);
             } else if (type == PARAM_TYPE_XYZ) {
                 if ((nItems % 3) != 0) {
                     Warning("Excess XYZ values given with parameter \"%s\". "
@@ -804,23 +797,68 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                             nItems % 3);
                     nItems -= nItems % 3;
                 }
-                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
-                for (int j = 0; j < nItems; ++j)
-                    floats[j] = ((double *)data)[j];
-                ps.AddXYZSpectrum(name, std::move(floats), nItems);
+
+                int nSpectra = nItems / 3;
+                std::unique_ptr<Spectrum[]> spectra = std::make_unique<Spectrum[]>(nSpectra);
+                for (int j = 0; j < nSpectra; ++j) {
+                    Float xyz[3] = { Float(((double *)data)[3*j]), Float(((double *)data)[3*j+1]), Float(((double *)data)[3*j+2]) };
+                    spectra[j] = Spectrum::FromXYZ(xyz, spectrumType);
+                }
+                ps.AddSpectrum(name, std::move(spectra), nSpectra);
             } else if (type == PARAM_TYPE_BLACKBODY) {
                 if ((nItems % 2) != 0) {
                     Warning("Excess value given with blackbody parameter \"%s\". "
                             "Ignoring extra one.", cur_paramlist[i].name);
                     nItems -= nItems % 2;
                 }
-                std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
-                for (int j = 0; j < nItems; ++j)
-                    floats[j] = ((double *)data)[j];
-                ps.AddBlackbodySpectrum(name, std::move(floats), nItems);
+
+                int nSpectra = nItems / 2;
+                std::unique_ptr<Spectrum[]> spectra = std::make_unique<Spectrum[]>(nSpectra);
+                std::vector<Float> v(nCIESamples);
+                for (int j = 0; j < nSpectra; ++j) {
+                    Float T = ((double *)data)[2 * j];
+                    Float scale = ((double *)data)[2 * j + 1];
+                    BlackbodyNormalized(CIE_lambda, T, &v);
+                    spectra[j] = scale * Spectrum::FromSampled(CIE_lambda, v);
+                }
+                ps.AddSpectrum(name, std::move(spectra), nSpectra);
             } else if (type == PARAM_TYPE_SPECTRUM) {
                 if (cur_paramlist[i].isString) {
-                    ps.AddSampledSpectrumFiles(name, (const char **)data, nItems);
+                    static std::map<std::string, Spectrum> cachedSpectra;
+
+                    std::unique_ptr<Spectrum[]> spectra = std::make_unique<Spectrum[]>(nItems);
+                    const char **names = (const char **)data;
+                    for (int i = 0; i < nItems; ++i) {
+                        std::string fn = AbsolutePath(ResolveFilename(names[i]));
+                        if (cachedSpectra.find(fn) != cachedSpectra.end()) {
+                            spectra[i] = cachedSpectra[fn];
+                            continue;
+                        }
+
+                        std::vector<Float> vals;
+                        if (!ReadFloatFile(fn.c_str(), &vals)) {
+                            Warning(
+                                "Unable to read SPD file \"%s\".  Using black distribution.",
+                                fn.c_str());
+                            spectra[i] = Spectrum(0.);
+                        } else {
+                            if (vals.size() % 2) {
+                                Warning(
+                                    "Extra value found in spectrum file \"%s\". "
+                                    "Ignoring it.",
+                                    fn.c_str());
+                            }
+                            std::vector<Float> lambda, v;
+                            for (size_t j = 0; j < vals.size() / 2; ++j) {
+                                lambda.push_back(vals[2 * j]);
+                                v.push_back(vals[2 * j + 1]);
+                            }
+                            spectra[i] = Spectrum::FromSampled(lambda, v);
+                        }
+                        cachedSpectra[fn] = spectra[i];
+                    }
+
+                    ps.AddSpectrum(name, std::move(spectra), nItems);
                 }
                 else {
                     if ((nItems % 2) != 0) {
@@ -829,10 +867,16 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
                                 cur_paramlist[i].name);
                         nItems -= nItems % 2;
                     }
-                    std::unique_ptr<Float[]> floats = std::make_unique<Float[]>(nItems);
-                    for (int j = 0; j < nItems; ++j)
-                        floats[j] = ((double *)data)[j];
-                    ps.AddSampledSpectrum(name, std::move(floats), nItems);
+
+                    int nValues = nItems / 2;
+                    std::vector<Float> lambda(nValues), value(nValues);
+                    for (int j = 0; j < nValues; ++j) {
+                        lambda[j] = ((double *)data)[2 * j];
+                        value[j] = ((double *)data)[2 * j + 1];
+                    }
+                    std::unique_ptr<Spectrum[]> spectrum = std::make_unique<Spectrum[]>(1);
+                    spectrum[0] = Spectrum::FromSampled(lambda, value);
+                    ps.AddSpectrum(name, std::move(spectrum), 1);
                 }
             } else if (type == PARAM_TYPE_STRING) {
                 std::unique_ptr<std::string[]> strings = std::make_unique<std::string[]>(nItems);
@@ -853,6 +897,7 @@ static void InitParamSet(ParamSet &ps, SpectrumType type) {
         else
             Warning("Type of parameter \"%s\" is unknown", cur_paramlist[i].name);
     }
+    return ps;
 }
 
 

@@ -81,7 +81,7 @@ std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(
         mp.GetFloatTexture("roughness", .1f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindBool("remaproughness", true);
+    bool remapRoughness = mp.FindOneBool("remaproughness", true);
     return std::make_shared<PlasticMaterial>(Kd, Ks, roughness, bumpMap,
                                              remapRoughness);
 }

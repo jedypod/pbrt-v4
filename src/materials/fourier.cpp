@@ -233,7 +233,7 @@ std::shared_ptr<FourierMaterial> CreateFourierMaterial(
     const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    return std::make_shared<FourierMaterial>(mp.FindFilename("bsdffile"),
+    return std::make_shared<FourierMaterial>(mp.FindOneFilename("bsdffile", ""),
                                              bumpMap);
 }
 

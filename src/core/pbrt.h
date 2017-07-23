@@ -136,8 +136,6 @@ class ProgressReporter;
 class MemoryArena;
 class Matrix4x4;
 class ParamSet;
-template <typename T>
-struct ParamSetItem;
 struct Options {
     int nThreads = 0;
     int texCacheMB = 96;
