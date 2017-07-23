@@ -214,9 +214,9 @@ std::shared_ptr<Cone> CreateConeShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    Float radius = params.FindOneFloat("radius", 1);
-    Float height = params.FindOneFloat("height", 1);
-    Float phimax = params.FindOneFloat("phimax", 360);
+    Float radius = params.GetOneFloat("radius", 1);
+    Float height = params.GetOneFloat("height", 1);
+    Float phimax = params.GetOneFloat("phimax", 360);
     return std::make_shared<Cone>(ObjectToWorld, WorldToObject,
                                   reverseOrientation, height, radius, phimax);
 }

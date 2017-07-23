@@ -172,9 +172,9 @@ void InfiniteAreaLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
 
 std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
     const Transform &light2world, const ParamSet &paramSet) {
-    Spectrum L = paramSet.FindOneSpectrum("L", Spectrum(1.0));
-    Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
-    std::string texmap = paramSet.FindOneFilename("mapname", "");
+    Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
+    Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+    std::string texmap = paramSet.GetOneFilename("mapname", "");
     return std::make_shared<InfiniteAreaLight>(light2world, L * sc, texmap);
 }
 

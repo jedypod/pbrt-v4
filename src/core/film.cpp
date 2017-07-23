@@ -209,10 +209,10 @@ void Film::WriteImage(Float splatScale) {
 }
 
 Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
-    // Intentionally use FindOneString() rather than FindOneFilename() here
+    // Intentionally use GetOneString() rather than GetOneFilename() here
     // so that the rendered image is left in the working directory, rather
     // than the directory the scene file lives in.
-    std::string filename = params.FindOneString("filename", "");
+    std::string filename = params.GetOneString("filename", "");
     if (PbrtOptions.imageFile != "") {
         if (filename != "") {
             Warning(
@@ -224,12 +224,12 @@ Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
     }
     if (filename == "") filename = "pbrt.exr";
 
-    int xres = params.FindOneInt("xresolution", 1280);
-    int yres = params.FindOneInt("yresolution", 720);
+    int xres = params.GetOneInt("xresolution", 1280);
+    int yres = params.GetOneInt("yresolution", 720);
     if (PbrtOptions.quickRender) xres = std::max(1, xres / 4);
     if (PbrtOptions.quickRender) yres = std::max(1, yres / 4);
     Bounds2f crop(Point2f(0, 0), Point2f(1, 1));
-    gtl::ArraySlice<Float> cr = params.FindFloat("cropwindow");
+    gtl::ArraySlice<Float> cr = params.GetFloatArray("cropwindow");
     if (!cr.empty() && cr.size() == 4) {
         crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
         crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
@@ -239,9 +239,9 @@ Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
         Error("%d values supplied for \"cropwindow\". Expected 4.",
               (int)cr.size());
 
-    Float scale = params.FindOneFloat("scale", 1.);
-    Float diagonal = params.FindOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = params.FindOneFloat("maxsampleluminance",
+    Float scale = params.GetOneFloat("scale", 1.);
+    Float diagonal = params.GetOneFloat("diagonal", 35.);
+    Float maxSampleLuminance = params.GetOneFloat("maxsampleluminance",
                                                    Infinity);
     return new Film(Point2i(xres, yres), crop, std::move(filter), diagonal,
                     filename, scale, maxSampleLuminance);

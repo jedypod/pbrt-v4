@@ -104,10 +104,10 @@ std::shared_ptr<KdSubsurfaceMaterial> CreateKdSubsurfaceMaterial(
         mp.GetFloatTexture("vroughness", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    Float eta = mp.FindOneFloat("eta", 1.33f);
-    Float scale = mp.FindOneFloat("scale", 1.0f);
-    Float g = mp.FindOneFloat("g", 0.0f);
-    bool remapRoughness = mp.FindOneBool("remaproughness", true);
+    Float eta = mp.GetOneFloat("eta", 1.33f);
+    Float scale = mp.GetOneFloat("scale", 1.0f);
+    Float g = mp.GetOneFloat("g", 0.0f);
+    bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<KdSubsurfaceMaterial>(scale, kd, kr, kt, mfp, g,
                                                   eta, roughu, roughv, bumpMap,
                                                   remapRoughness);

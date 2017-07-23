@@ -83,8 +83,8 @@ std::unique_ptr<Sampler> ZeroTwoSequenceSampler::Clone(int seed) {
 }
 
 ZeroTwoSequenceSampler *CreateZeroTwoSequenceSampler(const ParamSet &params) {
-    int nsamp = params.FindOneInt("pixelsamples", 16);
-    int sd = params.FindOneInt("dimensions", 4);
+    int nsamp = params.GetOneInt("pixelsamples", 16);
+    int sd = params.GetOneInt("dimensions", 4);
     if (PbrtOptions.quickRender) nsamp = 1;
     return new ZeroTwoSequenceSampler(nsamp, sd);
 }

@@ -78,7 +78,7 @@ std::shared_ptr<SubstrateMaterial> CreateSubstrateMaterial(
         mp.GetFloatTexture("vroughness", .1f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindOneBool("remaproughness", true);
+    bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<SubstrateMaterial>(Kd, Ks, uroughness, vroughness,
                                                bumpMap, remapRoughness);
 }

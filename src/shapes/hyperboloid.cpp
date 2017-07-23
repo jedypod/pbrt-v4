@@ -256,9 +256,9 @@ std::shared_ptr<Shape> CreateHyperboloidShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    Point3f p1 = params.FindOnePoint3f("p1", Point3f(0, 0, 0));
-    Point3f p2 = params.FindOnePoint3f("p2", Point3f(1, 1, 1));
-    Float phimax = params.FindOneFloat("phimax", 360);
+    Point3f p1 = params.GetOnePoint3f("p1", Point3f(0, 0, 0));
+    Point3f p2 = params.GetOnePoint3f("p2", Point3f(1, 1, 1));
+    Float phimax = params.GetOneFloat("phimax", 360);
     return std::make_shared<Hyperboloid>(ObjectToWorld, WorldToObject,
                                          reverseOrientation, p1, p2, phimax);
 }

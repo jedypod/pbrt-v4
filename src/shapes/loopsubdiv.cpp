@@ -409,9 +409,9 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    int nLevels = params.FindOneInt("levels", params.FindOneInt("nlevels", 3));
-    ArraySlice<int> vertexIndices = params.FindInt("indices");
-    ArraySlice<Point3f> P = params.FindPoint3f("P");
+    int nLevels = params.GetOneInt("levels", params.GetOneInt("nlevels", 3));
+    ArraySlice<int> vertexIndices = params.GetIntArray("indices");
+    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
     if (vertexIndices.empty()) {
         Error("Vertex indices \"indices\" not provided for LoopSubdiv shape.");
         return std::vector<std::shared_ptr<Shape>>();
@@ -422,7 +422,7 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     }
 
     // don't actually use this for now...
-    std::string scheme = params.FindOneString("scheme", "loop");
+    std::string scheme = params.GetOneString("scheme", "loop");
     return LoopSubdivide(ObjectToWorld.get(), WorldToObject.get(),
                          reverseOrientation, nLevels, vertexIndices, P);
 }

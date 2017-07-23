@@ -318,10 +318,10 @@ std::shared_ptr<Shape> CreateSphereShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    Float radius = params.FindOneFloat("radius", 1.f);
-    Float zmin = params.FindOneFloat("zmin", -radius);
-    Float zmax = params.FindOneFloat("zmax", radius);
-    Float phimax = params.FindOneFloat("phimax", 360.f);
+    Float radius = params.GetOneFloat("radius", 1.f);
+    Float zmin = params.GetOneFloat("zmin", -radius);
+    Float zmax = params.GetOneFloat("zmax", radius);
+    Float phimax = params.GetOneFloat("phimax", 360.f);
     return std::make_shared<Sphere>(ObjectToWorld, WorldToObject,
                                     reverseOrientation, radius, zmin, zmax,
                                     phimax);

@@ -157,13 +157,13 @@ T PtexTexture<T>::Evaluate(const SurfaceInteraction &si) const {
 
 PtexTexture<Float> *CreatePtexFloatTexture(const Transform &tex2world,
                                            const TextureParams &tp) {
-    std::string filename = tp.FindOneFilename("filename", "");
+    std::string filename = tp.GetOneFilename("filename", "");
     return new PtexTexture<Float>(filename);
 }
 
 PtexTexture<Spectrum> *CreatePtexSpectrumTexture(const Transform &tex2world,
                                                  const TextureParams &tp) {
-    std::string filename = tp.FindOneFilename("filename", "");
+    std::string filename = tp.GetOneFilename("filename", "");
     return new PtexTexture<Spectrum>(filename);
 }
 

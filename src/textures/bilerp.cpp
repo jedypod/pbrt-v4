@@ -44,12 +44,12 @@ BilerpTexture<Float> *CreateBilerpFloatTexture(const Transform &tex2world,
                                                const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
-    std::string type = tp.FindOneString("mapping", "uv");
+    std::string type = tp.GetOneString("mapping", "uv");
     if (type == "uv") {
-        Float su = tp.FindOneFloat("uscale", 1.);
-        Float sv = tp.FindOneFloat("vscale", 1.);
-        Float du = tp.FindOneFloat("udelta", 0.);
-        Float dv = tp.FindOneFloat("vdelta", 0.);
+        Float su = tp.GetOneFloat("uscale", 1.);
+        Float sv = tp.GetOneFloat("vscale", 1.);
+        Float du = tp.GetOneFloat("udelta", 0.);
+        Float dv = tp.GetOneFloat("vdelta", 0.);
         map = std::make_unique<UVMapping2D>(su, sv, du, dv);
     } else if (type == "spherical")
         map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -57,29 +57,29 @@ BilerpTexture<Float> *CreateBilerpFloatTexture(const Transform &tex2world,
         map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
     else if (type == "planar")
         map = std::make_unique<PlanarMapping2D>(
-            tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
-            tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.FindOneFloat("udelta", 0.f),
-            tp.FindOneFloat("vdelta", 0.f));
+            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
+            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
+            tp.GetOneFloat("udelta", 0.f),
+            tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
     return new BilerpTexture<Float>(
-        std::move(map), tp.FindOneFloat("v00", 0.f), tp.FindOneFloat("v01", 1.f),
-        tp.FindOneFloat("v10", 0.f), tp.FindOneFloat("v11", 1.f));
+        std::move(map), tp.GetOneFloat("v00", 0.f), tp.GetOneFloat("v01", 1.f),
+        tp.GetOneFloat("v10", 0.f), tp.GetOneFloat("v11", 1.f));
 }
 
 BilerpTexture<Spectrum> *CreateBilerpSpectrumTexture(const Transform &tex2world,
                                                      const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
-    std::string type = tp.FindOneString("mapping", "uv");
+    std::string type = tp.GetOneString("mapping", "uv");
     if (type == "uv") {
-        Float su = tp.FindOneFloat("uscale", 1.);
-        Float sv = tp.FindOneFloat("vscale", 1.);
-        Float du = tp.FindOneFloat("udelta", 0.);
-        Float dv = tp.FindOneFloat("vdelta", 0.);
+        Float su = tp.GetOneFloat("uscale", 1.);
+        Float sv = tp.GetOneFloat("vscale", 1.);
+        Float du = tp.GetOneFloat("udelta", 0.);
+        Float dv = tp.GetOneFloat("vdelta", 0.);
         map = std::make_unique<UVMapping2D>(su, sv, du, dv);
     } else if (type == "spherical")
         map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -87,18 +87,18 @@ BilerpTexture<Spectrum> *CreateBilerpSpectrumTexture(const Transform &tex2world,
         map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
     else if (type == "planar")
         map = std::make_unique<PlanarMapping2D>(
-            tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
-            tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.FindOneFloat("udelta", 0.f),
-            tp.FindOneFloat("vdelta", 0.f));
+            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
+            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
+            tp.GetOneFloat("udelta", 0.f),
+            tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
     return new BilerpTexture<Spectrum>(
-        std::move(map), tp.FindOneSpectrum("v00", 0.f),
-        tp.FindOneSpectrum("v01", 1.f), tp.FindOneSpectrum("v10", 0.f),
-        tp.FindOneSpectrum("v11", 1.f));
+        std::move(map), tp.GetOneSpectrum("v00", 0.f),
+        tp.GetOneSpectrum("v01", 1.f), tp.GetOneSpectrum("v10", 0.f),
+        tp.GetOneSpectrum("v11", 1.f));
 }
 
 }  // namespace pbrt

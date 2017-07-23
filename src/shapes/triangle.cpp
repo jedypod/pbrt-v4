@@ -573,14 +573,14 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    ArraySlice<int> vi = params.FindInt("indices");
-    ArraySlice<Point3f> P = params.FindPoint3f("P");
-    ArraySlice<Point2f> uvs = params.FindPoint2f("uv");
-    if (uvs.empty()) uvs = params.FindPoint2f("st");
+    ArraySlice<int> vi = params.GetIntArray("indices");
+    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
+    ArraySlice<Point2f> uvs = params.GetPoint2fArray("uv");
+    if (uvs.empty()) uvs = params.GetPoint2fArray("st");
     std::vector<Point2f> tempUVs;
     if (uvs.empty()) {
-        ArraySlice<Float> fuv = params.FindFloat("uv");
-        if (fuv.empty()) fuv = params.FindFloat("st");
+        ArraySlice<Float> fuv = params.GetFloatArray("uv");
+        if (fuv.empty()) fuv = params.GetFloatArray("st");
         if (!fuv.empty()) {
             tempUVs.reserve(fuv.size() / 2);
             for (size_t i = 0; i < fuv.size() / 2; ++i)
@@ -617,12 +617,12 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
         Error("Vertex positions \"P\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    ArraySlice<Vector3f> S = params.FindVector3f("S");
+    ArraySlice<Vector3f> S = params.GetVector3fArray("S");
     if (!S.empty() && S.size() != P.size()) {
         Error("Number of \"S\"s for triangle mesh must match \"P\"s");
         S = {};
     }
-    ArraySlice<Normal3f> N = params.FindNormal3f("N");
+    ArraySlice<Normal3f> N = params.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error("Number of \"N\"s for triangle mesh must match \"P\"s");
         N = {};
@@ -637,7 +637,7 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
             return std::vector<std::shared_ptr<Shape>>();
         }
 
-    ArraySlice<int> faceIndices = params.FindInt("faceIndices");
+    ArraySlice<int> faceIndices = params.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
         Error("Number of face indices %d != number of triangles %d",
               int(faceIndices.size()), int(vi.size() / 3));

@@ -142,10 +142,10 @@ std::shared_ptr<Disk> CreateDiskShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    Float height = params.FindOneFloat("height", 0.);
-    Float radius = params.FindOneFloat("radius", 1);
-    Float innerRadius = params.FindOneFloat("innerradius", 0);
-    Float phimax = params.FindOneFloat("phimax", 360);
+    Float height = params.GetOneFloat("height", 0.);
+    Float radius = params.GetOneFloat("radius", 1);
+    Float innerRadius = params.GetOneFloat("innerradius", 0);
+    Float phimax = params.GetOneFloat("phimax", 360);
     return std::make_shared<Disk>(ObjectToWorld, WorldToObject,
                                   reverseOrientation, height, radius,
                                   innerRadius, phimax);

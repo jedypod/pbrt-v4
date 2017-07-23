@@ -267,13 +267,13 @@ void MLTIntegrator::Render(const Scene &scene) {
 
 MLTIntegrator *CreateMLTIntegrator(const ParamSet &params,
                                    std::shared_ptr<const Camera> camera) {
-    int maxDepth = params.FindOneInt("maxdepth", 5);
-    int nBootstrap = params.FindOneInt("bootstrapsamples", 100000);
-    int64_t nChains = params.FindOneInt("chains", 1000);
-    int mutationsPerPixel = params.FindOneInt("mutationsperpixel", 100);
+    int maxDepth = params.GetOneInt("maxdepth", 5);
+    int nBootstrap = params.GetOneInt("bootstrapsamples", 100000);
+    int64_t nChains = params.GetOneInt("chains", 1000);
+    int mutationsPerPixel = params.GetOneInt("mutationsperpixel", 100);
     Float largeStepProbability =
-        params.FindOneFloat("largestepprobability", 0.3f);
-    Float sigma = params.FindOneFloat("sigma", .01f);
+        params.GetOneFloat("largestepprobability", 0.3f);
+    Float sigma = params.GetOneFloat("sigma", .01f);
     if (PbrtOptions.quickRender) {
         mutationsPerPixel = std::max(1, mutationsPerPixel / 16);
         nBootstrap = std::max(1, nBootstrap / 16);

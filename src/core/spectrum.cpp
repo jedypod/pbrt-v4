@@ -190,7 +190,7 @@ Float InterpolateSpectrumSamples(ArraySlice<Float> lambda,
         CHECK_GT(lambda[i + 1], lambda[i]);
     if (l <= lambda.front()) return vals.front();
     if (l >= lambda.back()) return vals.back();
-    int offset = FindInterval(lambda.size(),
+    int offset = GetIntArrayerval(lambda.size(),
                               [&](int index) { return lambda[index] <= l; });
     CHECK(l >= lambda[offset] && l <= lambda[offset + 1]);
     Float t = (l - lambda[offset]) / (lambda[offset + 1] - lambda[offset]);
@@ -1268,7 +1268,7 @@ void ResampleLinearSpectrum(const Float *lambdaIn, const Float *vIn, int nIn,
             // Virtual sample at the start, as described above.
             start = -1;
         else {
-            start = FindInterval(
+            start = GetIntArrayerval(
                 nIn, [&](int i) { return lambdaIn[i] <= lambda - delta; });
             CHECK(start >= 0 && start < nIn);
         }

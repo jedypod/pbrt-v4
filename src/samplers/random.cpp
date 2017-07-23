@@ -72,7 +72,7 @@ void RandomSampler::StartPixel(const Point2i &p) {
 }
 
 Sampler *CreateRandomSampler(const ParamSet &params) {
-    int ns = params.FindOneInt("pixelsamples", 4);
+    int ns = params.GetOneInt("pixelsamples", 4);
     return new RandomSampler(ns);
 }
 

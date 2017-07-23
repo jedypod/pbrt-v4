@@ -499,12 +499,12 @@ void SPPMIntegrator::Render(const Scene &scene) {
 Integrator *CreateSPPMIntegrator(const ParamSet &params,
                                  std::shared_ptr<const Camera> camera) {
     int nIterations =
-        params.FindOneInt("iterations",
-                          params.FindOneInt("numiterations", 64));
-    int maxDepth = params.FindOneInt("maxdepth", 5);
-    int photonsPerIter = params.FindOneInt("photonsperiteration", -1);
-    int writeFreq = params.FindOneInt("imagewritefrequency", 1 << 31);
-    Float radius = params.FindOneFloat("radius", 1.f);
+        params.GetOneInt("iterations",
+                          params.GetOneInt("numiterations", 64));
+    int maxDepth = params.GetOneInt("maxdepth", 5);
+    int photonsPerIter = params.GetOneInt("photonsperiteration", -1);
+    int writeFreq = params.GetOneInt("imagewritefrequency", 1 << 31);
+    Float radius = params.GetOneFloat("radius", 1.f);
     if (PbrtOptions.quickRender) nIterations = std::max(1, nIterations / 16);
     return new SPPMIntegrator(camera, nIterations, photonsPerIter, maxDepth,
                               radius, writeFreq);

@@ -151,19 +151,19 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    int nu = params.FindOneInt("nu", -1);
+    int nu = params.GetOneInt("nu", -1);
     if (nu == -1) {
         Error("Must provide number of control points \"nu\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    int uorder = params.FindOneInt("uorder", -1);
+    int uorder = params.GetOneInt("uorder", -1);
     if (uorder == -1) {
         Error("Must provide u order \"uorder\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    ArraySlice<Float> uknots = params.FindFloat("uknots");
+    ArraySlice<Float> uknots = params.GetFloatArray("uknots");
     if (uknots.empty()) {
         Error("Must provide u knot vector \"uknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
@@ -177,22 +177,22 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    Float u0 = params.FindOneFloat("u0", uknots[uorder - 1]);
-    Float u1 = params.FindOneFloat("u1", uknots[nu]);
+    Float u0 = params.GetOneFloat("u0", uknots[uorder - 1]);
+    Float u1 = params.GetOneFloat("u1", uknots[nu]);
 
-    int nv = params.FindOneInt("nv", -1);
+    int nv = params.GetOneInt("nv", -1);
     if (nv == -1) {
         Error("Must provide number of control points \"nv\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    int vorder = params.FindOneInt("vorder", -1);
+    int vorder = params.GetOneInt("vorder", -1);
     if (vorder == -1) {
         Error("Must provide v order \"vorder\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    ArraySlice<Float> vknots = params.FindFloat("vknots");
+    ArraySlice<Float> vknots = params.GetFloatArray("vknots");
     if (vknots.empty()) {
         Error("Must provide v knot vector \"vknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
@@ -206,13 +206,13 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    Float v0 = params.FindOneFloat("v0", vknots[vorder - 1]);
-    Float v1 = params.FindOneFloat("v1", vknots[nv]);
+    Float v0 = params.GetOneFloat("v0", vknots[vorder - 1]);
+    Float v1 = params.GetOneFloat("v1", vknots[nv]);
 
-    ArraySlice<Point3f> P = params.FindPoint3f("P");
+    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
     ArraySlice<Float> Pw;
     if (P.empty()) {
-        Pw = params.FindFloat("Pw");
+        Pw = params.GetFloatArray("Pw");
         if (Pw.empty()) {
             Error(
                 "Must provide control points via \"P\" or \"Pw\" parameter to "

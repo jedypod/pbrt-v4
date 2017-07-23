@@ -339,14 +339,14 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 getenv("PLY_PREFIX") ? getenv("PLY_PREFIX") : "mesh";
             std::string fn = StringPrintf("%s_%05d.ply", plyPrefix, count++);
 
-            ArraySlice<int> vi = paramSet.FindInt("indices");
-            ArraySlice<Point3f> P = paramSet.FindPoint3f("P");
-            ArraySlice<Point2f> uvs = paramSet.FindPoint2f("uv");
-            if (uvs.empty()) uvs = paramSet.FindPoint2f("st");
+            ArraySlice<int> vi = paramSet.GetIntArray("indices");
+            ArraySlice<Point3f> P = paramSet.GetPoint3fArray("P");
+            ArraySlice<Point2f> uvs = paramSet.GetPoint2fArray("uv");
+            if (uvs.empty()) uvs = paramSet.GetPoint2fArray("st");
             std::vector<Point2f> tempUVs;
             if (uvs.empty()) {
-                ArraySlice<Float> fuv = paramSet.FindFloat("uv");
-                if (fuv.empty()) fuv = paramSet.FindFloat("st");
+                ArraySlice<Float> fuv = paramSet.GetFloatArray("uv");
+                if (fuv.empty()) fuv = paramSet.GetFloatArray("st");
                 if (!fuv.empty()) {
                     tempUVs.reserve(fuv.size() / 2);
                     for (size_t i = 0; i < fuv.size() / 2; ++i)
@@ -354,8 +354,8 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                     uvs = tempUVs;
                 }
             }
-            ArraySlice<Normal3f> N = paramSet.FindNormal3f("N");
-            ArraySlice<Vector3f> S = paramSet.FindVector3f("S");
+            ArraySlice<Normal3f> N = paramSet.GetNormal3fArray("N");
+            ArraySlice<Vector3f> S = paramSet.GetVector3fArray("S");
             // TODO: check that if non-empty, N and S are at least as big
             // as P.
 
@@ -370,7 +370,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture alpha\" \"%s\" ", catIndentCount + 8, "",
                        alphaTex.c_str());
             else {
-                ArraySlice<Float> alpha = paramSet.FindFloat("alpha");
+                ArraySlice<Float> alpha = paramSet.GetFloatArray("alpha");
                 if (!alpha.empty())
                     printf("\n%*s\"float alpha\" %f ", catIndentCount + 8, "",
                            alpha[0]);
@@ -381,7 +381,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture shadowalpha\" \"%s\" ",
                        catIndentCount + 8, "", shadowAlphaTex.c_str());
             else {
-                ArraySlice<Float> alpha = paramSet.FindFloat("shadowalpha");
+                ArraySlice<Float> alpha = paramSet.GetFloatArray("shadowalpha");
                 if (!alpha.empty())
                     printf("\n%*s\"float shadowalpha\" %f ", catIndentCount + 8,
                            "", alpha[0]);
@@ -427,8 +427,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     else if (name == "disney")
         material = CreateDisneyMaterial(mp);
     else if (name == "mix") {
-        std::string m1 = mp.FindOneString("namedmaterial1", "");
-        std::string m2 = mp.FindOneString("namedmaterial2", "");
+        std::string m1 = mp.GetOneString("namedmaterial1", "");
+        std::string m2 = mp.GetOneString("namedmaterial2", "");
         std::shared_ptr<Material> mat1 = graphicsState.namedMaterials[m1];
         std::shared_ptr<Material> mat2 = graphicsState.namedMaterials[m2];
         if (!mat1) {
@@ -554,29 +554,29 @@ std::shared_ptr<Medium> MakeMedium(const std::string &name,
           sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
              sig_s = Spectrum::FromRGB(sig_s_rgb);
-    std::string preset = paramSet.FindOneString("preset", "");
+    std::string preset = paramSet.GetOneString("preset", "");
     bool found = GetMediumScatteringProperties(preset, &sig_a, &sig_s);
     if (preset != "" && !found)
         Warning("Material preset \"%s\" not found.  Using defaults.",
                 preset.c_str());
-    Float scale = paramSet.FindOneFloat("scale", 1.f);
-    Float g = paramSet.FindOneFloat("g", 0.0f);
-    sig_a = paramSet.FindOneSpectrum("sigma_a", sig_a) * scale;
-    sig_s = paramSet.FindOneSpectrum("sigma_s", sig_s) * scale;
+    Float scale = paramSet.GetOneFloat("scale", 1.f);
+    Float g = paramSet.GetOneFloat("g", 0.0f);
+    sig_a = paramSet.GetOneSpectrum("sigma_a", sig_a) * scale;
+    sig_s = paramSet.GetOneSpectrum("sigma_s", sig_s) * scale;
     Medium *m = NULL;
     if (name == "homogeneous") {
         m = new HomogeneousMedium(sig_a, sig_s, g);
     } else if (name == "heterogeneous") {
-        ArraySlice<Float> data = paramSet.FindFloat("density");
+        ArraySlice<Float> data = paramSet.GetFloatArray("density");
         if (data.empty()) {
             Error("No \"density\" values provided for heterogeneous medium?");
             return nullptr;
         }
-        int nx = paramSet.FindOneInt("nx", 1);
-        int ny = paramSet.FindOneInt("ny", 1);
-        int nz = paramSet.FindOneInt("nz", 1);
-        Point3f p0 = paramSet.FindOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-        Point3f p1 = paramSet.FindOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+        int nx = paramSet.GetOneInt("nx", 1);
+        int ny = paramSet.GetOneInt("ny", 1);
+        int nz = paramSet.GetOneInt("nz", 1);
+        Point3f p0 = paramSet.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+        Point3f p1 = paramSet.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
         if (data.size() != nx * ny * nz) {
             Error(
                 "GridDensityMedium has %d density values; expected nx*ny*nz = "
@@ -951,7 +951,7 @@ void pbrtCamera(const std::string &name, ParamSet params) {
 void pbrtMakeNamedMedium(const std::string &name, ParamSet params) {
     VERIFY_INITIALIZED("MakeNamedMedium");
     WARN_IF_ANIMATED_TRANSFORM("MakeNamedMedium");
-    std::string type = params.FindOneString("type", "");
+    std::string type = params.GetOneString("type", "");
     if (type == "")
         Error("No parameter string \"type\" found in MakeNamedMedium");
     else {
@@ -1099,7 +1099,7 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
         // error checking, warning if replace, what to use for transform?
         TextureParams mp(std::move(params), graphicsState.floatTextures,
                          graphicsState.spectrumTextures);
-        std::string matName = mp.FindOneString("type", "");
+        std::string matName = mp.GetOneString("type", "");
         WARN_IF_ANIMATED_TRANSFORM("MakeNamedMaterial");
         if (matName == "")
             Error("No parameter string \"type\" found in MakeNamedMaterial");
@@ -1172,7 +1172,7 @@ void pbrtShape(const std::string &name, ParamSet params) {
         else
             Error("Couldn't find float texture \"%s\" for \"alpha\" parameter",
                   alphaTexName.c_str());
-    } else if (params.FindOneFloat("alpha", 1.f) == 0.f)
+    } else if (params.GetOneFloat("alpha", 1.f) == 0.f)
         alphaTex = std::make_shared<ConstantTexture<Float>>(0.f);
 
     std::shared_ptr<Texture<Float>> shadowAlphaTex;
@@ -1185,7 +1185,7 @@ void pbrtShape(const std::string &name, ParamSet params) {
                 "Couldn't find float texture \"%s\" for \"shadowalpha\" "
                 "parameter",
                 shadowAlphaTexName.c_str());
-    } else if (params.FindOneFloat("shadowalpha", 1.f) == 0.f)
+    } else if (params.GetOneFloat("shadowalpha", 1.f) == 0.f)
         shadowAlphaTex = std::make_shared<ConstantTexture<Float>>(0.f);
 
     if (!curTransform.IsAnimated()) {

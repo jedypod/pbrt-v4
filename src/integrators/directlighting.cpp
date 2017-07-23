@@ -101,9 +101,9 @@ Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
 DirectLightingIntegrator *CreateDirectLightingIntegrator(
     const ParamSet &params, std::shared_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera) {
-    int maxDepth = params.FindOneInt("maxdepth", 5);
+    int maxDepth = params.GetOneInt("maxdepth", 5);
     LightStrategy strategy;
-    std::string st = params.FindOneString("strategy", "all");
+    std::string st = params.GetOneString("strategy", "all");
     if (st == "one")
         strategy = LightStrategy::UniformSampleOne;
     else if (st == "all")
@@ -115,7 +115,7 @@ DirectLightingIntegrator *CreateDirectLightingIntegrator(
             st.c_str());
         strategy = LightStrategy::UniformSampleAll;
     }
-    gtl::ArraySlice<int> pb = params.FindInt("pixelbounds");
+    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)

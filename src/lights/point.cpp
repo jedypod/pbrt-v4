@@ -79,9 +79,9 @@ void PointLight::Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
 std::shared_ptr<PointLight> CreatePointLight(const Transform &light2world,
                                              const Medium *medium,
                                              const ParamSet &paramSet) {
-    Spectrum I = paramSet.FindOneSpectrum("I", Spectrum(1.0));
-    Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
-    Point3f P = paramSet.FindOnePoint3f("from", Point3f(0, 0, 0));
+    Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
+    Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+    Point3f P = paramSet.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform l2w = Translate(Vector3f(P.x, P.y, P.z)) * light2world;
     return std::make_shared<PointLight>(l2w, medium, I * sc);
 }

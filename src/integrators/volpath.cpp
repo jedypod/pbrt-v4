@@ -193,8 +193,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 VolPathIntegrator *CreateVolPathIntegrator(
     const ParamSet &params, std::shared_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera) {
-    int maxDepth = params.FindOneInt("maxdepth", 5);
-    gtl::ArraySlice<int> pb = params.FindInt("pixelbounds");
+    int maxDepth = params.GetOneInt("maxdepth", 5);
+    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)
@@ -207,9 +207,9 @@ VolPathIntegrator *CreateVolPathIntegrator(
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
-    Float rrThreshold = params.FindOneFloat("rrthreshold", 1.);
+    Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
-        params.FindOneString("lightsamplestrategy", "spatial");
+        params.GetOneString("lightsamplestrategy", "spatial");
     return new VolPathIntegrator(maxDepth, camera, sampler, pixelBounds,
                                  rrThreshold, lightStrategy);
 }

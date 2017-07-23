@@ -111,7 +111,7 @@ AOIntegrator *CreateAOIntegrator(const ParamSet &params,
                                  std::shared_ptr<Sampler> sampler,
                                  std::shared_ptr<const Camera> camera) {
     int np;
-    ArraySlice<int> pb = params.FindInt("pixelbounds");
+    ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)
@@ -124,9 +124,9 @@ AOIntegrator *CreateAOIntegrator(const ParamSet &params,
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
-    Float rrThreshold = params.FindOneFloat("rrthreshold", 1.);
-    bool cosSample = params.FindOneBool("cossample", "true");
-    int nSamples = params.FindOneInt("nsamples", 64);
+    Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
+    bool cosSample = params.GetOneBool("cossample", "true");
+    int nSamples = params.GetOneInt("nsamples", 64);
     return new AOIntegrator(cosSample, nSamples, camera, sampler, pixelBounds);
 }
 

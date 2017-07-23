@@ -95,7 +95,7 @@ std::shared_ptr<TranslucentMaterial> CreateTranslucentMaterial(
         mp.GetFloatTexture("roughness", .1f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindOneBool("remaproughness", true);
+    bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<TranslucentMaterial>(
         Kd, Ks, roughness, reflect, transmit, bumpMap, remapRoughness);
 }

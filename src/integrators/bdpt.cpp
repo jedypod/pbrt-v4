@@ -536,9 +536,9 @@ Spectrum ConnectBDPT(
 BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
                                      std::shared_ptr<Sampler> sampler,
                                      std::shared_ptr<const Camera> camera) {
-    int maxDepth = params.FindOneInt("maxdepth", 5);
-    bool visualizeStrategies = params.FindOneBool("visualizestrategies", false);
-    bool visualizeWeights = params.FindOneBool("visualizeweights", false);
+    int maxDepth = params.GetOneInt("maxdepth", 5);
+    bool visualizeStrategies = params.GetOneBool("visualizestrategies", false);
+    bool visualizeWeights = params.GetOneBool("visualizeweights", false);
 
     if ((visualizeStrategies || visualizeWeights) && maxDepth > 5) {
         Warning(
@@ -547,7 +547,7 @@ BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
         maxDepth = 5;
     }
 
-    gtl::ArraySlice<int> pb = params.FindInt("pixelbounds");
+    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)
@@ -561,7 +561,7 @@ BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
         }
     }
 
-    std::string lightStrategy = params.FindOneString("lightsamplestrategy",
+    std::string lightStrategy = params.GetOneString("lightsamplestrategy",
                                                      "power");
     return new BDPTIntegrator(sampler, camera, maxDepth, visualizeStrategies,
                               visualizeWeights, pixelBounds, lightStrategy);

@@ -122,7 +122,7 @@ std::shared_ptr<UberMaterial> CreateUberMaterial(const TextureParams &mp) {
         mp.GetSpectrumTexture("opacity", 1.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    bool remapRoughness = mp.FindOneBool("remaproughness", true);
+    bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<UberMaterial>(Kd, Ks, Kr, Kt, roughness, uroughness,
                                           vroughness, opacity, eta, bumpMap,
                                           remapRoughness);

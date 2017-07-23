@@ -130,10 +130,10 @@ void ProjectionLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
 std::shared_ptr<ProjectionLight> CreateProjectionLight(
     const Transform &light2world, const Medium *medium,
     const ParamSet &paramSet) {
-    Spectrum I = paramSet.FindOneSpectrum("I", Spectrum(1.0));
-    Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
-    Float fov = paramSet.FindOneFloat("fov", 45.);
-    std::string texname = paramSet.FindOneFilename("mapname", "");
+    Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
+    Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+    Float fov = paramSet.GetOneFloat("fov", 45.);
+    std::string texname = paramSet.GetOneFilename("mapname", "");
     return std::make_shared<ProjectionLight>(light2world, medium, I * sc,
                                              texname, fov);
 }

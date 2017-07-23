@@ -126,16 +126,16 @@ OrthographicCamera *CreateOrthographicCamera(const ParamSet &params,
                                              const AnimatedTransform &cam2world,
                                              Film *film, const Medium *medium) {
     // Extract common camera parameters from _ParamSet_
-    Float shutteropen = params.FindOneFloat("shutteropen", 0.f);
-    Float shutterclose = params.FindOneFloat("shutterclose", 1.f);
+    Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
         std::swap(shutterclose, shutteropen);
     }
-    Float lensradius = params.FindOneFloat("lensradius", 0.f);
-    Float focaldistance = params.FindOneFloat("focaldistance", 1e6f);
-    Float frame = params.FindOneFloat(
+    Float lensradius = params.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = params.GetOneFloat("focaldistance", 1e6f);
+    Float frame = params.GetOneFloat(
         "frameaspectratio",
         Float(film->fullResolution.x) / Float(film->fullResolution.y));
     Bounds2f screen;
@@ -150,7 +150,7 @@ OrthographicCamera *CreateOrthographicCamera(const ParamSet &params,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    ArraySlice<Float> sw = params.FindFloat("screenwindow");
+    ArraySlice<Float> sw = params.GetFloatArray("screenwindow");
     if (sw.size() > 0) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];

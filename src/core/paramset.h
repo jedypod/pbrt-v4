@@ -41,10 +41,10 @@
 // core/paramset.h*
 #include "pbrt.h"
 
-#include "geometry.h"
-#include "texture.h"
-#include "spectrum.h"
 #include "ext/google/array_slice.h"
+#include "geometry.h"
+#include "spectrum.h"
+#include "texture.h"
 
 #include <map>
 #include <memory>
@@ -91,30 +91,31 @@ class ParamSet {
     void AddSpectrum(const std::string &, std::unique_ptr<Spectrum[]> v,
                      int nValues);
 
-    Float FindOneFloat(const std::string &, Float d) const;
-    int FindOneInt(const std::string &, int d) const;
-    bool FindOneBool(const std::string &, bool d) const;
-    Point2f FindOnePoint2f(const std::string &, const Point2f &d) const;
-    Vector2f FindOneVector2f(const std::string &, const Vector2f &d) const;
-    Point3f FindOnePoint3f(const std::string &, const Point3f &d) const;
-    Vector3f FindOneVector3f(const std::string &, const Vector3f &d) const;
-    Normal3f FindOneNormal3f(const std::string &, const Normal3f &d) const;
-    Spectrum FindOneSpectrum(const std::string &, const Spectrum &d) const;
-    std::string FindOneString(const std::string &, const std::string &d) const;
-    std::string FindOneFilename(const std::string &,
-                                const std::string &d) const;
+    Float GetOneFloat(const std::string &name, Float def) const;
+    int GetOneInt(const std::string &name, int def) const;
+    bool GetOneBool(const std::string &name, bool def) const;
+    Point2f GetOnePoint2f(const std::string &name, const Point2f &def) const;
+    Vector2f GetOneVector2f(const std::string &name, const Vector2f &def) const;
+    Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
+    Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
+    Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
+    Spectrum GetOneSpectrum(const std::string &name, const Spectrum &def) const;
+    std::string GetOneString(const std::string &name,
+                             const std::string &def) const;
+    std::string GetOneFilename(const std::string &name,
+                               const std::string &def) const;
     std::string FindTexture(const std::string &) const;
 
-    gtl::ArraySlice<Float> FindFloat(const std::string &) const;
-    gtl::ArraySlice<int> FindInt(const std::string &) const;
-    gtl::ArraySlice<bool> FindBool(const std::string &) const;
-    gtl::ArraySlice<Point2f> FindPoint2f(const std::string &) const;
-    gtl::ArraySlice<Vector2f> FindVector2f(const std::string &) const;
-    gtl::ArraySlice<Point3f> FindPoint3f(const std::string &) const;
-    gtl::ArraySlice<Vector3f> FindVector3f(const std::string &) const;
-    gtl::ArraySlice<Normal3f> FindNormal3f(const std::string &) const;
-    gtl::ArraySlice<Spectrum> FindSpectrum(const std::string &) const;
-    gtl::ArraySlice<std::string> FindString(const std::string &) const;
+    gtl::ArraySlice<Float> GetFloatArray(const std::string &name) const;
+    gtl::ArraySlice<int> GetIntArray(const std::string &name) const;
+    gtl::ArraySlice<bool> GetBoolArray(const std::string &name) const;
+    gtl::ArraySlice<Point2f> GetPoint2fArray(const std::string &name) const;
+    gtl::ArraySlice<Vector2f> GetVector2fArray(const std::string &name) const;
+    gtl::ArraySlice<Point3f> GetPoint3fArray(const std::string &name) const;
+    gtl::ArraySlice<Vector3f> GetVector3fArray(const std::string &name) const;
+    gtl::ArraySlice<Normal3f> GetNormal3fArray(const std::string &name) const;
+    gtl::ArraySlice<Spectrum> GetSpectrumArray(const std::string &name) const;
+    gtl::ArraySlice<std::string> GetStringArray(const std::string &name) const;
 
     void ReportUnused() const;
 
@@ -145,7 +146,7 @@ class TextureParams : public ParamSet {
         std::map<std::string, std::shared_ptr<Texture<Spectrum>>> &sTex)
         : ParamSet(std::move(params)),
           floatTextures(fTex),
-        spectrumTextures(sTex) {}
+          spectrumTextures(sTex) {}
 
     std::shared_ptr<Texture<Spectrum>> GetSpectrumTexture(
         const std::string &name, const Spectrum &def) const;

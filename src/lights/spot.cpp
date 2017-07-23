@@ -103,13 +103,13 @@ void SpotLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
 std::shared_ptr<SpotLight> CreateSpotLight(const Transform &l2w,
                                            const Medium *medium,
                                            const ParamSet &paramSet) {
-    Spectrum I = paramSet.FindOneSpectrum("I", Spectrum(1.0));
-    Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
-    Float coneangle = paramSet.FindOneFloat("coneangle", 30.);
-    Float conedelta = paramSet.FindOneFloat("conedeltaangle", 5.);
+    Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
+    Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+    Float coneangle = paramSet.GetOneFloat("coneangle", 30.);
+    Float conedelta = paramSet.GetOneFloat("conedeltaangle", 5.);
     // Compute spotlight world to light transformation
-    Point3f from = paramSet.FindOnePoint3f("from", Point3f(0, 0, 0));
-    Point3f to = paramSet.FindOnePoint3f("to", Point3f(0, 0, 1));
+    Point3f from = paramSet.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f to = paramSet.GetOnePoint3f("to", Point3f(0, 0, 1));
     Vector3f dir = Normalize(to - from);
     Vector3f du, dv;
     CoordinateSystem(dir, &du, &dv);

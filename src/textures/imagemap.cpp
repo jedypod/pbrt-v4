@@ -84,12 +84,12 @@ ImageTexture<Float> *CreateImageFloatTexture(const Transform &tex2world,
                                              const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
-    std::string type = tp.FindOneString("mapping", "uv");
+    std::string type = tp.GetOneString("mapping", "uv");
     if (type == "uv") {
-        Float su = tp.FindOneFloat("uscale", 1.);
-        Float sv = tp.FindOneFloat("vscale", 1.);
-        Float du = tp.FindOneFloat("udelta", 0.);
-        Float dv = tp.FindOneFloat("vdelta", 0.);
+        Float su = tp.GetOneFloat("uscale", 1.);
+        Float sv = tp.GetOneFloat("vscale", 1.);
+        Float du = tp.GetOneFloat("udelta", 0.);
+        Float dv = tp.GetOneFloat("vdelta", 0.);
         map = std::make_unique<UVMapping2D>(su, sv, du, dv);
     } else if (type == "spherical")
         map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -97,26 +97,26 @@ ImageTexture<Float> *CreateImageFloatTexture(const Transform &tex2world,
         map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
     else if (type == "planar")
         map = std::make_unique<PlanarMapping2D>(
-            tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
-            tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.FindOneFloat("udelta", 0.f),
-            tp.FindOneFloat("vdelta", 0.f));
+            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
+            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
+            tp.GetOneFloat("udelta", 0.f),
+            tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
 
     // Initialize _ImageTexture_ parameters
-    Float maxAniso = tp.FindOneFloat("maxanisotropy", 8.f);
-    std::string filter = tp.FindOneString("filter", "bilinear");
-    std::string wrap = tp.FindOneString("wrap", "repeat");
+    Float maxAniso = tp.GetOneFloat("maxanisotropy", 8.f);
+    std::string filter = tp.GetOneString("filter", "bilinear");
+    std::string wrap = tp.GetOneString("wrap", "repeat");
     WrapMode wrapMode;
-    std::string wrapString = tp.FindOneString("wrap", "repeat");
+    std::string wrapString = tp.GetOneString("wrap", "repeat");
     if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
         Warning("%s: wrap mode unknown", wrapString.c_str());
-    Float scale = tp.FindOneFloat("scale", 1.f);
-    std::string filename = tp.FindOneFilename("filename", "");
-    bool gamma = tp.FindOneBool("gamma", HasExtension(filename, ".tga") ||
+    Float scale = tp.GetOneFloat("scale", 1.f);
+    std::string filename = tp.GetOneFilename("filename", "");
+    bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
                                           HasExtension(filename, ".png"));
     return new ImageTexture<Float>(std::move(map), filename, filter,
                                    maxAniso, wrapMode, scale, gamma);
@@ -126,12 +126,12 @@ ImageTexture<Spectrum> *CreateImageSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
-    std::string type = tp.FindOneString("mapping", "uv");
+    std::string type = tp.GetOneString("mapping", "uv");
     if (type == "uv") {
-        Float su = tp.FindOneFloat("uscale", 1.);
-        Float sv = tp.FindOneFloat("vscale", 1.);
-        Float du = tp.FindOneFloat("udelta", 0.);
-        Float dv = tp.FindOneFloat("vdelta", 0.);
+        Float su = tp.GetOneFloat("uscale", 1.);
+        Float sv = tp.GetOneFloat("vscale", 1.);
+        Float du = tp.GetOneFloat("udelta", 0.);
+        Float dv = tp.GetOneFloat("vdelta", 0.);
         map = std::make_unique<UVMapping2D>(su, sv, du, dv);
     } else if (type == "spherical")
         map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
@@ -139,26 +139,26 @@ ImageTexture<Spectrum> *CreateImageSpectrumTexture(
         map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
     else if (type == "planar")
         map = std::make_unique<PlanarMapping2D>(
-            tp.FindOneVector3f("v1", Vector3f(1, 0, 0)),
-            tp.FindOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.FindOneFloat("udelta", 0.f),
-            tp.FindOneFloat("vdelta", 0.f));
+            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
+            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
+            tp.GetOneFloat("udelta", 0.f),
+            tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
 
     // Initialize _ImageTexture_ parameters
-    Float maxAniso = tp.FindOneFloat("maxanisotropy", 8.f);
-    std::string filter = tp.FindOneString("filter", "bilinear");
-    std::string wrap = tp.FindOneString("wrap", "repeat");
+    Float maxAniso = tp.GetOneFloat("maxanisotropy", 8.f);
+    std::string filter = tp.GetOneString("filter", "bilinear");
+    std::string wrap = tp.GetOneString("wrap", "repeat");
     WrapMode wrapMode;
-    std::string wrapString = tp.FindOneString("wrap", "repeat");
+    std::string wrapString = tp.GetOneString("wrap", "repeat");
     if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
         Warning("%s: wrap mode unknown", wrapString.c_str());
-    Float scale = tp.FindOneFloat("scale", 1.f);
-    std::string filename = tp.FindOneFilename("filename", "");
-    bool gamma = tp.FindOneBool("gamma", HasExtension(filename, ".tga") ||
+    Float scale = tp.GetOneFloat("scale", 1.f);
+    std::string filename = tp.GetOneFilename("filename", "");
+    bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
                                           HasExtension(filename, ".png"));
     return new ImageTexture<Spectrum>(
         std::move(map), filename, filter, maxAniso, wrapMode, scale, gamma);

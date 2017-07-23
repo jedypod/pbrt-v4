@@ -39,13 +39,13 @@ namespace pbrt {
 // ConstantTexture Method Definitions
 ConstantTexture<Float> *CreateConstantFloatTexture(const Transform &tex2world,
                                                    const TextureParams &tp) {
-    return new ConstantTexture<Float>(tp.FindOneFloat("value", 1.f));
+    return new ConstantTexture<Float>(tp.GetOneFloat("value", 1.f));
 }
 
 ConstantTexture<Spectrum> *CreateConstantSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
     return new ConstantTexture<Spectrum>(
-        tp.FindOneSpectrum("value", Spectrum(1.f)));
+        tp.GetOneSpectrum("value", Spectrum(1.f)));
 }
 
 }  // namespace pbrt

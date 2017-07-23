@@ -92,9 +92,9 @@ void GonioPhotometricLight::Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
 std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
     const Transform &light2world, const Medium *medium,
     const ParamSet &paramSet) {
-    Spectrum I = paramSet.FindOneSpectrum("I", Spectrum(1.0));
-    Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
-    std::string texname = paramSet.FindOneFilename("mapname", "");
+    Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
+    Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+    std::string texname = paramSet.GetOneFilename("mapname", "");
     return std::make_shared<GonioPhotometricLight>(light2world, medium, I * sc,
                                                    texname);
 }

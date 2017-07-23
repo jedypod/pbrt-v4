@@ -698,8 +698,8 @@ Float RealisticCamera::GenerateRay(const CameraSample &sample, Ray *ray) const {
 RealisticCamera *CreateRealisticCamera(const ParamSet &params,
                                        const AnimatedTransform &cam2world,
                                        Film *film, const Medium *medium) {
-    Float shutteropen = params.FindOneFloat("shutteropen", 0.f);
-    Float shutterclose = params.FindOneFloat("shutterclose", 1.f);
+    Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
@@ -707,10 +707,10 @@ RealisticCamera *CreateRealisticCamera(const ParamSet &params,
     }
 
     // Realistic camera-specific parameters
-    std::string lensFile = params.FindOneFilename("lensfile", "");
-    Float apertureDiameter = params.FindOneFloat("aperturediameter", 1.0);
-    Float focusDistance = params.FindOneFloat("focusdistance", 10.0);
-    bool simpleWeighting = params.FindOneBool("simpleweighting", true);
+    std::string lensFile = params.GetOneFilename("lensfile", "");
+    Float apertureDiameter = params.GetOneFloat("aperturediameter", 1.0);
+    Float focusDistance = params.GetOneFloat("focusdistance", 10.0);
+    bool simpleWeighting = params.GetOneBool("simpleweighting", true);
     if (lensFile == "") {
         Error("No lens description file supplied!");
         return nullptr;

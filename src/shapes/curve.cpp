@@ -397,11 +397,11 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
-    Float width = params.FindOneFloat("width", 1.f);
-    Float width0 = params.FindOneFloat("width0", width);
-    Float width1 = params.FindOneFloat("width1", width);
+    Float width = params.GetOneFloat("width", 1.f);
+    Float width0 = params.GetOneFloat("width0", width);
+    Float width1 = params.GetOneFloat("width1", width);
 
-    ArraySlice<Point3f> cp = params.FindPoint3f("P");
+    ArraySlice<Point3f> cp = params.GetPoint3fArray("P");
     if (cp.size() != 4) {
         Error(
             "Must provide 4 control points for \"curve\" primitive. "
@@ -411,7 +411,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
     }
 
     CurveType type;
-    std::string curveType = params.FindOneString("type", "flat");
+    std::string curveType = params.GetOneString("type", "flat");
     if (curveType == "flat")
         type = CurveType::Flat;
     else if (curveType == "ribbon")
@@ -423,7 +423,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
         type = CurveType::Cylinder;
     }
 
-    ArraySlice<Normal3f> n = params.FindNormal3f("N");
+    ArraySlice<Normal3f> n = params.GetNormal3fArray("N");
     if (n.size() > 0) {
         if (type != CurveType::Ribbon) {
             Warning("Curve normals are only used with \"ribbon\" type curves.");
@@ -438,7 +438,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
         }
     }
 
-    int sd = params.FindOneFloat("splitdepth", 3);
+    int sd = params.GetOneFloat("splitdepth", 3);
 
     if (type == CurveType::Ribbon && n.empty()) {
         Error(

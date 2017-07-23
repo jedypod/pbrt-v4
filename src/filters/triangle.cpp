@@ -45,8 +45,8 @@ Float TriangleFilter::Evaluate(const Point2f &p) const {
 
 TriangleFilter *CreateTriangleFilter(const ParamSet &ps) {
     // Find common filter parameters
-    Float xw = ps.FindOneFloat("xwidth", 2.f);
-    Float yw = ps.FindOneFloat("ywidth", 2.f);
+    Float xw = ps.GetOneFloat("xwidth", 2.f);
+    Float yw = ps.GetOneFloat("ywidth", 2.f);
     return new TriangleFilter(Vector2f(xw, yw));
 }
 

@@ -589,7 +589,7 @@ std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(const TextureParams &mp) {
         mp.GetFloatTexture("spectrans", 0.f);
     std::shared_ptr<Texture<Spectrum>> scatterDistance =
         mp.GetSpectrumTexture("scatterdistance", Spectrum(0.));
-    bool thin = mp.FindOneBool("thin", false);
+    bool thin = mp.GetOneBool("thin", false);
     std::shared_ptr<Texture<Float>> flatness =
         mp.GetFloatTexture("flatness", 0.f);
     std::shared_ptr<Texture<Float>> diffTrans =

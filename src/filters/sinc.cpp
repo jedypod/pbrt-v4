@@ -43,9 +43,9 @@ Float LanczosSincFilter::Evaluate(const Point2f &p) const {
 }
 
 LanczosSincFilter *CreateSincFilter(const ParamSet &ps) {
-    Float xw = ps.FindOneFloat("xwidth", 4.);
-    Float yw = ps.FindOneFloat("ywidth", 4.);
-    Float tau = ps.FindOneFloat("tau", 3.f);
+    Float xw = ps.GetOneFloat("xwidth", 4.);
+    Float yw = ps.GetOneFloat("ywidth", 4.);
+    Float tau = ps.GetOneFloat("tau", 3.f);
     return new LanczosSincFilter(Vector2f(xw, yw), tau);
 }
 

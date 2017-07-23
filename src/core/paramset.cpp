@@ -30,7 +30,6 @@
 
  */
 
-
 // core/paramset.cpp*
 #include "paramset.h"
 
@@ -38,15 +37,16 @@
 #include "fileutil.h"
 #include "floatfile.h"
 #include "textures/constant.h"
+
 #include <glog/logging.h>
 
 using gtl::ArraySlice;
 
 namespace pbrt {
 
-template <typename T> static void
-addParam(const std::string &name, std::unique_ptr<T[]> values, int nValues,
-         std::vector<ParamSetItem<T>> &vec) {
+template <typename T>
+static void addParam(const std::string &name, std::unique_ptr<T[]> values,
+                     int nValues, std::vector<ParamSetItem<T>> &vec) {
     for (auto &v : vec) {
         if (v.name == name) {
             Warning("%s: parameter redefined", name.c_str());
@@ -58,9 +58,9 @@ addParam(const std::string &name, std::unique_ptr<T[]> values, int nValues,
     vec.push_back(ParamSetItem<T>(name, std::move(values), nValues));
 }
 
-template <typename T> static ArraySlice<T>
-lookupPtr(const std::string &name,
-          const std::vector<ParamSetItem<T>> &vec) {
+template <typename T>
+static ArraySlice<T> lookupPtr(const std::string &name,
+                               const std::vector<ParamSetItem<T>> &vec) {
     for (const auto &v : vec)
         if (v.name == name) {
             v.lookedUp = true;
@@ -69,9 +69,9 @@ lookupPtr(const std::string &name,
     return {};
 }
 
-template <typename T> static T
-lookupOne(const std::string &name, T def,
-          const std::vector<ParamSetItem<T>> &vec) {
+template <typename T>
+static T lookupOne(const std::string &name, T def,
+                   const std::vector<ParamSetItem<T>> &vec) {
     for (const auto &v : vec)
         if (v.name == name && v.nValues == 1) {
             v.lookedUp = true;
@@ -138,96 +138,97 @@ void ParamSet::AddTexture(const std::string &name, const std::string &value) {
     addParam(name, std::move(str), 1, textures);
 }
 
-Float ParamSet::FindOneFloat(const std::string &name, Float def) const {
+Float ParamSet::GetOneFloat(const std::string &name, Float def) const {
     return lookupOne(name, def, floats);
 }
 
-ArraySlice<Float> ParamSet::FindFloat(const std::string &name) const {
+ArraySlice<Float> ParamSet::GetFloatArray(const std::string &name) const {
     return lookupPtr(name, floats);
 }
 
-ArraySlice<int> ParamSet::FindInt(const std::string &name) const {
+ArraySlice<int> ParamSet::GetIntArray(const std::string &name) const {
     return lookupPtr(name, ints);
 }
 
-ArraySlice<bool> ParamSet::FindBool(const std::string &name) const {
+ArraySlice<bool> ParamSet::GetBoolArray(const std::string &name) const {
     return lookupPtr(name, bools);
 }
 
-int ParamSet::FindOneInt(const std::string &name, int def) const {
+int ParamSet::GetOneInt(const std::string &name, int def) const {
     return lookupOne(name, def, ints);
 }
 
-bool ParamSet::FindOneBool(const std::string &name, bool def) const {
+bool ParamSet::GetOneBool(const std::string &name, bool def) const {
     return lookupOne(name, def, bools);
 }
 
-ArraySlice<Point2f> ParamSet::FindPoint2f(const std::string &name) const {
+ArraySlice<Point2f> ParamSet::GetPoint2fArray(const std::string &name) const {
     return lookupPtr(name, point2fs);
 }
 
-Point2f ParamSet::FindOnePoint2f(const std::string &name,
-                                 const Point2f &def) const {
+Point2f ParamSet::GetOnePoint2f(const std::string &name,
+                                const Point2f &def) const {
     return lookupOne(name, def, point2fs);
 }
 
-ArraySlice<Vector2f> ParamSet::FindVector2f(const std::string &name) const {
+ArraySlice<Vector2f> ParamSet::GetVector2fArray(const std::string &name) const {
     return lookupPtr(name, vector2fs);
 }
 
-Vector2f ParamSet::FindOneVector2f(const std::string &name,
-                                   const Vector2f &def) const {
+Vector2f ParamSet::GetOneVector2f(const std::string &name,
+                                  const Vector2f &def) const {
     return lookupOne(name, def, vector2fs);
 }
 
-ArraySlice<Point3f> ParamSet::FindPoint3f(const std::string &name) const {
+ArraySlice<Point3f> ParamSet::GetPoint3fArray(const std::string &name) const {
     return lookupPtr(name, point3fs);
 }
 
-Point3f ParamSet::FindOnePoint3f(const std::string &name,
-                                 const Point3f &def) const {
+Point3f ParamSet::GetOnePoint3f(const std::string &name,
+                                const Point3f &def) const {
     return lookupOne(name, def, point3fs);
 }
 
-ArraySlice<Vector3f> ParamSet::FindVector3f(const std::string &name) const {
+ArraySlice<Vector3f> ParamSet::GetVector3fArray(const std::string &name) const {
     return lookupPtr(name, vector3fs);
 }
 
-Vector3f ParamSet::FindOneVector3f(const std::string &name,
-                                   const Vector3f &def) const {
+Vector3f ParamSet::GetOneVector3f(const std::string &name,
+                                  const Vector3f &def) const {
     return lookupOne(name, def, vector3fs);
 }
 
-ArraySlice<Normal3f> ParamSet::FindNormal3f(const std::string &name) const {
+ArraySlice<Normal3f> ParamSet::GetNormal3fArray(const std::string &name) const {
     return lookupPtr(name, normals);
 }
 
-Normal3f ParamSet::FindOneNormal3f(const std::string &name,
-                                   const Normal3f &def) const {
+Normal3f ParamSet::GetOneNormal3f(const std::string &name,
+                                  const Normal3f &def) const {
     return lookupOne(name, def, normals);
 }
 
-ArraySlice<Spectrum> ParamSet::FindSpectrum(const std::string &name) const {
+ArraySlice<Spectrum> ParamSet::GetSpectrumArray(const std::string &name) const {
     return lookupPtr(name, spectra);
 }
 
-Spectrum ParamSet::FindOneSpectrum(const std::string &name,
-                                   const Spectrum &def) const {
+Spectrum ParamSet::GetOneSpectrum(const std::string &name,
+                                  const Spectrum &def) const {
     return lookupOne(name, def, spectra);
 }
 
-ArraySlice<std::string> ParamSet::FindString(const std::string &name) const {
+ArraySlice<std::string> ParamSet::GetStringArray(
+    const std::string &name) const {
     return lookupPtr(name, strings);
 }
 
-std::string ParamSet::FindOneString(const std::string &name,
-                                    const std::string &def) const {
+std::string ParamSet::GetOneString(const std::string &name,
+                                   const std::string &def) const {
     return lookupOne(name, def, strings);
 }
 
-std::string ParamSet::FindOneFilename(const std::string &name,
-                                      const std::string &def) const {
-    std::string filename = FindOneString(name, "");
+std::string ParamSet::GetOneFilename(const std::string &name,
+                                     const std::string &def) const {
+    std::string filename = GetOneString(name, "");
     if (filename == "") return def;
     return AbsolutePath(ResolveFilename(filename));
 }
@@ -236,11 +237,10 @@ std::string ParamSet::FindTexture(const std::string &name) const {
     return lookupOne(name, std::string(""), textures);
 }
 
-template <typename T> static void
-checkUnused(const std::vector<ParamSetItem<T>> &vec) {
+template <typename T>
+static void checkUnused(const std::vector<ParamSetItem<T>> &vec) {
     for (const auto &v : vec)
-        if (!v.lookedUp)
-            Warning("Parameter \"%s\" not used", v.name.c_str());
+        if (!v.lookedUp) Warning("Parameter \"%s\" not used", v.name.c_str());
 }
 
 void ParamSet::ReportUnused() const {
@@ -286,9 +286,7 @@ static std::string toString(const Normal3f &n) {
     return StringPrintf("%f %f %f", n.x, n.y, n.z);
 }
 
-static std::string toString(const std::string &s) {
-    return '\"' + s + "\"";
-}
+static std::string toString(const std::string &s) { return '\"' + s + "\""; }
 
 static std::string toString(const Spectrum &s) {
     Float rgb[3];
@@ -296,13 +294,13 @@ static std::string toString(const Spectrum &s) {
     return StringPrintf("%f %f %f", rgb[0], rgb[1], rgb[2]);
 }
 
-
-template <typename T> static std::string
-toString(const char *type, int indent, bool first,
-         const std::vector<ParamSetItem<T>> &vec) {
+template <typename T>
+static std::string toString(const char *type, int indent, bool first,
+                            const std::vector<ParamSetItem<T>> &vec) {
     std::string ret;
     for (const auto &item : vec) {
-        if (first) first = false;
+        if (first)
+            first = false;
         else {
             ret += '\n';
             ret.append(indent + 4, ' ');
@@ -340,7 +338,7 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     auto tex = GetSpectrumTextureOrNull(name);
     if (tex) return tex;
 
-    Spectrum val = FindOneSpectrum(name, def);
+    Spectrum val = GetOneSpectrum(name, def);
     return std::make_shared<ConstantTexture<Spectrum>>(val);
 }
 
@@ -352,13 +350,15 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
             return spectrumTextures[name];
         else {
             Error(
-                "Couldn't find spectrum texture named \"%s\" for parameter \"%s\"",
+                "Couldn't find spectrum texture named \"%s\" for parameter "
+                "\"%s\"",
                 name.c_str(), n.c_str());
             return nullptr;
         }
     }
-    ArraySlice<Spectrum> val = FindSpectrum(n);
-    if (!val.empty()) return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
+    ArraySlice<Spectrum> val = GetSpectrumArray(n);
+    if (!val.empty())
+        return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
 }
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
@@ -366,7 +366,7 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
     auto tex = GetFloatTextureOrNull(name);
     if (tex) return tex;
 
-    Float val = FindOneFloat(name, def);
+    Float val = GetOneFloat(name, def);
     return std::make_shared<ConstantTexture<Float>>(val);
 }
 
@@ -384,7 +384,7 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
         }
     }
 
-    ArraySlice<Float> val = FindFloat(n);
+    ArraySlice<Float> val = GetFloatArray(n);
     if (!val.empty()) return std::make_shared<ConstantTexture<Float>>(val[0]);
     return nullptr;
 }
