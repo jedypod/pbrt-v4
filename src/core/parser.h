@@ -41,11 +41,42 @@
 // core/parser.h*
 #include "pbrt.h"
 
+#include "spectrum.h"
+
 #include <string>
+#include <vector>
 
 namespace pbrt {
 
 bool ParseFile(const std::string &filename);
+
+namespace parse {
+
+extern std::string currentFilename;
+extern int currentLineNumber;
+
+}  // namespace parse
+
+struct ParamArray {
+    void AddNumber(double d);
+    void AddString(const std::string &str);
+    void AddBool(bool v);
+
+    std::vector<double> numbers;
+    std::vector<std::string> strings;
+    std::vector<bool> bools;
+};
+
+struct ParamListItem {
+    ParamListItem(const std::string &name, std::unique_ptr<ParamArray> array)
+        : name(name), array(std::move(array)) {}
+
+    std::string name;
+    std::unique_ptr<ParamArray> array;
+};
+
+ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
+                         SpectrumType spectrumType);
 
 }  // namespace pbrt
 

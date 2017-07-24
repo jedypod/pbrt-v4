@@ -32,16 +32,17 @@
 
 // core/error.cpp*
 #include "error.h"
+
+#include "parser.h"
 #include "stringprint.h"
 #include "progressreporter.h"
-#include <mutex>
 
-// Error Reporting Includes
+#include <mutex>
 #include <stdarg.h>
 
 namespace pbrt {
 
-const char *findWordEnd(const char *buf) {
+static const char *findWordEnd(const char *buf) {
     while (*buf != '\0' && !isspace(*buf)) ++buf;
     return buf;
 }
@@ -69,11 +70,9 @@ static void processError(const char *format, va_list args,
     std::string errorString;
 
     // Print line and position in input file, if available
-    extern int line_num;
-    if (line_num != 0) {
-        extern std::string current_file;
-        errorString += current_file;
-        errorString += StringPrintf("(%d): ", line_num);
+    if (parse::currentLineNumber != 0) {
+        errorString += parse::currentFilename;
+        errorString += StringPrintf("(%d): ", parse::currentLineNumber);
     }
 
     errorString += StringVaprintf(format, args);

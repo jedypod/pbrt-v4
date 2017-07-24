@@ -45,17 +45,16 @@ using gtl::ArraySlice;
 namespace pbrt {
 
 template <typename T>
-static void addParam(const std::string &name, std::unique_ptr<T[]> values,
-                     int nValues, std::vector<ParamSetItem<T>> &vec) {
+static void addParam(const std::string &name, std::vector<T> values,
+                     std::vector<ParamSetItem<T>> &vec) {
     for (auto &v : vec) {
         if (v.name == name) {
             Warning("%s: parameter redefined", name.c_str());
             v.values = std::move(values);
-            v.nValues = nValues;
             return;
         }
     }
-    vec.push_back(ParamSetItem<T>(name, std::move(values), nValues));
+    vec.push_back(ParamSetItem<T>(name, std::move(values)));
 }
 
 template <typename T>
@@ -64,7 +63,7 @@ static ArraySlice<T> lookupPtr(const std::string &name,
     for (const auto &v : vec)
         if (v.name == name) {
             v.lookedUp = true;
-            return ArraySlice<T>(v.values.get(), v.nValues);
+            return ArraySlice<T>(v.values);
         }
     return {};
 }
@@ -73,7 +72,7 @@ template <typename T>
 static T lookupOne(const std::string &name, T def,
                    const std::vector<ParamSetItem<T>> &vec) {
     for (const auto &v : vec)
-        if (v.name == name && v.nValues == 1) {
+        if (v.name == name && v.values.size() == 1) {
             v.lookedUp = true;
             return v.values[0];
         }
@@ -82,60 +81,58 @@ static T lookupOne(const std::string &name, T def,
 
 // ParamSet Methods
 void ParamSet::AddFloat(const std::string &name,
-                        std::unique_ptr<Float[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, floats);
+                        std::vector<Float> values) {
+    addParam(name, std::move(values), floats);
 }
 
-void ParamSet::AddInt(const std::string &name, std::unique_ptr<int[]> values,
-                      int nValues) {
-    addParam(name, std::move(values), nValues, ints);
+void ParamSet::AddInt(const std::string &name, std::vector<int> values) {
+    addParam(name, std::move(values), ints);
 }
 
-void ParamSet::AddBool(const std::string &name, std::unique_ptr<bool[]> values,
-                       int nValues) {
-    addParam(name, std::move(values), nValues, bools);
+void ParamSet::AddBool(const std::string &name, std::vector<uint8_t> values) {
+    addParam(name, std::move(values), bools);
 }
 
 void ParamSet::AddPoint2f(const std::string &name,
-                          std::unique_ptr<Point2f[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, point2fs);
+                          std::vector<Point2f> values) {
+    addParam(name, std::move(values), point2fs);
 }
 
 void ParamSet::AddVector2f(const std::string &name,
-                           std::unique_ptr<Vector2f[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, vector2fs);
+                           std::vector<Vector2f> values) {
+    addParam(name, std::move(values), vector2fs);
 }
 
 void ParamSet::AddPoint3f(const std::string &name,
-                          std::unique_ptr<Point3f[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, point3fs);
+                          std::vector<Point3f> values) {
+    addParam(name, std::move(values), point3fs);
 }
 
 void ParamSet::AddVector3f(const std::string &name,
-                           std::unique_ptr<Vector3f[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, vector3fs);
+                           std::vector<Vector3f> values) {
+    addParam(name, std::move(values), vector3fs);
 }
 
 void ParamSet::AddNormal3f(const std::string &name,
-                           std::unique_ptr<Normal3f[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, normals);
+                           std::vector<Normal3f> values) {
+    addParam(name, std::move(values), normals);
 }
 
 void ParamSet::AddSpectrum(const std::string &name,
-                           std::unique_ptr<Spectrum[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, spectra);
+                           std::vector<Spectrum> values) {
+    addParam(name, std::move(values), spectra);
 }
 
 void ParamSet::AddString(const std::string &name,
-                         std::unique_ptr<std::string[]> values, int nValues) {
-    addParam(name, std::move(values), nValues, strings);
+                         std::vector<std::string> values) {
+    addParam(name, std::move(values), strings);
 }
 
 void ParamSet::AddTexture(const std::string &name, const std::string &value) {
-    std::unique_ptr<std::string[]> str(new std::string[1]);
+    std::vector<std::string> str(1);
     str[0] = value;
 
-    addParam(name, std::move(str), 1, textures);
+    addParam(name, std::move(str), textures);
 }
 
 Float ParamSet::GetOneFloat(const std::string &name, Float def) const {
@@ -150,7 +147,7 @@ ArraySlice<int> ParamSet::GetIntArray(const std::string &name) const {
     return lookupPtr(name, ints);
 }
 
-ArraySlice<bool> ParamSet::GetBoolArray(const std::string &name) const {
+ArraySlice<uint8_t> ParamSet::GetBoolArray(const std::string &name) const {
     return lookupPtr(name, bools);
 }
 
@@ -159,7 +156,7 @@ int ParamSet::GetOneInt(const std::string &name, int def) const {
 }
 
 bool ParamSet::GetOneBool(const std::string &name, bool def) const {
-    return lookupOne(name, def, bools);
+    return lookupOne(name, uint8_t(def), bools);
 }
 
 ArraySlice<Point2f> ParamSet::GetPoint2fArray(const std::string &name) const {
@@ -307,9 +304,8 @@ static std::string toString(const char *type, int indent, bool first,
         }
 
         ret += StringPrintf("\"%s %s\" [ ", type, item.name.c_str());
-        for (int i = 0; i < item.nValues; ++i) {
-            ret += toString(item.values[i]) + ' ';
-        }
+        for (const auto &val : item.values)
+            ret += toString(val) + ' ';
         ret += "] ";
     }
     return ret;

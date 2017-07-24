@@ -56,14 +56,12 @@ namespace pbrt {
 template <typename T>
 struct ParamSetItem {
     // ParamSetItem Public Methods
-    ParamSetItem(const std::string &name, std::unique_ptr<T[]> values,
-                 size_t nValues = 1)
-        : name(name), values(std::move(values)), nValues(nValues) {}
+    ParamSetItem(const std::string &name, std::vector<T> values)
+       : name(name), values(std::move(values)) {}
 
     // ParamSetItem Data
     const std::string name;
-    std::unique_ptr<T[]> values;
-    size_t nValues;
+    std::vector<T> values;
     mutable bool lookedUp = false;
 };
 
@@ -71,25 +69,21 @@ struct ParamSetItem {
 class ParamSet {
   public:
     // ParamSet Public Methods
-    void AddFloat(const std::string &, std::unique_ptr<Float[]> v,
-                  int nValues = 1);
-    void AddInt(const std::string &, std::unique_ptr<int[]> v, int nValues);
-    void AddBool(const std::string &, std::unique_ptr<bool[]> v, int nValues);
-    void AddPoint2f(const std::string &, std::unique_ptr<Point2f[]> v,
-                    int nValues);
-    void AddVector2f(const std::string &, std::unique_ptr<Vector2f[]> v,
-                     int nValues);
-    void AddPoint3f(const std::string &, std::unique_ptr<Point3f[]> v,
-                    int nValues);
-    void AddVector3f(const std::string &, std::unique_ptr<Vector3f[]> v,
-                     int nValues);
-    void AddNormal3f(const std::string &, std::unique_ptr<Normal3f[]> v,
-                     int nValues);
-    void AddString(const std::string &, std::unique_ptr<std::string[]> v,
-                   int nValues);
+    void AddFloat(const std::string &, std::vector<Float> v);
+    void AddInt(const std::string &, std::vector<int> v);
+    // Use uint8_t for bool rather than an actual bool so that the
+    // std::vector<bool> specialization doesn't kick in (which in turn
+    // prevents us from being able to return an ArraySlice from
+    // GetBoolArray()).
+    void AddBool(const std::string &, std::vector<uint8_t> v);
+    void AddPoint2f(const std::string &, std::vector<Point2f> v);
+    void AddVector2f(const std::string &, std::vector<Vector2f> v);
+    void AddPoint3f(const std::string &, std::vector<Point3f> v);
+    void AddVector3f(const std::string &, std::vector<Vector3f> v);
+    void AddNormal3f(const std::string &, std::vector<Normal3f> v);
+    void AddString(const std::string &, std::vector<std::string> v);
     void AddTexture(const std::string &, const std::string &);
-    void AddSpectrum(const std::string &, std::unique_ptr<Spectrum[]> v,
-                     int nValues);
+    void AddSpectrum(const std::string &, std::vector<Spectrum> v);
 
     Float GetOneFloat(const std::string &name, Float def) const;
     int GetOneInt(const std::string &name, int def) const;
@@ -108,7 +102,7 @@ class ParamSet {
 
     gtl::ArraySlice<Float> GetFloatArray(const std::string &name) const;
     gtl::ArraySlice<int> GetIntArray(const std::string &name) const;
-    gtl::ArraySlice<bool> GetBoolArray(const std::string &name) const;
+    gtl::ArraySlice<uint8_t> GetBoolArray(const std::string &name) const;
     gtl::ArraySlice<Point2f> GetPoint2fArray(const std::string &name) const;
     gtl::ArraySlice<Vector2f> GetVector2fArray(const std::string &name) const;
     gtl::ArraySlice<Point3f> GetPoint3fArray(const std::string &name) const;
@@ -121,9 +115,16 @@ class ParamSet {
 
     std::string ToString(int indent = 0) const;
 
+    // Should only be moving these, so enforce that. (Remove if this is a pain?)
+    ParamSet() = default;
+    ParamSet(const ParamSet &) = delete;
+    ParamSet &operator=(const ParamSet &) = delete;
+    ParamSet(ParamSet &&) = default;
+    ParamSet &operator=(ParamSet &&) = default;
+
   private:
     // ParamSet Private Data
-    std::vector<ParamSetItem<bool>> bools;
+    std::vector<ParamSetItem<uint8_t>> bools;
     std::vector<ParamSetItem<int>> ints;
     std::vector<ParamSetItem<Float>> floats;
     std::vector<ParamSetItem<Point2f>> point2fs;

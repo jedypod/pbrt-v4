@@ -38,6 +38,7 @@
 
 #include "api.h"
 #include "error.h"
+#include "parser.h"
 #include "fileutil.h"
 
 #include <string>
@@ -55,13 +56,13 @@ int isatty(int fd) { return _isatty(fd); }
 #include <unistd.h>
 #endif  // PBRT_IS_MSVC
 
-namespace pbrt {
-struct ParamArray;
-}
-
 #include "pbrtparse.h"
 
 namespace pbrt {
+
+extern int catIndentCount;
+
+namespace parse {
 
 struct IncludeInfo {
     std::string filename;
@@ -69,70 +70,70 @@ struct IncludeInfo {
     int lineNum;
 };
 
-std::vector<IncludeInfo> includeStack;
+static std::vector<IncludeInfo> includeStack;
 
-extern int line_num;
-int str_pos;
-extern int catIndentCount;
-
-void add_string_char(char c) {
-    yylval.string[str_pos++] = c;
-    yylval.string[str_pos] = '\0';
-}
-
-
-void include_push(char *filename) {
+void includePush(const std::string &filename) {
     if (includeStack.size() > 32) {
         Error("Only 32 levels of nested Include allowed in scene files.");
         exit(1);
     }
 
-    std::string new_file = AbsolutePath(ResolveFilename(filename));
+    std::string newFilename = AbsolutePath(ResolveFilename(filename));
 
-    FILE *f = fopen(new_file.c_str(), "r");
+    FILE *f = fopen(newFilename.c_str(), "r");
     if (!f)
-        Error("Unable to open included scene file \"%s\"", new_file.c_str());
+        Error("Unable to open included scene file \"%s\"", newFilename.c_str());
     else {
-        extern std::string current_file;
         IncludeInfo ii;
-        ii.filename = current_file;
+        ii.filename = currentFilename;
         ii.bufState = YY_CURRENT_BUFFER;
-        ii.lineNum = line_num;
+        ii.lineNum = currentLineNumber;
         includeStack.push_back(ii);
 
         yyin = f;
-        current_file = new_file;
-        line_num = 1;
+        currentFilename = newFilename;
+        currentLineNumber = 1;
 
         yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
     }
 }
 
-
-
-void include_pop() {
-    extern int line_num;
-    extern std::string current_file;
+void includePop() {
     fclose(yyin);
     yy_delete_buffer(YY_CURRENT_BUFFER);
     yy_switch_to_buffer(includeStack.back().bufState);
-    current_file = includeStack.back().filename;
-    line_num = includeStack.back().lineNum;
+    currentFilename = includeStack.back().filename;
+    currentLineNumber = includeStack.back().lineNum;
     includeStack.pop_back();
 }
 
 }  // namespace pbrt
+}  // namespace parse
 
 %}
+
 %option nounput
 WHITESPACE [ \t\r]+
 NUMBER [-+]?([0-9]+|(([0-9]+\.[0-9]*)|(\.[0-9]+)))([eE][-+]?[0-9]+)?
 IDENT [a-zA-Z_][a-zA-Z_0-9]*
 %x STR COMMENT INCL INCL_FILE
+
 %%
-"#" { BEGIN COMMENT; if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly) printf("%*s#", pbrt::catIndentCount, ""); }
-<COMMENT>. { /* eat it up */ if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly) putchar(yytext[0]); }
-<COMMENT>\n { pbrt::line_num++; if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly) putchar('\n'); BEGIN INITIAL; }
+"#" {
+    BEGIN COMMENT;
+    if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly)
+        printf("%*s#", pbrt::catIndentCount, "");
+}
+<COMMENT>. {
+    /* eat it up */
+    if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly)
+        putchar(yytext[0]);
+}
+<COMMENT>\n {
+    pbrt::parse::currentLineNumber++;
+    if (pbrt::PbrtOptions.cat || pbrt::PbrtOptions.toPly) putchar('\n');
+    BEGIN INITIAL;
+}
 Accelerator             { return ACCELERATOR; }
 ActiveTransform         { return ACTIVETRANSFORM; }
 All                     { return ALL; }
@@ -144,6 +145,7 @@ ConcatTransform         { return CONCATTRANSFORM; }
 CoordinateSystem        { return COORDINATESYSTEM; }
 CoordSysTransform       { return COORDSYSTRANSFORM; }
 EndTime                 { return ENDTIME; }
+false                   { return FALSE; }
 Film                    { return FILM; }
 Identity                { return IDENTITY; }
 Include                 { return INCLUDE; }
@@ -171,54 +173,58 @@ TransformEnd            { return TRANSFORMEND; }
 TransformTimes          { return TRANSFORMTIMES; }
 Transform               { return TRANSFORM; }
 Translate               { return TRANSLATE; }
+true                    { return TRUE; }
 WorldBegin              { return WORLDBEGIN; }
 WorldEnd                { return WORLDEND; }
+
 {WHITESPACE} /* do nothing */
-\n { pbrt::line_num++; }
+\n { pbrt::parse::currentLineNumber++; }
+
 {NUMBER} {
     yylval.num = atof(yytext);
     return NUM;
 }
 
-
 {IDENT} {
-    yylval.string[0] = '\0';
-    strncat(yylval.string, yytext, sizeof(yylval.string) - 1);
+    yylval.string = new std::string(yytext);
     return ID;
 }
 
-
 "[" { return LBRACK; }
 "]" { return RBRACK; }
-\" { BEGIN STR; pbrt::str_pos = 0; yylval.string[0] = '\0'; }
-<STR>\\n {pbrt::add_string_char('\n');}
-<STR>\\t {pbrt::add_string_char('\t');}
-<STR>\\r {pbrt::add_string_char('\r');}
-<STR>\\b {pbrt::add_string_char('\b');}
-<STR>\\f {pbrt::add_string_char('\f');}
-<STR>\\\" {pbrt::add_string_char('\"');}
-<STR>\\\\ {pbrt::add_string_char('\\');}
+
+\" { BEGIN STR; yylval.string = new std::string; }
+<STR>\\n { *yylval.string += '\n'; }
+<STR>\\t { *yylval.string += '\t'; }
+<STR>\\r { *yylval.string += '\r'; }
+<STR>\\b { *yylval.string += '\b'; }
+<STR>\\f { *yylval.string += '\f'; }
+<STR>\\\" { *yylval.string += '\"'; }
+<STR>\\\\ { *yylval.string += '\\'; }
 <STR>\\[0-9]{3} {
-  int val = atoi(yytext+1);
-  while (val > 256)
-    val -= 256;
-  pbrt::add_string_char(val);
+    int val = atoi(yytext+1);
+    while (val > 256)
+        val -= 256;
+    *yylval.string += val; 
+}
+<STR>\\\n { pbrt::parse::currentLineNumber++; }
+<STR>\\. {  yylval.string += yytext[1]; }
+<STR>\" {
+    BEGIN INITIAL;
+    CHECK(yylval.string != nullptr);
+    return STRING;
+}
+<STR>. { *yylval.string += yytext[0]; }
+<STR>\n { pbrt::Error("Unterminated string!"); }
+
+. {
+    pbrt::Error("Illegal character: %c (0x%x)", yytext[0], int(yytext[0]));
 }
 
-
-<STR>\\\n {pbrt::line_num++;}
-<STR>\\. { pbrt::add_string_char(yytext[1]);}
-<STR>\" {BEGIN INITIAL; return STRING;}
-<STR>. {pbrt::add_string_char(yytext[0]);}
-<STR>\n {pbrt::Error("Unterminated string!");}
-
-. { pbrt::Error("Illegal character: %c (0x%x)", yytext[0], int(yytext[0])); }
 %%
+
 int yywrap() {
-    if (pbrt::includeStack.size() == 0) return 1;
-    pbrt::include_pop();
+    if (pbrt::parse::includeStack.size() == 0) return 1;
+    pbrt::parse::includePop();
     return 0;
 }
-
-
-
