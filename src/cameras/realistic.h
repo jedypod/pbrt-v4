@@ -55,7 +55,7 @@ class RealisticCamera : public Camera {
     RealisticCamera(const AnimatedTransform &CameraToWorld, Float shutterOpen,
                     Float shutterClose, Float apertureDiameter,
                     Float focusDistance, bool simpleWeighting,
-                    std::vector<Float> &lensData, Film *film,
+                    std::vector<Float> &lensData, std::unique_ptr<Film> film,
                     const Medium *medium);
     Float GenerateRay(const CameraSample &sample, Ray *) const;
 
@@ -107,9 +107,9 @@ class RealisticCamera : public Camera {
     void TestExitPupilBounds() const;
 };
 
-RealisticCamera *CreateRealisticCamera(const ParamSet &params,
-                                       const AnimatedTransform &cam2world,
-                                       Film *film, const Medium *medium);
+std::shared_ptr<RealisticCamera> CreateRealisticCamera(
+    const ParamSet &params, const AnimatedTransform &cam2world,
+    std::unique_ptr<Film> film, const Medium *medium);
 
 }  // namespace pbrt
 

@@ -41,6 +41,8 @@
 // filters/sinc.h*
 #include "filter.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // Sinc Filter Declarations
@@ -66,7 +68,7 @@ class LanczosSincFilter : public Filter {
     const Float tau;
 };
 
-LanczosSincFilter *CreateSincFilter(const ParamSet &ps);
+std::unique_ptr<LanczosSincFilter> CreateSincFilter(const ParamSet &ps);
 
 }  // namespace pbrt
 

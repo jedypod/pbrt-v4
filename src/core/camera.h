@@ -47,6 +47,7 @@
 #include "stringprint.h"
 
 #include <iostream>
+#include <memory>
 
 namespace pbrt {
 
@@ -55,7 +56,7 @@ class Camera {
   public:
     // Camera Interface
     Camera(const AnimatedTransform &CameraToWorld, Float shutterOpen,
-           Float shutterClose, Film *film, const Medium *medium);
+           Float shutterClose, std::unique_ptr<Film> film, const Medium *medium);
     virtual ~Camera();
     virtual Float GenerateRay(const CameraSample &sample, Ray *ray) const = 0;
     virtual Float GenerateRayDifferential(const CameraSample &sample,
@@ -69,7 +70,7 @@ class Camera {
     // Camera Public Data
     AnimatedTransform CameraToWorld;
     const Float shutterOpen, shutterClose;
-    Film *film;
+    std::unique_ptr<Film> film;
     const Medium *medium;
 };
 
@@ -91,9 +92,10 @@ class ProjectiveCamera : public Camera {
     ProjectiveCamera(const AnimatedTransform &CameraToWorld,
                      const Transform &CameraToScreen,
                      const Bounds2f &screenWindow, Float shutterOpen,
-                     Float shutterClose, Float lensr, Float focald, Film *film,
-                     const Medium *medium)
-        : Camera(CameraToWorld, shutterOpen, shutterClose, film, medium),
+                     Float shutterClose, Float lensr, Float focald,
+                     std::unique_ptr<Film> f, const Medium *medium)
+        : Camera(CameraToWorld, shutterOpen, shutterClose, std::move(f),
+                 medium),
           CameraToScreen(CameraToScreen) {
         // Initialize depth of field parameters
         lensRadius = lensr;

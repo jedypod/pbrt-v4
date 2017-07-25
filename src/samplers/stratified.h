@@ -39,8 +39,10 @@
 #define PBRT_SAMPLERS_STRATIFIED_H
 
 // samplers/stratified.h*
-#include "sampler.h"
 #include "rng.h"
+#include "sampler.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -63,7 +65,8 @@ class StratifiedSampler : public PixelSampler {
     const bool jitterSamples;
 };
 
-StratifiedSampler *CreateStratifiedSampler(const ParamSet &params);
+std::unique_ptr<StratifiedSampler> CreateStratifiedSampler(
+    const ParamSet &params);
 
 }  // namespace pbrt
 

@@ -90,14 +90,14 @@ Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
     return L;
 }
 
-WhittedIntegrator *CreateWhittedIntegrator(
-    const ParamSet &params, std::shared_ptr<Sampler> sampler,
+std::unique_ptr<WhittedIntegrator> CreateWhittedIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
-      if (pb.size() != 4)
+        if (pb.size() != 4)
             Error("Expected four values for \"pixelbounds\" parameter. Got %d.",
                   (int)pb.size());
         else {
@@ -107,7 +107,8 @@ WhittedIntegrator *CreateWhittedIntegrator(
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
-    return new WhittedIntegrator(maxDepth, camera, sampler, pixelBounds);
+    return std::make_unique<WhittedIntegrator>(maxDepth, camera,
+                                               std::move(sampler), pixelBounds);
 }
 
 }  // namespace pbrt

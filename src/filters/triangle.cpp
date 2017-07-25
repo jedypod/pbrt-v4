@@ -43,11 +43,11 @@ Float TriangleFilter::Evaluate(const Point2f &p) const {
            std::max((Float)0, radius.y - std::abs(p.y));
 }
 
-TriangleFilter *CreateTriangleFilter(const ParamSet &ps) {
+std::unique_ptr<TriangleFilter> CreateTriangleFilter(const ParamSet &ps) {
     // Find common filter parameters
     Float xw = ps.GetOneFloat("xwidth", 2.f);
     Float yw = ps.GetOneFloat("ywidth", 2.f);
-    return new TriangleFilter(Vector2f(xw, yw));
+    return std::make_unique<TriangleFilter>(Vector2f(xw, yw));
 }
 
 }  // namespace pbrt

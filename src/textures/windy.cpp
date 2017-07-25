@@ -30,25 +30,24 @@
 
  */
 
-
 // textures/windy.cpp*
 #include "textures/windy.h"
 
 namespace pbrt {
 
 // WindyTexture Method Definitions
-WindyTexture<Float> *CreateWindyFloatTexture(const Transform &tex2world,
-                                             const TextureParams &tp) {
+std::shared_ptr<WindyTexture<Float>> CreateWindyFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new WindyTexture<Float>(std::move(map));
+    return std::make_shared<WindyTexture<Float>>(std::move(map));
 }
 
-WindyTexture<Spectrum> *CreateWindySpectrumTexture(const Transform &tex2world,
-                                                   const TextureParams &tp) {
+std::shared_ptr<WindyTexture<Spectrum>> CreateWindySpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new WindyTexture<Spectrum>(std::move(map));
+    return std::make_shared<WindyTexture<Spectrum>>(std::move(map));
 }
 
 }  // namespace pbrt

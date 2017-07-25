@@ -43,6 +43,8 @@
 #include "integrator.h"
 #include "lightdistrib.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // VolPathIntegrator Declarations
@@ -50,10 +52,10 @@ class VolPathIntegrator : public SamplerIntegrator {
   public:
     // VolPathIntegrator Public Methods
     VolPathIntegrator(int maxDepth, std::shared_ptr<const Camera> camera,
-                      std::shared_ptr<Sampler> sampler,
+                      std::unique_ptr<Sampler> sampler,
                       const Bounds2i &pixelBounds, Float rrThreshold = 1,
                       const std::string &lightSampleStrategy = "spatial")
-        : SamplerIntegrator(camera, sampler, pixelBounds),
+        : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
           maxDepth(maxDepth),
           rrThreshold(rrThreshold),
           lightSampleStrategy(lightSampleStrategy) { }
@@ -69,8 +71,8 @@ class VolPathIntegrator : public SamplerIntegrator {
     std::unique_ptr<LightDistribution> lightDistribution;
 };
 
-VolPathIntegrator *CreateVolPathIntegrator(
-    const ParamSet &params, std::shared_ptr<Sampler> sampler,
+std::unique_ptr<VolPathIntegrator> CreateVolPathIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera);
 
 }  // namespace pbrt

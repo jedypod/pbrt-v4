@@ -47,6 +47,8 @@
 #include "rng.h"
 #include <unordered_map>
 
+#include <memory>
+
 namespace pbrt {
 
 // MLTSampler Declarations
@@ -133,8 +135,8 @@ class MLTIntegrator : public Integrator {
     const Float sigma, largeStepProbability;
 };
 
-MLTIntegrator *CreateMLTIntegrator(const ParamSet &params,
-                                   std::shared_ptr<const Camera> camera);
+std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(
+    const ParamSet &params, std::shared_ptr<const Camera> camera);
 
 }  // namespace pbrt
 

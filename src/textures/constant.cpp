@@ -30,21 +30,21 @@
 
  */
 
-
 // textures/constant.cpp*
 #include "textures/constant.h"
 
 namespace pbrt {
 
 // ConstantTexture Method Definitions
-ConstantTexture<Float> *CreateConstantFloatTexture(const Transform &tex2world,
-                                                   const TextureParams &tp) {
-    return new ConstantTexture<Float>(tp.GetOneFloat("value", 1.f));
+std::shared_ptr<ConstantTexture<Float>> CreateConstantFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
+    return std::make_shared<ConstantTexture<Float>>(
+        tp.GetOneFloat("value", 1.f));
 }
 
-ConstantTexture<Spectrum> *CreateConstantSpectrumTexture(
+std::shared_ptr<ConstantTexture<Spectrum>> CreateConstantSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
-    return new ConstantTexture<Spectrum>(
+    return std::make_shared<ConstantTexture<Spectrum>>(
         tp.GetOneSpectrum("value", Spectrum(1.f)));
 }
 

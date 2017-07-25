@@ -314,7 +314,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
         lightToIndex[scene.lights[i].get()] = i;
 
     // Partition the image into tiles
-    Film *film = camera->film;
+    Film *film = camera->film.get();
     const Bounds2i sampleBounds = film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
     const int tileSize = 16;
@@ -533,9 +533,9 @@ Spectrum ConnectBDPT(
     return L;
 }
 
-BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
-                                     std::shared_ptr<Sampler> sampler,
-                                     std::shared_ptr<const Camera> camera) {
+std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
+    std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     bool visualizeStrategies = params.GetOneBool("visualizestrategies", false);
     bool visualizeWeights = params.GetOneBool("visualizeweights", false);
@@ -561,10 +561,11 @@ BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
         }
     }
 
-    std::string lightStrategy = params.GetOneString("lightsamplestrategy",
-                                                     "power");
-    return new BDPTIntegrator(sampler, camera, maxDepth, visualizeStrategies,
-                              visualizeWeights, pixelBounds, lightStrategy);
+    std::string lightStrategy =
+        params.GetOneString("lightsamplestrategy", "power");
+    return std::make_unique<BDPTIntegrator>(
+        std::move(sampler), camera, maxDepth, visualizeStrategies,
+        visualizeWeights, pixelBounds, lightStrategy);
 }
 
 }  // namespace pbrt

@@ -40,10 +40,10 @@ namespace pbrt {
 // Box Filter Method Definitions
 Float BoxFilter::Evaluate(const Point2f &p) const { return 1.; }
 
-BoxFilter *CreateBoxFilter(const ParamSet &ps) {
+std::unique_ptr<BoxFilter> CreateBoxFilter(const ParamSet &ps) {
     Float xw = ps.GetOneFloat("xwidth", 0.5f);
     Float yw = ps.GetOneFloat("ywidth", 0.5f);
-    return new BoxFilter(Vector2f(xw, yw));
+    return std::make_unique<BoxFilter>(Vector2f(xw, yw));
 }
 
 }  // namespace pbrt

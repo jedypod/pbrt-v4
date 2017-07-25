@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_MARBLE_H
 
 // textures/marble.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -95,10 +97,10 @@ class MarbleTexture : public Texture<Spectrum> {
     const Float omega, scale, variation;
 };
 
-Texture<Float> *CreateMarbleFloatTexture(const Transform &tex2world,
-                                         const TextureParams &tp);
-MarbleTexture *CreateMarbleSpectrumTexture(const Transform &tex2world,
-                                           const TextureParams &tp);
+std::shared_ptr<Texture<Float>> CreateMarbleFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<MarbleTexture> CreateMarbleSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

@@ -49,9 +49,9 @@ namespace pbrt {
 // AOIntegrator Method Definitions
 AOIntegrator::AOIntegrator(bool cosSample, int ns,
                            std::shared_ptr<const Camera> camera,
-                           std::shared_ptr<Sampler> sampler,
+                           std::unique_ptr<Sampler> sampler,
                            const Bounds2i &pixelBounds)
-    : SamplerIntegrator(camera, sampler, pixelBounds),
+    : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
       cosSample(cosSample) {
     nSamples = sampler->RoundCount(ns);
     if (ns != nSamples)
@@ -107,9 +107,9 @@ Spectrum AOIntegrator::Li(const RayDifferential &r, const Scene &scene,
     return L;
 }
 
-AOIntegrator *CreateAOIntegrator(const ParamSet &params,
-                                 std::shared_ptr<Sampler> sampler,
-                                 std::shared_ptr<const Camera> camera) {
+std::unique_ptr<AOIntegrator> CreateAOIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
+    std::shared_ptr<const Camera> camera) {
     int np;
     ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
@@ -127,7 +127,8 @@ AOIntegrator *CreateAOIntegrator(const ParamSet &params,
     Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     bool cosSample = params.GetOneBool("cossample", "true");
     int nSamples = params.GetOneInt("nsamples", 64);
-    return new AOIntegrator(cosSample, nSamples, camera, sampler, pixelBounds);
+    return std::make_unique<AOIntegrator>(cosSample, nSamples, camera,
+                                          std::move(sampler), pixelBounds);
 }
 
 }  // namespace pbrt

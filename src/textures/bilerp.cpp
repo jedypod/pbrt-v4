@@ -30,7 +30,6 @@
 
  */
 
-
 // textures/bilerp.cpp*
 #include "textures/bilerp.h"
 
@@ -40,8 +39,8 @@
 namespace pbrt {
 
 // BilerpTexture Method Definitions
-BilerpTexture<Float> *CreateBilerpFloatTexture(const Transform &tex2world,
-                                               const TextureParams &tp) {
+std::shared_ptr<BilerpTexture<Float>> CreateBilerpFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
     std::string type = tp.GetOneString("mapping", "uv");
@@ -59,19 +58,18 @@ BilerpTexture<Float> *CreateBilerpFloatTexture(const Transform &tex2world,
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
-    return new BilerpTexture<Float>(
+    return std::make_shared<BilerpTexture<Float>>(
         std::move(map), tp.GetOneFloat("v00", 0.f), tp.GetOneFloat("v01", 1.f),
         tp.GetOneFloat("v10", 0.f), tp.GetOneFloat("v11", 1.f));
 }
 
-BilerpTexture<Spectrum> *CreateBilerpSpectrumTexture(const Transform &tex2world,
-                                                     const TextureParams &tp) {
+std::shared_ptr<BilerpTexture<Spectrum>> CreateBilerpSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
     std::string type = tp.GetOneString("mapping", "uv");
@@ -89,13 +87,12 @@ BilerpTexture<Spectrum> *CreateBilerpSpectrumTexture(const Transform &tex2world,
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
-    return new BilerpTexture<Spectrum>(
+    return std::make_shared<BilerpTexture<Spectrum>>(
         std::move(map), tp.GetOneSpectrum("v00", 0.f),
         tp.GetOneSpectrum("v01", 1.f), tp.GetOneSpectrum("v10", 0.f),
         tp.GetOneSpectrum("v11", 1.f));

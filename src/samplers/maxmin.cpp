@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/maxmin.cpp*
 #include "samplers/maxmin.h"
 #include "paramset.h"
@@ -73,11 +72,12 @@ std::unique_ptr<Sampler> MaxMinDistSampler::Clone(int seed) {
     return std::move(mmds);
 }
 
-MaxMinDistSampler *CreateMaxMinDistSampler(const ParamSet &params) {
+std::unique_ptr<MaxMinDistSampler> CreateMaxMinDistSampler(
+    const ParamSet &params) {
     int nsamp = params.GetOneInt("pixelsamples", 16);
     int sd = params.GetOneInt("dimensions", 4);
     if (PbrtOptions.quickRender) nsamp = 1;
-    return new MaxMinDistSampler(nsamp, sd);
+    return std::make_unique<MaxMinDistSampler>(nsamp, sd);
 }
 
 }  // namespace pbrt

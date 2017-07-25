@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_MIX_H
 
 // textures/mix.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -65,10 +67,10 @@ class MixTexture : public Texture<T> {
     std::shared_ptr<Texture<Float>> amount;
 };
 
-MixTexture<Float> *CreateMixFloatTexture(const Transform &tex2world,
-                                         const TextureParams &tp);
-MixTexture<Spectrum> *CreateMixSpectrumTexture(const Transform &tex2world,
-                                               const TextureParams &tp);
+std::shared_ptr<MixTexture<Float>> CreateMixFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<MixTexture<Spectrum>> CreateMixSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

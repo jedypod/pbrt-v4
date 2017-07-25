@@ -43,6 +43,8 @@
 #include "camera.h"
 #include "film.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // OrthographicCamera Declarations
@@ -52,10 +54,11 @@ class OrthographicCamera : public ProjectiveCamera {
     OrthographicCamera(const AnimatedTransform &CameraToWorld,
                        const Bounds2f &screenWindow, Float shutterOpen,
                        Float shutterClose, Float lensRadius,
-                       Float focalDistance, Film *film, const Medium *medium)
+                       Float focalDistance, std::unique_ptr<Film> film,
+                       const Medium *medium)
         : ProjectiveCamera(CameraToWorld, Orthographic(0, 1), screenWindow,
                            shutterOpen, shutterClose, lensRadius, focalDistance,
-                           film, medium) {
+                           std::move(film), medium) {
         // Compute differential changes in origin for orthographic camera rays
         dxCamera = RasterToCamera(Vector3f(1, 0, 0));
         dyCamera = RasterToCamera(Vector3f(0, 1, 0));
@@ -69,9 +72,9 @@ class OrthographicCamera : public ProjectiveCamera {
     Vector3f dxCamera, dyCamera;
 };
 
-OrthographicCamera *CreateOrthographicCamera(const ParamSet &params,
-                                             const AnimatedTransform &cam2world,
-                                             Film *film, const Medium *medium);
+std::shared_ptr<OrthographicCamera> CreateOrthographicCamera(
+    const ParamSet &params, const AnimatedTransform &cam2world,
+    std::unique_ptr<Film> film, const Medium *medium);
 
 }  // namespace pbrt
 

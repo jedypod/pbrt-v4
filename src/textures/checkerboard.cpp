@@ -30,7 +30,6 @@
 
  */
 
-
 // textures/checkerboard.cpp*
 #include "textures/checkerboard.h"
 
@@ -39,8 +38,8 @@
 namespace pbrt {
 
 // CheckerboardTexture Method Definitions
-Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
-                                               const TextureParams &tp) {
+std::shared_ptr<Texture<Float>> CreateCheckerboardFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     int dim = tp.GetOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
         Error("%d dimensional checkerboard texture not supported", dim);
@@ -86,17 +85,18 @@ Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
                 aa.c_str());
             aaMethod = AAMethod::ClosedForm;
         }
-        return new Checkerboard2DTexture<Float>(std::move(map), tex1, tex2,
-                                                aaMethod);
+        return std::make_shared<Checkerboard2DTexture<Float>>(
+            std::move(map), tex1, tex2, aaMethod);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         std::unique_ptr<TextureMapping3D> map(new IdentityMapping3D(tex2world));
-        return new Checkerboard3DTexture<Float>(std::move(map), tex1, tex2);
+        return std::make_shared<Checkerboard3DTexture<Float>>(std::move(map),
+                                                              tex1, tex2);
     }
 }
 
-Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
-                                                     const TextureParams &tp) {
+std::shared_ptr<Texture<Spectrum>> CreateCheckerboardSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     int dim = tp.GetOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
         Error("%d dimensional checkerboard texture not supported", dim);
@@ -144,12 +144,12 @@ Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
                 aa.c_str());
             aaMethod = AAMethod::ClosedForm;
         }
-        return new Checkerboard2DTexture<Spectrum>(std::move(map), tex1, tex2,
-                                                   aaMethod);
+        return std::make_shared<Checkerboard2DTexture<Spectrum>>(
+            std::move(map), tex1, tex2, aaMethod);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         std::unique_ptr<TextureMapping3D> map(new IdentityMapping3D(tex2world));
-        return new Checkerboard3DTexture<Spectrum>(
+        return std::make_shared<Checkerboard3DTexture<Spectrum>>(
             std::make_unique<IdentityMapping3D>(tex2world), tex1, tex2);
     }
 }

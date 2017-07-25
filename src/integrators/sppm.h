@@ -44,6 +44,8 @@
 #include "camera.h"
 #include "film.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // SPPM Declarations
@@ -73,8 +75,8 @@ class SPPMIntegrator : public Integrator {
     const int writeFrequency;
 };
 
-Integrator *CreateSPPMIntegrator(const ParamSet &params,
-                                 std::shared_ptr<const Camera> camera);
+std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
+    const ParamSet &params, std::shared_ptr<const Camera> camera);
 
 }  // namespace pbrt
 

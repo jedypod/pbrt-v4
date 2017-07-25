@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_FBM_H
 
 // textures/fbm.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -65,10 +67,10 @@ class FBmTexture : public Texture<T> {
     const int octaves;
 };
 
-FBmTexture<Float> *CreateFBmFloatTexture(const Transform &tex2world,
-                                         const TextureParams &tp);
-FBmTexture<Spectrum> *CreateFBmSpectrumTexture(const Transform &tex2world,
-                                               const TextureParams &tp);
+std::shared_ptr<FBmTexture<Float>> CreateFBmFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<FBmTexture<Spectrum>> CreateFBmSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

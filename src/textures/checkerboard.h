@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_CHECKERBOARD_H
 
 // textures/checkerboard.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -133,10 +135,10 @@ class Checkerboard3DTexture : public Texture<T> {
     std::shared_ptr<Texture<T>> tex1, tex2;
 };
 
-Texture<Float> *CreateCheckerboardFloatTexture(const Transform &tex2world,
-                                               const TextureParams &tp);
-Texture<Spectrum> *CreateCheckerboardSpectrumTexture(const Transform &tex2world,
-                                                     const TextureParams &tp);
+std::shared_ptr<Texture<Float>> CreateCheckerboardFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<Texture<Spectrum>> CreateCheckerboardSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

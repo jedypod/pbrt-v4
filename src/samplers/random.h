@@ -39,8 +39,10 @@
 #define PBRT_SAMPLERS_RANDOM_H
 
 // samplers/random.h*
-#include "sampler.h"
 #include "rng.h"
+#include "sampler.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -56,7 +58,7 @@ class RandomSampler : public Sampler {
     RNG rng;
 };
 
-Sampler *CreateRandomSampler(const ParamSet &params);
+std::unique_ptr<RandomSampler> CreateRandomSampler(const ParamSet &params);
 
 }  // namespace pbrt
 

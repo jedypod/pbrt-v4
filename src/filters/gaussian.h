@@ -41,6 +41,8 @@
 // filters/gaussian.h*
 #include "filter.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // Gaussian Filter Declarations
@@ -65,7 +67,7 @@ class GaussianFilter : public Filter {
     }
 };
 
-GaussianFilter *CreateGaussianFilter(const ParamSet &ps);
+std::unique_ptr<GaussianFilter> CreateGaussianFilter(const ParamSet &ps);
 
 }  // namespace pbrt
 

@@ -208,7 +208,7 @@ void Film::WriteImage(Float splatScale) {
     rgb32.Write(filename, croppedPixelBounds, fullResolution);
 }
 
-Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
+std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
     // Intentionally use GetOneString() rather than GetOneFilename() here
     // so that the rendered image is left in the working directory, rather
     // than the directory the scene file lives in.
@@ -243,8 +243,8 @@ Film *CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
     Float diagonal = params.GetOneFloat("diagonal", 35.);
     Float maxSampleLuminance = params.GetOneFloat("maxsampleluminance",
                                                    Infinity);
-    return new Film(Point2i(xres, yres), crop, std::move(filter), diagonal,
-                    filename, scale, maxSampleLuminance);
+    return std::make_unique<Film>(Point2i(xres, yres), crop, std::move(filter),
+                                  diagonal, filename, scale, maxSampleLuminance);
 }
 
 }  // namespace pbrt

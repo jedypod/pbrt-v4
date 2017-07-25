@@ -41,31 +41,30 @@
 // textures/imagemap.h*
 #include "pbrt.h"
 
-#include "texture.h"
 #include "mipmap.h"
+#include "texture.h"
 
 #include <map>
+#include <memory>
+
 #include <memory>
 
 namespace pbrt {
 
 // TexInfo Declarations
 struct TexInfo {
-    TexInfo(const std::string &f, const std::string &filt, Float ma, WrapMode wm,
-            bool gamma)
-        : filename(f),
-          filter(filt),
-          maxAniso(ma),
-          wrapMode(wm),
-          gamma(gamma) {}
+    TexInfo(const std::string &f, const std::string &filt, Float ma,
+            WrapMode wm, bool gamma)
+        : filename(f), filter(filt), maxAniso(ma), wrapMode(wm), gamma(gamma) {}
     std::string filename;
     std::string filter;
     Float maxAniso;
     WrapMode wrapMode;
     bool gamma;
     bool operator<(const TexInfo &t2) const {
-      return std::tie(filename, filter, maxAniso, gamma, wrapMode) <
-          std::tie(t2.filename, t2.filter, t2.maxAniso, t2.gamma, t2.wrapMode);
+        return std::tie(filename, filter, maxAniso, gamma, wrapMode) <
+               std::tie(t2.filename, t2.filter, t2.maxAniso, t2.gamma,
+                        t2.wrapMode);
     }
 };
 
@@ -92,9 +91,9 @@ class ImageTexture : public Texture<T> {
 
   private:
     // ImageTexture Private Methods
-    static MIPMap *GetTexture(
-        const std::string &filename, const std::string &filter, Float maxAniso,
-        WrapMode wm, bool gamma);
+    static MIPMap *GetTexture(const std::string &filename,
+                              const std::string &filter, Float maxAniso,
+                              WrapMode wm, bool gamma);
 
     // ImageTexture Private Data
     std::unique_ptr<TextureMapping2D> mapping;
@@ -103,9 +102,9 @@ class ImageTexture : public Texture<T> {
     static std::map<TexInfo, std::unique_ptr<MIPMap>> textures;
 };
 
-ImageTexture<Float> *CreateImageFloatTexture(const Transform &tex2world,
-                                             const TextureParams &tp);
-ImageTexture<Spectrum> *CreateImageSpectrumTexture(
+std::shared_ptr<ImageTexture<Float>> CreateImageFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<ImageTexture<Spectrum>> CreateImageSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt

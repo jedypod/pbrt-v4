@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_WINDY_H
 
 // textures/windy.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -64,10 +66,10 @@ class WindyTexture : public Texture<T> {
     std::unique_ptr<TextureMapping3D> mapping;
 };
 
-WindyTexture<Float> *CreateWindyFloatTexture(const Transform &tex2world,
-                                             const TextureParams &tp);
-WindyTexture<Spectrum> *CreateWindySpectrumTexture(const Transform &tex2world,
-                                                   const TextureParams &tp);
+std::shared_ptr<WindyTexture<Float>> CreateWindyFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<WindyTexture<Spectrum>> CreateWindySpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

@@ -40,14 +40,14 @@
 namespace pbrt {
 
 // Camera Method Definitions
-Camera::~Camera() { delete film; }
+Camera::~Camera() { }
 
 Camera::Camera(const AnimatedTransform &CameraToWorld, Float shutterOpen,
-               Float shutterClose, Film *film, const Medium *medium)
+               Float shutterClose, std::unique_ptr<Film> film, const Medium *medium)
     : CameraToWorld(CameraToWorld),
       shutterOpen(shutterOpen),
       shutterClose(shutterClose),
-      film(film),
+      film(std::move(film)),
       medium(medium) {
     if (CameraToWorld.HasScale())
         Warning(

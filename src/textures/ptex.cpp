@@ -155,16 +155,16 @@ T PtexTexture<T>::Evaluate(const SurfaceInteraction &si) const {
     return fromResult<T>(nc, result);
 }
 
-PtexTexture<Float> *CreatePtexFloatTexture(const Transform &tex2world,
-                                           const TextureParams &tp) {
+std::shared_ptr<PtexTexture<Float>> CreatePtexFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     std::string filename = tp.GetOneFilename("filename", "");
-    return new PtexTexture<Float>(filename);
+    return std::make_shared<PtexTexture<Float>>(filename);
 }
 
-PtexTexture<Spectrum> *CreatePtexSpectrumTexture(const Transform &tex2world,
-                                                 const TextureParams &tp) {
+std::shared_ptr<PtexTexture<Spectrum>> CreatePtexSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     std::string filename = tp.GetOneFilename("filename", "");
-    return new PtexTexture<Spectrum>(filename);
+    return std::make_shared<PtexTexture<Spectrum>>(filename);
 }
 
 }  // namespace pbrt

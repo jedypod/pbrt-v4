@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/zerotwosequence.cpp*
 #include "samplers/zerotwosequence.h"
 
@@ -82,11 +81,12 @@ std::unique_ptr<Sampler> ZeroTwoSequenceSampler::Clone(int seed) {
     return std::move(lds);
 }
 
-ZeroTwoSequenceSampler *CreateZeroTwoSequenceSampler(const ParamSet &params) {
+std::unique_ptr<ZeroTwoSequenceSampler> CreateZeroTwoSequenceSampler(
+    const ParamSet &params) {
     int nsamp = params.GetOneInt("pixelsamples", 16);
     int sd = params.GetOneInt("dimensions", 4);
     if (PbrtOptions.quickRender) nsamp = 1;
-    return new ZeroTwoSequenceSampler(nsamp, sd);
+    return std::make_unique<ZeroTwoSequenceSampler>(nsamp, sd);
 }
 
 }  // namespace pbrt

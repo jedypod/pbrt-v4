@@ -51,10 +51,10 @@ STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 // PathIntegrator Method Definitions
 PathIntegrator::PathIntegrator(int maxDepth,
                                std::shared_ptr<const Camera> camera,
-                               std::shared_ptr<Sampler> sampler,
+                               std::unique_ptr<Sampler> sampler,
                                const Bounds2i &pixelBounds, Float rrThreshold,
                                const std::string &lightSampleStrategy)
-    : SamplerIntegrator(camera, sampler, pixelBounds),
+    : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
       maxDepth(maxDepth),
       rrThreshold(rrThreshold),
       lightSampleStrategy(lightSampleStrategy) {}
@@ -190,14 +190,14 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     return L;
 }
 
-PathIntegrator *CreatePathIntegrator(const ParamSet &params,
-                                     std::shared_ptr<Sampler> sampler,
-                                     std::shared_ptr<const Camera> camera) {
+std::unique_ptr<PathIntegrator> CreatePathIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
+    std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
-      if (pb.size() != 4)
+        if (pb.size() != 4)
             Error("Expected four values for \"pixelbounds\" parameter. Got %d.",
                   (int)pb.size());
         else {
@@ -210,8 +210,9 @@ PathIntegrator *CreatePathIntegrator(const ParamSet &params,
     Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
         params.GetOneString("lightsamplestrategy", "spatial");
-    return new PathIntegrator(maxDepth, camera, sampler, pixelBounds,
-                              rrThreshold, lightStrategy);
+    return std::make_unique<PathIntegrator>(maxDepth, camera,
+                                            std::move(sampler), pixelBounds,
+                                            rrThreshold, lightStrategy);
 }
 
 }  // namespace pbrt

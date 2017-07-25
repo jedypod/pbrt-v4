@@ -42,6 +42,8 @@
 #include "camera.h"
 #include "film.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // EnvironmentCamera Declarations
@@ -49,14 +51,14 @@ class EnvironmentCamera : public Camera {
   public:
     // EnvironmentCamera Public Methods
     EnvironmentCamera(const AnimatedTransform &CameraToWorld, Float shutterOpen,
-                      Float shutterClose, Film *film, const Medium *medium)
-        : Camera(CameraToWorld, shutterOpen, shutterClose, film, medium) {}
+                      Float shutterClose, std::unique_ptr<Film> film, const Medium *medium)
+        : Camera(CameraToWorld, shutterOpen, shutterClose, std::move(film), medium) {}
     Float GenerateRay(const CameraSample &sample, Ray *) const;
 };
 
-EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
-                                           const AnimatedTransform &cam2world,
-                                           Film *film, const Medium *medium);
+std::shared_ptr<EnvironmentCamera> CreateEnvironmentCamera(
+        const ParamSet &params, const AnimatedTransform &cam2world,
+        std::unique_ptr<Film> film, const Medium *medium);
 
 }  // namespace pbrt
 

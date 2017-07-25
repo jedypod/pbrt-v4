@@ -122,9 +122,9 @@ Float OrthographicCamera::GenerateRayDifferential(const CameraSample &sample,
     return 1;
 }
 
-OrthographicCamera *CreateOrthographicCamera(const ParamSet &params,
-                                             const AnimatedTransform &cam2world,
-                                             Film *film, const Medium *medium) {
+std::shared_ptr<OrthographicCamera> CreateOrthographicCamera(
+        const ParamSet &params, const AnimatedTransform &cam2world,
+        std::unique_ptr<Film> film, const Medium *medium) {
     // Extract common camera parameters from _ParamSet_
     Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
@@ -160,8 +160,9 @@ OrthographicCamera *CreateOrthographicCamera(const ParamSet &params,
         } else
             Error("\"screenwindow\" should have four values");
     }
-    return new OrthographicCamera(cam2world, screen, shutteropen, shutterclose,
-                                  lensradius, focaldistance, film, medium);
+    return std::make_shared<OrthographicCamera>(
+        cam2world, screen, shutteropen, shutterclose, lensradius, focaldistance,
+        std::move(film), medium);
 }
 
 }  // namespace pbrt

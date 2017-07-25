@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_WRINKLED_H
 
 // textures/wrinkled.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -66,9 +68,9 @@ class WrinkledTexture : public Texture<T> {
     Float omega;
 };
 
-WrinkledTexture<Float> *CreateWrinkledFloatTexture(const Transform &tex2world,
-                                                   const TextureParams &tp);
-WrinkledTexture<Spectrum> *CreateWrinkledSpectrumTexture(
+std::shared_ptr<WrinkledTexture<Float>> CreateWrinkledFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<WrinkledTexture<Spectrum>> CreateWrinkledSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt

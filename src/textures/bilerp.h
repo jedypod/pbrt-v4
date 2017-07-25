@@ -42,6 +42,8 @@
 #include "pbrt.h"
 #include "texture.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // BilerpTexture Declarations
@@ -65,10 +67,10 @@ class BilerpTexture : public Texture<T> {
     const T v00, v01, v10, v11;
 };
 
-BilerpTexture<Float> *CreateBilerpFloatTexture(const Transform &tex2world,
-                                               const TextureParams &tp);
-BilerpTexture<Spectrum> *CreateBilerpSpectrumTexture(const Transform &tex2world,
-                                                     const TextureParams &tp);
+std::shared_ptr<BilerpTexture<Float>> CreateBilerpFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<BilerpTexture<Spectrum>> CreateBilerpSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

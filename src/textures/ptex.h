@@ -44,6 +44,8 @@
 
 #include <string>
 
+#include <memory>
+
 namespace pbrt {
 
 // PtexTexture Declarations
@@ -60,10 +62,10 @@ class PtexTexture : public Texture<T> {
     const std::string filename;
 };
 
-PtexTexture<Float> *CreatePtexFloatTexture(const Transform &tex2world,
-                                           const TextureParams &tp);
-PtexTexture<Spectrum> *CreatePtexSpectrumTexture(const Transform &tex2world,
-                                                 const TextureParams &tp);
+std::shared_ptr<PtexTexture<Float>> CreatePtexFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<PtexTexture<Spectrum>> CreatePtexSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

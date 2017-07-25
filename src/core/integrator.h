@@ -44,6 +44,7 @@
 #include "bounds.h"
 #include "geometry.h"
 #include "sampling.h"
+#include "sampler.h"
 
 #include <memory>
 #include <vector>
@@ -79,9 +80,9 @@ class SamplerIntegrator : public Integrator {
   public:
     // SamplerIntegrator Public Methods
     SamplerIntegrator(std::shared_ptr<const Camera> camera,
-                      std::shared_ptr<Sampler> sampler,
+                      std::unique_ptr<Sampler> sampler,
                       const Bounds2i &pixelBounds)
-        : camera(camera), sampler(sampler), pixelBounds(pixelBounds) {}
+        : camera(camera), sampler(std::move(sampler)), pixelBounds(pixelBounds) {}
     virtual void Preprocess(const Scene &scene, Sampler &sampler) {}
     void Render(const Scene &scene);
     virtual Spectrum Li(const RayDifferential &ray, const Scene &scene,
@@ -102,7 +103,7 @@ class SamplerIntegrator : public Integrator {
 
   private:
     // SamplerIntegrator Private Data
-    std::shared_ptr<Sampler> sampler;
+    std::unique_ptr<Sampler> sampler;
     const Bounds2i pixelBounds;
 };
 

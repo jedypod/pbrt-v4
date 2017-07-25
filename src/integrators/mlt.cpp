@@ -265,8 +265,8 @@ void MLTIntegrator::Render(const Scene &scene) {
     camera->film->WriteImage(b / mutationsPerPixel);
 }
 
-MLTIntegrator *CreateMLTIntegrator(const ParamSet &params,
-                                   std::shared_ptr<const Camera> camera) {
+std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(
+    const ParamSet &params, std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     int nBootstrap = params.GetOneInt("bootstrapsamples", 100000);
     int64_t nChains = params.GetOneInt("chains", 1000);
@@ -278,8 +278,9 @@ MLTIntegrator *CreateMLTIntegrator(const ParamSet &params,
         mutationsPerPixel = std::max(1, mutationsPerPixel / 16);
         nBootstrap = std::max(1, nBootstrap / 16);
     }
-    return new MLTIntegrator(camera, maxDepth, nBootstrap, nChains,
-                             mutationsPerPixel, sigma, largeStepProbability);
+    return std::make_unique<MLTIntegrator>(camera, maxDepth, nBootstrap,
+                                           nChains, mutationsPerPixel, sigma,
+                                           largeStepProbability);
 }
 
 }  // namespace pbrt

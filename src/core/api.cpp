@@ -160,9 +160,9 @@ struct TransformSet {
 
 struct RenderOptions {
     // RenderOptions Public Methods
-    Integrator *MakeIntegrator() const;
+    std::unique_ptr<Integrator> MakeIntegrator() const;
     Scene *MakeScene();
-    Camera *MakeCamera() const;
+    std::shared_ptr<Camera> MakeCamera() const;
 
     // RenderOptions Public Data
     Float transformStartTime = 0, transformEndTime = 1;
@@ -478,7 +478,7 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
 std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
                                                  const Transform &tex2world,
                                                  const TextureParams &tp) {
-    Texture<Float> *tex = nullptr;
+    std::shared_ptr<Texture<Float>> tex;
     if (name == "constant")
         tex = CreateConstantFloatTexture(tex2world, tp);
     else if (name == "scale")
@@ -508,13 +508,13 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
     else
         Warning("Float texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
-    return std::shared_ptr<Texture<Float>>(tex);
+    return tex;
 }
 
 std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
     const std::string &name, const Transform &tex2world,
     const TextureParams &tp) {
-    Texture<Spectrum> *tex = nullptr;
+    std::shared_ptr<Texture<Spectrum>> tex;
     if (name == "constant")
         tex = CreateConstantSpectrumTexture(tex2world, tp);
     else if (name == "scale")
@@ -544,7 +544,7 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
     else
         Warning("Spectrum texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
-    return std::shared_ptr<Texture<Spectrum>>(tex);
+    return tex;
 }
 
 std::shared_ptr<Medium> MakeMedium(const std::string &name,
@@ -650,10 +650,10 @@ std::shared_ptr<Primitive> MakeAccelerator(
     return accel;
 }
 
-Camera *MakeCamera(const std::string &name, const ParamSet &paramSet,
-                   const TransformSet &cam2worldSet, Float transformStart,
-                   Float transformEnd, Film *film) {
-    Camera *camera = nullptr;
+std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &paramSet,
+        const TransformSet &cam2worldSet, Float transformStart,
+        Float transformEnd, std::unique_ptr<Film> film) {
+    std::shared_ptr<Camera> camera;
     MediumInterface mediumInterface = graphicsState.CreateMediumInterface();
     static_assert(MaxTransforms == 2,
                   "TransformCache assumes only two transforms");
@@ -663,48 +663,52 @@ Camera *MakeCamera(const std::string &name, const ParamSet &paramSet,
     AnimatedTransform animatedCam2World(cam2world[0], transformStart,
                                         cam2world[1], transformEnd);
     if (name == "perspective")
-        camera = CreatePerspectiveCamera(paramSet, animatedCam2World, film,
+        camera = CreatePerspectiveCamera(paramSet, animatedCam2World, std::move(film),
                                          mediumInterface.outside);
     else if (name == "orthographic")
-        camera = CreateOrthographicCamera(paramSet, animatedCam2World, film,
+        camera = CreateOrthographicCamera(paramSet, animatedCam2World, std::move(film),
                                           mediumInterface.outside);
     else if (name == "realistic")
-        camera = CreateRealisticCamera(paramSet, animatedCam2World, film,
+        camera = CreateRealisticCamera(paramSet, animatedCam2World, std::move(film),
                                        mediumInterface.outside);
     else if (name == "environment")
-        camera = CreateEnvironmentCamera(paramSet, animatedCam2World, film,
+        camera = CreateEnvironmentCamera(paramSet, animatedCam2World, std::move(film),
                                          mediumInterface.outside);
-    else
-        Warning("Camera \"%s\" unknown.", name.c_str());
+    else {
+        Error("Camera \"%s\" unknown.", name.c_str());
+        exit(1);
+    }
     paramSet.ReportUnused();
     return camera;
 }
 
-std::shared_ptr<Sampler> MakeSampler(const std::string &name,
+std::unique_ptr<Sampler> MakeSampler(const std::string &name,
                                      const ParamSet &paramSet,
-                                     const Film *film) {
-    Sampler *sampler = nullptr;
+                                     const Bounds2i &sampleBounds) {
+    std::unique_ptr<Sampler> sampler;
     if (name == "02sequence")
         sampler = CreateZeroTwoSequenceSampler(paramSet);
     else if (name == "maxmindist")
         sampler = CreateMaxMinDistSampler(paramSet);
     else if (name == "halton")
-        sampler = CreateHaltonSampler(paramSet, film->GetSampleBounds());
+        sampler = CreateHaltonSampler(paramSet, sampleBounds);
     else if (name == "sobol")
-        sampler = CreateSobolSampler(paramSet, film->GetSampleBounds());
+        sampler = CreateSobolSampler(paramSet, sampleBounds);
     else if (name == "random")
         sampler = CreateRandomSampler(paramSet);
     else if (name == "stratified")
         sampler = CreateStratifiedSampler(paramSet);
-    else
-        Warning("Sampler \"%s\" unknown.", name.c_str());
+    else {
+        Error("Sampler \"%s\" unknown.", name.c_str());
+        exit(1);
+    }
     paramSet.ReportUnused();
-    return std::shared_ptr<Sampler>(sampler);
+    return sampler;
 }
 
 std::unique_ptr<Filter> MakeFilter(const std::string &name,
                                    const ParamSet &paramSet) {
-    Filter *filter = nullptr;
+    std::unique_ptr<Filter> filter;
     if (name == "box")
         filter = CreateBoxFilter(paramSet);
     else if (name == "gaussian")
@@ -720,16 +724,18 @@ std::unique_ptr<Filter> MakeFilter(const std::string &name,
         exit(1);
     }
     paramSet.ReportUnused();
-    return std::unique_ptr<Filter>(filter);
+    return filter;
 }
 
-Film *MakeFilm(const std::string &name, const ParamSet &paramSet,
-               std::unique_ptr<Filter> filter) {
-    Film *film = nullptr;
+std::unique_ptr<Film> MakeFilm(const std::string &name, const ParamSet &paramSet,
+                               std::unique_ptr<Filter> filter) {
+    std::unique_ptr<Film> film;
     if (name == "image")
         film = CreateFilm(paramSet, std::move(filter));
-    else
-        Warning("Film \"%s\" unknown.", name.c_str());
+    else {
+        Error("Film \"%s\" unknown.", name.c_str());
+        exit(1);
+    }
     paramSet.ReportUnused();
     return film;
 }
@@ -1388,7 +1394,7 @@ void pbrtWorldEnd() {
     if (PbrtOptions.cat || PbrtOptions.toPly) {
         printf("%*sWorldEnd\n", catIndentCount, "");
     } else {
-        std::unique_ptr<Integrator> integrator(renderOptions->MakeIntegrator());
+        std::unique_ptr<Integrator> integrator = renderOptions->MakeIntegrator();
         std::unique_ptr<Scene> scene(renderOptions->MakeScene());
 
         // This is kind of ugly; we directly override the current profiler
@@ -1446,41 +1452,32 @@ Scene *RenderOptions::MakeScene() {
     return scene;
 }
 
-Integrator *RenderOptions::MakeIntegrator() const {
-    std::shared_ptr<const Camera> camera(MakeCamera());
-    if (!camera) {
-        Error("Unable to create camera");
-        return nullptr;
-    }
+std::unique_ptr<Integrator> RenderOptions::MakeIntegrator() const {
+    std::shared_ptr<Camera> camera = MakeCamera();
+    std::unique_ptr<Sampler> sampler =
+        MakeSampler(SamplerName, SamplerParams, camera->film->GetSampleBounds());
 
-    std::shared_ptr<Sampler> sampler =
-        MakeSampler(SamplerName, SamplerParams, camera->film);
-    if (!sampler) {
-        Error("Unable to create sampler.");
-        return nullptr;
-    }
-
-    Integrator *integrator = nullptr;
+    std::unique_ptr<Integrator> integrator;
     if (IntegratorName == "whitted")
-        integrator = CreateWhittedIntegrator(IntegratorParams, sampler, camera);
+        integrator = CreateWhittedIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "directlighting")
         integrator =
-            CreateDirectLightingIntegrator(IntegratorParams, sampler, camera);
+            CreateDirectLightingIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "path")
-        integrator = CreatePathIntegrator(IntegratorParams, sampler, camera);
+        integrator = CreatePathIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "volpath")
-        integrator = CreateVolPathIntegrator(IntegratorParams, sampler, camera);
+        integrator = CreateVolPathIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "bdpt") {
-        integrator = CreateBDPTIntegrator(IntegratorParams, sampler, camera);
+        integrator = CreateBDPTIntegrator(IntegratorParams, std::move(sampler), camera);
     } else if (IntegratorName == "mlt") {
         integrator = CreateMLTIntegrator(IntegratorParams, camera);
     } else if (IntegratorName == "ambientocclusion") {
-        integrator = CreateAOIntegrator(IntegratorParams, sampler, camera);
+        integrator = CreateAOIntegrator(IntegratorParams, std::move(sampler), camera);
     } else if (IntegratorName == "sppm") {
         integrator = CreateSPPMIntegrator(IntegratorParams, camera);
     } else {
         Error("Integrator \"%s\" unknown.", IntegratorName.c_str());
-        return nullptr;
+        exit(1);
     }
 
     if (renderOptions->haveScatteringMedia && IntegratorName != "volpath" &&
@@ -1500,17 +1497,16 @@ Integrator *RenderOptions::MakeIntegrator() const {
     return integrator;
 }
 
-Camera *RenderOptions::MakeCamera() const {
+std::shared_ptr<Camera> RenderOptions::MakeCamera() const {
     std::unique_ptr<Filter> filter = MakeFilter(FilterName, FilterParams);
-    Film *film = MakeFilm(FilmName, FilmParams, std::move(filter));
+    std::unique_ptr<Film> film = MakeFilm(FilmName, FilmParams, std::move(filter));
     if (!film) {
         Error("Unable to create film.");
-        return nullptr;
+        exit(1);
     }
-    Camera *camera = pbrt::MakeCamera(CameraName, CameraParams, CameraToWorld,
-                                  renderOptions->transformStartTime,
-                                  renderOptions->transformEndTime, film);
-    return camera;
+    return pbrt::MakeCamera(CameraName, CameraParams, CameraToWorld,
+                            renderOptions->transformStartTime,
+                            renderOptions->transformEndTime, std::move(film));
 }
 
 }  // namespace pbrt

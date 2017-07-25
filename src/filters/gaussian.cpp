@@ -42,12 +42,12 @@ Float GaussianFilter::Evaluate(const Point2f &p) const {
     return Gaussian(p.x, expX) * Gaussian(p.y, expY);
 }
 
-GaussianFilter *CreateGaussianFilter(const ParamSet &ps) {
+std::unique_ptr<GaussianFilter> CreateGaussianFilter(const ParamSet &ps) {
     // Find common filter parameters
     Float xw = ps.GetOneFloat("xwidth", 2.f);
     Float yw = ps.GetOneFloat("ywidth", 2.f);
     Float alpha = ps.GetOneFloat("alpha", 2.f);
-    return new GaussianFilter(Vector2f(xw, yw), alpha);
+    return std::make_unique<GaussianFilter>(Vector2f(xw, yw), alpha);
 }
 
 }  // namespace pbrt

@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/halton.cpp*
 #include "samplers/halton.h"
 #include "paramset.h"
@@ -130,12 +129,12 @@ std::unique_ptr<Sampler> HaltonSampler::Clone(int seed) {
     return std::make_unique<HaltonSampler>(*this);
 }
 
-HaltonSampler *CreateHaltonSampler(const ParamSet &params,
-                                   const Bounds2i &sampleBounds) {
+std::unique_ptr<HaltonSampler> CreateHaltonSampler(
+    const ParamSet &params, const Bounds2i &sampleBounds) {
     int nsamp = params.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.quickRender) nsamp = 1;
     bool sampleAtCenter = params.GetOneBool("samplepixelcenter", false);
-    return new HaltonSampler(nsamp, sampleBounds, sampleAtCenter);
+    return std::make_unique<HaltonSampler>(nsamp, sampleBounds, sampleAtCenter);
 }
 
 }  // namespace pbrt

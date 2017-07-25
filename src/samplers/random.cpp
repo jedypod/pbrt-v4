@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/random.cpp*
 #include "samplers/random.h"
 #include "paramset.h"
@@ -71,9 +70,9 @@ void RandomSampler::StartPixel(const Point2i &p) {
     Sampler::StartPixel(p);
 }
 
-Sampler *CreateRandomSampler(const ParamSet &params) {
+std::unique_ptr<RandomSampler> CreateRandomSampler(const ParamSet &params) {
     int ns = params.GetOneInt("pixelsamples", 4);
-    return new RandomSampler(ns);
+    return std::make_unique<RandomSampler>(ns);
 }
 
 }  // namespace pbrt

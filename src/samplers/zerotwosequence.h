@@ -39,7 +39,12 @@
 #define PBRT_SAMPLERS_ZEROTWOSEQUENCE_H
 
 // samplers/zerotwosequence.h*
+#include "pbrt.h"
+
+#include "mathutil.h"
 #include "sampler.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -53,7 +58,8 @@ class ZeroTwoSequenceSampler : public PixelSampler {
     int RoundCount(int count) const { return RoundUpPow2(count); }
 };
 
-ZeroTwoSequenceSampler *CreateZeroTwoSequenceSampler(const ParamSet &params);
+std::unique_ptr<ZeroTwoSequenceSampler> CreateZeroTwoSequenceSampler(
+    const ParamSet &params);
 
 }  // namespace pbrt
 

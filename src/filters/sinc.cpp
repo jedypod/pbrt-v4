@@ -42,11 +42,11 @@ Float LanczosSincFilter::Evaluate(const Point2f &p) const {
     return WindowedSinc(p.x, radius.x) * WindowedSinc(p.y, radius.y);
 }
 
-LanczosSincFilter *CreateSincFilter(const ParamSet &ps) {
+std::unique_ptr<LanczosSincFilter> CreateSincFilter(const ParamSet &ps) {
     Float xw = ps.GetOneFloat("xwidth", 4.);
     Float yw = ps.GetOneFloat("ywidth", 4.);
     Float tau = ps.GetOneFloat("tau", 3.f);
-    return new LanczosSincFilter(Vector2f(xw, yw), tau);
+    return std::make_unique<LanczosSincFilter>(Vector2f(xw, yw), tau);
 }
 
 }  // namespace pbrt

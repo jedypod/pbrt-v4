@@ -30,7 +30,6 @@
 
  */
 
-
 // textures/uv.cpp*
 #include "textures/uv.h"
 
@@ -40,13 +39,13 @@
 namespace pbrt {
 
 // UVTexture Method Definitions
-Texture<Float> *CreateUVFloatTexture(const Transform &tex2world,
-                                     const TextureParams &tp) {
+std::shared_ptr<Texture<Float>> CreateUVFloatTexture(const Transform &tex2world,
+                                                     const TextureParams &tp) {
     return nullptr;
 }
 
-UVTexture *CreateUVSpectrumTexture(const Transform &tex2world,
-                                   const TextureParams &tp) {
+std::shared_ptr<UVTexture> CreateUVSpectrumTexture(const Transform &tex2world,
+                                                   const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
     std::string type = tp.GetOneString("mapping", "uv");
@@ -64,13 +63,12 @@ UVTexture *CreateUVSpectrumTexture(const Transform &tex2world,
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
-    return new UVTexture(std::move(map));
+    return std::make_shared<UVTexture>(std::move(map));
 }
 
 }  // namespace pbrt

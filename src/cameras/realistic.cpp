@@ -53,9 +53,9 @@ RealisticCamera::RealisticCamera(const AnimatedTransform &CameraToWorld,
                                  Float shutterOpen, Float shutterClose,
                                  Float apertureDiameter, Float focusDistance,
                                  bool simpleWeighting,
-                                 std::vector<Float> &lensData, Film *film,
+                                 std::vector<Float> &lensData, std::unique_ptr<Film> f,
                                  const Medium *medium)
-    : Camera(CameraToWorld, shutterOpen, shutterClose, film, medium),
+    : Camera(CameraToWorld, shutterOpen, shutterClose, std::move(f), medium),
       simpleWeighting(simpleWeighting) {
     for (int i = 0; i < (int)lensData.size(); i += 4) {
         if (lensData[i] == 0) {
@@ -695,9 +695,9 @@ Float RealisticCamera::GenerateRay(const CameraSample &sample, Ray *ray) const {
                (cos4Theta * exitPupilBoundsArea) / (LensRearZ() * LensRearZ());
 }
 
-RealisticCamera *CreateRealisticCamera(const ParamSet &params,
-                                       const AnimatedTransform &cam2world,
-                                       Film *film, const Medium *medium) {
+std::shared_ptr<RealisticCamera> CreateRealisticCamera(
+        const ParamSet &params, const AnimatedTransform &cam2world,
+        std::unique_ptr<Film> film, const Medium *medium) {
     Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
@@ -730,9 +730,9 @@ RealisticCamera *CreateRealisticCamera(const ParamSet &params,
         return nullptr;
     }
 
-    return new RealisticCamera(cam2world, shutteropen, shutterclose,
-                               apertureDiameter, focusDistance, simpleWeighting,
-                               lensData, film, medium);
+    return std::make_shared<RealisticCamera>(
+        cam2world, shutteropen, shutterclose, apertureDiameter, focusDistance,
+        simpleWeighting, lensData, std::move(film), medium);
 }
 
 }  // namespace pbrt

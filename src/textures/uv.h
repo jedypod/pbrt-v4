@@ -41,8 +41,10 @@
 // textures/uv.h*
 #include "pbrt.h"
 
-#include "texture.h"
 #include "spectrum.h"
+#include "texture.h"
+
+#include <memory>
 
 #include <memory>
 
@@ -66,10 +68,10 @@ class UVTexture : public Texture<Spectrum> {
     std::unique_ptr<TextureMapping2D> mapping;
 };
 
-Texture<Float> *CreateUVFloatTexture(const Transform &tex2world,
-                                     const TextureParams &tp);
-UVTexture *CreateUVSpectrumTexture(const Transform &tex2world,
-                                   const TextureParams &tp);
+std::shared_ptr<Texture<Float>> CreateUVFloatTexture(const Transform &tex2world,
+                                                     const TextureParams &tp);
+std::shared_ptr<UVTexture> CreateUVSpectrumTexture(const Transform &tex2world,
+                                                   const TextureParams &tp);
 
 }  // namespace pbrt
 

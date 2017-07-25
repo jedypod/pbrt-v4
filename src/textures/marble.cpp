@@ -30,26 +30,25 @@
 
  */
 
-
 // textures/marble.cpp*
 #include "textures/marble.h"
 
 namespace pbrt {
 
 // MarbleTexture Method Definitions
-Texture<Float> *CreateMarbleFloatTexture(const Transform &tex2world,
-                                         const TextureParams &tp) {
+std::shared_ptr<Texture<Float>> CreateMarbleFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     return nullptr;
 }
 
-MarbleTexture *CreateMarbleSpectrumTexture(const Transform &tex2world,
-                                           const TextureParams &tp) {
+std::shared_ptr<MarbleTexture> CreateMarbleSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new MarbleTexture(std::move(map), tp.GetOneInt("octaves", 8),
-                             tp.GetOneFloat("roughness", .5f),
-                             tp.GetOneFloat("scale", 1.f),
-                             tp.GetOneFloat("variation", .2f));
+    return std::make_shared<MarbleTexture>(
+        std::move(map), tp.GetOneInt("octaves", 8),
+        tp.GetOneFloat("roughness", .5f), tp.GetOneFloat("scale", 1.f),
+        tp.GetOneFloat("variation", .2f));
 }
 
 }  // namespace pbrt

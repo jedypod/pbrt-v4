@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/stratified.cpp*
 #include "samplers/stratified.h"
 #include "paramset.h"
@@ -78,13 +77,14 @@ std::unique_ptr<Sampler> StratifiedSampler::Clone(int seed) {
     return std::move(ss);
 }
 
-StratifiedSampler *CreateStratifiedSampler(const ParamSet &params) {
+std::unique_ptr<StratifiedSampler> CreateStratifiedSampler(
+    const ParamSet &params) {
     bool jitter = params.GetOneBool("jitter", true);
     int xsamp = params.GetOneInt("xsamples", 4);
     int ysamp = params.GetOneInt("ysamples", 4);
     int sd = params.GetOneInt("dimensions", 4);
     if (PbrtOptions.quickRender) xsamp = ysamp = 1;
-    return new StratifiedSampler(xsamp, ysamp, jitter, sd);
+    return std::make_unique<StratifiedSampler>(xsamp, ysamp, jitter, sd);
 }
 
 }  // namespace pbrt

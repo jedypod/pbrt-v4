@@ -242,20 +242,20 @@ std::vector<TestScene> GetScenes() {
     return scenes;
 }
 
-std::vector<std::pair<std::shared_ptr<Sampler>, std::string>> GetSamplers(
+std::vector<std::pair<std::unique_ptr<Sampler>, std::string>> GetSamplers(
     const Bounds2i &sampleBounds) {
-    std::vector<std::pair<std::shared_ptr<Sampler>, std::string>> samplers;
+    std::vector<std::pair<std::unique_ptr<Sampler>, std::string>> samplers;
 
     samplers.push_back(std::make_pair(
-        std::make_shared<HaltonSampler>(256, sampleBounds), "Halton 256"));
+        std::make_unique<HaltonSampler>(256, sampleBounds), "Halton 256"));
     samplers.push_back(std::make_pair(
-        std::make_shared<ZeroTwoSequenceSampler>(256), "(0,2)-seq 256"));
+        std::make_unique<ZeroTwoSequenceSampler>(256), "(0,2)-seq 256"));
     samplers.push_back(std::make_pair(
-        std::make_shared<SobolSampler>(256, sampleBounds), "Sobol 256"));
+        std::make_unique<SobolSampler>(256, sampleBounds), "Sobol 256"));
     samplers.push_back(
-        std::make_pair(std::make_shared<RandomSampler>(256), "Random 256"));
+        std::make_pair(std::make_unique<RandomSampler>(256), "Random 256"));
     samplers.push_back(
-        std::make_pair(std::make_shared<StratifiedSampler>(16, 16, true, 8),
+        std::make_pair(std::make_unique<StratifiedSampler>(16, 16, true, 8),
                        "Stratified 16x16"));
 
     return samplers;
@@ -270,79 +270,79 @@ std::vector<TestIntegrator> GetIntegrators() {
 
     for (auto scene : GetScenes()) {
         // Path tracing integrators
-        for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
+        for (auto &sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new PathIntegrator(8, camera, sampler.first,
+                new PathIntegrator(8, camera, std::move(sampler.first),
                                    film->croppedPixelBounds);
-            integrators.push_back({integrator, film,
+            integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Perspective, " +
                                        sampler.second + ", " +
                                        scene.description,
                                    scene});
         }
 
-        for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
+        for (auto &sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
-                    1., 0., 10., film, nullptr);
+                    1., 0., 10., std::move(film), nullptr);
 
             Integrator *integrator =
-                new PathIntegrator(8, camera, sampler.first,
+                new PathIntegrator(8, camera, std::move(sampler.first),
                                    film->croppedPixelBounds);
-            integrators.push_back({integrator, film,
+            integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Ortho, " + sampler.second +
                                        ", " + scene.description,
                                    scene});
         }
 
         // Volume path tracing integrators
-        for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
+        for (auto &sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new VolPathIntegrator(8, camera, sampler.first,
+                new VolPathIntegrator(8, camera, std::move(sampler.first),
                                       film->croppedPixelBounds);
-            integrators.push_back({integrator, film,
+            integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Perspective, " +
                                        sampler.second + ", " +
                                        scene.description,
                                    scene});
         }
-        for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
+        for (auto &sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
-                    1., 0., 10., film, nullptr);
+                    1., 0., 10., std::move(film), nullptr);
 
             Integrator *integrator =
-                new VolPathIntegrator(8, camera, sampler.first,
+                new VolPathIntegrator(8, camera, std::move(sampler.first),
                                       film->croppedPixelBounds);
-            integrators.push_back({integrator, film,
+            integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Ortho, " +
                                        sampler.second + ", " +
                                        scene.description,
@@ -350,20 +350,20 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
 
         // BDPT
-        for (auto sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
+        for (auto &sampler : GetSamplers(Bounds2i(Point2i(0, 0), resolution))) {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new BDPTIntegrator(sampler.first, camera, 6, false, false,
-                                   film->croppedPixelBounds);
-            integrators.push_back({integrator, film,
+                new BDPTIntegrator(std::move(sampler.first), camera, 6, false, false,
+                                   camera->film->croppedPixelBounds);
+            integrators.push_back({integrator, camera->film.get(),
                                    "BDPT, depth 8, Perspective, " +
                                        sampler.second + ", " +
                                        scene.description,
@@ -371,15 +371,15 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
 #if 0
     // Ortho camera not currently supported with BDPT.
-    for (auto sampler : GetSamplers(Bounds2i(Point2i(0,0), resolution))) {
+    for (auto &sampler : GetSamplers(Bounds2i(Point2i(0,0), resolution))) {
       std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-      Film *film = new Film(resolution, Bounds2f(Point2f(0,0), Point2f(1,1)),
+      std::unique_ptr<Film> film = std::make_unique<Film>(resolution, Bounds2f(Point2f(0,0), Point2f(1,1)),
                             std::move(filter), 1., "test.exr", 1.);
       std::shared_ptr<Camera> camera = std::make_shared<OrthographicCamera>(
           identity, Bounds2f(Point2f(-.1,-.1), Point2f(.1,.1)), 0., 1.,
           0., 10., film, nullptr);
 
-      Integrator *integrator = new BDPTIntegrator(sampler.first, camera, 8,
+      Integrator *integrator = new BDPTIntegrator(std::move(sampler.first), camera, 8,
                                             false, false);
       integrators.push_back({integrator, film,
               "BDPT, depth 8, Ortho, " + sampler.second + ", " +
@@ -390,20 +390,20 @@ std::vector<TestIntegrator> GetIntegrators() {
         // MLT
         {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
-            Film *film =
-                new Film(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+            std::unique_ptr<Film> film =
+                std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
                          std::move(filter), 1., "test.exr", 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator = new MLTIntegrator(
                 camera, 8 /* depth */, 100000 /* n bootstrap */,
                 1000 /* nchains */, 1024 /* mutations per pixel */,
                 0.01 /* sigma */, 0.3 /* large step prob */);
             integrators.push_back(
-                {integrator, film,
+                                  {integrator, camera->film.get(),
                  "MLT, depth 8, Perspective, " + scene.description, scene});
         }
     }

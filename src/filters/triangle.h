@@ -41,6 +41,8 @@
 // filters/triangle.h*
 #include "filter.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // Triangle Filter Declarations
@@ -50,7 +52,7 @@ class TriangleFilter : public Filter {
     Float Evaluate(const Point2f &p) const;
 };
 
-TriangleFilter *CreateTriangleFilter(const ParamSet &ps);
+std::unique_ptr<TriangleFilter> CreateTriangleFilter(const ParamSet &ps);
 
 }  // namespace pbrt
 

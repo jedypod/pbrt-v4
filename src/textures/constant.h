@@ -39,9 +39,11 @@
 #define PBRT_TEXTURES_CONSTANT_H
 
 // textures/constant.h*
+#include "paramset.h"
 #include "pbrt.h"
 #include "texture.h"
-#include "paramset.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -57,9 +59,9 @@ class ConstantTexture : public Texture<T> {
     T value;
 };
 
-ConstantTexture<Float> *CreateConstantFloatTexture(const Transform &tex2world,
-                                                   const TextureParams &tp);
-ConstantTexture<Spectrum> *CreateConstantSpectrumTexture(
+std::shared_ptr<ConstantTexture<Float>> CreateConstantFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<ConstantTexture<Spectrum>> CreateConstantSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt

@@ -49,6 +49,8 @@
 #include "sampling.h"
 #include "scene.h"
 
+#include <memory>
+
 namespace pbrt {
 
 /// Forward declaration (correction term for adjoint BSDF with shading normals)
@@ -127,12 +129,12 @@ inline Float InfiniteLightDensity(
 class BDPTIntegrator : public Integrator {
   public:
     // BDPTIntegrator Public Methods
-    BDPTIntegrator(std::shared_ptr<Sampler> sampler,
+    BDPTIntegrator(std::unique_ptr<Sampler> sampler,
                    std::shared_ptr<const Camera> camera, int maxDepth,
                    bool visualizeStrategies, bool visualizeWeights,
                    const Bounds2i &pixelBounds,
                    const std::string &lightSampleStrategy = "power")
-        : sampler(sampler),
+        : sampler(std::move(sampler)),
           camera(camera),
           maxDepth(maxDepth),
           visualizeStrategies(visualizeStrategies),
@@ -143,7 +145,7 @@ class BDPTIntegrator : public Integrator {
 
   private:
     // BDPTIntegrator Private Data
-    std::shared_ptr<Sampler> sampler;
+    std::unique_ptr<Sampler> sampler;
     std::shared_ptr<const Camera> camera;
     const int maxDepth;
     const bool visualizeStrategies;
@@ -435,9 +437,9 @@ Spectrum ConnectBDPT(
     const std::unordered_map<const Light *, size_t> &lightToIndex,
     const Camera &camera, Sampler &sampler, Point2f *pRaster,
     Float *misWeight = nullptr);
-BDPTIntegrator *CreateBDPTIntegrator(const ParamSet &params,
-                                     std::shared_ptr<Sampler> sampler,
-                                     std::shared_ptr<const Camera> camera);
+std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
+    std::shared_ptr<const Camera> camera);
 
 // Vertex Inline Method Definitions
 inline Vertex Vertex::CreateCamera(const Camera *camera, const Ray &ray,

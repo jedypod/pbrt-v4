@@ -39,9 +39,11 @@
 #define PBRT_SAMPLERS_HALTON_H
 
 // samplers/halton.h*
-#include "sampler.h"
-#include "lowdiscrepancy.h"
 #include "ext/google/array_slice.h"
+#include "lowdiscrepancy.h"
+#include "sampler.h"
+
+#include <memory>
 
 namespace pbrt {
 
@@ -78,8 +80,8 @@ class HaltonSampler : public GlobalSampler {
     }
 };
 
-HaltonSampler *CreateHaltonSampler(const ParamSet &params,
-                                   const Bounds2i &sampleBounds);
+std::unique_ptr<HaltonSampler> CreateHaltonSampler(
+    const ParamSet &params, const Bounds2i &sampleBounds);
 
 }  // namespace pbrt
 

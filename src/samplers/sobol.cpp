@@ -30,7 +30,6 @@
 
  */
 
-
 // samplers/sobol.cpp*
 #include "samplers/sobol.h"
 #include "lowdiscrepancy.h"
@@ -46,9 +45,10 @@ int64_t SobolSampler::GetIndexForSample(int64_t sampleNum) const {
 
 Float SobolSampler::SampleDimension(int64_t index, int dim) const {
     if (dim >= NumSobolDimensions)
-        LOG(FATAL) << StringPrintf("SobolSampler can only sample up to %d "
-                                   "dimensions! Exiting.",
-                                   NumSobolDimensions);
+        LOG(FATAL) << StringPrintf(
+            "SobolSampler can only sample up to %d "
+            "dimensions! Exiting.",
+            NumSobolDimensions);
     Float s = SobolSample(index, dim);
     // Remap Sobol$'$ dimensions used for pixel samples
     if (dim == 0 || dim == 1) {
@@ -62,11 +62,11 @@ std::unique_ptr<Sampler> SobolSampler::Clone(int seed) {
     return std::make_unique<SobolSampler>(*this);
 }
 
-SobolSampler *CreateSobolSampler(const ParamSet &params,
-                                 const Bounds2i &sampleBounds) {
+std::unique_ptr<SobolSampler> CreateSobolSampler(const ParamSet &params,
+                                                 const Bounds2i &sampleBounds) {
     int nsamp = params.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.quickRender) nsamp = 1;
-    return new SobolSampler(nsamp, sampleBounds);
+    return std::make_unique<SobolSampler>(nsamp, sampleBounds);
 }
 
 }  // namespace pbrt

@@ -41,6 +41,8 @@
 // filters/box.h*
 #include "filter.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // Box Filter Declarations
@@ -50,7 +52,7 @@ class BoxFilter : public Filter {
     Float Evaluate(const Point2f &p) const;
 };
 
-BoxFilter *CreateBoxFilter(const ParamSet &ps);
+std::unique_ptr<BoxFilter> CreateBoxFilter(const ParamSet &ps);
 
 }  // namespace pbrt
 

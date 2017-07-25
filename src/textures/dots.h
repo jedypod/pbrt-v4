@@ -41,8 +41,10 @@
 // textures/dots.h*
 #include "pbrt.h"
 
-#include "texture.h"
 #include "geometry.h"
+#include "texture.h"
+
+#include <memory>
 
 #include <memory>
 
@@ -86,10 +88,10 @@ class DotsTexture : public Texture<T> {
     std::shared_ptr<Texture<T>> outsideDot, insideDot;
 };
 
-DotsTexture<Float> *CreateDotsFloatTexture(const Transform &tex2world,
-                                           const TextureParams &tp);
-DotsTexture<Spectrum> *CreateDotsSpectrumTexture(const Transform &tex2world,
-                                                 const TextureParams &tp);
+std::shared_ptr<DotsTexture<Float>> CreateDotsFloatTexture(
+    const Transform &tex2world, const TextureParams &tp);
+std::shared_ptr<DotsTexture<Spectrum>> CreateDotsSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp);
 
 }  // namespace pbrt
 

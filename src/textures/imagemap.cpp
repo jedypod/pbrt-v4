@@ -30,7 +30,6 @@
 
  */
 
-
 // textures/imagemap.cpp*
 #include "textures/imagemap.h"
 
@@ -44,19 +43,18 @@ namespace pbrt {
 
 // ImageTexture Method Definitions
 template <typename T>
-ImageTexture<T>::ImageTexture(
-    std::unique_ptr<TextureMapping2D> mapping, const std::string &filename,
-    const std::string &filter, Float maxAniso, WrapMode wrapMode, Float scale,
-    bool gamma)
+ImageTexture<T>::ImageTexture(std::unique_ptr<TextureMapping2D> mapping,
+                              const std::string &filename,
+                              const std::string &filter, Float maxAniso,
+                              WrapMode wrapMode, Float scale, bool gamma)
     : mapping(std::move(mapping)), scale(scale) {
-    mipmap =
-        GetTexture(filename, filter, maxAniso, wrapMode, gamma);
+    mipmap = GetTexture(filename, filter, maxAniso, wrapMode, gamma);
 }
 
 template <typename T>
-MIPMap *ImageTexture<T>::GetTexture(
-    const std::string &filename, const std::string &filter, Float maxAniso,
-    WrapMode wrap, bool gamma) {
+MIPMap *ImageTexture<T>::GetTexture(const std::string &filename,
+                                    const std::string &filter, Float maxAniso,
+                                    WrapMode wrap, bool gamma) {
     // Return _MIPMap_ from texture cache if present
     TexInfo texInfo(filename, filter, maxAniso, wrap, gamma);
     if (textures.find(texInfo) != textures.end())
@@ -80,49 +78,7 @@ MIPMap *ImageTexture<T>::GetTexture(
 template <typename T>
 std::map<TexInfo, std::unique_ptr<MIPMap>> ImageTexture<T>::textures;
 
-ImageTexture<Float> *CreateImageFloatTexture(const Transform &tex2world,
-                                             const TextureParams &tp) {
-    // Initialize 2D texture mapping _map_ from _tp_
-    std::unique_ptr<TextureMapping2D> map;
-    std::string type = tp.GetOneString("mapping", "uv");
-    if (type == "uv") {
-        Float su = tp.GetOneFloat("uscale", 1.);
-        Float sv = tp.GetOneFloat("vscale", 1.);
-        Float du = tp.GetOneFloat("udelta", 0.);
-        Float dv = tp.GetOneFloat("vdelta", 0.);
-        map = std::make_unique<UVMapping2D>(su, sv, du, dv);
-    } else if (type == "spherical")
-        map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
-    else if (type == "cylindrical")
-        map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
-    else if (type == "planar")
-        map = std::make_unique<PlanarMapping2D>(
-            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
-            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
-    else {
-        Error("2D texture mapping \"%s\" unknown", type.c_str());
-        map = std::make_unique<UVMapping2D>();
-    }
-
-    // Initialize _ImageTexture_ parameters
-    Float maxAniso = tp.GetOneFloat("maxanisotropy", 8.f);
-    std::string filter = tp.GetOneString("filter", "bilinear");
-    std::string wrap = tp.GetOneString("wrap", "repeat");
-    WrapMode wrapMode;
-    std::string wrapString = tp.GetOneString("wrap", "repeat");
-    if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
-        Warning("%s: wrap mode unknown", wrapString.c_str());
-    Float scale = tp.GetOneFloat("scale", 1.f);
-    std::string filename = tp.GetOneFilename("filename", "");
-    bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
-                                          HasExtension(filename, ".png"));
-    return new ImageTexture<Float>(std::move(map), filename, filter,
-                                   maxAniso, wrapMode, scale, gamma);
-}
-
-ImageTexture<Spectrum> *CreateImageSpectrumTexture(
+std::shared_ptr<ImageTexture<Float>> CreateImageFloatTexture(
     const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
@@ -141,8 +97,7 @@ ImageTexture<Spectrum> *CreateImageSpectrumTexture(
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
@@ -159,8 +114,49 @@ ImageTexture<Spectrum> *CreateImageSpectrumTexture(
     Float scale = tp.GetOneFloat("scale", 1.f);
     std::string filename = tp.GetOneFilename("filename", "");
     bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
-                                          HasExtension(filename, ".png"));
-    return new ImageTexture<Spectrum>(
+                                            HasExtension(filename, ".png"));
+    return std::make_shared<ImageTexture<Float>>(
+        std::move(map), filename, filter, maxAniso, wrapMode, scale, gamma);
+}
+
+std::shared_ptr<ImageTexture<Spectrum>> CreateImageSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
+    // Initialize 2D texture mapping _map_ from _tp_
+    std::unique_ptr<TextureMapping2D> map;
+    std::string type = tp.GetOneString("mapping", "uv");
+    if (type == "uv") {
+        Float su = tp.GetOneFloat("uscale", 1.);
+        Float sv = tp.GetOneFloat("vscale", 1.);
+        Float du = tp.GetOneFloat("udelta", 0.);
+        Float dv = tp.GetOneFloat("vdelta", 0.);
+        map = std::make_unique<UVMapping2D>(su, sv, du, dv);
+    } else if (type == "spherical")
+        map = std::make_unique<SphericalMapping2D>(Inverse(tex2world));
+    else if (type == "cylindrical")
+        map = std::make_unique<CylindricalMapping2D>(Inverse(tex2world));
+    else if (type == "planar")
+        map = std::make_unique<PlanarMapping2D>(
+            tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
+            tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
+    else {
+        Error("2D texture mapping \"%s\" unknown", type.c_str());
+        map = std::make_unique<UVMapping2D>();
+    }
+
+    // Initialize _ImageTexture_ parameters
+    Float maxAniso = tp.GetOneFloat("maxanisotropy", 8.f);
+    std::string filter = tp.GetOneString("filter", "bilinear");
+    std::string wrap = tp.GetOneString("wrap", "repeat");
+    WrapMode wrapMode;
+    std::string wrapString = tp.GetOneString("wrap", "repeat");
+    if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
+        Warning("%s: wrap mode unknown", wrapString.c_str());
+    Float scale = tp.GetOneFloat("scale", 1.f);
+    std::string filename = tp.GetOneFilename("filename", "");
+    bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
+                                            HasExtension(filename, ".png"));
+    return std::make_shared<ImageTexture<Spectrum>>(
         std::move(map), filename, filter, maxAniso, wrapMode, scale, gamma);
 }
 

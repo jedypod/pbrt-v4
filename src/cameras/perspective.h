@@ -43,6 +43,8 @@
 #include "camera.h"
 #include "film.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // PerspectiveCamera Declarations
@@ -52,7 +54,7 @@ class PerspectiveCamera : public ProjectiveCamera {
     PerspectiveCamera(const AnimatedTransform &CameraToWorld,
                       const Bounds2f &screenWindow, Float shutterOpen,
                       Float shutterClose, Float lensRadius, Float focalDistance,
-                      Float fov, Film *film, const Medium *medium);
+                      Float fov, std::unique_ptr<Film> film, const Medium *medium);
     Float GenerateRay(const CameraSample &sample, Ray *) const;
     Float GenerateRayDifferential(const CameraSample &sample,
                                   RayDifferential *ray) const;
@@ -68,9 +70,9 @@ class PerspectiveCamera : public ProjectiveCamera {
     Float A;
 };
 
-PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
-                                           const AnimatedTransform &cam2world,
-                                           Film *film, const Medium *medium);
+std::shared_ptr<PerspectiveCamera> CreatePerspectiveCamera(
+    const ParamSet &params,const AnimatedTransform &cam2world,
+    std::unique_ptr<Film> film, const Medium *medium);
 
 }  // namespace pbrt
 

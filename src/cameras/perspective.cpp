@@ -48,11 +48,11 @@ PerspectiveCamera::PerspectiveCamera(const AnimatedTransform &CameraToWorld,
                                      const Bounds2f &screenWindow,
                                      Float shutterOpen, Float shutterClose,
                                      Float lensRadius, Float focalDistance,
-                                     Float fov, Film *film,
+                                     Float fov, std::unique_ptr<Film> f,
                                      const Medium *medium)
     : ProjectiveCamera(CameraToWorld, Perspective(fov, 1e-2f, 1000.f),
                        screenWindow, shutterOpen, shutterClose, lensRadius,
-                       focalDistance, film, medium) {
+                       focalDistance, std::move(f), medium) {
     // Compute differential changes in origin for perspective camera rays
     dxCamera =
         (RasterToCamera(Point3f(1, 0, 0)) - RasterToCamera(Point3f(0, 0, 0)));
@@ -226,9 +226,9 @@ Spectrum PerspectiveCamera::Sample_Wi(const Interaction &ref, const Point2f &u,
     return We(lensIntr.SpawnRay(-*wi), pRaster);
 }
 
-PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
-                                           const AnimatedTransform &cam2world,
-                                           Film *film, const Medium *medium) {
+std::shared_ptr<PerspectiveCamera> CreatePerspectiveCamera(
+        const ParamSet &params, const AnimatedTransform &cam2world,
+        std::unique_ptr<Film> film, const Medium *medium) {
     // Extract common camera parameters from _ParamSet_
     Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
@@ -269,8 +269,9 @@ PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
     if (halffov > 0.f)
         // hack for structure synth, which exports half of the full fov
         fov = 2.f * halffov;
-    return new PerspectiveCamera(cam2world, screen, shutteropen, shutterclose,
-                                 lensradius, focaldistance, fov, film, medium);
+    return std::make_shared<PerspectiveCamera>(
+        cam2world, screen, shutteropen, shutterclose, lensradius, focaldistance,
+        fov, std::move(film), medium);
 }
 
 }  // namespace pbrt

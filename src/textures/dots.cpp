@@ -30,7 +30,6 @@
 
  */
 
-
 // textures/dots.cpp*
 #include "textures/dots.h"
 
@@ -40,8 +39,8 @@
 namespace pbrt {
 
 // DotsTexture Method Definitions
-DotsTexture<Float> *CreateDotsFloatTexture(const Transform &tex2world,
-                                           const TextureParams &tp) {
+std::shared_ptr<DotsTexture<Float>> CreateDotsFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
     std::string type = tp.GetOneString("mapping", "uv");
@@ -59,19 +58,18 @@ DotsTexture<Float> *CreateDotsFloatTexture(const Transform &tex2world,
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
-    return new DotsTexture<Float>(std::move(map),
-                                  tp.GetFloatTexture("inside", 1.f),
-                                  tp.GetFloatTexture("outside", 0.f));
+    return std::make_shared<DotsTexture<Float>>(
+        std::move(map), tp.GetFloatTexture("inside", 1.f),
+        tp.GetFloatTexture("outside", 0.f));
 }
 
-DotsTexture<Spectrum> *CreateDotsSpectrumTexture(const Transform &tex2world,
-                                                 const TextureParams &tp) {
+std::shared_ptr<DotsTexture<Spectrum>> CreateDotsSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 2D texture mapping _map_ from _tp_
     std::unique_ptr<TextureMapping2D> map;
     std::string type = tp.GetOneString("mapping", "uv");
@@ -89,15 +87,14 @@ DotsTexture<Spectrum> *CreateDotsSpectrumTexture(const Transform &tex2world,
         map = std::make_unique<PlanarMapping2D>(
             tp.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             tp.GetOneVector3f("v2", Vector3f(0, 1, 0)),
-            tp.GetOneFloat("udelta", 0.f),
-            tp.GetOneFloat("vdelta", 0.f));
+            tp.GetOneFloat("udelta", 0.f), tp.GetOneFloat("vdelta", 0.f));
     else {
         Error("2D texture mapping \"%s\" unknown", type.c_str());
         map = std::make_unique<UVMapping2D>();
     }
-    return new DotsTexture<Spectrum>(std::move(map),
-                                     tp.GetSpectrumTexture("inside", 1.f),
-                                     tp.GetSpectrumTexture("outside", 0.f));
+    return std::make_shared<DotsTexture<Spectrum>>(
+        std::move(map), tp.GetSpectrumTexture("inside", 1.f),
+        tp.GetSpectrumTexture("outside", 0.f));
 }
 
 }  // namespace pbrt

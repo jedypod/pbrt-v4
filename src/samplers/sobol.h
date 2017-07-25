@@ -41,10 +41,12 @@
 // samplers/sobol.h*
 #include "sampler.h"
 
+#include <glog/logging.h>
+#include "error.h"
 #include "geometry.h"
 #include "mathutil.h"
-#include "error.h"
-#include <glog/logging.h>
+
+#include <memory>
 
 namespace pbrt {
 
@@ -74,8 +76,8 @@ class SobolSampler : public GlobalSampler {
     int resolution, log2Resolution;
 };
 
-SobolSampler *CreateSobolSampler(const ParamSet &params,
-                                 const Bounds2i &sampleBounds);
+std::unique_ptr<SobolSampler> CreateSobolSampler(const ParamSet &params,
+                                                 const Bounds2i &sampleBounds);
 
 }  // namespace pbrt
 

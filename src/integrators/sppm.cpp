@@ -496,18 +496,17 @@ void SPPMIntegrator::Render(const Scene &scene) {
     progress.Done();
 }
 
-Integrator *CreateSPPMIntegrator(const ParamSet &params,
-                                 std::shared_ptr<const Camera> camera) {
+std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
+    const ParamSet &params, std::shared_ptr<const Camera> camera) {
     int nIterations =
-        params.GetOneInt("iterations",
-                          params.GetOneInt("numiterations", 64));
+        params.GetOneInt("iterations", params.GetOneInt("numiterations", 64));
     int maxDepth = params.GetOneInt("maxdepth", 5);
     int photonsPerIter = params.GetOneInt("photonsperiteration", -1);
     int writeFreq = params.GetOneInt("imagewritefrequency", 1 << 31);
     Float radius = params.GetOneFloat("radius", 1.f);
     if (PbrtOptions.quickRender) nIterations = std::max(1, nIterations / 16);
-    return new SPPMIntegrator(camera, nIterations, photonsPerIter, maxDepth,
-                              radius, writeFreq);
+    return std::make_unique<SPPMIntegrator>(camera, nIterations, photonsPerIter,
+                                            maxDepth, radius, writeFreq);
 }
 
 }  // namespace pbrt

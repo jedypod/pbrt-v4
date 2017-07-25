@@ -30,27 +30,28 @@
 
  */
 
-
 // textures/fbm.cpp*
 #include "textures/fbm.h"
 
 namespace pbrt {
 
 // FBmTexture Method Definitions
-FBmTexture<Float> *CreateFBmFloatTexture(const Transform &tex2world,
-                                         const TextureParams &tp) {
+std::shared_ptr<FBmTexture<Float>> CreateFBmFloatTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new FBmTexture<Float>(std::move(map), tp.GetOneInt("octaves", 8),
-                                 tp.GetOneFloat("roughness", .5f));
+    return std::make_shared<FBmTexture<Float>>(
+        std::move(map), tp.GetOneInt("octaves", 8),
+        tp.GetOneFloat("roughness", .5f));
 }
 
-FBmTexture<Spectrum> *CreateFBmSpectrumTexture(const Transform &tex2world,
-                                               const TextureParams &tp) {
+std::shared_ptr<FBmTexture<Spectrum>> CreateFBmSpectrumTexture(
+    const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
     auto map = std::make_unique<IdentityMapping3D>(tex2world);
-    return new FBmTexture<Spectrum>(std::move(map), tp.GetOneInt("octaves", 8),
-                                    tp.GetOneFloat("roughness", .5f));
+    return std::make_shared<FBmTexture<Spectrum>>(
+        std::move(map), tp.GetOneInt("octaves", 8),
+        tp.GetOneFloat("roughness", .5f));
 }
 
 }  // namespace pbrt

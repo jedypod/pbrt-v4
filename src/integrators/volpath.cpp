@@ -190,8 +190,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     return L;
 }
 
-VolPathIntegrator *CreateVolPathIntegrator(
-    const ParamSet &params, std::shared_ptr<Sampler> sampler,
+std::unique_ptr<VolPathIntegrator> CreateVolPathIntegrator(
+    const ParamSet &params, std::unique_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
@@ -210,8 +210,9 @@ VolPathIntegrator *CreateVolPathIntegrator(
     Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
         params.GetOneString("lightsamplestrategy", "spatial");
-    return new VolPathIntegrator(maxDepth, camera, sampler, pixelBounds,
-                                 rrThreshold, lightStrategy);
+    return std::make_unique<VolPathIntegrator>(maxDepth, camera,
+                                               std::move(sampler), pixelBounds,
+                                               rrThreshold, lightStrategy);
 }
 
 }  // namespace pbrt
