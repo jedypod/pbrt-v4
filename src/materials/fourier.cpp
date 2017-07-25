@@ -111,8 +111,6 @@ static inline uint32_t ByteSwap32(uint32_t x) {
 
 bool FourierBSDFTable::Read(const std::string &filename,
                             FourierBSDFTable *bsdfTable) {
-    bsdfTable->mu = bsdfTable->cdf = bsdfTable->a = nullptr;
-    bsdfTable->aOffset = bsdfTable->m = nullptr;
     bsdfTable->nChannels = 0;
 
     FILE *f = fopen(filename.c_str(), "rb");
@@ -143,7 +141,7 @@ bool FourierBSDFTable::Read(const std::string &filename,
 
     const char header_exp[8] = {'S', 'C', 'A', 'T', 'F', 'U', 'N', '\x01'};
     char header[8];
-    std::unique_ptr<int[]> offsetAndLength;
+    std::vector<int> offsetAndLength;
 
     if (fread(header, 1, 8, f) != 8 || memcmp(header, header_exp, 8) != 0)
         goto fail;
@@ -167,18 +165,18 @@ bool FourierBSDFTable::Read(const std::string &filename,
         (bsdfTable->nChannels != 1 && bsdfTable->nChannels != 3) || nBases != 1)
         goto fail;
 
-    bsdfTable->mu = new Float[bsdfTable->nMu];
-    bsdfTable->cdf = new Float[bsdfTable->nMu * bsdfTable->nMu];
-    bsdfTable->a0 = new Float[bsdfTable->nMu * bsdfTable->nMu];
-    offsetAndLength = std::make_unique<int[]>(bsdfTable->nMu * bsdfTable->nMu * 2);
-    bsdfTable->aOffset = new int[bsdfTable->nMu * bsdfTable->nMu];
-    bsdfTable->m = new int[bsdfTable->nMu * bsdfTable->nMu];
-    bsdfTable->a = new Float[nCoeffs];
+    bsdfTable->mu.resize(bsdfTable->nMu);
+    bsdfTable->cdf.resize(bsdfTable->nMu * bsdfTable->nMu);
+    bsdfTable->a0.resize(bsdfTable->nMu * bsdfTable->nMu);
+    offsetAndLength.resize(bsdfTable->nMu * bsdfTable->nMu * 2);
+    bsdfTable->aOffset.resize(bsdfTable->nMu * bsdfTable->nMu);
+    bsdfTable->m.resize(bsdfTable->nMu * bsdfTable->nMu);
+    bsdfTable->a.resize(nCoeffs);
 
-    if (!readfloat(bsdfTable->mu, bsdfTable->nMu) ||
-        !readfloat(bsdfTable->cdf, bsdfTable->nMu * bsdfTable->nMu) ||
-        !read32(offsetAndLength.get(), bsdfTable->nMu * bsdfTable->nMu * 2) ||
-        !readfloat(bsdfTable->a, nCoeffs))
+    if (!readfloat(bsdfTable->mu.data(), bsdfTable->nMu) ||
+        !readfloat(bsdfTable->cdf.data(), bsdfTable->nMu * bsdfTable->nMu) ||
+        !read32(offsetAndLength.data(), bsdfTable->nMu * bsdfTable->nMu * 2) ||
+        !readfloat(bsdfTable->a.data(), nCoeffs))
         goto fail;
 
     for (int i = 0; i < bsdfTable->nMu * bsdfTable->nMu; ++i) {
@@ -191,7 +189,7 @@ bool FourierBSDFTable::Read(const std::string &filename,
         bsdfTable->a0[i] = length > 0 ? bsdfTable->a[offset] : (Float)0;
     }
 
-    bsdfTable->recip = new Float[bsdfTable->mMax];
+    bsdfTable->recip.resize(bsdfTable->mMax);
     for (int i = 0; i < bsdfTable->mMax; ++i)
         bsdfTable->recip[i] = 1 / (Float)i;
 

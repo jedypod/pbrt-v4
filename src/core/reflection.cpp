@@ -371,7 +371,7 @@ std::string FourierBSDF::ToString() const {
 
 bool FourierBSDFTable::GetWeightsAndOffset(Float cosTheta, int *offset,
                                            Float weights[4]) const {
-    return CatmullRomWeights({mu, nMu}, cosTheta, offset, {weights, 4});
+    return CatmullRomWeights(mu, cosTheta, offset, {weights, 4});
 }
 
 Spectrum BxDF::Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u,
@@ -525,11 +525,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
     // Sample zenith angle component for _FourierBSDF_
     Float muO = CosTheta(wo);
     Float pdfMu;
-    Float muI = SampleCatmullRom2D(
-        {bsdfTable.mu, bsdfTable.nMu}, {bsdfTable.mu, bsdfTable.nMu},
-        {bsdfTable.a0, bsdfTable.nMu * bsdfTable.nMu},
-        {bsdfTable.cdf, bsdfTable.nMu * bsdfTable.nMu}, muO, u[1], nullptr,
-        &pdfMu);
+    Float muI = SampleCatmullRom2D(bsdfTable.mu, bsdfTable.mu, bsdfTable.a0,
+        bsdfTable.cdf, muO, u[1], nullptr, &pdfMu);
 
     // Compute Fourier coefficients $a_k$ for $(\mui, \muo)$
 
@@ -563,7 +560,7 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     // Importance sample the luminance Fourier expansion
     Float phi, pdfPhi;
-    Float Y = SampleFourier({ak, size_t(mMax)}, {bsdfTable.recip, size_t(mMax)},
+    Float Y = SampleFourier({ak, size_t(mMax)}, {bsdfTable.recip, 0, size_t(mMax)},
                             u[0], &pdfPhi, &phi);
     *pdf = std::max((Float)0, pdfPhi * pdfMu);
 

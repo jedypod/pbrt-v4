@@ -138,19 +138,19 @@ struct FourierBSDFTable {
     int mMax;
     int nChannels;
     size_t nMu;
-    Float *mu;
-    int *m;
-    int *aOffset;
-    Float *a;
-    Float *a0;
-    Float *cdf;
-    Float *recip;
+    std::vector<Float> mu;
+    std::vector<int> m;
+    std::vector<int> aOffset;
+    std::vector<Float> a;
+    std::vector<Float> a0;
+    std::vector<Float> cdf;
+    std::vector<Float> recip;
 
     // FourierBSDFTable Public Methods
     static bool Read(const std::string &filename, FourierBSDFTable *table);
     const Float *GetAk(int offsetI, int offsetO, int *mptr) const {
         *mptr = m[offsetO * nMu + offsetI];
-        return a + aOffset[offsetO * nMu + offsetI];
+        return &a[aOffset[offsetO * nMu + offsetI]];
     }
     bool GetWeightsAndOffset(Float cosTheta, int *offset,
                              Float weights[4]) const;
