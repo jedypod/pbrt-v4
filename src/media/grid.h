@@ -68,9 +68,9 @@ class GridDensityMedium : public Medium {
           ny(ny),
           nz(nz),
           WorldToMedium(Inverse(mediumToWorld)),
-          density(std::make_unique<Float[]>(nx * ny * nz)) {
-        densityBytes += nx * ny * nz * sizeof(Float);
-        std::memcpy((Float *)density.get(), d.data(), sizeof(Float) * nx * ny * nz);
+          density(nx * ny * nz) {
+        densityBytes += density.size() * sizeof(Float);
+        std::copy(d.begin(), d.end(), density.begin());
         // Precompute values for Monte Carlo sampling of _GridDensityMedium_
         sigma_t = (sigma_a + sigma_s)[0];
         if (Spectrum(sigma_t) != sigma_a + sigma_s)
@@ -99,7 +99,7 @@ class GridDensityMedium : public Medium {
     const Float g;
     const int nx, ny, nz;
     const Transform WorldToMedium;
-    std::unique_ptr<Float[]> density;
+    std::vector<Float> density;
     Float sigma_t;
     Float invMaxDensity;
 };
