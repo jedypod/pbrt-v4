@@ -57,10 +57,10 @@ class Vector2 : public Tuple2<Vector2, T> {
 
     // Vector2 Public Methods
     Vector2() { }
-    Vector2(T x, T y) : Tuple2<Vector2::template Vector2, T>(x, y) { }
+    Vector2(T x, T y) : Tuple2<pbrt::Vector2, T>(x, y) { }
     template <typename U> explicit Vector2(const Point2<U> &p);
     template <typename U> explicit Vector2(const Vector2<U> &v)
-        : Tuple2<Vector2::template Vector2, T>(T(v.x), T(v.y)) { }
+        : Tuple2<pbrt::Vector2, T>(T(v.x), T(v.y)) { }
 };
 
 template <typename T>
@@ -71,7 +71,7 @@ class Vector3 : public Tuple3<Vector3, T> {
     using Tuple3<Vector3::template Vector3, T>::z;
 
     Vector3() { }
-    Vector3(T x, T y, T z) : Tuple3<Vector3::template Vector3, T>(x, y, z) { }
+    Vector3(T x, T y, T z) : Tuple3<pbrt::Vector3, T>(x, y, z) { }
     explicit Vector3(const Point3<T> &p);
     explicit Vector3(const Normal3<T> &n);
 };
@@ -92,7 +92,7 @@ class Point2 : public Tuple2<Point2, T> {
 
     // Point2 Public Methods
     Point2() { x = y = 0; }
-    Point2(T xx, T yy) : Tuple2<Point2::template Point2, T>(xx, yy) { }
+    Point2(T xx, T yy) : Tuple2<pbrt::Point2, T>(xx, yy) { }
     template <typename U>
     explicit Point2(const Point2<U> &p) {
         x = (T)p.x;
@@ -151,10 +151,10 @@ class Point3 : public Tuple3<Point3, T> {
 
     // Point3 Public Methods
     Point3() { x = y = z = 0; }
-    Point3(T x, T y, T z) : Tuple3<Point3::template Point3, T>(x, y, z) { }
+    Point3(T x, T y, T z) : Tuple3<pbrt::Point3, T>(x, y, z) { }
     template <typename U>
     explicit Point3(const Point3<U> &p)
-        : Tuple3<Point3::template Point3, T>((T)p.x, (T)p.y, (T)p.z) { }
+        : Tuple3<pbrt::Point3, T>((T)p.x, (T)p.y, (T)p.z) { }
     template <typename U>
     explicit operator Vector3<U>() const {
         return Vector3<U>(x, y, z);
@@ -204,9 +204,9 @@ class Normal3 : public Tuple3<Normal3, T> {
 
     // Normal3 Public Methods
     Normal3() { x = y = z = 0; }
-    Normal3(T x, T y, T z) : Tuple3<Normal3::template Normal3, T>(x, y, z) { }
+    Normal3(T x, T y, T z) : Tuple3<pbrt::Normal3, T>(x, y, z) { }
     explicit Normal3<T>(const Vector3<T> &v)
-        : Tuple3<Normal3::template Normal3, T>(v.x, v.y, v.z) { }
+        : Tuple3<pbrt::Normal3, T>(v.x, v.y, v.z) { }
 };
 
 using Normal3f = Normal3<Float>;
@@ -274,7 +274,7 @@ class RayDifferential : public Ray {
 // Geometry Inline Functions
 template <typename T>
 inline Vector3<T>::Vector3(const Point3<T> &p)
-    : Tuple3<Vector3::template Vector3, T>(p.x, p.y, p.z) { }
+    : Tuple3<pbrt::Vector3, T>(p.x, p.y, p.z) { }
 
 template <typename T>
 inline T Dot(const Vector3<T> &v1, const Vector3<T> &v2) {
@@ -340,7 +340,7 @@ inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
 
 template <typename T> template <typename U>
 Vector2<T>::Vector2(const Point2<U> &p)
-    : Tuple2<Vector2::template Vector2, T>(p.x, p.y) { }
+    : Tuple2<pbrt::Vector2, T>(p.x, p.y) { }
 
 template <typename T>
 inline Float Dot(const Vector2<T> &v1, const Vector2<T> &v2) {
@@ -402,7 +402,7 @@ inline Normal3<T> Normalize(const Normal3<T> &n) {
 
 template <typename T>
 inline Vector3<T>::Vector3(const Normal3<T> &n)
-  : Tuple3<Vector3::template Vector3, T>(n.x, n.y, n.z) { }
+    : Tuple3<pbrt::Vector3, T>(n.x, n.y, n.z) { }
 
 template <typename T>
 inline T Dot(const Normal3<T> &n1, const Vector3<T> &v2) {

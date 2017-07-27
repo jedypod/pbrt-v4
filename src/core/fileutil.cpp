@@ -38,6 +38,7 @@
 #ifndef PBRT_IS_WINDOWS
 #include <libgen.h>
 #endif
+#include <string.h>
 
 namespace pbrt {
 

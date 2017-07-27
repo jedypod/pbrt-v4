@@ -219,7 +219,12 @@ class CoefficientSpectrum {
         DCHECK(!ret.HasNaNs());
         return ret;
     }
-    friend inline Child Pow(const Child &s, Float e);
+    friend inline Child Pow(const Child &s, Float e) {
+        CoefficientSpectrum<Child, nSpectrumSamples> ret;
+        for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = std::pow(s.c[i], e);
+        DCHECK(!ret.HasNaNs());
+        return ret;
+    }
     Child operator-() const {
         Child ret;
         for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = -c[i];
@@ -489,15 +494,6 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
 };
 
 // Spectrum Inline Functions
-template <typename Child, int nSpectrumSamples>
-inline CoefficientSpectrum<Child, nSpectrumSamples> Pow(
-    const CoefficientSpectrum<Child, nSpectrumSamples> &s, Float e) {
-  CoefficientSpectrum<Child, nSpectrumSamples> ret;
-    for (int i = 0; i < nSpectrumSamples; ++i) ret.c[i] = std::pow(s.c[i], e);
-    DCHECK(!ret.HasNaNs());
-    return ret;
-}
-
 inline RGBSpectrum Lerp(Float t, const RGBSpectrum &s1, const RGBSpectrum &s2) {
     return (1 - t) * s1 + t * s2;
 }

@@ -38,6 +38,7 @@
 #include "geometry.h"
 #include "sampling.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
