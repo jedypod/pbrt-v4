@@ -282,7 +282,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
             Integrator *integrator =
                 new PathIntegrator(8, camera, std::move(sampler.first),
-                                   film->croppedPixelBounds);
+                                   camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Perspective, " +
                                        sampler.second + ", " +
@@ -302,7 +302,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
             Integrator *integrator =
                 new PathIntegrator(8, camera, std::move(sampler.first),
-                                   film->croppedPixelBounds);
+                                   camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Ortho, " + sampler.second +
                                        ", " + scene.description,
@@ -322,7 +322,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
             Integrator *integrator =
                 new VolPathIntegrator(8, camera, std::move(sampler.first),
-                                      film->croppedPixelBounds);
+                                      camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Perspective, " +
                                        sampler.second + ", " +
@@ -341,7 +341,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
             Integrator *integrator =
                 new VolPathIntegrator(8, camera, std::move(sampler.first),
-                                      film->croppedPixelBounds);
+                                      camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Ortho, " +
                                        sampler.second + ", " +
@@ -377,11 +377,11 @@ std::vector<TestIntegrator> GetIntegrators() {
                             std::move(filter), 1., "test.exr", 1.);
       std::shared_ptr<Camera> camera = std::make_shared<OrthographicCamera>(
           identity, Bounds2f(Point2f(-.1,-.1), Point2f(.1,.1)), 0., 1.,
-          0., 10., film, nullptr);
+          0., 10., std::move(film), nullptr);
 
       Integrator *integrator = new BDPTIntegrator(std::move(sampler.first), camera, 8,
                                             false, false);
-      integrators.push_back({integrator, film,
+      integrators.push_back({integrator, camera->film.get(),
               "BDPT, depth 8, Ortho, " + sampler.second + ", " +
               scene.description, scene});
     }
@@ -402,8 +402,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                 camera, 8 /* depth */, 100000 /* n bootstrap */,
                 1000 /* nchains */, 1024 /* mutations per pixel */,
                 0.01 /* sigma */, 0.3 /* large step prob */);
-            integrators.push_back(
-                                  {integrator, camera->film.get(),
+            integrators.push_back({integrator, camera->film.get(),
                  "MLT, depth 8, Perspective, " + scene.description, scene});
         }
     }
