@@ -98,7 +98,6 @@ int makesky(int argc, char *argv[]) {
     Float elevation = 10;
     int resolution = 2048;
 
-    ++argv;
     while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
@@ -183,7 +182,6 @@ int assemble(int argc, char *argv[]) {
     std::string outfile;
     std::vector<std::string> infiles;
 
-    ++argv;
     while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
@@ -342,7 +340,6 @@ int diff(int argc, char *argv[]) {
     std::string outfile;
     std::vector<std::string> filenames;
 
-    ++argv;
     while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
@@ -350,6 +347,7 @@ int diff(int argc, char *argv[]) {
         };
 
         if (ParseArg(&argv, "outfile", &outfile, onError) ||
+            ParseArg(&argv, "o", &outfile, onError) ||
             ParseArg(&argv, "difftol", &tol, onError)) {
             // success
         } else {
@@ -634,7 +632,6 @@ int convert(int argc, char *argv[]) {
     bool preserveColors = false;
     std::vector<std::string> filenames;
 
-    ++argv;
     while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
@@ -815,7 +812,6 @@ int maketiled(int argc, char *argv[]) {
     WrapMode wrapMode = WrapMode::Clamp;
     std::vector<std::string> filenames;
 
-    ++argv;
     while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());

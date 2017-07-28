@@ -139,20 +139,17 @@ bool ParseArg(char ***argv, const std::string &name, T *ptr,
         return true;
     } else if (normalize(arg) == normalize(name)) {
         // --arg <value>, except for bool arguments, which are set to true
-        // without
-        // expecting another argument.
+        // without expecting another argument.
         *argv += 1;
         if (enable(ptr))
             return true;
-        else {
-            if (**argv == nullptr) {
-                onError(
-                    StringPrintf("missing value after %s argument", **argv));
-                return false;
-            }
-            initArg(**argv, ptr);
-            *argv += 1;
+
+        if (**argv == nullptr) {
+            onError(StringPrintf("missing value after %s argument", **argv));
+            return false;
         }
+        initArg(**argv, ptr);
+        *argv += 1;
         return true;
     } else
         return false;
