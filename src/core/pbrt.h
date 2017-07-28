@@ -39,7 +39,6 @@
 #define PBRT_CORE_PBRT_H
 
 // core/pbrt.h*
-#include <string>
 
 // Platform-specific definitions
 #if defined(_WIN32) || defined(_WIN64)
@@ -143,7 +142,7 @@ struct Options {
     bool quickRender = false;
     bool quiet = false;
     bool cat = false, toPly = false;
-    std::string imageFile;  // FIXME need string included here
+    char *imageFile = nullptr;
 };
 
 extern Options PbrtOptions;

@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+
+#include "args.h"
 #include "fileutil.h"
 #include "imageio.h"
 #include "mipmap.h"
@@ -90,59 +92,37 @@ maketiled options:
 }
 
 int makesky(int argc, char *argv[]) {
-    const char *outfile = "sky.exr";
-    float albedo = 0.5;
-    float turbidity = 3.;
-    float elevation = Radians(10);
+    std::string outfile = "sky.exr";
+    Float albedo = 0.5;
+    Float turbidity = 3.;
+    Float elevation = 10;
     int resolution = 2048;
 
-    int i;
-    auto parseArg = [&]() -> std::pair<std::string, double> {
-        const char *ptr = argv[i];
-        // Skip over a leading dash or two.
-        CHECK_EQ(*ptr, '-');
-        ++ptr;
-        if (*ptr == '-') ++ptr;
-
-        // Copy the flag name to the string.
-        std::string flag;
-        while (*ptr && *ptr != '=') flag += *ptr++;
-
-        if (!*ptr && i + 1 == argc)
-            usage("missing value after %s flag", argv[i]);
-        const char *value = (*ptr == '=') ? (ptr + 1) : argv[++i];
-        return {flag, atof(value)};
-    };
-
-    for (i = 0; i < argc; ++i) {
-        if (!strcmp(argv[i], "--outfile") || !strcmp(argv[i], "-outfile")) {
-            if (i + 1 == argc)
-                usage("missing filename for %s parameter", argv[i]);
-            outfile = argv[++i];
-        } else if (!strncmp(argv[i], "--outfile=", 10)) {
-            outfile = &argv[i][10];
-        } else {
-            auto arg = parseArg();
-            if (std::get<0>(arg) == "albedo") {
-                albedo = std::get<1>(arg);
-                if (albedo < 0. || albedo > 1.)
-                    usage("--albedo must be between 0 and 1");
-            } else if (std::get<0>(arg) == "turbidity") {
-                turbidity = std::get<1>(arg);
-                if (turbidity < 1.7 || turbidity > 10.)
-                    usage("--turbidity must be between 1.7 and 10.");
-            } else if (std::get<0>(arg) == "elevation") {
-                elevation = std::get<1>(arg);
-                if (elevation < 0. || elevation > 90.)
-                    usage("--elevation must be between 0. and 90.");
-                elevation = Radians(elevation);
-            } else if (std::get<0>(arg) == "resolution") {
-                resolution = int(std::get<1>(arg));
-                if (resolution < 1) usage("--resolution must be >= 1");
-            } else
-                usage();
-        }
+    ++argv;
+    for (; *argv; ++argv) {
+        auto onError = [](const std::string &err) {
+            usage("%s", err.c_str());
+            exit(1);
+        };
+        if (ParseArg(&argv, "outfile", &outfile, onError) ||
+            ParseArg(&argv, "albedo", &albedo, onError) ||
+            ParseArg(&argv, "turbidity", &turbidity, onError) ||
+            ParseArg(&argv, "elevation", &elevation, onError) ||
+            ParseArg(&argv, "resolution", &resolution, onError)) {
+            // success
+        } else
+            onError(StringPrintf("makesky: argument %s invalid", *argv));
     }
+
+    if (albedo < 0. || albedo > 1.)
+        usage("--albedo must be between 0 and 1");
+    if (turbidity < 1.7 || turbidity > 10.)
+        usage("--turbidity must be between 1.7 and 10.");
+    if (elevation < 0. || elevation > 90.)
+        usage("--elevation must be between 0. and 90.");
+    elevation = Radians(elevation);
+    if (resolution < 1)
+        usage("--resolution must be >= 1");
 
     constexpr int num_channels = 9;
     // Three wavelengths around red, three around green, and three around blue.
@@ -200,27 +180,26 @@ int makesky(int argc, char *argv[]) {
 
 int assemble(int argc, char *argv[]) {
     if (argc == 0) usage("no filenames provided to \"assemble\"?");
-    const char *outfile = nullptr;
-    std::vector<const char *> infiles;
-    for (int i = 0; i < argc; ++i) {
-        if (!strcmp(argv[i], "--outfile") || !strcmp(argv[i], "-outfile")) {
-            if (i + 1 == argc)
-                usage("missing filename for %s parameter", argv[i]);
-            outfile = argv[++i];
-        } else if (!strncmp(argv[i], "--outfile=", 10)) {
-            outfile = &argv[i][10];
-        } else
-            infiles.push_back(argv[i]);
+    std::string outfile;
+    std::vector<std::string> infiles;
+
+    ++argv;
+    for (; *argv; ++argv) {
+        auto onError = [](const std::string &err) {
+            usage("%s", err.c_str());
+        };
+        if (!ParseArg(&argv, "outfile", &outfile, onError))
+            infiles.push_back(*argv);
     }
 
-    if (!outfile) usage("--outfile not provided for \"assemble\"");
+    if (!outfile.size()) usage("--outfile not provided for \"assemble\"");
 
     Image fullImage;
     std::vector<bool> seenPixel;
     int seenMultiple = 0;
     Point2i fullRes;
     Bounds2i displayWindow;
-    for (const char *file : infiles) {
+    for (const std::string &file : infiles) {
         if (!HasExtension(file, ".exr"))
             usage(
                 "only EXR images include the image bounding boxes that "
@@ -290,10 +269,10 @@ int assemble(int argc, char *argv[]) {
             if (!seenPixel[y * fullRes.x + x]) ++unseenPixels;
 
     if (seenMultiple > 0)
-        fprintf(stderr, "%s: %d pixels present in multiple images.\n", outfile,
+        fprintf(stderr, "%s: %d pixels present in multiple images.\n", outfile.c_str(),
                 seenMultiple);
     if (unseenPixels > 0)
-        fprintf(stderr, "%s: %d pixels not present in any images.\n", outfile,
+        fprintf(stderr, "%s: %d pixels not present in any images.\n", outfile.c_str(),
                 unseenPixels);
 
     fullImage.Write(outfile);
@@ -357,45 +336,32 @@ int cat(int argc, char *argv[]) {
 }
 
 int diff(int argc, char *argv[]) {
-    float tol = 0.;
-    const char *outfile = nullptr;
+    Float tol = 0.;
+    std::string outfile;
+    std::vector<std::string> filenames;
 
-    int i;
-    for (i = 0; i < argc; ++i) {
-        if (argv[i][0] != '-') break;
-        if (!strcmp(argv[i], "--outfile") || !strcmp(argv[i], "-outfile") ||
-            !strcmp(argv[i], "-o")) {
-            if (i + 1 == argc)
-                usage("missing filename after %s option", argv[i]);
-            outfile = argv[++i];
-        } else if (!strncmp(argv[i], "--outfile=", 10)) {
-            outfile = &argv[i][10];
-        } else if (!strcmp(argv[i], "--difftol") ||
-                   !strcmp(argv[i], "-difftol") || !strcmp(argv[i], "-d")) {
-            if (i + 1 == argc)
-                usage("missing filename after %s option", argv[i]);
-            ++i;
-            if (!isdigit(argv[i][0]) && argv[i][0] != '.')
-                usage("argument after %s doesn't look like a number", argv[i]);
-            tol = atof(argv[i]);
-        } else if (!strncmp(argv[i], "--difftol=", 10))
-            tol = atof(&argv[i][10]);
-        else
-            usage("unknown \"diff\" option");
+    ++argv;
+    for (; *argv; ++argv) {
+        auto onError = [](const std::string &err) {
+            usage("%s", err.c_str());
+            exit(1);
+        };
+
+        if (ParseArg(&argv, "outfile", &outfile, onError) ||
+            ParseArg(&argv, "difftol", &tol, onError)) {
+            // success
+        } else
+            filenames.push_back(*argv);
     }
 
-    if (i >= argc)
-        usage("missing filenames for \"diff\"");
-    else if (i + 1 >= argc)
-        usage("missing second filename for \"diff\"");
-    else if (i + 2 < argc)
-        usage("excess filenames provided to \"diff\"");
+    if (filenames.size() != 2)
+        usage("expecting two filenames for \"diff\". Given %d",
+              int(filenames.size()));
 
-    const char *filename[2] = {argv[i], argv[i + 1]};
     Image img[2];
     for (int i = 0; i < 2; ++i)
-        if (!Image::Read(filename[i], &img[i])) {
-            fprintf(stderr, "%s: unable to read image\n", filename[i]);
+        if (!Image::Read(filenames[i], &img[i])) {
+            fprintf(stderr, "%s: unable to read image\n", filenames[i].c_str());
             return 1;
         }
 
@@ -403,8 +369,8 @@ int diff(int argc, char *argv[]) {
         fprintf(stderr,
                 "imgtool: image resolutions don't match \"%s\": (%d, %d) "
                 "\"%s\": (%d, %d)\n",
-                filename[0], img[0].resolution.x, img[0].resolution.y,
-                filename[1], img[1].resolution.x, img[1].resolution.y);
+                filenames[0].c_str(), img[0].resolution.x, img[0].resolution.y,
+                filenames[1].c_str(), img[1].resolution.x, img[1].resolution.y);
         return 1;
     }
 
@@ -447,15 +413,15 @@ int diff(int argc, char *argv[]) {
             "%s %s\n\tImages differ: %d big (%.2f%%), %d small (%.2f%%)\n"
             "\tavg 1 = %g, avg2 = %g (%f%% delta)\n"
             "\tMSE = %g, RMS = %.3f%%\n",
-            filename[0], filename[1], bigDiff,
+            filenames[0].c_str(), filenames[1].c_str(), bigDiff,
             100.f * float(bigDiff) / (3 * res.x * res.y), smallDiff,
             100.f * float(smallDiff) / (3 * res.x * res.y), avg[0], avg[1],
             100. * avgDelta, mse / (3. * res.x * res.y),
             100. * sqrt(mse / (3. * res.x * res.y)));
-        if (outfile) {
+        if (!outfile.empty()) {
             if (!diffImage.Write(outfile))
                 fprintf(stderr, "imgtool: unable to write \"%s\": %s\n",
-                        outfile, strerror(errno));
+                        outfile.c_str(), strerror(errno));
         }
         return 1;
     }
@@ -662,69 +628,41 @@ int convert(int argc, char *argv[]) {
     Float maxY = 1.;
     Float despikeLimit = Infinity;
     bool preserveColors = false;
+    std::vector<std::string> filenames;
 
-    int i;
-    auto parseArg = [&]() -> std::pair<std::string, double> {
-        const char *ptr = argv[i];
-        // Skip over a leading dash or two.
-        CHECK_EQ(*ptr, '-');
-        ++ptr;
-        if (*ptr == '-') ++ptr;
+    ++argv;
+    for (; *argv; ++argv) {
+        auto onError = [](const std::string &err) {
+            usage("%s", err.c_str());
+            exit(1);
+        };
 
-        // Copy the flag name to the string.
-        std::string flag;
-        while (*ptr && *ptr != '=') flag += *ptr++;
-
-        if (!*ptr && i + 1 == argc)
-            usage("missing value after %s flag", argv[i]);
-        const char *value = (*ptr == '=') ? (ptr + 1) : argv[++i];
-        return {flag, atof(value)};
-    };
-
-    std::pair<std::string, double> arg;
-    for (i = 0; i < argc; ++i) {
-        if (argv[i][0] != '-') break;
-        if (!strcmp(argv[i], "--flipy") || !strcmp(argv[i], "-flipy"))
-            flipy = !flipy;
-        else if (!strcmp(argv[i], "--tonemap") || !strcmp(argv[i], "-tonemap"))
-            tonemap = !tonemap;
-        else if (!strcmp(argv[i], "--preservecolors") ||
-                 !strcmp(argv[i], "-preservecolors"))
-            preserveColors = !preserveColors;
-        else {
-            std::pair<std::string, double> arg = parseArg();
-            if (std::get<0>(arg) == "maxluminance") {
-                maxY = std::get<1>(arg);
-                if (maxY <= 0)
-                    usage("--maxluminance value must be greater than zero");
-            } else if (std::get<0>(arg) == "repeatpix") {
-                repeat = int(std::get<1>(arg));
-                if (repeat <= 0)
-                    usage("--repeatpix value must be greater than zero");
-            } else if (std::get<0>(arg) == "scale") {
-                scale = std::get<1>(arg);
-                if (scale == 0) usage("--scale value must be non-zero");
-            } else if (std::get<0>(arg) == "bloomlevel")
-                bloomLevel = std::get<1>(arg);
-            else if (std::get<0>(arg) == "bloomwidth")
-                bloomWidth = int(std::get<1>(arg));
-            else if (std::get<0>(arg) == "bloomscale")
-                bloomScale = std::get<1>(arg);
-            else if (std::get<0>(arg) == "bloomiters")
-                bloomIters = int(std::get<1>(arg));
-            else if (std::get<0>(arg) == "despike")
-                despikeLimit = std::get<1>(arg);
-            else
-                usage();
-        }
+        if (ParseArg(&argv, "flipy", &flipy, onError) ||
+            ParseArg(&argv, "tonemap", &tonemap, onError) ||
+            ParseArg(&argv, "preservecolors", &preserveColors, onError) ||
+            ParseArg(&argv, "maxluminance", &maxY, onError) ||
+            ParseArg(&argv, "repeatpix", &repeat, onError) ||
+            ParseArg(&argv, "scale", &scale, onError) ||
+            ParseArg(&argv, "bloomlevel", &bloomLevel, onError) ||
+            ParseArg(&argv, "bloomwidth", &bloomWidth, onError) ||
+            ParseArg(&argv, "bloomscale", &bloomScale, onError) ||
+            ParseArg(&argv, "bloomiters", &bloomIters, onError) ||
+            ParseArg(&argv, "despike", &despikeLimit, onError)) {
+            // success
+        } else
+            filenames.push_back(*argv);
     }
 
-    if (i + 1 >= argc)
-        usage("missing second filename for \"convert\"");
-    else if (i >= argc)
-        usage("missing filenames for \"convert\"");
+    if (maxY <= 0)
+        usage("--maxluminance value must be greater than zero");
+    if (repeat <= 0)
+        usage("--repeatpix value must be greater than zero");
+    if (scale == 0)
+        usage("--scale value must be non-zero");
+    if (filenames.size() != 2)
+        usage("expected two filenames. Given %d", int(filenames.size()));
 
-    const char *inFilename = argv[i], *outFilename = argv[i + 1];
+    const char *inFilename = filenames[0].c_str(), *outFilename = filenames[1].c_str();
     Image image;
     if (HasExtension(inFilename, "txp")) {
         std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
@@ -869,32 +807,30 @@ int convert(int argc, char *argv[]) {
 int maketiled(int argc, char *argv[]) {
     ParallelInit();
     WrapMode wrapMode = WrapMode::Clamp;
+    std::vector<std::string> filenames;
 
-    int i;
-    for (i = 0; i < argc; ++i) {
-        if (argv[i][0] != '-') break;
-        if (!strcmp(argv[i], "--wrapmode") || !strcmp(argv[i], "-wrapmode")) {
-            if (i + 1 == argc)
-                usage("missing wrap mode after %s option", argv[i]);
-            ++i;
-            if (!ParseWrapMode(argv[i], &wrapMode))
+    ++argv;
+    for (; *argv; ++argv) {
+        auto onError = [](const std::string &err) {
+            usage("%s", err.c_str());
+            exit(1);
+        };
+
+        std::string wrapModeStr;
+        if (ParseArg(&argv, "wrapmode", &wrapModeStr, onError)) {
+            if (!ParseWrapMode(wrapModeStr.c_str(), &wrapMode))
                 usage(
                     "unknown wrap mode %s. Expected \"clamp\", \"repeat\", "
                     "or \"black\".",
-                    argv[i]);
-        } else if (!strncmp(argv[i], "--wrapmode=", 11)) {
-            if (!ParseWrapMode(argv[i] + 11, &wrapMode))
-                usage(
-                    "unknown wrap mode %s. Expected \"clamp\", \"repeat\", "
-                    "or \"black\".",
-                    argv[i] + 11);
+                    wrapModeStr.c_str());
         } else
-            usage("unknown \"maketiled\" option \"%s\"", argv[i]);
+            filenames.push_back(*argv);
     }
-    if (i + 2 != argc) {
+
+    if (filenames.size() != 2)
         usage("expecting input and output filenames as arguments");
-    }
-    const char *infile = argv[i], *outfile = argv[i + 1];
+
+    const char *infile = filenames[0].c_str(), *outfile = filenames[1].c_str();
 
     Image image;
     if (!Image::Read(infile, &image)) {

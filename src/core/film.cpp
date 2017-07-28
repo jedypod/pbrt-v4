@@ -213,12 +213,12 @@ std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter>
     // so that the rendered image is left in the working directory, rather
     // than the directory the scene file lives in.
     std::string filename = params.GetOneString("filename", "");
-    if (PbrtOptions.imageFile != "") {
+    if (PbrtOptions.imageFile != nullptr && std::string(PbrtOptions.imageFile) != "") {
         if (filename != "") {
             Warning(
                 "Output filename supplied on command line, \"%s\", ignored "
                 "due to filename provided in scene description file, \"%s\".",
-                PbrtOptions.imageFile.c_str(), filename.c_str());
+                PbrtOptions.imageFile, filename.c_str());
         } else
             filename = PbrtOptions.imageFile;
     }

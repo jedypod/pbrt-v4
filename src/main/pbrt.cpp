@@ -35,6 +35,7 @@
 #include "pbrt.h"
 
 #include "api.h"
+#include "args.h"
 #include "error.h"
 #include "parser.h"
 #include "parallel.h"
@@ -42,9 +43,9 @@
 
 using namespace pbrt;
 
-static void usage(const char *msg = nullptr) {
-    if (msg)
-        fprintf(stderr, "pbrt: %s\n\n", msg);
+static void usage(const std::string &msg = {}) {
+    if (!msg.empty())
+        fprintf(stderr, "pbrt: %s\n\n", msg.c_str());
 
     fprintf(stderr, R"(usage: pbrt [<options>] <filename.pbrt...>
 Rendering options:
@@ -81,65 +82,39 @@ int main(int argc, char *argv[]) {
     Options options;
     std::vector<std::string> filenames;
     // Process command-line arguments
-    for (int i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "--nthreads") || !strcmp(argv[i], "-nthreads")) {
-            if (i + 1 == argc)
-                usage("missing value after --nthreads argument");
-            options.nThreads = atoi(argv[++i]);
-        } else if (!strncmp(argv[i], "--nthreads=", 11)) {
-            options.nThreads = atoi(&argv[i][11]);
-        } else if (!strcmp(argv[i], "--texcachemb") || !strcmp(argv[i], "-texcachemb")) {
-            if (i + 1 == argc)
-                usage("missing value after --texcachemb argument");
-            options.texCacheMB = atoi(argv[++i]);
-            CHECK_GT(options.texCacheMB, 0);
-        } else if (!strcmp(argv[i], "--texreadms") || !strcmp(argv[i], "-texreadms")) {
-            if (i + 1 == argc)
-                usage("missing value after --texreadms argument");
-            options.texReadMinMS = atoi(argv[++i]);
-            CHECK_GT(options.texCacheMB, 0);
-        } else if (!strcmp(argv[i], "--outfile") || !strcmp(argv[i], "-outfile")) {
-            if (i + 1 == argc)
-                usage("missing value after --outfile argument");
-            options.imageFile = argv[++i];
-        } else if (!strncmp(argv[i], "--outfile=", 10)) {
-            options.imageFile = &argv[i][10];
-        } else if (!strcmp(argv[i], "--logdir") || !strcmp(argv[i], "-logdir")) {
-            if (i + 1 == argc)
-                usage("missing value after --logdir argument");
-            FLAGS_log_dir = argv[++i];
-        } else if (!strncmp(argv[i], "--logdir=", 9)) {
-            FLAGS_log_dir = &argv[i][9];
-        } else if (!strcmp(argv[i], "--minloglevel") ||
-                   !strcmp(argv[i], "-minloglevel")) {
-            if (i + 1 == argc)
-                usage("missing value after --minloglevel argument");
-            FLAGS_minloglevel = atoi(argv[++i]);
-        } else if (!strncmp(argv[i], "--minloglevel=", 14)) {
-            FLAGS_minloglevel = atoi(&argv[i][14]);
-        } else if (!strcmp(argv[i], "--quick") || !strcmp(argv[i], "-quick")) {
-            options.quickRender = true;
-        } else if (!strcmp(argv[i], "--quiet") || !strcmp(argv[i], "-quiet")) {
-            options.quiet = true;
-        } else if (!strcmp(argv[i], "--cat") || !strcmp(argv[i], "-cat")) {
-            options.cat = true;
-        } else if (!strcmp(argv[i], "--toply") || !strcmp(argv[i], "-toply")) {
-            options.toPly = true;
-        } else if (!strcmp(argv[i], "--v") || !strcmp(argv[i], "-v")) {
-            if (i + 1 == argc)
-                usage("missing value after --v argument");
-            FLAGS_v = atoi(argv[++i]);
-        } else if (!strncmp(argv[i], "--v=", 4)) {
-          FLAGS_v = atoi(argv[i] + 4);
+    ++argv;
+    for (; *argv; ++argv) {
+        if ((*argv)[0] != '-') {
+            filenames.push_back(*argv);
+            continue;
         }
-        else if (!strcmp(argv[i], "--logtostderr")) {
-          FLAGS_logtostderr = true;
-        } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
-                   !strcmp(argv[i], "-h")) {
+
+        auto onError = [](const std::string &err) {
+            usage(err);
+            exit(1);
+        };
+
+        if (ParseArg(&argv, "nthreads", &options.nThreads, onError) ||
+            ParseArg(&argv, "texcachemb", &options.texCacheMB, onError) ||
+            ParseArg(&argv, "texreadms", &options.texReadMinMS, onError) ||
+            ParseArg(&argv, "minloglevel", &FLAGS_minloglevel, onError) ||
+            ParseArg(&argv, "v", &FLAGS_v, onError) ||
+            ParseArg(&argv, "outfile", &options.imageFile, onError) ||
+            ParseArg(&argv, "logdir", &FLAGS_log_dir, onError) ||
+            ParseArg(&argv, "quick", &options.quickRender, onError) ||
+            ParseArg(&argv, "quiet", &options.quiet, onError) ||
+            ParseArg(&argv, "cat", &options.cat, onError) ||
+            ParseArg(&argv, "toply", &options.toPly, onError) ||
+            ParseArg(&argv, "logtostderr", &FLAGS_logtostderr, onError)) {
+            // success
+        } else if (!strcmp(*argv, "--help") || !strcmp(*argv, "-help") ||
+                   !strcmp(*argv, "-h")) {
             usage();
             return 0;
-        } else
-            filenames.push_back(argv[i]);
+        } else {
+            usage(StringPrintf("argument \"%s\" unknown", *argv));
+            return 1;
+        }
     }
 
     // Print welcome banner
