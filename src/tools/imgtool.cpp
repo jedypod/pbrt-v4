@@ -99,7 +99,7 @@ int makesky(int argc, char *argv[]) {
     int resolution = 2048;
 
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
             exit(1);
@@ -184,12 +184,14 @@ int assemble(int argc, char *argv[]) {
     std::vector<std::string> infiles;
 
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
         };
-        if (!ParseArg(&argv, "outfile", &outfile, onError))
+        if (!ParseArg(&argv, "outfile", &outfile, onError)) {
             infiles.push_back(*argv);
+            ++argv;
+        }
     }
 
     if (!outfile.size()) usage("--outfile not provided for \"assemble\"");
@@ -225,7 +227,7 @@ int assemble(int argc, char *argv[]) {
                         "doesn't match the displayWindow of first EXR file "
                         "(%d,%d) - (%d,%d). "
                         "Ignoring this file.\n",
-                        file, dspw.pMin.x, dspw.pMin.y, dspw.pMax.x,
+                        file.c_str(), dspw.pMin.x, dspw.pMin.y, dspw.pMax.x,
                         dspw.pMax.y, displayWindow.pMin.x, displayWindow.pMin.y,
                         displayWindow.pMax.x, displayWindow.pMax.y);
                 continue;
@@ -236,7 +238,7 @@ int assemble(int argc, char *argv[]) {
                         "inside the displayWindow of first EXR file (%d,%d) - "
                         "(%d,%d). "
                         "Ignoring this file.\n",
-                        file, dataWindow.pMin.x, dataWindow.pMin.y,
+                        file.c_str(), dataWindow.pMin.x, dataWindow.pMin.y,
                         dataWindow.pMax.x, dataWindow.pMax.y,
                         displayWindow.pMin.x, displayWindow.pMin.y,
                         displayWindow.pMax.x, displayWindow.pMax.y);
@@ -244,8 +246,8 @@ int assemble(int argc, char *argv[]) {
             }
             if (fullImage.nChannels() != img.nChannels()) {
                 fprintf(stderr,
-                        "%s: %d channel image; expecting %d channels.\n", file,
-                        img.nChannels(), fullImage.nChannels());
+                        "%s: %d channel image; expecting %d channels.\n",
+                        file.c_str(), img.nChannels(), fullImage.nChannels());
                 continue;
             }
         }
@@ -341,7 +343,7 @@ int diff(int argc, char *argv[]) {
     std::vector<std::string> filenames;
 
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
             exit(1);
@@ -350,8 +352,10 @@ int diff(int argc, char *argv[]) {
         if (ParseArg(&argv, "outfile", &outfile, onError) ||
             ParseArg(&argv, "difftol", &tol, onError)) {
             // success
-        } else
+        } else {
             filenames.push_back(*argv);
+            ++argv;
+        }
     }
 
     if (filenames.size() != 2)
@@ -631,7 +635,7 @@ int convert(int argc, char *argv[]) {
     std::vector<std::string> filenames;
 
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
             exit(1);
@@ -649,8 +653,10 @@ int convert(int argc, char *argv[]) {
             ParseArg(&argv, "bloomiters", &bloomIters, onError) ||
             ParseArg(&argv, "despike", &despikeLimit, onError)) {
             // success
-        } else
+        } else {
             filenames.push_back(*argv);
+            ++argv;
+        }
     }
 
     if (maxY <= 0)
@@ -810,7 +816,7 @@ int maketiled(int argc, char *argv[]) {
     std::vector<std::string> filenames;
 
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());
             exit(1);
@@ -823,8 +829,10 @@ int maketiled(int argc, char *argv[]) {
                     "unknown wrap mode %s. Expected \"clamp\", \"repeat\", "
                     "or \"black\".",
                     wrapModeStr.c_str());
-        } else
+        } else {
             filenames.push_back(*argv);
+            ++argv;
+        }
     }
 
     if (filenames.size() != 2)

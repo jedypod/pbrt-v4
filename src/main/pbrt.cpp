@@ -83,9 +83,10 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> filenames;
     // Process command-line arguments
     ++argv;
-    for (; *argv; ++argv) {
+    while (*argv) {
         if ((*argv)[0] != '-') {
             filenames.push_back(*argv);
+            ++argv;
             continue;
         }
 
