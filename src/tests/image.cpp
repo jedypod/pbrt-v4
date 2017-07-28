@@ -55,8 +55,8 @@ TEST(Image, Basics) {
 }
 
 static Float sRGBRoundTrip(Float v) {
-    Float encoded = 255. * GammaCorrect(Clamp(v, 0, 1));
-    return InverseGammaCorrect(std::round(encoded) / 255.);
+    Float encoded = 255. * LinearToSRGB(Clamp(v, 0, 1));
+    return SrgbToLinear(std::round(encoded) / 255.);
 }
 
 static std::vector<uint8_t> GetInt8Pixels(Point2i res, int nc) {
@@ -108,7 +108,7 @@ TEST(Image, GetSetY) {
                     break;
                 }
                 case PixelFormat::SY8: {
-                    EXPECT_EQ(v, sRGBRoundTrip(yPixels[y * res[0] + x]));
+                    EXPECT_FLOAT_EQ(v, sRGBRoundTrip(yPixels[y * res[0] + x]));
                     break;
                 }
                 default:  // silence compiler warning
@@ -159,7 +159,7 @@ TEST(Image, GetSetRGB) {
                         break;
                     }
                     case PixelFormat::SRGB8: {
-                        EXPECT_EQ(rgb[c], sRGBRoundTrip(rgbPixels[offset]));
+                        EXPECT_FLOAT_EQ(rgb[c], sRGBRoundTrip(rgbPixels[offset]));
                         break;
                     }
                     default:  // silence compiler warning
@@ -226,8 +226,8 @@ TEST(Image, TgaRgbIO) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c)
-                EXPECT_EQ(sRGBRoundTrip(image.GetChannel({x, y}, c)),
-                          read.GetChannel({x, y}, c))
+                EXPECT_FLOAT_EQ(sRGBRoundTrip(image.GetChannel({x, y}, c)),
+                                read.GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
 
@@ -249,12 +249,53 @@ TEST(Image, PngRgbIO) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c)
-                EXPECT_EQ(sRGBRoundTrip(image.GetChannel({x, y}, c)),
-                          read.GetChannel({x, y}, c))
+                EXPECT_FLOAT_EQ(sRGBRoundTrip(image.GetChannel({x, y}, c)),
+                                read.GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
 
     EXPECT_EQ(0, remove("test.png"));
+}
+
+TEST(Image, SrgbLUTAccuracy) {
+    const int n = 1024 * 1024;
+    double sumErr = 0, maxErr = 0;
+    RNG rng;
+    for (int i = 0; i < n; ++i) {
+        Float v = (i + rng.UniformFloat()) / n;
+        Float lut = LinearToSRGB(v);
+        Float precise = LinearToSRGBFull(v);
+        double err = std::abs(lut - precise);
+        sumErr += err;
+        maxErr = std::max(err, maxErr);
+    }
+    // These bounds were measured empirically.
+    EXPECT_LT(sumErr / n, 6e-6);  // average error
+    EXPECT_LT(maxErr, 0.0015);
+}
+
+// Monotonicity between the individual segments actually isn't enforced
+// when we do the piecewise linear fit, but it should happen naturally
+// since the derivative of the underlying function doesn't change fit.
+TEST(Image, SrgbLUTMonotonic) {
+    for (int i = 1; i < LinearToSRGBPiecewiseSize; ++i) {
+        // For each break in the function, we'd like to find a pair of floats
+        // such that the second uses the next segment after the one used by
+        // the first. To deal with fp rounding error, move down a bunch of floats
+        // from the computed split point and then step up one float at a time.
+        Float v = Float(i) / LinearToSRGBPiecewiseSize;
+        int slop = 100;
+        v = NextFloatDown(v, slop);
+        bool spanned = true;
+        for (int j = 0; j < 2 * slop; ++j) {
+            EXPECT_LE(LinearToSRGB(v), LinearToSRGB(NextFloatUp(v)));
+            spanned |= int(v * LinearToSRGBPiecewiseSize) !=
+                int(NextFloatUp(v) * LinearToSRGBPiecewiseSize);
+            v = NextFloatUp(v);
+        }
+        // Make sure we actually did cross segments at some point.
+        EXPECT_TRUE(spanned);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

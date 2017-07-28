@@ -181,7 +181,7 @@ bool Image::WriteEXR(const std::string &name, const Bounds2i &pixelBounds,
 // PNG Function Definitions
 
 static inline uint8_t FloatToSRGB(Float v) {
-    return uint8_t(Clamp(255.f * GammaCorrect(v) + 0.5f, 0.f, 255.f));
+    return uint8_t(Clamp(255.f * LinearToSRGB(v) + 0.5f, 0.f, 255.f));
 }
 
 static bool ReadImagePNG(const std::string &name, bool gamma, Image *image) {

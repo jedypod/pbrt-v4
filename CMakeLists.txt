@@ -340,6 +340,7 @@ SET ( PBRT_CORE_SOURCE
   src/core/lightdistrib.cpp
   src/core/lowdiscrepancy.cpp
   src/core/material.cpp
+  src/core/mathutil.cpp
   src/core/medium.cpp
   src/core/memory.cpp
   src/core/microfacet.cpp

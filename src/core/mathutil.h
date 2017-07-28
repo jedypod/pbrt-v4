@@ -50,7 +50,7 @@
 
 #ifdef PBRT_IS_MSVC
 #include <intrin.h>
-#endif // PBRT_IS_MSVC
+#endif  // PBRT_IS_MSVC
 
 namespace pbrt {
 
@@ -145,12 +145,39 @@ inline constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
-inline Float GammaCorrect(Float value) {
+inline Float LinearToSRGBFull(Float value) {
     if (value <= 0.0031308f) return 12.92f * value;
     return 1.055f * std::pow(value, (Float)(1.f / 2.4f)) - 0.055f;
 }
 
-inline Float InverseGammaCorrect(Float value) {
+struct PiecewiseLinearSegment {
+    Float base, slope;
+};
+
+// Piecewise linear fit to LinearToSrgbFull() (via Mathematica).
+// Table size 1024 gave avg error: 7.36217e-07, max: 0.000284649
+// 512 gave avg: 1.76644e-06, max: 0.000490334
+// 256 gave avg: 5.68012e-06, max: 0.00116351
+// 128 gave avg: 2.90114e-05, max: 0.00502084
+// 256 seemed like a reasonable trade-off.
+
+extern const PiecewiseLinearSegment LinearToSRGBPiecewise[];
+constexpr int LinearToSRGBPiecewiseSize = 256;
+
+inline Float LinearToSRGB(Float value) {
+    int index = int(value * LinearToSRGBPiecewiseSize);
+    if (index < 0) return 0;
+    if (index >= LinearToSRGBPiecewiseSize) return 1;
+    return LinearToSRGBPiecewise[index].base + value * LinearToSRGBPiecewise[index].slope;
+}
+
+extern const Float LinearToSRGBChar[256];
+
+inline Float LinearToSRGB(uint8_t value) {
+    return LinearToSRGBChar[value];
+}
+
+inline Float SrgbToLinear(Float value) {
     if (value <= 0.04045f) return value * 1.f / 12.92f;
     return std::pow((value + 0.055f) * 1.f / 1.055f, (Float)2.4f);
 }
@@ -203,11 +230,11 @@ inline int Log2Int(uint64_t v) {
 #if defined(_WIN64)
     _BitScanReverse64(&lz, v);
 #else
-    if  (_BitScanReverse(&lz, v >> 32))
+    if (_BitScanReverse(&lz, v >> 32))
         lz += 32;
     else
         _BitScanReverse(&lz, v & 0xffffffff);
-#endif // _WIN64
+#endif  // _WIN64
     return lz;
 #else  // PBRT_IS_MSVC
     return 63 - __builtin_clzll(v);
@@ -269,7 +296,9 @@ int GetIntArrayerval(int size, const Predicate &pred) {
     return Clamp(first - 1, 0, size - 2);
 }
 
-inline constexpr Float Lerp(Float t, Float v1, Float v2) { return (1 - t) * v1 + t * v2; }
+inline constexpr Float Lerp(Float t, Float v1, Float v2) {
+    return (1 - t) * v1 + t * v2;
+}
 
 inline Float Sqr(Float v) { return v * v; }
 
@@ -305,7 +334,7 @@ inline Float Pow<1>(Float v) {
     return v;
 }
 
- template <>
+template <>
 inline Float Pow<0>(Float v) {
     return 1;
 }
@@ -381,6 +410,6 @@ inline Float Erf(Float x) {
     return sign * y;
 }
 
-} // namespace pbrt
+}  // namespace pbrt
 
-#endif // PBRT_CORE_MATHUTIL_H
+#endif  // PBRT_CORE_MATHUTIL_H

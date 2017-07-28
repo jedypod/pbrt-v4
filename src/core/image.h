@@ -54,8 +54,6 @@
 
 namespace pbrt {
 
-extern Float LinearToSRGB[256];
-
 ///////////////////////////////////////////////////////////////////////////
 // PixelFormat
 
@@ -129,7 +127,7 @@ Float ConvertTexel(const void *ptr, PixelFormat format) {
     // sure about uint8_t, strictly speaking...
     switch (format) {
     case PixelFormat::SY8:
-        return LinearToSRGB[*((uint8_t *)ptr)];
+        return LinearToSRGB(*((uint8_t *)ptr));
     case PixelFormat::Y8:
         return Float(*((uint8_t *)ptr)) / 255.f;
     case PixelFormat::Y16:
@@ -151,7 +149,7 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
     Float rgb[3];
     for (int c = 0; c < 3; ++c) switch (format) {
         case PixelFormat::SRGB8:
-            rgb[c] = LinearToSRGB[((uint8_t *)ptr)[c]];
+            rgb[c] = LinearToSRGB(((uint8_t *)ptr)[c]);
             break;
         case PixelFormat::RGB8:
             rgb[c] = Float(((uint8_t *)ptr)[c]) / 255.f;
