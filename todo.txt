@@ -1,0 +1,83 @@
+
+- v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
+  - fast resampling, cache aware tiles...
+
+- api: move medium param processing to media/*
+
+- MemoryPool stuff in parser?
+
+- CreateConeShape -> Cone::Create (etc..)
+
+- api / MakeFilter error handling (exit) is inconsistent with others...
+
+- test alpha tex for non triangles. also review how it's passed through for
+  non-triangles in --cat/--toply
+
+- Attribute ... std::shared_ptr<ParamSet>: Primitive/Shape, Light,
+  Material, ... ?
+
+- need tests based on more interesting scenes in v3-scenes
+
+- params faceindices face_indices faceIndices
+
+- Sampler::SampleDiscrete (based on Smaple1D...)
+
+- alpha masking really doesn't work with area lights (do we care, or is
+  this just for leaves?)
+    - nuke shadowalpha: alpha can be made physical, not shadow...
+
+- do we actually use tHit at this point?
+
+- store Integrator and Camera in Scene
+
+- how come e.g. a triangle isn't xformed twice when an area light source?
+  light to world versus the baked in world space xform
+  
+- itentity mapping3d should be called transformampping3d
+
+- IntersectTr? only used once?
+
+- move ray into its own header?
+
+- imageio.* nuke?
+
+- texcache branch is blurring bump map lookups; see e.g. bump-sphere.pbrt.
+  do side-by-side runs?  this is due to bilerp default (only partly?)
+
+- actually do robust bvh traversal--watertight...
+
+- Replace NOT_ONE in HasScale with a local lambda function...
+
+- manuka-style pre-dice?
+
+- Keep a pool of FilmTiles, don't do dynamic allocation in the usual case
+  (remember to zero out spectrum sums and weights when returning them)
+
+- BxDFType is really only used for "was it specular" at this point;
+  simplify?  (BSSRDFs also though...)
+
+- pass relative IOR rather than both IORs everywhere that's possible. be
+  consistent: to/from, right? 
+
+- support animated light sources (transformation at least)
+
+- light tree for many lights
+
+- sampling utility routine that takes an initializer list (or array slice)
+  of discrete probabilities (not necessarily normalized?) and a random
+  value in [0,1], then samples one of the probabilities, then returns both
+  the index of the even sampled and a renormalized to [0,1] random
+  variable. Use for sort of one-off things where it's not worth building
+  a full Distribution1D, or cases where it's just an a or b choice?
+
+- direct lighting code can use a general cleanup
+
+- FindOneFilename: support search path. also, pass it in (absl-based?)
+
+- break out cat and toply to be separate (C++) implementations of the API,
+  such that we can run it on individual files, w/o worrying about am I in a
+  world block, etc...
+
+- v3->v4 upgrade option  (cat variant)
+
+- rename --cat to --fmt ?
