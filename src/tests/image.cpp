@@ -55,8 +55,10 @@ TEST(Image, Basics) {
 }
 
 static Float sRGBRoundTrip(Float v) {
-    Float encoded = 255. * LinearToSRGB(Clamp(v, 0, 1));
-    return SrgbToLinear(std::round(encoded) / 255.);
+    if (v < 0) return 0;
+    else if (v > 1) return 1;
+    uint8_t encoded = LinearToSRGB8(v);
+    return SRGB8ToLinear(encoded);
 }
 
 static std::vector<uint8_t> GetInt8Pixels(Point2i res, int nc) {
@@ -257,7 +259,7 @@ TEST(Image, PngRgbIO) {
     EXPECT_EQ(0, remove("test.png"));
 }
 
-TEST(Image, SrgbLUTAccuracy) {
+TEST(Image, ToSRGB_LUTAccuracy) {
     const int n = 1024 * 1024;
     double sumErr = 0, maxErr = 0;
     RNG rng;
@@ -274,10 +276,17 @@ TEST(Image, SrgbLUTAccuracy) {
     EXPECT_LT(maxErr, 0.0015);
 }
 
+TEST(Image, SRGB8ToLinear) {
+    for (int v = 0; v < 255; ++v) {
+        float err = std::abs(SRGBToLinear(v / 255.f) - SRGB8ToLinear(v));
+        EXPECT_LT(err, 1e-6);
+    }
+}
+
 // Monotonicity between the individual segments actually isn't enforced
 // when we do the piecewise linear fit, but it should happen naturally
 // since the derivative of the underlying function doesn't change fit.
-TEST(Image, SrgbLUTMonotonic) {
+TEST(Image, ToSRGB_LUTMonotonic) {
     for (int i = 1; i < LinearToSRGBPiecewiseSize; ++i) {
         // For each break in the function, we'd like to find a pair of floats
         // such that the second uses the next segment after the one used by

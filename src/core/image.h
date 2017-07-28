@@ -127,7 +127,7 @@ Float ConvertTexel(const void *ptr, PixelFormat format) {
     // sure about uint8_t, strictly speaking...
     switch (format) {
     case PixelFormat::SY8:
-        return LinearToSRGB(*((uint8_t *)ptr));
+        return SRGB8ToLinear(*((uint8_t *)ptr));
     case PixelFormat::Y8:
         return Float(*((uint8_t *)ptr)) / 255.f;
     case PixelFormat::Y16:
@@ -147,9 +147,10 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
 
     CHECK_EQ(3, nChannels(format));
     Float rgb[3];
-    for (int c = 0; c < 3; ++c) switch (format) {
+    for (int c = 0; c < 3; ++c) {
+        switch (format) {
         case PixelFormat::SRGB8:
-            rgb[c] = LinearToSRGB(((uint8_t *)ptr)[c]);
+            rgb[c] = SRGB8ToLinear(((uint8_t *)ptr)[c]);
             break;
         case PixelFormat::RGB8:
             rgb[c] = Float(((uint8_t *)ptr)[c]) / 255.f;
@@ -163,6 +164,7 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
         default:
             LOG(FATAL) << "Unhandled pixelformat";
         }
+    }
 
     // TODO: pass through illuminant/reflectance enum? (Or nix this whole
     // idea)...
@@ -262,8 +264,8 @@ class Image {
     Point2i resolution;
 
     size_t PixelOffset(Point2i p, int c = 0) const {
-        CHECK(c >= 0 && c < nChannels());
-        CHECK(InsideExclusive(p, Bounds2i({0, 0}, resolution)));
+        DCHECK(c >= 0 && c < nChannels());
+        DCHECK(InsideExclusive(p, Bounds2i({0, 0}, resolution)));
         return nChannels() * (p.y * resolution.x + p.x) + c;
     }
     const void *RawPointer(Point2i p) const {

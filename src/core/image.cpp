@@ -105,10 +105,10 @@ Float Image::GetChannel(Point2i p, int c, WrapMode wrapMode) const {
     switch (format) {
     case PixelFormat::SY8:
     case PixelFormat::SRGB8:
-        return LinearToSRGB(p8[PixelOffset(p, c)]);
+        return SRGB8ToLinear(p8[PixelOffset(p, c)]);
     case PixelFormat::Y8:
     case PixelFormat::RGB8:
-        return Float(p8[PixelOffset(p, c)]) / 255.f;
+        return Float(p8[PixelOffset(p, c)]) * (1.f / 255.f);
     case PixelFormat::Y16:
     case PixelFormat::RGB16:
         return HalfToFloat(p16[PixelOffset(p, c)]);
@@ -138,11 +138,11 @@ std::array<Float, 3> Image::GetRGB(Point2i p, WrapMode wrapMode) const {
     switch (format) {
     case PixelFormat::SRGB8:
         for (int c = 0; c < 3; ++c)
-            rgb[c] = LinearToSRGB(p8[PixelOffset(p, c)]);
+            rgb[c] = SRGB8ToLinear(p8[PixelOffset(p, c)]);
         break;
     case PixelFormat::RGB8:
         for (int c = 0; c < 3; ++c)
-            rgb[c] = Float(p8[PixelOffset(p, c)]) / 255.f;
+            rgb[c] = p8[PixelOffset(p, c)] * (1.f / 255.f);
         break;
     case PixelFormat::RGB16:
         for (int c = 0; c < 3; ++c)
@@ -195,12 +195,12 @@ Spectrum Image::BilerpSpectrum(Point2f p, SpectrumType spectrumType,
 
 void Image::SetChannel(Point2i p, int c, Float value) {
     CHECK(!std::isnan(value));
-    if (format == PixelFormat::SRGB8 || format == PixelFormat::SY8)
-        value = LinearToSRGB(value);
 
     switch (format) {
     case PixelFormat::SY8:
     case PixelFormat::SRGB8:
+        p8[PixelOffset(p, c)] = LinearToSRGB8(value);
+        break;
     case PixelFormat::Y8:
     case PixelFormat::RGB8:
         value = Clamp((value * 255.f) + 0.5f, 0, 255);

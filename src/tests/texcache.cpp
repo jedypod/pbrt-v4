@@ -98,12 +98,15 @@ static void TestFormat(PixelFormat format) {
             for (int x = 0; x < mips[level].resolution.x; ++x) {
                 if (nChannels(format) == 1) {
                     Float val = cache->Texel<Float>(id, level, {x, y});
-                    EXPECT_EQ(mips[level].GetChannel({x, y}, 0), val);
+                    Float err = std::abs(val - mips[level].GetChannel({x, y}, 0));
+                    EXPECT_LT(err, 1e-5);  // SRGB LUTs...
                 } else {
                     ASSERT_EQ(3, nChannels(format));
                     Spectrum s = cache->Texel<Spectrum>(id, level, {x, y});
-                    for (int c = 0; c < 3; ++c)
-                        EXPECT_EQ(mips[level].GetChannel({x, y}, c), s[c]);
+                    for (int c = 0; c < 3; ++c) {
+                        Float err = std::abs(mips[level].GetChannel({x, y}, c) - s[c]);
+                        EXPECT_LT(err, 1e-5); // SRGB LUTs...
+                    }
                 }
             }
     }

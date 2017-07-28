@@ -145,43 +145,6 @@ inline constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
-inline Float LinearToSRGBFull(Float value) {
-    if (value <= 0.0031308f) return 12.92f * value;
-    return 1.055f * std::pow(value, (Float)(1.f / 2.4f)) - 0.055f;
-}
-
-struct PiecewiseLinearSegment {
-    Float base, slope;
-};
-
-// Piecewise linear fit to LinearToSrgbFull() (via Mathematica).
-// Table size 1024 gave avg error: 7.36217e-07, max: 0.000284649
-// 512 gave avg: 1.76644e-06, max: 0.000490334
-// 256 gave avg: 5.68012e-06, max: 0.00116351
-// 128 gave avg: 2.90114e-05, max: 0.00502084
-// 256 seemed like a reasonable trade-off.
-
-extern const PiecewiseLinearSegment LinearToSRGBPiecewise[];
-constexpr int LinearToSRGBPiecewiseSize = 256;
-
-inline Float LinearToSRGB(Float value) {
-    int index = int(value * LinearToSRGBPiecewiseSize);
-    if (index < 0) return 0;
-    if (index >= LinearToSRGBPiecewiseSize) return 1;
-    return LinearToSRGBPiecewise[index].base + value * LinearToSRGBPiecewise[index].slope;
-}
-
-extern const Float LinearToSRGBChar[256];
-
-inline Float LinearToSRGB(uint8_t value) {
-    return LinearToSRGBChar[value];
-}
-
-inline Float SrgbToLinear(Float value) {
-    if (value <= 0.04045f) return value * 1.f / 12.92f;
-    return std::pow((value + 0.055f) * 1.f / 1.055f, (Float)2.4f);
-}
-
 template <typename T, typename U, typename V>
 inline constexpr T Clamp(T val, U low, V high) {
     if (val < low)
@@ -408,6 +371,49 @@ inline Float Erf(Float x) {
         (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * std::exp(-x * x);
 
     return sign * y;
+}
+
+// TODO: move to image.h?
+
+inline Float LinearToSRGBFull(Float value) {
+    if (value <= 0.0031308f) return 12.92f * value;
+    return 1.055f * std::pow(value, (Float)(1.f / 2.4f)) - 0.055f;
+}
+
+struct PiecewiseLinearSegment {
+    Float base, slope;
+};
+
+// Piecewise linear fit to LinearToSRGBFull() (via Mathematica).
+// Table size 1024 gave avg error: 7.36217e-07, max: 0.000284649
+// 512 gave avg: 1.76644e-06, max: 0.000490334
+// 256 gave avg: 5.68012e-06, max: 0.00116351
+// 128 gave avg: 2.90114e-05, max: 0.00502084
+// 256 seemed like a reasonable trade-off.
+
+extern const PiecewiseLinearSegment LinearToSRGBPiecewise[];
+constexpr int LinearToSRGBPiecewiseSize = 256;
+
+inline Float LinearToSRGB(Float value) {
+    int index = int(value * LinearToSRGBPiecewiseSize);
+    if (index < 0) return 0;
+    if (index >= LinearToSRGBPiecewiseSize) return 1;
+    return LinearToSRGBPiecewise[index].base + value * LinearToSRGBPiecewise[index].slope;
+}
+
+inline uint8_t LinearToSRGB8(Float value) {
+    return Clamp(255.f * LinearToSRGB(value) + 0.5f, 0, 255);
+}
+
+inline Float SRGBToLinear(Float value) {
+    if (value <= 0.04045f) return value * (1 / 12.92f);
+    return std::pow((value + 0.055f) * (1 / 1.055f), (Float)2.4f);
+}
+
+extern const Float SRGBToLinearLUT[256];
+
+inline Float SRGB8ToLinear(uint8_t value) {
+    return SRGBToLinearLUT[value];
 }
 
 }  // namespace pbrt
