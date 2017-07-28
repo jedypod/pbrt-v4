@@ -550,48 +550,16 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
 std::shared_ptr<Medium> MakeMedium(const std::string &name,
                                    const ParamSet &paramSet,
                                    const Transform &medium2world) {
-    Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
-          sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
-    Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
-             sig_s = Spectrum::FromRGB(sig_s_rgb);
-    std::string preset = paramSet.GetOneString("preset", "");
-    bool found = GetMediumScatteringProperties(preset, &sig_a, &sig_s);
-    if (preset != "" && !found)
-        Warning("Material preset \"%s\" not found.  Using defaults.",
-                preset.c_str());
-    Float scale = paramSet.GetOneFloat("scale", 1.f);
-    Float g = paramSet.GetOneFloat("g", 0.0f);
-    sig_a = paramSet.GetOneSpectrum("sigma_a", sig_a) * scale;
-    sig_s = paramSet.GetOneSpectrum("sigma_s", sig_s) * scale;
-    Medium *m = NULL;
+    std::shared_ptr<Medium> m;
     if (name == "homogeneous") {
-        m = new HomogeneousMedium(sig_a, sig_s, g);
+        m = HomogeneousMedium::Create(paramSet);
     } else if (name == "heterogeneous") {
-        ArraySlice<Float> data = paramSet.GetFloatArray("density");
-        if (data.empty()) {
-            Error("No \"density\" values provided for heterogeneous medium?");
-            return nullptr;
-        }
-        int nx = paramSet.GetOneInt("nx", 1);
-        int ny = paramSet.GetOneInt("ny", 1);
-        int nz = paramSet.GetOneInt("nz", 1);
-        Point3f p0 = paramSet.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-        Point3f p1 = paramSet.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-        if (data.size() != nx * ny * nz) {
-            Error(
-                "GridDensityMedium has %d density values; expected nx*ny*nz = "
-                "%d",
-                (int)data.size(), nx * ny * nz);
-            return nullptr;
-        }
-        Transform data2Medium = Translate(Vector3f(p0)) *
-                                Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-        m = new GridDensityMedium(sig_a, sig_s, g, nx, ny, nz,
-                                  medium2world * data2Medium, data);
+        m = GridDensityMedium::Create(paramSet, medium2world);
     } else
         Warning("Medium \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
-    return std::shared_ptr<Medium>(m);
+    return m;
 }
 
 std::shared_ptr<Light> MakeLight(const std::string &name,

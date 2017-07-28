@@ -42,6 +42,7 @@
 #include "medium.h"
 
 #include "spectrum.h"
+#include <memory>
 
 namespace pbrt {
 
@@ -54,6 +55,8 @@ class HomogeneousMedium : public Medium {
           sigma_s(sigma_s),
           sigma_t(sigma_s + sigma_a),
           g(g) {}
+    static std::shared_ptr<HomogeneousMedium> Create(const ParamSet &ps);
+
     Spectrum Tr(const Ray &ray, Sampler &sampler) const;
     Spectrum Sample(const Ray &ray, Sampler &sampler, MemoryArena &arena,
                     MediumInteraction *mi) const;

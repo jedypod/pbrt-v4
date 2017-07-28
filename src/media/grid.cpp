@@ -44,6 +44,47 @@ namespace pbrt {
 STAT_RATIO("Media/Grid steps per Tr() call", nTrSteps, nTrCalls);
 
 // GridDensityMedium Method Definitions
+std::shared_ptr<GridDensityMedium> GridDensityMedium::Create(
+        const ParamSet &ps, const Transform &mediumToWorld) {
+    Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
+          sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
+    Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
+             sig_s = Spectrum::FromRGB(sig_s_rgb);
+    std::string preset = ps.GetOneString("preset", "");
+    bool found = GetMediumScatteringProperties(preset, &sig_a, &sig_s);
+    if (preset != "" && !found)
+        Warning("Material preset \"%s\" not found.  Using defaults.",
+                preset.c_str());
+    Float scale = ps.GetOneFloat("scale", 1.f);
+    Float g = ps.GetOneFloat("g", 0.0f);
+    sig_a = ps.GetOneSpectrum("sigma_a", sig_a) * scale;
+    sig_s = ps.GetOneSpectrum("sigma_s", sig_s) * scale;
+
+    gtl::ArraySlice<Float> data = ps.GetFloatArray("density");
+    if (data.empty()) {
+        Error("No \"density\" values provided for heterogeneous medium?");
+        return nullptr;
+    }
+    int nx = ps.GetOneInt("nx", 1);
+    int ny = ps.GetOneInt("ny", 1);
+    int nz = ps.GetOneInt("nz", 1);
+    Point3f p0 = ps.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = ps.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+    if (data.size() != nx * ny * nz) {
+        Error(
+              "GridDensityMedium has %d density values; expected nx*ny*nz = "
+              "%d",
+              (int)data.size(), nx * ny * nz);
+        return nullptr;
+    }
+
+    Transform dataToMedium = Translate(Vector3f(p0)) *
+        Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+    return std::make_shared<GridDensityMedium>(
+        sig_a, sig_s, g, nx, ny, nz, mediumToWorld * dataToMedium, data);
+}
+
+
 Float GridDensityMedium::Density(const Point3f &p) const {
     // Compute voxel coordinates and offsets for _p_
     Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);

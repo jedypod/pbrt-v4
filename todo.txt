@@ -2,7 +2,7 @@
 - v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
   - fast resampling, cache aware tiles...
 
-- api: move medium param processing to media/*
+- api: Create* vs Make*, etc.
 
 - MemoryPool stuff in parser?
 

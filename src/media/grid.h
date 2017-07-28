@@ -82,6 +82,8 @@ class GridDensityMedium : public Medium {
             maxDensity = std::max(maxDensity, density[i]);
         invMaxDensity = 1 / maxDensity;
     }
+    static std::shared_ptr<GridDensityMedium> Create(
+        const ParamSet &ps, const Transform &mediumToWorld);
 
     Float Density(const Point3f &p) const;
     Float D(const Point3i &p) const {

@@ -34,6 +34,7 @@
 // media/homogeneous.cpp*
 #include "media/homogeneous.h"
 
+#include "error.h"
 #include "sampler.h"
 #include "interaction.h"
 #include "paramset.h"
@@ -44,6 +45,24 @@
 namespace pbrt {
 
 // HomogeneousMedium Method Definitions
+std::shared_ptr<HomogeneousMedium> HomogeneousMedium::Create(const ParamSet &ps) {
+    Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
+          sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
+    Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
+             sig_s = Spectrum::FromRGB(sig_s_rgb);
+    std::string preset = ps.GetOneString("preset", "");
+    bool found = GetMediumScatteringProperties(preset, &sig_a, &sig_s);
+    if (preset != "" && !found)
+        Warning("Material preset \"%s\" not found.  Using defaults.",
+                preset.c_str());
+    Float scale = ps.GetOneFloat("scale", 1.f);
+    Float g = ps.GetOneFloat("g", 0.0f);
+    sig_a = ps.GetOneSpectrum("sigma_a", sig_a) * scale;
+    sig_s = ps.GetOneSpectrum("sigma_s", sig_s) * scale;
+
+    return std::make_shared<HomogeneousMedium>(sig_a, sig_s, g);
+}
+
 Spectrum HomogeneousMedium::Tr(const Ray &ray, Sampler &sampler) const {
     ProfilePhase _(Prof::MediumTr);
     return Exp(-sigma_t * std::min(ray.tMax * Length(ray.d), MaxFloat));
