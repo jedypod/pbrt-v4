@@ -399,8 +399,8 @@ int diff(int argc, char *argv[]) {
 
                 float d = std::abs(c0 - c1) / c0;
                 mse += (c0 - c1) * (c0 - c1);
-                if (d > .005) ++smallDiff;
-                if (d > .05) ++bigDiff;
+                if (d > 3.f / 255.f) ++bigDiff;
+                else if (d > 0) ++smallDiff;
             }
             diffImage.SetSpectrum({x, y}, diff);
         }
@@ -413,8 +413,8 @@ int diff(int argc, char *argv[]) {
         (tol > 0. && 100.f * std::abs(avgDelta) > tol)) {
         printf(
             "%s %s\n\tImages differ: %d big (%.2f%%), %d small (%.2f%%)\n"
-            "\tavg 1 = %g, avg2 = %g (%f%% delta)\n"
-            "\tMSE = %g, RMS = %.3f%%\n",
+            "\tavg 1 = %.9g, avg2 = %.9g (%f%% delta)\n"
+            "\tMSE = %.9g, RMS = %.3f%%\n",
             filenames[0].c_str(), filenames[1].c_str(), bigDiff,
             100.f * float(bigDiff) / (3 * res.x * res.y), smallDiff,
             100.f * float(smallDiff) / (3 * res.x * res.y), avg[0], avg[1],
