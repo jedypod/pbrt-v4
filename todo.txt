@@ -1,4 +1,16 @@
 
+- CopyRect* (and throughout Image) can be simplified with some templates, a
+  la
+
+(TBD)
+template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                Op(bufIter++, p8[offset++]);
+
+- give pixelformat enum methods! (numchannels, etc.)
+
 - v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
   - fast resampling, cache aware tiles...
 

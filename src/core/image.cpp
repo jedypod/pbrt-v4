@@ -165,6 +165,156 @@ Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
     return Spectrum::FromRGB(&rgb[0], spectrumType);
 }
 
+void Image::CopyRectOut(const Bounds2i &extent,
+                        gtl::MutableArraySlice<Float> buf) {
+    CHECK_GE(buf.size(), extent.Area() * nChannels());
+    CHECK_LT(extent.pMin.x, extent.pMax.x);
+    CHECK_LT(extent.pMin.y, extent.pMax.y);
+
+    int nu = extent.pMax[0] - extent.pMin[0];
+    auto bufIter = buf.begin();
+
+    switch (format) {
+    case PixelFormat::SY8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                *bufIter++ = SRGB8ToLinear(p8[offset++]);
+        }
+        break;
+    case PixelFormat::SRGB8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    *bufIter++ = SRGB8ToLinear(p8[offset++]);
+        }
+        break;
+    case PixelFormat::Y8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                *bufIter++ = p8[offset++] * (1.f / 255.f);
+        }
+        break;
+    case PixelFormat::RGB8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    *bufIter++ = p8[offset++] * (1.f / 255.f);
+        }
+        break;
+    case PixelFormat::Y16:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                *bufIter++ = HalfToFloat(p16[offset++]);
+        }
+        break;
+    case PixelFormat::RGB16:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    *bufIter++ = HalfToFloat(p16[offset++]);
+        }
+        break;
+    case PixelFormat::Y32:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                *bufIter++ = Float(p32[offset++]);
+        }
+        break;
+    case PixelFormat::RGB32:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    *bufIter++ = Float(p32[offset++]);
+        }
+        break;
+    default:
+        LOG(FATAL) << "Unhandled PixelFormat";
+    }
+}
+
+void Image::CopyRectIn(const Bounds2i &extent,
+                       gtl::ArraySlice<Float> buf) {
+    CHECK_GE(buf.size(), extent.Area() * nChannels());
+    CHECK_LT(extent.pMin.x, extent.pMax.x);
+    CHECK_LT(extent.pMin.y, extent.pMax.y);
+
+    int nu = extent.pMax[0] - extent.pMin[0];
+    auto bufIter = buf.begin();
+
+    switch (format) {
+    case PixelFormat::SY8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                p8[offset++] = LinearToSRGB8(*bufIter++);
+        }
+        break;
+    case PixelFormat::SRGB8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    p8[offset++] = LinearToSRGB8(*bufIter++);
+        }
+        break;
+    case PixelFormat::Y8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                p8[offset++] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
+        }
+        break;
+    case PixelFormat::RGB8:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    p8[offset++] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
+        }
+        break;
+    case PixelFormat::Y16:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                p16[offset++] = FloatToHalf(*bufIter++);
+        }
+        break;
+    case PixelFormat::RGB16:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    p16[offset++] = FloatToHalf(*bufIter++);
+        }
+        break;
+    case PixelFormat::Y32:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                p32[offset++] = *bufIter++;
+        }
+        break;
+    case PixelFormat::RGB32:
+        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+            int offset = PixelOffset({extent.pMin[0], v}, 0);
+            for (int u = 0; u < nu; ++u)
+                for (int c = 0; c < 3; ++c)
+                    p32[offset++] = *bufIter++;
+        }
+        break;
+    default:
+        LOG(FATAL) << "Unhandled PixelFormat";
+    }
+}
+
 Float Image::BilerpChannel(Point2f p, int c, WrapMode wrapMode) const {
     Float s = p[0] * resolution.x - 0.5f;
     Float t = p[1] * resolution.y - 0.5f;

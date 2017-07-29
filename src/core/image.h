@@ -46,6 +46,7 @@
 #include "fp16.h"
 #include "spectrum.h"
 #include <glog/logging.h>
+#include <ext/google/array_slice.h>
 
 #include <array>
 #include <cstdint>
@@ -85,6 +86,20 @@ inline int nChannels(PixelFormat format) {
     case PixelFormat::RGB16:
     case PixelFormat::RGB32:
         return 3;
+    }
+}
+
+inline const char *FormatName(PixelFormat format) {
+    switch (format) {
+    case PixelFormat::SY8: return "SY8";
+    case PixelFormat::Y8: return "Y8";
+    case PixelFormat::Y16: return "Y16";
+    case PixelFormat::Y32: return "Y32";
+    case PixelFormat::RGB8: return "RGB8";
+    case PixelFormat::SRGB8: return "SRGB8";
+    case PixelFormat::RGB16: return "RGB16";
+    case PixelFormat::RGB32: return "RGB32";
+    default: return nullptr;
     }
 }
 
@@ -239,6 +254,11 @@ class Image {
     Spectrum GetSpectrum(Point2i p,
                          SpectrumType spectrumType = SpectrumType::Reflectance,
                          WrapMode wrapMode = WrapMode::Clamp) const;
+
+    void CopyRectOut(const Bounds2i &extent,
+                     gtl::MutableArraySlice<Float> buf);
+    void CopyRectIn(const Bounds2i &extent,
+                    gtl::ArraySlice<Float> buf);
 
     Float BilerpChannel(Point2f p, int c,
                         WrapMode wrapMode = WrapMode::Clamp) const;

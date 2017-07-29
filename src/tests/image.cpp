@@ -7,6 +7,8 @@
 #include "mipmap.h"
 #include "half.h"
 
+#include <algorithm>
+
 using namespace pbrt;
 
 // TODO:
@@ -80,6 +82,25 @@ static std::vector<Float> GetFloatPixels(Point2i res, int nc) {
     return p;
 }
 
+static Float modelQuantization(Float value, PixelFormat format) {
+    switch (format) {
+    case PixelFormat::SY8:
+    case PixelFormat::SRGB8:
+        return sRGBRoundTrip(value);
+    case PixelFormat::Y8:
+    case PixelFormat::RGB8:
+        return Clamp((value * 255.f) + 0.5f, 0, 255) * (1.f / 255.f);
+    case PixelFormat::Y16:
+    case PixelFormat::RGB16:
+        return HalfToFloat(FloatToHalf(value));
+    case PixelFormat::Y32:
+    case PixelFormat::RGB32:
+        return value;
+    default:
+        LOG(FATAL) << "Unhandled pixel format";
+    }
+}
+
 TEST(Image, GetSetY) {
     Point2i res(9, 3);
     std::vector<Float> yPixels = GetFloatPixels(res, 1);
@@ -95,27 +116,11 @@ TEST(Image, GetSetY) {
             for (int x = 0; x < res[0]; ++x) {
                 Float v = image.GetChannel({x, y}, 0);
                 EXPECT_EQ(v, image.GetY({x, y}));
-                switch (format) {
-                case PixelFormat::Y32:
-                    EXPECT_EQ(v, yPixels[y * res[0] + x]);
-                    break;
-                case PixelFormat::Y16:
-                    EXPECT_EQ(
-                        v, HalfToFloat(FloatToHalf(yPixels[y * res[0] + x])));
-                    break;
-                case PixelFormat::Y8: {
-                    Float delta =
-                        std::abs(v - Clamp(yPixels[y * res[0] + x], 0, 1));
-                    EXPECT_LE(delta, 0.501 / 255.);
-                    break;
-                }
-                case PixelFormat::SY8: {
-                    EXPECT_FLOAT_EQ(v, sRGBRoundTrip(yPixels[y * res[0] + x]));
-                    break;
-                }
-                default:  // silence compiler warning
-                    break;
-                }
+                if (format == PixelFormat::Y8)
+                    EXPECT_LT(std::abs(v - Clamp(yPixels[y * res[0] + x], 0, 1)),
+                              0.501f / 255.f);
+                else
+                    EXPECT_EQ(v, modelQuantization(yPixels[y * res[0] + x], format));
             }
     }
 }
@@ -144,31 +149,96 @@ TEST(Image, GetSetRGB) {
                     ASSERT_EQ(sizeof(RGBSpectrum), sizeof(Spectrum));
 
                     EXPECT_EQ(rgb[c], image.GetChannel({x, y}, c));
-
                     int offset = 3 * y * res[0] + 3 * x + c;
-                    switch (format) {
-                    case PixelFormat::RGB32:
-                        EXPECT_EQ(rgb[c], rgbPixels[offset]);
-                        break;
-                    case PixelFormat::RGB16:
-                        EXPECT_EQ(rgb[c],
-                                  HalfToFloat(FloatToHalf(rgbPixels[offset])));
-                        break;
-                    case PixelFormat::RGB8: {
-                        Float delta =
-                            std::abs(rgb[c] - Clamp(rgbPixels[offset], 0, 1));
-                        EXPECT_LE(delta, 0.501 / 255.);
-                        break;
-                    }
-                    case PixelFormat::SRGB8: {
-                        EXPECT_FLOAT_EQ(rgb[c], sRGBRoundTrip(rgbPixels[offset]));
-                        break;
-                    }
-                    default:  // silence compiler warning
-                        break;
+                    if (format == PixelFormat::RGB8)
+                        EXPECT_LT(std::abs(rgb[c] - Clamp(rgbPixels[offset], 0, 1)),
+                                  0.501f / 255.f);
+                    else {
+                        Float qv = modelQuantization(rgbPixels[offset], format);
+                        EXPECT_EQ(rgb[c], qv);
                     }
                 }
             }
+    }
+}
+
+TEST(Image, CopyRectOut) {
+    Point2i res(29, 14);
+
+    for (auto format : {PixelFormat::SY8, PixelFormat::Y8,
+                PixelFormat::SRGB8, PixelFormat::RGB8,
+                PixelFormat::Y16, PixelFormat::RGB16,
+                PixelFormat::Y32, PixelFormat::RGB32}) {
+        int nc = nChannels(format);
+        std::vector<Float> orig = GetFloatPixels(res, nc);
+
+        Image image(format, res);
+        auto origIter = orig.begin();
+        for (int y = 0; y < res[1]; ++y)
+            for (int x = 0; x < res[0]; ++x)
+                for (int c = 0; c < nc; ++c, ++origIter)
+                    image.SetChannel({x, y}, c, *origIter);
+
+        Bounds2i extent(Point2i(2, 3), Point2i(5, 10));
+        std::vector<Float> buf(extent.Area() * nc);
+
+        image.CopyRectOut(extent, &buf);
+
+        // Iterate through the points in the extent and the buffer
+        // together.
+        auto bufIter = buf.begin();
+        for (auto pIter = begin(extent); pIter != end(extent); ++pIter) {
+            for (int c = 0; c < nc; ++c) {
+                ASSERT_FALSE(bufIter == buf.end());
+                EXPECT_EQ(*bufIter, image.GetChannel(*pIter, c));
+                ++bufIter;
+            }
+        }
+    }
+}
+
+TEST(Image, CopyRectIn) {
+    Point2i res(17, 32);
+    RNG rng;
+
+    for (auto format : {PixelFormat::SY8, PixelFormat::Y8,
+                PixelFormat::SRGB8, PixelFormat::RGB8,
+                PixelFormat::Y16, PixelFormat::RGB16,
+                PixelFormat::Y32, PixelFormat::RGB32}) {
+        int nc = nChannels(format);
+        std::vector<Float> orig = GetFloatPixels(res, nc);
+
+        Image image(format, res);
+        auto origIter = orig.begin();
+        for (int y = 0; y < res[1]; ++y)
+            for (int x = 0; x < res[0]; ++x)
+                for (int c = 0; c < nc; ++c, ++origIter)
+                    image.SetChannel({x, y}, c, *origIter);
+
+        Bounds2i extent(Point2i(10, 23), Point2i(17, 28));
+        std::vector<Float> buf(extent.Area() * nc);
+        std::generate(buf.begin(), buf.end(),
+                      [&rng]() { return rng.UniformFloat(); });
+
+        image.CopyRectIn(extent, buf);
+
+        // Iterate through the points in the extent and the buffer
+        // together.
+        auto bufIter = buf.begin();
+        for (auto pIter = begin(extent); pIter != end(extent); ++pIter) {
+            for (int c = 0; c < nc; ++c) {
+                ASSERT_FALSE(bufIter == buf.end());
+                if (format == PixelFormat::Y8 || format == PixelFormat::RGB8) {
+                    Float err = std::abs(image.GetChannel(*pIter, c) -
+                                         Clamp(*bufIter, 0, 1));
+                    EXPECT_LT(err, 0.501f / 255.f);
+                } else {
+                    Float qv = modelQuantization(*bufIter, format);
+                    EXPECT_EQ(qv, image.GetChannel(*pIter, c));
+                }
+                ++bufIter;
+            }
+        }
     }
 }
 
