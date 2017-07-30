@@ -38,6 +38,13 @@ if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/ptex")
     "\"git submodule update --init --recursive\"")
 endif()
 
+if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/asyncplusplus")
+  message(FATAL_ERROR "The asyncplusplus submodule directory is missing! "
+    "You probably did not clone the project with --recursive, or first checked out "
+    "pbrt before it was added. It is possible to recover by running "
+    "\"git submodule update --init --recursive\"")
+endif()
+
 FIND_PACKAGE ( Sanitizers )
 FIND_PACKAGE ( Threads )
 
@@ -318,6 +325,13 @@ SET_PROPERTY(TARGET Ptex_static PROPERTY FOLDER "dependencies")
 INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 
 ###########################################################################
+# asyncplusplus
+
+ADD_SUBDIRECTORY(src/ext/asyncplusplus)
+SET_PROPERTY(TARGET Async++ PROPERTY FOLDER "dependencies")
+INCLUDE_DIRECTORIES(src/ext/asyncplusplus/include)
+
+###########################################################################
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
@@ -469,6 +483,7 @@ SET(ALL_PBRT_LIBS
   ${OPENEXR_LIBS}
   glog
   Ptex_static
+  Async++
   ${ZLIB_LIBRARY}
 )
 

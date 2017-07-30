@@ -36,7 +36,9 @@
 
 #include "memory.h"
 #include "stats.h"
+#include <async++.h>
 
+#include <array>
 #include <list>
 #include <thread>
 #include <vector>
@@ -68,32 +70,40 @@ class ParallelForLoop {
         : func1D(std::move(func1D)),
           maxIndex(maxIndex),
           chunkSize(chunkSize),
-          profilerState(profilerState) {}
+          indexIncrement(chunkSize * threads.size()),
+          profilerState(profilerState) {
+        for (size_t i = 0; i < threads.size(); ++i)
+            threadNextIndex[i].index.store(i * chunkSize, std::memory_order_release);
+    }
     ParallelForLoop(const std::function<void(Point2i)> &f, const Point2i &count,
                     uint64_t profilerState)
         : func2D(f),
           maxIndex(count.x * count.y),
           chunkSize(1),
+          indexIncrement(threads.size()),
           profilerState(profilerState) {
         nX = count.x;
+        for (size_t i = 0; i < threads.size(); ++i)
+            threadNextIndex[i].index.store(i * chunkSize, std::memory_order_release);
     }
 
   public:
     // ParallelForLoop Private Data
     std::function<void(int64_t)> func1D;
     std::function<void(Point2i)> func2D;
+
+    struct alignas(PBRT_L1_CACHE_LINE_SIZE) ThreadWorkIndex {
+        std::atomic<int64_t> index;
+    };
+    static constexpr int maxThreads = 128;
+    std::array<ThreadWorkIndex, maxThreads> threadNextIndex;
+
     const int64_t maxIndex;
     const int chunkSize;
+    const int indexIncrement;
     uint64_t profilerState;
-    int64_t nextIndex = 0;
     int activeWorkers = 0;
-    ParallelForLoop *next = nullptr;
     int nX = -1;
-
-    // ParallelForLoop Private Methods
-    bool Finished() const {
-        return nextIndex >= maxIndex && activeWorkers == 0;
-    }
 };
 
 void Barrier::Wait() {
@@ -145,38 +155,53 @@ static void workerThreadFunc(int tIndex, std::shared_ptr<Barrier> barrier) {
             // Get work from _workList_ and run loop iterations
             ParallelForLoop &loop = *workList;
 
-            // Run a chunk of loop iterations for _loop_
-
-            // Find the set of loop iterations to run next
-            int64_t indexStart = loop.nextIndex;
-            int64_t indexEnd =
-                std::min(indexStart + loop.chunkSize, loop.maxIndex);
-
-            // Update _loop_ to reflect iterations this thread will run
-            loop.nextIndex = indexEnd;
-            if (loop.nextIndex == loop.maxIndex) workList = loop.next;
             loop.activeWorkers++;
-
-            // Run loop indices in _[indexStart, indexEnd)_
             lock.unlock();
-            for (int64_t index = indexStart; index < indexEnd; ++index) {
-                uint64_t oldState = ProfilerState;
-                ProfilerState = loop.profilerState;
-                if (loop.func1D) {
-                    loop.func1D(index);
+
+            // Lock-free until we're done...
+            // For now, just do our own work list...
+            // TODO: per-worker random ordering, or something smarter...
+            for (int dt = 0; dt < threads.size(); ++dt) {
+                while (true) {
+                    int64_t indexStart = loop.threadNextIndex[tIndex + dt].index.
+                        fetch_add(loop.indexIncrement, std::memory_order_acq_rel);
+                    if (indexStart >= loop.maxIndex)
+                        // Done.
+                        // TODO: work stealing
+                        break;
+                    int64_t indexEnd =
+                        std::min(indexStart + loop.chunkSize, loop.maxIndex);
+
+                    // Run loop indices in _[indexStart, indexEnd)_
+                    for (int64_t index = indexStart; index < indexEnd; ++index) {
+                        uint64_t oldState = ProfilerState;
+                        ProfilerState = loop.profilerState;
+                        if (loop.func1D) {
+                            loop.func1D(index);
+                        }
+                        // Handle other types of loops
+                        else {
+                            CHECK(loop.func2D);
+                            loop.func2D(Point2i(index % loop.nX, index / loop.nX));
+                        }
+                        ProfilerState = oldState;
+                    }
                 }
-                // Handle other types of loops
-                else {
-                    CHECK(loop.func2D);
-                    loop.func2D(Point2i(index % loop.nX, index / loop.nX));
-                }
-                ProfilerState = oldState;
             }
+
+            // No more work.
             lock.lock();
 
             // Update _loop_ to reflect completion of iterations
-            loop.activeWorkers--;
-            if (loop.Finished()) workListCondition.notify_all();
+            if (--loop.activeWorkers > 0) {
+                // others are still working. hold up  for now...
+                workListCondition.wait(lock);
+            } else {
+                // everyone is done.
+                workList = nullptr;
+                // wake them up to clear the wait() from a few lines above
+                workListCondition.notify_all();
+            }
         }
     }
     LOG(INFO) << "Exiting worker thread " << tIndex;
@@ -198,7 +223,7 @@ void ParallelFor(std::function<void(int64_t)> func, int64_t count,
     ParallelForLoop loop(std::move(func), count, chunkSize,
                          CurrentProfilerState());
     workListMutex.lock();
-    loop.next = workList;
+    CHECK(workList == nullptr);
     workList = &loop;
     workListMutex.unlock();
 
@@ -207,37 +232,55 @@ void ParallelFor(std::function<void(int64_t)> func, int64_t count,
     workListCondition.notify_all();
 
     // Help out with parallel loop iterations in the current thread
-    while (!loop.Finished()) {
-        // Run a chunk of loop iterations for _loop_
+    int tIndex = ThreadIndex;
 
-        // Find the set of loop iterations to run next
-        int64_t indexStart = loop.nextIndex;
-        int64_t indexEnd = std::min(indexStart + loop.chunkSize, loop.maxIndex);
+    // Get work from _workList_ and run loop iterations
+    loop.activeWorkers++;
+    lock.unlock();
 
-        // Update _loop_ to reflect iterations this thread will run
-        loop.nextIndex = indexEnd;
-        if (loop.nextIndex == loop.maxIndex) workList = loop.next;
-        loop.activeWorkers++;
+    // Lock-free until we're done...
+    // For now, just do our own work list...
+    // TODO: chunksize... We want to add nThreads * chunkSize, but then set end according
+    // to chunksize.
+    for (int dt = 0; dt < threads.size(); ++dt) {
+        while (true) {
+            int64_t indexStart = loop.threadNextIndex[tIndex + dt].index.
+                fetch_add(loop.indexIncrement, std::memory_order_acq_rel);
+            if (indexStart >= loop.maxIndex)
+                // Done.
+                // TODO: work stealing
+                break;
+            int64_t indexEnd =
+                std::min(indexStart + loop.chunkSize, loop.maxIndex);
 
-        // Run loop indices in _[indexStart, indexEnd)_
-        lock.unlock();
-        for (int64_t index = indexStart; index < indexEnd; ++index) {
-            uint64_t oldState = ProfilerState;
-            ProfilerState = loop.profilerState;
-            if (loop.func1D) {
-                loop.func1D(index);
+            // Run loop indices in _[indexStart, indexEnd)_
+            for (int64_t index = indexStart; index < indexEnd; ++index) {
+                uint64_t oldState = ProfilerState;
+                ProfilerState = loop.profilerState;
+                if (loop.func1D) {
+                    loop.func1D(index);
+                }
+                // Handle other types of loops
+                else {
+                    CHECK(loop.func2D);
+                    loop.func2D(Point2i(index % loop.nX, index / loop.nX));
+                }
+                ProfilerState = oldState;
             }
-            // Handle other types of loops
-            else {
-                CHECK(loop.func2D);
-                loop.func2D(Point2i(index % loop.nX, index / loop.nX));
-            }
-            ProfilerState = oldState;
         }
-        lock.lock();
+    }
 
-        // Update _loop_ to reflect completion of iterations
-        loop.activeWorkers--;
+    // No more work.
+    lock.lock();
+
+    // Update _loop_ to reflect completion of iterations
+    if (--loop.activeWorkers > 0) {
+        // others are still working. hold up  for now...
+        workListCondition.wait(lock);
+    } else {
+        // everyone is done.
+        workList = nullptr;
+        workListCondition.notify_all();
     }
 }
 
@@ -260,11 +303,20 @@ void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count) {
             for (int x = 0; x < count.x; ++x) func(Point2i(x, y));
         return;
     }
+#if 1
+    std::vector<Point2i> pos;
+    pos.reserve(count.x * count.y);
+    for (int y = 0; y < count.y; ++y)
+        for (int x = 0; x < count.x; ++x)
+            pos.push_back({x, y});
+    async::parallel_for(pos, [&func](Point2i p) { func(p); });
+    return;
+#endif
 
     ParallelForLoop loop(std::move(func), count, CurrentProfilerState());
     {
         std::lock_guard<std::mutex> lock(workListMutex);
-        loop.next = workList;
+        CHECK(workList == nullptr);
         workList = &loop;
     }
 
@@ -272,37 +324,55 @@ void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count) {
     workListCondition.notify_all();
 
     // Help out with parallel loop iterations in the current thread
-    while (!loop.Finished()) {
-        // Run a chunk of loop iterations for _loop_
+    int tIndex = ThreadIndex;
 
-        // Find the set of loop iterations to run next
-        int64_t indexStart = loop.nextIndex;
-        int64_t indexEnd = std::min(indexStart + loop.chunkSize, loop.maxIndex);
+    // Get work from _workList_ and run loop iterations
+    loop.activeWorkers++;
+    lock.unlock();
 
-        // Update _loop_ to reflect iterations this thread will run
-        loop.nextIndex = indexEnd;
-        if (loop.nextIndex == loop.maxIndex) workList = loop.next;
-        loop.activeWorkers++;
+    // Lock-free until we're done...
+    // For now, just do our own work list...
+    // TODO: chunksize... We want to add nThreads * chunkSize, but then set end according
+    // to chunksize.
+    for (int dt = 0; dt < threads.size(); ++dt) {
+        while (true) {
+            int64_t indexStart = loop.threadNextIndex[tIndex + dt].index.
+                fetch_add(loop.indexIncrement, std::memory_order_acq_rel);
+            if (indexStart >= loop.maxIndex)
+                // Done.
+                // TODO: work stealing
+                break;
+            int64_t indexEnd =
+                std::min(indexStart + loop.chunkSize, loop.maxIndex);
 
-        // Run loop indices in _[indexStart, indexEnd)_
-        lock.unlock();
-        for (int64_t index = indexStart; index < indexEnd; ++index) {
-            uint64_t oldState = ProfilerState;
-            ProfilerState = loop.profilerState;
-            if (loop.func1D) {
-                loop.func1D(index);
+            // Run loop indices in _[indexStart, indexEnd)_
+            for (int64_t index = indexStart; index < indexEnd; ++index) {
+                uint64_t oldState = ProfilerState;
+                ProfilerState = loop.profilerState;
+                if (loop.func1D) {
+                    loop.func1D(index);
+                }
+                // Handle other types of loops
+                else {
+                    CHECK(loop.func2D);
+                    loop.func2D(Point2i(index % loop.nX, index / loop.nX));
+                }
+                ProfilerState = oldState;
             }
-            // Handle other types of loops
-            else {
-                CHECK(loop.func2D);
-                loop.func2D(Point2i(index % loop.nX, index / loop.nX));
-            }
-            ProfilerState = oldState;
         }
-        lock.lock();
+    }
 
-        // Update _loop_ to reflect completion of iterations
-        loop.activeWorkers--;
+    // No more work.
+    lock.lock();
+
+    // Update _loop_ to reflect completion of iterations
+    if (--loop.activeWorkers > 0) {
+        // others are still working. hold up  for now...
+        workListCondition.wait(lock);
+    } else {
+        // everyone is done.
+        workList = nullptr;
+        workListCondition.notify_all();
     }
 }
 

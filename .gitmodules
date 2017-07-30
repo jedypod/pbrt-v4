@@ -10,3 +10,6 @@
 [submodule "src/ext/ptex"]
 	path = src/ext/ptex
 	url = https://github.com/wdas/ptex.git
+[submodule "src/ext/asyncplusplus"]
+	path = src/ext/asyncplusplus
+	url = https://github.com/Amanieu/asyncplusplus/
