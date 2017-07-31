@@ -182,7 +182,7 @@ void MLTIntegrator::Render(const Scene &scene) {
                                   "Generating bootstrap paths");
         std::vector<MemoryArena> bootstrapThreadArenas(MaxThreadIndex());
         int chunkSize = Clamp(nBootstrap / 128, 1, 8192);
-        ParallelFor([&](int i) {
+        ParallelFor(0, nBootstrap, chunkSize, [&](int i) {
             // Generate _i_th bootstrap sample
             MemoryArena &arena = bootstrapThreadArenas[ThreadIndex];
             for (int depth = 0; depth <= maxDepth; ++depth) {
@@ -195,7 +195,7 @@ void MLTIntegrator::Render(const Scene &scene) {
                 arena.Reset();
             }
             if ((i + 1 % 256) == 0) progress.Update();
-        }, nBootstrap, chunkSize);
+        });
         progress.Done();
     }
     Distribution1D bootstrap(bootstrapWeights);
@@ -209,7 +209,7 @@ void MLTIntegrator::Render(const Scene &scene) {
         const int progressFrequency = 32768;
         ProgressReporter progress(nTotalMutations / progressFrequency,
                                   "Rendering");
-        ParallelFor([&](int i) {
+        ParallelFor(0, nChains, [&](int i) {
             int64_t nChainMutations =
                 std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
                 i * nTotalMutations / nChains;
@@ -257,7 +257,7 @@ void MLTIntegrator::Render(const Scene &scene) {
                     progress.Update();
                 arena.Reset();
             }
-        }, nChains);
+        });
         progress.Done();
     }
 

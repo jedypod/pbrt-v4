@@ -424,7 +424,7 @@ void Image::Resize(Point2i newResolution, WrapMode wrapMode) {
                          newResolution);
 
     // Apply _sWeights_ to zoom in $s$ direction
-    ParallelFor(
+    ParallelFor(0, resolution[1], 16,
         [&](int t) {
             for (int s = 0; s < newResolution[0]; ++s) {
                 // Compute texel $(s,t)$ in $s$-zoomed image
@@ -438,8 +438,7 @@ void Image::Resize(Point2i newResolution, WrapMode wrapMode) {
                     resampledImage.SetChannel({s, t}, c, value);
                 }
             }
-        },
-        resolution[1], 16);
+        });
 
     // Resample image in $t$ direction
     std::unique_ptr<ResampleWeight[]> tWeights =
@@ -448,7 +447,7 @@ void Image::Resize(Point2i newResolution, WrapMode wrapMode) {
     int nThreads = MaxThreadIndex();
     for (int i = 0; i < nThreads; ++i)
         resampleBufs.push_back(new Float[nc * newResolution[1]]);
-    ParallelFor(
+    ParallelFor(0, newResolution[0], 32,
         [&](int s) {
             Float *workData = resampleBufs[ThreadIndex];
             memset(workData, 0, sizeof(Float) * nc * newResolution[1]);
@@ -467,8 +466,7 @@ void Image::Resize(Point2i newResolution, WrapMode wrapMode) {
                     Float v = Clamp(workData[nc * t + c], 0, Infinity);
                     resampledImage.SetChannel({s, t}, c, v);
                 }
-        },
-        newResolution[0], 32);
+        });
 
     resolution = newResolution;
     if (Is8Bit(format))
@@ -534,7 +532,7 @@ std::vector<Image> Image::GenerateMIPMap(WrapMode wrapMode) const {
         pyramid[i] = Image(pyramid[0].format, levelResolution);
 
         // Filter four texels from finer level of pyramid
-        ParallelFor(
+        ParallelFor(0, levelResolution[1], 16,
             [&](int t) {
                 for (int s = 0; s < levelResolution[0]; ++s) {
                     for (int c = 0; c < nc; ++c) {
@@ -551,8 +549,7 @@ std::vector<Image> Image::GenerateMIPMap(WrapMode wrapMode) const {
                         pyramid[i].SetChannel(Point2i(s, t), c, texel);
                     }
                 }
-            },
-            levelResolution[1], 16);
+            });
     }
     return pyramid;
 }

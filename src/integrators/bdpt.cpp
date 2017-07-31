@@ -345,16 +345,11 @@ void BDPTIntegrator::Render(const Scene &scene) {
 
     // Render and write the output image to disk
     if (scene.lights.size() > 0) {
-        ParallelFor2D([&](const Point2i tile) {
+        ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
             // Render a single tile using BDPT
             MemoryArena arena;
-            int seed = tile.y * nXTiles + tile.x;
+            int seed = tileBounds.pMin.y * nXTiles + tileBounds.pMin.x;
             std::unique_ptr<Sampler> tileSampler = sampler->Clone(seed);
-            int x0 = sampleBounds.pMin.x + tile.x * tileSize;
-            int x1 = std::min(x0 + tileSize, sampleBounds.pMax.x);
-            int y0 = sampleBounds.pMin.y + tile.y * tileSize;
-            int y1 = std::min(y0 + tileSize, sampleBounds.pMax.y);
-            Bounds2i tileBounds(Point2i(x0, y0), Point2i(x1, y1));
             std::unique_ptr<FilmTile> filmTile =
                 camera->film->GetFilmTile(tileBounds);
             for (Point2i pPixel : tileBounds) {
@@ -427,7 +422,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
             }
             film->MergeFilmTile(std::move(filmTile));
             reporter.Update();
-        }, Point2i(nXTiles, nYTiles));
+        });
         reporter.Done();
     }
     film->WriteImage(1.0f / sampler->samplesPerPixel);

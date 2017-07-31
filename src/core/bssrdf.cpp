@@ -162,7 +162,7 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
         t->rhoSamples[i] =
             (1 - std::exp(-8 * i / (Float)(t->rhoSamples.size() - 1))) /
             (1 - std::exp(-8));
-    ParallelFor([&](int i) {
+    ParallelFor(0, t->rhoSamples.size(), [&](int i) {
         // Compute the diffusion profile for the _i_th albedo sample
 
         // Compute scattering profile for chosen albedo $\rho$
@@ -180,7 +180,7 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
             t->radiusSamples,
             {&t->profile[i * nSamples], nSamples},
             {&t->profileCDF[i * nSamples], nSamples});
-    }, t->rhoSamples.size());
+    });
 }
 
 void SubsurfaceFromDiffuse(const BSSRDFTable &t, const Spectrum &rhoEff,

@@ -57,7 +57,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
     std::vector<Float> img(width * height);
 
     float fwidth = 0.5f / std::min(width, height);
-    ParallelFor(
+    ParallelFor(0, height, 32,
         [&](int64_t v) {
             Float vp = (v + .5f) / (Float)height;
             Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
@@ -66,7 +66,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
                 img[u + v * width] = image.BilerpY({up, vp});
                 img[u + v * width] *= sinTheta;
             }
-        }, height, 32);
+        });
 
     // Compute sampling distributions for rows and columns of image
     distribution = std::make_unique<Distribution2D>(img, width, height);

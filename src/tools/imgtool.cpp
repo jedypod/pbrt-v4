@@ -141,7 +141,7 @@ int makesky(int argc, char *argv[]) {
     Image img(PixelFormat::RGB32, {nPhi, nTheta});
 
     ParallelInit();
-    ParallelFor(
+    ParallelFor(0, nTheta, 32,
         [&](int64_t t) {
             Float theta = float(t + 0.5) / nTheta * Pi;
             if (theta > Pi / 2.) return;
@@ -168,8 +168,7 @@ int makesky(int argc, char *argv[]) {
                 for (int c = 0; c < 3; ++c)
                     img.SetChannel({p, (int)t}, c, rgb[c]);
             }
-        },
-        nTheta, 32);
+        });
 
     CHECK(img.Write(outfile));
 

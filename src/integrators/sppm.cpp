@@ -137,18 +137,12 @@ void SPPMIntegrator::Render(const Scene &scene) {
         std::vector<MemoryArena> perThreadArenas(MaxThreadIndex());
         {
             ProfilePhase _(Prof::SPPMCameraPass);
-            ParallelFor2D([&](Point2i tile) {
+            ParallelFor2D(pixelBounds, tileSize, [&](Bounds2i tileBounds) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
                 // Follow camera paths for _tile_ in image for SPPM
-                int tileIndex = tile.y * nTiles.x + tile.x;
+                int tileIndex = tileBounds.pMin.y * nTiles.x + tileBounds.pMin.x;
                 std::unique_ptr<Sampler> tileSampler = sampler.Clone(tileIndex);
 
-                // Compute _tileBounds_ for SPPM tile
-                int x0 = pixelBounds.pMin.x + tile.x * tileSize;
-                int x1 = std::min(x0 + tileSize, pixelBounds.pMax.x);
-                int y0 = pixelBounds.pMin.y + tile.y * tileSize;
-                int y1 = std::min(y0 + tileSize, pixelBounds.pMax.y);
-                Bounds2i tileBounds(Point2i(x0, y0), Point2i(x1, y1));
                 for (Point2i pPixel : tileBounds) {
                     // Prepare _tileSampler_ for _pPixel_
                     tileSampler->StartPixel(pPixel);
@@ -234,7 +228,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         }
                     }
                 }
-            }, nTiles);
+            });
         }
         progress.Update();
 
@@ -266,7 +260,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 gridRes[i] = std::max((int)(baseGridRes * diag[i] / maxDiag), 1);
 
             // Add visible points to SPPM grid
-            ParallelFor([&](int pixelIndex) {
+            ParallelFor(0, nPixels, 4096, [&](int pixelIndex) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
                 SPPMPixel &pixel = pixels[pixelIndex];
                 if (!pixel.vp.beta.IsBlack()) {
@@ -297,14 +291,14 @@ void SPPMIntegrator::Render(const Scene &scene) {
                                 (1 + pMax.x - pMin.x) * (1 + pMax.y - pMin.y) *
                                     (1 + pMax.z - pMin.z));
                 }
-            }, nPixels, 4096);
+            });
         }
 
         // Trace photons and accumulate contributions
         {
             ProfilePhase _(Prof::SPPMPhotonPass);
             std::vector<MemoryArena> photonShootArenas(MaxThreadIndex());
-            ParallelFor([&](int photonIndex) {
+            ParallelFor(0, photonsPerIteration, 8192, [&](int photonIndex) {
                 MemoryArena &arena = photonShootArenas[ThreadIndex];
                 // Follow photon path for _photonIndex_
                 uint64_t haltonIndex =
@@ -409,7 +403,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                     photonRay = (RayDifferential)isect.SpawnRay(wi);
                 }
                 arena.Reset();
-            }, photonsPerIteration, 8192);
+            });
             progress.Update();
             photonPaths += photonsPerIteration;
         }
@@ -417,7 +411,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
         // Update pixel values from this pass's photons
         {
             ProfilePhase _(Prof::SPPMStatsUpdate);
-            ParallelFor([&](int i) {
+            ParallelFor(0, nPixels, 4096, [&](int i) {
                 SPPMPixel &p = pixels[i];
                 int M = p.M.load();
                 if (M > 0) {
@@ -440,7 +434,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 // Reset _VisiblePoint_ in pixel
                 p.vp.beta = 0.;
                 p.vp.bsdf = nullptr;
-            }, nPixels, 4096);
+            });
         }
 
         // Periodically store SPPM image in film and write image

@@ -1,41 +1,6 @@
 
-- code to e.g. compute tile bounds feels like it should be possible to do
-  more concisely with bounds methods...
-
 - absorbing-sphere-null.pbrt gives inconsistent resutls (even with one
   thread??) (others as well...)
-
-- work stealing thread scheduler for parallel for -> reduce overhead ->
-make small buckets work well (bucket size tests). why is async++ not a win
-on bdpt??
-
-path:
-256: 1355.92s user, 1.22s sys, 52.29s real. 2595% CPU.
-128: 1359.01s user, 1.24s sys, 51.39s real. 2646% CPU.
-64:  1376.57s user, 1.17s sys, 52.31s real. 2633% CPU.
-32:  1368.74s user, 1.14s sys, 52.14s real. 2627% CPU.
-16:  1420.12s user, 1.24s sys, 53.21s real. 2671% CPU.
-8:   1466.59s user, 1.78s sys, 55.19s real. 2660% CPU.
-4:   1541.90s user, 4.41s sys, 57.32s real. 2697% CPU.
-
-async++
-64: 1318.48s user, 1.12s sys, 52.36s real. 2520% CPU.
-32: 1316.95s user, 1.06s sys, 51.46s real. 2561% CPU.
-16: 1320.74s user, 1.23s sys, 54.30s real. 2434% CPU.
-16: 1338.01s user, 1.19s sys, 52.30s real. 2560% CPU.
-16: 1370.69s user, 1.31s sys, 53.37s real. 2570% CPU.
-8:  1409.40s user, 2.15s sys, 55.56s real. 2540% CPU.
-4:  1490.13s user, 4.61s sys, 56.34s real. 2653% CPU.
-
-regular bdpt:
-32: 1080.23s user, 0.99s sys, 42.31s real. 2555% CPU.
-16: 1085.48s user, 0.94s sys, 42.24s real. 2572% CPU.
-8:  1109.75s user, 1.06s sys, 44.20s real. 2512% CPU.
-
-async++ bdpt
-32: 1102.43s user, 0.93s sys, 44.23s real. 2494% CPU.
-16: 1101.12s user, 0.93s sys, 44.26s real. 2489% CPU.
-8:  1177.35s user, 1.06s sys, 48.25s real. 2442% CPU.
 
 - CopyRect* (and throughout Image) can be simplified with some templates, a
   la
@@ -51,10 +16,9 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
 
 - v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
   - fast resampling, cache aware tiles...
+  - MemoryPool stuff in parser?
 
-- api: Create* vs Make*, etc.
-
-- MemoryPool stuff in parser?
+- api.cpp: Create* vs Make*, etc.
 
 - CreateConeShape -> Cone::Create (etc..)
 
@@ -76,7 +40,7 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
   this just for leaves?)
     - nuke shadowalpha: alpha can be made physical, not shadow...
 
-- do we actually use tHit at this point?
+- do we actually use tHit at this point? (for anything besides far hit culling)
 
 - store Integrator and Camera in Scene
 

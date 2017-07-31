@@ -159,7 +159,7 @@ TEST(Texcache, ThreadInsanity) {
     for (const auto &fn : filenames) ids.push_back(cache->AddTexture(fn));
 
     // Have a bunch of threads hammer on it in parallel.
-    ParallelFor(
+    ParallelFor(0, 1000,
         [&](int64_t chunk) {
             RNG rng(chunk);
             for (int i = 0; i < 10000; ++i) {
@@ -175,8 +175,7 @@ TEST(Texcache, ThreadInsanity) {
                 Spectrum v = cache->Texel<Spectrum>(texId, level, p);
                 EXPECT_EQ(v, images[texIndex][level].GetSpectrum(p));
             }
-        },
-        1000);
+        });
 
     for (const auto &fn : filenames) EXPECT_EQ(0, remove(fn.c_str()));
 

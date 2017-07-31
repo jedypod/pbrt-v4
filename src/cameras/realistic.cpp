@@ -85,11 +85,11 @@ RealisticCamera::RealisticCamera(const AnimatedTransform &CameraToWorld,
     // Compute exit pupil bounds at sampled points on the film
     int nSamples = 64;
     exitPupilBounds.resize(nSamples);
-    ParallelFor([&](int i) {
+    ParallelFor(0, nSamples, [&](int i) {
         Float r0 = (Float)i / nSamples * film->diagonal / 2;
         Float r1 = (Float)(i + 1) / nSamples * film->diagonal / 2;
         exitPupilBounds[i] = BoundExitPupil(r0, r1);
-    }, nSamples);
+    });
 }
 
 bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const {

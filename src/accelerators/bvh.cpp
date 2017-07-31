@@ -402,14 +402,14 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
 
     // Compute Morton indices of primitives
     std::vector<MortonPrimitive> mortonPrims(primitiveInfo.size());
-    ParallelFor([&](int i) {
+    ParallelFor(0, primitiveInfo.size(), 512, [&](int i) {
         // Initialize _mortonPrims[i]_ for _i_th primitive
         constexpr int mortonBits = 10;
         constexpr int mortonScale = 1 << mortonBits;
         mortonPrims[i].primitiveIndex = primitiveInfo[i].primitiveNumber;
         Vector3f centroidOffset = bounds.Offset(primitiveInfo[i].centroid);
         mortonPrims[i].mortonCode = EncodeMorton3(centroidOffset * mortonScale);
-    }, primitiveInfo.size(), 512);
+    });
 
     // Radix sort primitive Morton indices
     RadixSort(&mortonPrims);
@@ -435,7 +435,7 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
     // Create LBVHs for treelets in parallel
     std::atomic<int> atomicTotal(0), orderedPrimsOffset(0);
     orderedPrims.resize(primitives.size());
-    ParallelFor([&](int i) {
+    ParallelFor(0, treeletsToBuild.size(), [&](int i) {
         // Generate _i_th LBVH treelet
         int nodesCreated = 0;
         const int firstBitIndex = 29 - 12;
@@ -445,7 +445,7 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
                      tr.nPrimitives, &nodesCreated, orderedPrims,
                      &orderedPrimsOffset, firstBitIndex);
         atomicTotal += nodesCreated;
-    }, treeletsToBuild.size());
+    });
     *totalNodes = atomicTotal;
 
     // Create and return SAH BVH from LBVH treelets

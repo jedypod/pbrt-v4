@@ -241,22 +241,16 @@ void SamplerIntegrator::Render(const Scene &scene) {
                    (sampleExtent.y + tileSize - 1) / tileSize);
     ProgressReporter reporter(nTiles.x * nTiles.y, "Rendering");
     {
-        ParallelFor2D([&](Point2i tile) {
+        ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
             // Render section of image corresponding to _tile_
 
             // Allocate _MemoryArena_ for tile
             MemoryArena arena;
 
             // Get sampler instance for tile
-            int seed = tile.y * nTiles.x + tile.x;
+            int seed = tileBounds.pMin.y * nTiles.x + tileBounds.pMin.x;
             std::unique_ptr<Sampler> tileSampler = sampler->Clone(seed);
 
-            // Compute sample bounds for tile
-            int x0 = sampleBounds.pMin.x + tile.x * tileSize;
-            int x1 = std::min(x0 + tileSize, sampleBounds.pMax.x);
-            int y0 = sampleBounds.pMin.y + tile.y * tileSize;
-            int y1 = std::min(y0 + tileSize, sampleBounds.pMax.y);
-            Bounds2i tileBounds(Point2i(x0, y0), Point2i(x1, y1));
             LOG(INFO) << "Starting image tile " << tileBounds;
 
             // Get _FilmTile_ for tile
@@ -337,7 +331,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
             // Merge image tile into _Film_
             camera->film->MergeFilmTile(std::move(filmTile));
             reporter.Update();
-        }, nTiles);
+        });
         reporter.Done();
     }
     LOG(INFO) << "Rendering finished";

@@ -41,6 +41,7 @@
 // core/parallel.h*
 #include "pbrt.h"
 
+#include "bounds.h"
 #include "mathutil.h"
 #include "geometry.h"
 #include "stats.h"
@@ -104,10 +105,19 @@ class Barrier {
     int count;
 };
 
-void ParallelFor(std::function<void(int64_t)> func, int64_t count,
-                 int chunkSize = 1);
+void ParallelFor(int64_t start, int64_t end, int chunkSize,
+                 std::function<void(int64_t)> func);
+inline void ParallelFor(int64_t start, int64_t end,
+                        std::function<void(int64_t)> func) {
+    ParallelFor(start, end, 1, std::move(func));
+}
 extern PBRT_THREAD_LOCAL int ThreadIndex;
-void ParallelFor2D(std::function<void(Point2i)> func, const Point2i &count);
+void ParallelFor2D(const Bounds2i &extent, int chunkSize,
+                   std::function<void(Bounds2i)> func);
+inline void ParallelFor2D(const Bounds2i &extent,
+                          std::function<void(Bounds2i)> func) {
+    ParallelFor2D(extent, 1, std::move(func));
+}
 int MaxThreadIndex();
 
 void ParallelInit();
