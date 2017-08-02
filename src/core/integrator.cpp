@@ -236,12 +236,10 @@ void SamplerIntegrator::Render(const Scene &scene) {
     // Compute number of tiles, _nTiles_, to use for parallel rendering
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
     Vector2i sampleExtent = sampleBounds.Diagonal();
-    const int tileSize = 16;
-    Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
-                   (sampleExtent.y + tileSize - 1) / tileSize);
-    ProgressReporter reporter(nTiles.x * nTiles.y, "Rendering");
+    int nPixels = sampleBounds.Area();
+    ProgressReporter reporter(nPixels, "Rendering");
     {
-        ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
+        ParallelFor2D(sampleBounds, [&](Bounds2i tileBounds) {
             // Render section of image corresponding to _tile_
 
             // Allocate _MemoryArena_ for tile
@@ -323,7 +321,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
 
             // Merge image tile into _Film_
             camera->film->MergeFilmTile(std::move(filmTile));
-            reporter.Update();
+            reporter.Update(tileBounds.Area());
         });
         reporter.Done();
     }

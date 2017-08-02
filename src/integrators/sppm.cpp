@@ -128,16 +128,13 @@ void SPPMIntegrator::Render(const Scene &scene) {
 
     // Compute number of tiles to use for SPPM camera pass
     Vector2i pixelExtent = pixelBounds.Diagonal();
-    const int tileSize = 16;
-    Point2i nTiles((pixelExtent.x + tileSize - 1) / tileSize,
-                   (pixelExtent.y + tileSize - 1) / tileSize);
     ProgressReporter progress(2 * nIterations, "Rendering");
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
         std::vector<MemoryArena> perThreadArenas(MaxThreadIndex());
         {
             ProfilePhase _(Prof::SPPMCameraPass);
-            ParallelFor2D(pixelBounds, tileSize, [&](Bounds2i tileBounds) {
+            ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
                 // Follow camera paths for _tile_ in image for SPPM
                 std::unique_ptr<Sampler> tileSampler = sampler.Clone();
