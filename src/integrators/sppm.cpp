@@ -140,13 +140,11 @@ void SPPMIntegrator::Render(const Scene &scene) {
             ParallelFor2D(pixelBounds, tileSize, [&](Bounds2i tileBounds) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
                 // Follow camera paths for _tile_ in image for SPPM
-                int tileIndex = tileBounds.pMin.y * nTiles.x + tileBounds.pMin.x;
-                std::unique_ptr<Sampler> tileSampler = sampler.Clone(tileIndex);
+                std::unique_ptr<Sampler> tileSampler = sampler.Clone();
 
                 for (Point2i pPixel : tileBounds) {
                     // Prepare _tileSampler_ for _pPixel_
-                    tileSampler->StartPixel(pPixel);
-                    tileSampler->SetSampleNumber(iter);
+                    tileSampler->StartSequence(pPixel, iter);
 
                     // Generate camera ray for pixel for SPPM
                     CameraSample cameraSample =

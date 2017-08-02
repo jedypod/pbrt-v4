@@ -53,12 +53,12 @@ namespace pbrt {
 class MaxMinDistSampler : public PixelSampler {
   public:
     // MaxMinDistSampler Public Methods
-    void StartPixel(const Point2i &);
-    std::unique_ptr<Sampler> Clone(int seed);
+    void GeneratePixelSamples(RNG &rng);
+    std::unique_ptr<Sampler> Clone();
     int RoundCount(int count) const { return RoundUpPow2(count); }
-    MaxMinDistSampler(int64_t samplesPerPixel, int nSampledDimensions)
+    MaxMinDistSampler(int samplesPerPixel, int nSampledDimensions)
         : PixelSampler(
-              [](int64_t spp) {
+              [](int spp) {
                   int Cindex = Log2Int(spp);
                   if (Cindex >= sizeof(CMaxMinDist) / sizeof(CMaxMinDist[0])) {
                       Warning(

@@ -59,8 +59,8 @@ class Sampler {
   public:
     // Sampler Interface
     virtual ~Sampler();
-    Sampler(int64_t samplesPerPixel);
-    virtual void StartPixel(const Point2i &p);
+    Sampler(int samplesPerPixel);
+    virtual void StartSequence(const Point2i &p, int sampleIndex);
     virtual Float Get1D() = 0;
     virtual Point2f Get2D() = 0;
     CameraSample GetCameraSample(const Point2i &pRaster);
@@ -69,9 +69,7 @@ class Sampler {
     virtual int RoundCount(int n) const { return n; }
     gtl::ArraySlice<Float> Get1DArray(int n);
     gtl::ArraySlice<Point2f> Get2DArray(int n);
-    virtual bool StartNextSample();
-    virtual std::unique_ptr<Sampler> Clone(int seed) = 0;
-    virtual bool SetSampleNumber(int64_t sampleNum);
+    virtual std::unique_ptr<Sampler> Clone() = 0;
     std::string StateString() const {
       return StringPrintf("(%d,%d), sample %" PRId64, currentPixel.x,
                           currentPixel.y, currentPixelSampleIndex);
@@ -79,7 +77,7 @@ class Sampler {
     int64_t CurrentSampleNumber() const { return currentPixelSampleIndex; }
 
     // Sampler Public Data
-    const int64_t samplesPerPixel;
+    const int samplesPerPixel;
 
   protected:
     // Sampler Protected Data
@@ -97,29 +95,30 @@ class Sampler {
 class PixelSampler : public Sampler {
   public:
     // PixelSampler Public Methods
-    PixelSampler(int64_t samplesPerPixel, int nSampledDimensions);
-    bool StartNextSample();
-    bool SetSampleNumber(int64_t);
-    Float Get1D();
-    Point2f Get2D();
+    PixelSampler(int samplesPerPixel, int nSampledDimensions);
+    void StartSequence(const Point2i &p, int sampleIndex) final;
+    Float Get1D() final;
+    Point2f Get2D() final;
+
+    virtual void GeneratePixelSamples(RNG &rng) = 0;
 
   protected:
     // PixelSampler Protected Data
     std::vector<std::vector<Float>> samples1D;
     std::vector<std::vector<Point2f>> samples2D;
     int current1DDimension = 0, current2DDimension = 0;
+
+  private:
     RNG rng;
 };
 
 class GlobalSampler : public Sampler {
   public:
     // GlobalSampler Public Methods
-    bool StartNextSample();
-    void StartPixel(const Point2i &);
-    bool SetSampleNumber(int64_t sampleNum);
-    Float Get1D();
-    Point2f Get2D();
-    GlobalSampler(int64_t samplesPerPixel) : Sampler(samplesPerPixel) {}
+    void StartSequence(const Point2i &p, int sampleIndex) final;
+    Float Get1D() final;
+    Point2f Get2D() final;
+    GlobalSampler(int samplesPerPixel) : Sampler(samplesPerPixel) {}
     virtual int64_t GetIndexForSample(int64_t sampleNum) const = 0;
     virtual Float SampleDimension(int64_t index, int dimension) const = 0;
 

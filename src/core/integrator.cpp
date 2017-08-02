@@ -248,8 +248,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
             MemoryArena arena;
 
             // Get sampler instance for tile
-            int seed = tileBounds.pMin.y * nTiles.x + tileBounds.pMin.x;
-            std::unique_ptr<Sampler> tileSampler = sampler->Clone(seed);
+            std::unique_ptr<Sampler> tileSampler = sampler->Clone();
 
             LOG(INFO) << "Starting image tile " << tileBounds;
 
@@ -259,19 +258,13 @@ void SamplerIntegrator::Render(const Scene &scene) {
 
             // Loop over pixels in tile to render them
             for (Point2i pixel : tileBounds) {
-                {
-                    ProfilePhase pp(Prof::StartPixel);
-                    tileSampler->StartPixel(pixel);
-                }
-
-                // Do this check after the StartPixel() call; this keeps
-                // the usage of RNG values from (most) Samplers that use
-                // RNGs consistent, which improves reproducability /
-                // debugging.
                 if (!InsideExclusive(pixel, pixelBounds))
                     continue;
 
-                do {
+                int spp = sampler->samplesPerPixel;
+                for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
+                    tileSampler->StartSequence(pixel, sampleIndex);
+
                     // Initialize _CameraSample_ for current sample
                     CameraSample cameraSample =
                         tileSampler->GetCameraSample(pixel);
@@ -324,7 +317,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
                     // Free _MemoryArena_ memory from computing image sample
                     // value
                     arena.Reset();
-                } while (tileSampler->StartNextSample());
+                }
             }
             LOG(INFO) << "Finished image tile " << tileBounds;
 

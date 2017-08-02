@@ -2,12 +2,16 @@
 #include "tests/gtest/gtest.h"
 #include <stdint.h>
 #include <algorithm>
+#include <iterator>
 #include "pbrt.h"
 #include "rng.h"
 #include "sampling.h"
 #include "lowdiscrepancy.h"
+#include "samplers/halton.h"
 #include "samplers/maxmin.h"
+#include "samplers/random.h"
 #include "samplers/sobol.h"
+#include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
 
 using namespace pbrt;
@@ -132,6 +136,117 @@ TEST(LowDiscrepancy, Sobol) {
     }
 }
 
+// Make sure GeneratePixelSamples() isn't called more than it should be.
+TEST(PixelSampler, GeneratePixelSamples) {
+    class TestSampler : public PixelSampler {
+    public:
+        TestSampler() : PixelSampler(64, 5) {}
+        void GeneratePixelSamples(RNG &rng) { ++calls; }
+        std::unique_ptr<Sampler> Clone() { return std::make_unique<TestSampler>(*this); }
+        int calls = 0;
+    };
+
+    TestSampler ts;
+    ts.StartSequence({0, 0}, 0);
+    ts.StartSequence({0, 0}, 1);
+    ts.StartSequence({0, 0}, 10);
+    ts.StartSequence({1, 0}, 4);
+    ts.StartSequence({0, 0}, 11);
+    EXPECT_EQ(ts.calls, 3);
+}
+
+TEST(RNG, Advance) {
+    RNG rng;
+    rng.SetSequence(1234);
+    std::vector<Float> v;
+    for (int i = 0; i < 1000; ++i)
+        v.push_back(rng.UniformFloat());
+
+    rng.SetSequence(1234);
+    rng.Advance(16);
+    EXPECT_EQ(rng.UniformFloat(), v[16]);
+
+    for (int i = v.size() - 1; i >= 0; --i) {
+        rng.SetSequence(1234);
+        rng.Advance(i);
+        EXPECT_EQ(rng.UniformFloat(), v[i]);
+    }
+
+    // Switch to another sequence
+    rng.SetSequence(32);
+    rng.UniformFloat();
+
+    // Go back and check one last time
+    for (int i : { 5, 998, 552, 37, 16 }) {
+        rng.SetSequence(1234);
+        rng.Advance(i);
+        EXPECT_EQ(rng.UniformFloat(), v[i]);
+    }
+}
+
+// Make sure all samplers give the same sample values if we go back to the
+// same pixel / sample index.
+TEST(Sampler, ConsistentValues) {
+    constexpr int rootSpp = 4;
+    constexpr int spp = rootSpp * rootSpp;
+    Bounds2i sampleBounds {{-2, -1}, {100, 101}};
+
+    std::vector<std::unique_ptr<Sampler>> samplers;
+    samplers.push_back(std::make_unique<HaltonSampler>(spp, sampleBounds));
+    samplers.push_back(std::make_unique<RandomSampler>(spp));
+    samplers.push_back(std::make_unique<StratifiedSampler>(rootSpp, rootSpp, true, 4));
+    samplers.push_back(std::make_unique<SobolSampler>(spp, sampleBounds));
+    samplers.push_back(std::make_unique<ZeroTwoSequenceSampler>(spp));
+    samplers.push_back(std::make_unique<MaxMinDistSampler>(spp, 4));
+
+    for (const auto &sampler : samplers) {
+        int na1d = sampler->RoundCount(8);
+        sampler->Request1DArray(na1d);
+        int na2d = sampler->RoundCount(18);
+        sampler->Request2DArray(na2d);
+
+        std::vector<Float> s1d[spp], a1d[spp];
+        std::vector<Point2f> s2d[spp], a2d[spp];
+
+        for (int s = 0; s < spp; ++s) {
+            sampler->StartSequence({1, 5}, s);
+            for (int i = 0; i < 10; ++i) {
+                s2d[s].push_back(sampler->Get2D());
+                s1d[s].push_back(sampler->Get1D());
+            }
+            auto array1d = sampler->Get1DArray(na1d);
+            std::copy(array1d.begin(), array1d.end(), std::back_inserter(a1d[s]));
+            auto array2d = sampler->Get2DArray(na2d);
+            std::copy(array2d.begin(), array2d.end(), std::back_inserter(a2d[s]));
+        }
+
+        // Go somewhere else and generate some samples, just to make sure
+        // things are shaken up.
+        sampler->StartSequence({0, 6}, 10);
+        sampler->Get2D();
+        sampler->Get2D();
+        sampler->Get1D();
+
+        // Now go back and generate samples again, but enumerate them in a
+        // different order to make sure the sampler is doing the right
+        // thing.
+        for (int s = spp - 1; s >= 0; --s) {
+            sampler->StartSequence({1, 5}, s);
+            for (int i = 0; i < s2d[s].size(); ++i) {
+                EXPECT_EQ(s2d[s][i], sampler->Get2D());
+                EXPECT_EQ(s1d[s][i], sampler->Get1D());
+            }
+            auto array1d = sampler->Get1DArray(na1d);
+            for (int i = 0; i < na1d; ++i)
+                EXPECT_EQ(array1d[i], a1d[s][i]);
+
+            auto array2d = sampler->Get2DArray(na2d);
+            for (int i = 0; i < na2d; ++i)
+                EXPECT_EQ(array2d[i], a2d[s][i]);
+        }
+    }
+}
+
 // Make sure samplers that are supposed to generate a single sample in
 // each of the elementary intervals actually do so.
 // TODO: check Halton (where the elementary intervals are (2^i, 3^j)).
@@ -139,11 +254,12 @@ TEST(LowDiscrepancy, ElementaryIntervals) {
     auto checkSampler = [](const char *name, std::unique_ptr<Sampler> sampler,
                            int logSamples) {
         // Get all of the samples for a pixel.
-        sampler->StartPixel(Point2i(0, 0));
+        int spp = sampler->samplesPerPixel;
         std::vector<Point2f> samples;
-        do {
+        for (int i = 0; i < spp; ++i) {
+            sampler->StartSequence(Point2i(0, 0), i);
             samples.push_back(sampler->Get2D());
-        } while (sampler->StartNextSample());
+        }
 
         for (int i = 0; i <= logSamples; ++i) {
             // Check one set of elementary intervals: number of intervals
@@ -192,11 +308,12 @@ TEST(MaxMinDist, MinDist) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples) {
         // Store a pixel's worth of samples in the vector s.
         MaxMinDistSampler mm(1 << logSamples, 2);
-        mm.StartPixel(Point2i(0, 0));
+        int spp = mm.samplesPerPixel;
         std::vector<Point2f> s;
-        do {
+        for (int i = 0; i < spp; ++i) {
+            mm.StartSequence(Point2i(0, 0), i);
             s.push_back(mm.Get2D());
-        } while (mm.StartNextSample());
+        }
 
         // Distance with toroidal topology
         auto dist = [](const Point2f &p0, const Point2f &p1) {

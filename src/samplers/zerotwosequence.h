@@ -52,9 +52,9 @@ namespace pbrt {
 class ZeroTwoSequenceSampler : public PixelSampler {
   public:
     // ZeroTwoSequenceSampler Public Methods
-    ZeroTwoSequenceSampler(int64_t samplesPerPixel, int nSampledDimensions = 4);
-    void StartPixel(const Point2i &);
-    std::unique_ptr<Sampler> Clone(int seed);
+    ZeroTwoSequenceSampler(int samplesPerPixel, int nSampledDimensions = 4);
+    void GeneratePixelSamples(RNG &rng);
+    std::unique_ptr<Sampler> Clone();
     int RoundCount(int count) const { return RoundUpPow2(count); }
 };
 

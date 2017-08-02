@@ -1,6 +1,12 @@
 
+- tbb: progressporter for rendering is semi-borked, assumes fixed tile
+  decomposition.  but don't want to update it per pixel either...
+  
+- why does GlobalSampler generate all array samples; can't we just do the
+  ones for the current sample index???
+
 - absorbing-sphere-null.pbrt gives inconsistent resutls (even with one
-  thread??) (others as well...)
+  thread??) (others as well...)  (Film tile merge??)
 
 - CopyRect* (and throughout Image) can be simplified with some templates, a
   la

@@ -33,15 +33,13 @@
 // samplers/maxmin.cpp*
 #include "samplers/maxmin.h"
 #include "paramset.h"
-#include "stats.h"
 
 namespace pbrt {
 
 using gtl::MutableArraySlice;
 
 // MaxMinDistSampler Method Definitions
-void MaxMinDistSampler::StartPixel(const Point2i &p) {
-    ProfilePhase _(Prof::StartPixel);
+void MaxMinDistSampler::GeneratePixelSamples(RNG &rng) {
     Float invSPP = (Float)1 / samplesPerPixel;
     for (int i = 0; i < samplesPerPixel; ++i)
         samples2D[0][i] = Point2f(i * invSPP, SampleGeneratorMatrix(CPixel, i));
@@ -63,13 +61,10 @@ void MaxMinDistSampler::StartPixel(const Point2i &p) {
         int count = samples2DArraySizes[i];
         Sobol2D(count, samplesPerPixel, &sampleArray2D[i], rng);
     }
-    PixelSampler::StartPixel(p);
 }
 
-std::unique_ptr<Sampler> MaxMinDistSampler::Clone(int seed) {
-    auto mmds = std::make_unique<MaxMinDistSampler>(*this);
-    mmds->rng.SetSequence(seed);
-    return std::move(mmds);
+std::unique_ptr<Sampler> MaxMinDistSampler::Clone() {
+    return std::make_unique<MaxMinDistSampler>(*this);
 }
 
 std::unique_ptr<MaxMinDistSampler> CreateMaxMinDistSampler(

@@ -34,13 +34,11 @@
 #include "samplers/stratified.h"
 #include "paramset.h"
 #include "sampling.h"
-#include "stats.h"
 
 namespace pbrt {
 
 // StratifiedSampler Method Definitions
-void StratifiedSampler::StartPixel(const Point2i &p) {
-    ProfilePhase _(Prof::StartPixel);
+void StratifiedSampler::GeneratePixelSamples(RNG &rng) {
     // Generate single stratified samples for the pixel
     for (size_t i = 0; i < samples1D.size(); ++i) {
         StratifiedSample1D(&samples1D[i], rng, jitterSamples);
@@ -68,13 +66,10 @@ void StratifiedSampler::StartPixel(const Point2i &p) {
                 &sampleArray2D[i][j * count].x, count);
             LatinHypercube(samples, 2, rng);
         }
-    PixelSampler::StartPixel(p);
 }
 
-std::unique_ptr<Sampler> StratifiedSampler::Clone(int seed) {
-    auto ss = std::make_unique<StratifiedSampler>(*this);
-    ss->rng.SetSequence(seed);
-    return std::move(ss);
+std::unique_ptr<Sampler> StratifiedSampler::Clone() {
+    return std::make_unique<StratifiedSampler>(*this);
 }
 
 std::unique_ptr<StratifiedSampler> CreateStratifiedSampler(

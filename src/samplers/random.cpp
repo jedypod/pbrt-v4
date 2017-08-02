@@ -38,7 +38,7 @@
 
 namespace pbrt {
 
-RandomSampler::RandomSampler(int ns, int seed) : Sampler(ns), rng(seed) {}
+RandomSampler::RandomSampler(int ns) : Sampler(ns) {}
 
 Float RandomSampler::Get1D() {
     ProfilePhase _(Prof::GetSample);
@@ -52,14 +52,17 @@ Point2f RandomSampler::Get2D() {
     return {rng.UniformFloat(), rng.UniformFloat()};
 }
 
-std::unique_ptr<Sampler> RandomSampler::Clone(int seed) {
-    auto rs = std::make_unique<RandomSampler>(*this);
-    rs->rng.SetSequence(seed);
-    return std::move(rs);
+std::unique_ptr<Sampler> RandomSampler::Clone() {
+    return std::make_unique<RandomSampler>(*this);
 }
 
-void RandomSampler::StartPixel(const Point2i &p) {
-    ProfilePhase _(Prof::StartPixel);
+void RandomSampler::StartSequence(const Point2i &p, int sampleIndex) {
+    ProfilePhase _(Prof::StartSequence);
+
+    // Regardless of the value of sampleIndex, always start at the begining
+    // of the sequence to fill in the arrays.
+    rng.SetSequence(p.x + p.y * 65536);
+
     for (size_t i = 0; i < sampleArray1D.size(); ++i)
         for (size_t j = 0; j < sampleArray1D[i].size(); ++j)
             sampleArray1D[i][j] = rng.UniformFloat();
@@ -67,7 +70,13 @@ void RandomSampler::StartPixel(const Point2i &p) {
     for (size_t i = 0; i < sampleArray2D.size(); ++i)
         for (size_t j = 0; j < sampleArray2D[i].size(); ++j)
             sampleArray2D[i][j] = {rng.UniformFloat(), rng.UniformFloat()};
-    Sampler::StartPixel(p);
+
+    // Now advance in the sequence past what may have been used to fill in
+    // the arrays for the rest of the random samples for the pixel.
+    rng.SetSequence(p.x + p.y * 65536);
+    rng.Advance((sampleIndex + 1) * 65536);
+
+    Sampler::StartSequence(p, sampleIndex);
 }
 
 std::unique_ptr<RandomSampler> CreateRandomSampler(const ParamSet &params) {

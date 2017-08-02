@@ -64,7 +64,7 @@ class MLTSampler : public Sampler {
           streamCount(streamCount) {}
     Float Get1D();
     Point2f Get2D();
-    std::unique_ptr<Sampler> Clone(int seed);
+    std::unique_ptr<Sampler> Clone();
     void StartIteration();
     void Accept();
     void Reject();
