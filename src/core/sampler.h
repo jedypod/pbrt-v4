@@ -71,6 +71,9 @@ class Sampler {
     virtual gtl::ArraySlice<Point2f> Get2DArray(int n) = 0;
     virtual std::unique_ptr<Sampler> Clone() = 0;
 
+    int GetDiscrete1D(int n) {
+        return std::min(int(Get1D() * n), n - 1);
+    }
     // Sampler Public Data
     const int samplesPerPixel;
 

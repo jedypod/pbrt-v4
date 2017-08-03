@@ -100,7 +100,7 @@ Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
         lightNum = lightDistrib->SampleDiscrete(sampler.Get1D(), &lightPdf);
         if (lightPdf == 0) return Spectrum(0.f);
     } else {
-        lightNum = std::min((int)(sampler.Get1D() * nLights), nLights - 1);
+        lightNum = sampler.GetDiscrete1D(nLights);
         lightPdf = Float(1) / nLights;
     }
     const std::shared_ptr<Light> &light = scene.lights[lightNum];

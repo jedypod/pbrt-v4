@@ -21,8 +21,6 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
             for (int u = 0; u < nu; ++u)
                 Op(bufIter++, p8[offset++]);
 
-- give pixelformat enum methods! (numchannels, etc.)
-
 - v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
   - fast resampling, cache aware tiles...
   - MemoryPool stuff in parser?
@@ -32,7 +30,9 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
 - CreateConeShape -> Cone::Create (etc..)
 
 - api / MakeFilter error handling (exit) is inconsistent with others...
-
+  General API error handling review. Recover and use something, or fail
+  hard?
+  
 - test alpha tex for non triangles. also review how it's passed through for
   non-triangles in --cat/--toply
 
@@ -42,8 +42,6 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
 - need tests based on more interesting scenes in v3-scenes
 
 - params faceindices face_indices faceIndices
-
-- Sampler::SampleDiscrete (based on Smaple1D...)
 
 - alpha masking really doesn't work with area lights (do we care, or is
   this just for leaves?)

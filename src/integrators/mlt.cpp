@@ -154,7 +154,7 @@ Spectrum MLTIntegrator::L(const Scene &scene, MemoryArena &arena,
         t = 2;
     } else {
         nStrategies = depth + 2;
-        s = std::min((int)(sampler.Get1D() * nStrategies), nStrategies - 1);
+        s = sampler.GetDiscrete1D(nStrategies);
         t = nStrategies - s;
     }
 
