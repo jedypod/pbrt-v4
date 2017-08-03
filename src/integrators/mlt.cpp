@@ -70,6 +70,24 @@ std::unique_ptr<Sampler> MLTSampler::Clone() {
     return nullptr;
 }
 
+void MLTSampler::Request1DArray(int n) {
+    LOG(FATAL) << "Unimplemented";
+}
+
+void MLTSampler::Request2DArray(int n) {
+    LOG(FATAL) << "Unimplemented";
+}
+
+gtl::ArraySlice<Float> MLTSampler::Get1DArray(int n) {
+    LOG(FATAL) << "Unimplemented";
+    return {};
+}
+
+gtl::ArraySlice<Point2f> MLTSampler::Get2DArray(int n) {
+    LOG(FATAL) << "Unimplemented";
+    return {};
+}
+
 void MLTSampler::StartIteration() {
     currentIteration++;
     largeStep = rng.UniformFloat() < largeStepProbability;

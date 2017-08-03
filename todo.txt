@@ -1,10 +1,13 @@
 
-- tbb: progressporter for rendering is semi-borked, assumes fixed tile
-  decomposition.  but don't want to update it per pixel either...
+- use kahan summation for accumulating into the image, not for accumulating
+  into the tile!!!
   
-- why does GlobalSampler generate all array samples; can't we just do the
-  ones for the current sample index???
+- add test for elementary intervals on e.g. sobol arrays, just to be sure
+  the array sampling isn't borked
 
+- figure out consistent merging of film tiles so have fully deterministic
+  final pixel outputs
+  
 - absorbing-sphere-null.pbrt gives inconsistent resutls (even with one
   thread??) (others as well...)  (Film tile merge??)
 

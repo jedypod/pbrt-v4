@@ -59,24 +59,39 @@ std::unique_ptr<Sampler> RandomSampler::Clone() {
 void RandomSampler::StartSequence(const Point2i &p, int sampleIndex) {
     ProfilePhase _(Prof::StartSequence);
 
-    // Regardless of the value of sampleIndex, always start at the begining
-    // of the sequence to fill in the arrays.
     rng.SetSequence(p.x + p.y * 65536);
+    // Assume we won't use more than 64k sample dimensions in a pixel...
+    rng.Advance(sampleIndex * 65536);
 
-    for (size_t i = 0; i < sampleArray1D.size(); ++i)
-        for (size_t j = 0; j < sampleArray1D[i].size(); ++j)
-            sampleArray1D[i][j] = rng.UniformFloat();
-
-    for (size_t i = 0; i < sampleArray2D.size(); ++i)
-        for (size_t j = 0; j < sampleArray2D[i].size(); ++j)
-            sampleArray2D[i][j] = {rng.UniformFloat(), rng.UniformFloat()};
-
-    // Now advance in the sequence past what may have been used to fill in
-    // the arrays for the rest of the random samples for the pixel.
-    rng.SetSequence(p.x + p.y * 65536);
-    rng.Advance((sampleIndex + 1) * 65536);
+    array1DOffset = array2DOffset = 0;
 
     Sampler::StartSequence(p, sampleIndex);
+}
+
+void RandomSampler::Request1DArray(int n) {
+    sampleArray1D.push_back(std::vector<Float>(n));
+}
+
+void RandomSampler::Request2DArray(int n) {
+    sampleArray2D.push_back(std::vector<Point2f>(n));
+}
+
+gtl::ArraySlice<Float> RandomSampler::Get1DArray(int n) {
+    ProfilePhase _(Prof::GetSample);
+    CHECK_LT(array1DOffset, sampleArray1D.size());
+    for (int i = 0; i < n; ++i)
+        sampleArray1D[array1DOffset][i] = rng.UniformFloat();
+    return sampleArray1D[array1DOffset++];
+}
+
+gtl::ArraySlice<Point2f> RandomSampler::Get2DArray(int n) {
+    ProfilePhase _(Prof::GetSample);
+    CHECK_LT(array2DOffset, sampleArray2D.size());
+    for (int i = 0; i < n; ++i) {
+        sampleArray2D[array2DOffset][i].x = rng.UniformFloat();
+        sampleArray2D[array2DOffset][i].y = rng.UniformFloat();
+    }
+    return sampleArray2D[array2DOffset++];
 }
 
 std::unique_ptr<RandomSampler> CreateRandomSampler(const ParamSet &params) {

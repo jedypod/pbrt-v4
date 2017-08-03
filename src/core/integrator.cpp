@@ -288,22 +288,19 @@ void SamplerIntegrator::Render(const Scene &scene) {
                         LOG(ERROR) << StringPrintf(
                             "Not-a-number radiance value returned "
                             "for pixel (%d, %d), sample %d. Setting to black.",
-                            pixel.x, pixel.y,
-                            (int)tileSampler->CurrentSampleNumber());
+                            pixel.x, pixel.y, sampleIndex);
                         L = Spectrum(0.f);
                     } else if (L.y() < -1e-5) {
                         LOG(ERROR) << StringPrintf(
                             "Negative luminance value, %f, returned "
                             "for pixel (%d, %d), sample %d. Setting to black.",
-                            L.y(), pixel.x, pixel.y,
-                            (int)tileSampler->CurrentSampleNumber());
+                            L.y(), pixel.x, pixel.y, sampleIndex);
                         L = Spectrum(0.f);
                     } else if (std::isinf(L.y())) {
                           LOG(ERROR) << StringPrintf(
                             "Infinite luminance value returned "
                             "for pixel (%d, %d), sample %d. Setting to black.",
-                            pixel.x, pixel.y,
-                            (int)tileSampler->CurrentSampleNumber());
+                            pixel.x, pixel.y, sampleIndex);
                         L = Spectrum(0.f);
                     }
                     VLOG(1) << "Camera sample: " << cameraSample << " -> ray: " <<

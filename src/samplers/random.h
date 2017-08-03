@@ -52,10 +52,17 @@ class RandomSampler : public Sampler {
     void StartSequence(const Point2i &p, int sampleIndex);
     Float Get1D();
     Point2f Get2D();
+    void Request1DArray(int n) final;
+    void Request2DArray(int n) final;
+    gtl::ArraySlice<Float> Get1DArray(int n) final;
+    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
     std::unique_ptr<Sampler> Clone();
 
   private:
     RNG rng;
+    size_t array1DOffset, array2DOffset;
+    std::vector<std::vector<Float>> sampleArray1D;
+    std::vector<std::vector<Point2f>> sampleArray2D;
 };
 
 std::unique_ptr<RandomSampler> CreateRandomSampler(const ParamSet &params);

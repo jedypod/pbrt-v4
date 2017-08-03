@@ -64,17 +64,12 @@ class Sampler {
     virtual Float Get1D() = 0;
     virtual Point2f Get2D() = 0;
     CameraSample GetCameraSample(const Point2i &pRaster);
-    void Request1DArray(int n);
-    void Request2DArray(int n);
     virtual int RoundCount(int n) const { return n; }
-    gtl::ArraySlice<Float> Get1DArray(int n);
-    gtl::ArraySlice<Point2f> Get2DArray(int n);
+    virtual void Request1DArray(int n) = 0;
+    virtual void Request2DArray(int n) = 0;
+    virtual gtl::ArraySlice<Float> Get1DArray(int n) = 0;
+    virtual gtl::ArraySlice<Point2f> Get2DArray(int n) = 0;
     virtual std::unique_ptr<Sampler> Clone() = 0;
-    std::string StateString() const {
-      return StringPrintf("(%d,%d), sample %" PRId64, currentPixel.x,
-                          currentPixel.y, currentPixelSampleIndex);
-    }
-    int64_t CurrentSampleNumber() const { return currentPixelSampleIndex; }
 
     // Sampler Public Data
     const int samplesPerPixel;
@@ -83,13 +78,6 @@ class Sampler {
     // Sampler Protected Data
     Point2i currentPixel;
     int64_t currentPixelSampleIndex;
-    std::vector<int> samples1DArraySizes, samples2DArraySizes;
-    std::vector<std::vector<Float>> sampleArray1D;
-    std::vector<std::vector<Point2f>> sampleArray2D;
-
-  private:
-    // Sampler Private Data
-    size_t array1DOffset, array2DOffset;
 };
 
 class PixelSampler : public Sampler {
@@ -99,6 +87,10 @@ class PixelSampler : public Sampler {
     void StartSequence(const Point2i &p, int sampleIndex) final;
     Float Get1D() final;
     Point2f Get2D() final;
+    void Request1DArray(int n) final;
+    void Request2DArray(int n) final;
+    gtl::ArraySlice<Float> Get1DArray(int n) final;
+    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
 
     virtual void GeneratePixelSamples(RNG &rng) = 0;
 
@@ -106,10 +98,15 @@ class PixelSampler : public Sampler {
     // PixelSampler Protected Data
     std::vector<std::vector<Float>> samples1D;
     std::vector<std::vector<Point2f>> samples2D;
-    int current1DDimension = 0, current2DDimension = 0;
+
+    std::vector<int> samples1DArraySizes, samples2DArraySizes;
+    std::vector<std::vector<Float>> sampleArray1D;
+    std::vector<std::vector<Point2f>> sampleArray2D;
 
   private:
+    int current1DDimension = 0, current2DDimension = 0;
     RNG rng;
+    size_t array1DOffset, array2DOffset;
 };
 
 class GlobalSampler : public Sampler {
@@ -119,6 +116,11 @@ class GlobalSampler : public Sampler {
     Float Get1D() final;
     Point2f Get2D() final;
     GlobalSampler(int samplesPerPixel) : Sampler(samplesPerPixel) {}
+    void Request1DArray(int n) final;
+    void Request2DArray(int n) final;
+    gtl::ArraySlice<Float> Get1DArray(int n) final;
+    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
+
     virtual int64_t GetIndexForSample(int64_t sampleNum) const = 0;
     virtual Float SampleDimension(int64_t index, int dimension) const = 0;
 
@@ -126,8 +128,17 @@ class GlobalSampler : public Sampler {
     // GlobalSampler Private Data
     int dimension;
     int64_t intervalSampleIndex;
+
     static const int arrayStartDim = 5;
-    int arrayEndDim;
+    int arrayEndDim = arrayStartDim;
+    // Offsets into sampleArray1D and sampleArray2D, respectively, as
+    // we consume sample arrays for the current pixel sample.
+    size_t array1DOffset, array2DOffset;
+    // Note: we need separate vectors for each requested array since
+    // callers may want to have multiple of them outstanding at the same
+    // time.
+    std::vector<std::vector<Float>> sampleArray1D;
+    std::vector<std::vector<Point2f>> sampleArray2D;
 };
 
 }  // namespace pbrt
