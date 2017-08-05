@@ -317,7 +317,10 @@ void BDPTIntegrator::Render(const Scene &scene) {
     Film *film = camera->film.get();
     const Bounds2i sampleBounds = film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
-    ProgressReporter reporter(sampleBounds.Area(), "Rendering");
+    const int tileSize = 16;
+    const int nXTiles = (sampleExtent.x + tileSize - 1) / tileSize;
+    const int nYTiles = (sampleExtent.y + tileSize - 1) / tileSize;
+    ProgressReporter reporter(nXTiles * nYTiles, "Rendering");
 
     // Allocate buffers for debug visualization
     const int bufferCount = (1 + maxDepth) * (6 + maxDepth) / 2;
@@ -342,7 +345,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
 
     // Render and write the output image to disk
     if (scene.lights.size() > 0) {
-        ParallelFor2D(sampleBounds, [&](Bounds2i tileBounds) {
+        ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
             // Render a single tile using BDPT
             MemoryArena arena;
             std::unique_ptr<Sampler> tileSampler = sampler->Clone();
@@ -420,7 +423,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
                 }
             }
             film->MergeFilmTile(std::move(filmTile));
-            reporter.Update(tileBounds.Area());
+            reporter.Update();
         });
         reporter.Done();
     }

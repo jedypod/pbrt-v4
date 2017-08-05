@@ -38,13 +38,6 @@ if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/ptex")
     "\"git submodule update --init --recursive\"")
 endif()
 
-if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/tbb")
-  message(FATAL_ERROR "The tbb submodule directory is missing! "
-    "You probably did not clone the project with --recursive, or first checked out "
-    "pbrt before it was added. It is possible to recover by running "
-    "\"git submodule update --init --recursive\"")
-endif()
-
 FIND_PACKAGE ( Sanitizers )
 FIND_PACKAGE ( Threads )
 
@@ -325,23 +318,6 @@ SET_PROPERTY(TARGET Ptex_static PROPERTY FOLDER "dependencies")
 INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 
 ###########################################################################
-# tbb
-
-if (MSVC)
-  # We'll select the TBB library ourselves
-  SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D__TBB_NO_IMPLICIT_LINKAGE")
-ENDIF()
-SET (TBB_BUILD_SHARED          OFF  CACHE BOOL " " FORCE )
-SET (TBB_BUILD_STATIC          ON  CACHE BOOL " " FORCE )
-SET (TBB_BUILD_TBBMALLOC       OFF CACHE BOOL " " FORCE )
-SET (TBB_BUILD_TBBMALLOC_PROXY OFF CACHE BOOL " " FORCE )
-SET (TBB_BUILD_TESTS           OFF CACHE BOOL " " FORCE )
-ADD_SUBDIRECTORY ( src/ext/tbb )
-SET_PROPERTY (TARGET tbb_static tbb_def_files PROPERTY FOLDER "dependencies" )
-SET (TBB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/ext/tbb/include )
-INCLUDE_DIRECTORIES ( ${TBB_INCLUDE_DIR} )
-
-###########################################################################
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
@@ -494,7 +470,6 @@ SET(ALL_PBRT_LIBS
   glog
   Ptex_static
   ${ZLIB_LIBRARY}
-  tbb_static
 )
 
 # Main renderer
