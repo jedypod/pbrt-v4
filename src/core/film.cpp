@@ -68,6 +68,7 @@ Film::Film(const Point2i &resolution, const Bounds2f &cropWindow,
         croppedPixelBounds;
 
     // Allocate film image storage
+    CHECK(!croppedPixelBounds.Empty());
     pixels = std::make_unique<Pixel[]>(croppedPixelBounds.Area());
     filmPixelMemory += croppedPixelBounds.Area() * sizeof(Pixel);
 

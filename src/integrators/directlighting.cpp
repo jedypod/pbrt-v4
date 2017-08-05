@@ -124,7 +124,7 @@ std::unique_ptr<DirectLightingIntegrator> CreateDirectLightingIntegrator(
         else {
             pixelBounds = Intersect(pixelBounds,
                                     Bounds2i{{pb[0], pb[2]}, {pb[1], pb[3]}});
-            if (pixelBounds.Area() == 0)
+            if (pixelBounds.Empty())
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }

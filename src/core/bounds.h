@@ -72,6 +72,9 @@ class Bounds2 {
         Vector2<T> d = pMax - pMin;
         return d.x * d.y;
     }
+    bool Empty() const {
+        return pMin.x >= pMax.x || pMin.y >= pMax.y;
+    }
     int MaximumExtent() const {
         Vector2<T> diag = Diagonal();
         if (diag.x > diag.y)
@@ -151,6 +154,9 @@ class Bounds3 {
     T Volume() const {
         Vector3<T> d = Diagonal();
         return d.x * d.y * d.z;
+    }
+    bool Empty() const {
+        return pMin.x >= pMax.x || pMin.y >= pMax.y || pMin.x >= pMax.z;
     }
     int MaximumExtent() const {
         Vector3<T> d = Diagonal();
@@ -257,7 +263,12 @@ Bounds3<T> Union(const Bounds3<T> &b1, const Bounds3<T> &b2) {
 
 template <typename T>
 Bounds3<T> Intersect(const Bounds3<T> &b1, const Bounds3<T> &b2) {
-    return { Max(b1.pMin, b2.pMin), Min(b1.pMax, b2.pMax) };
+    // Don't run the Bounds3() constructor, since it takes mins/maxes of
+    // the given points!
+    Bounds3<T> b;
+    b.pMin = Max(b1.pMin, b2.pMin);
+    b.pMax = Min(b1.pMax, b2.pMax);
+    return b;
 }
 
 template <typename T>
@@ -328,8 +339,13 @@ Bounds2<T> Union(const Bounds2<T> &b, const Bounds2<T> &b2) {
 }
 
 template <typename T>
-Bounds2<T> Intersect(const Bounds2<T> &b, const Bounds2<T> &b2) {
-    return { Max(b.pMin, b2.pMin), Min(b.pMax, b2.pMax) };
+Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2) {
+    // Don't run the Bounds2() constructor, since it takes mins/maxes of
+    // the given points!
+    Bounds2<T> b;
+    b.pMin = Max(b1.pMin, b2.pMin);
+    b.pMax = Min(b1.pMax, b2.pMax);
+    return b;
 }
 
 template <typename T>
