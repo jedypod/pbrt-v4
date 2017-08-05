@@ -82,7 +82,7 @@ static void TestFormat(PixelFormat format) {
     char filename[64];
     sprintf(filename, "tx_fmt-%d", int(format));
     WrapMode wrapMode = WrapMode::Clamp;
-    std::vector<Image> mips = image.GenerateMIPMap(wrapMode);
+    std::vector<Image> mips = Image::GenerateMIPMap(image, wrapMode);
     int tileSize = TextureCache::TileSize(format);
     ASSERT_TRUE(TiledImagePyramid::Create(mips, filename, wrapMode, tileSize));
 

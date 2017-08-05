@@ -1,4 +1,28 @@
 
+- v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
+  - fast resampling, cache aware tiles...
+  - MemoryPool stuff in parser?
+  - there is borkage in stats hierarchy in v4, e.g. with landsacpe, scene
+    creation parts...
+
+- avx 2 support, half to float, etc...
+
+- remove black filtering mode?
+
+- aovs
+
+- ThreadIndex is borked with TBB :-(
+
+- try jacopo/heitz stuff for inf env map sampling e.g.
+
+- parallelfor2d: allow providing both min and max grain size (subdivide on
+  our side when tbb gives us too much/)
+
+- encode rendering time in exr headers, compute mc efficiency in imgtool
+  diff
+
+- explicit path representation
+
 - use kahan summation for accumulating into the image, not for accumulating
   into the tile!!!
   
@@ -10,20 +34,6 @@
   
 - absorbing-sphere-null.pbrt gives inconsistent resutls (even with one
   thread??) (others as well...)  (Film tile merge??)
-
-- CopyRect* (and throughout Image) can be simplified with some templates, a
-  la
-
-(TBD)
-template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                Op(bufIter++, p8[offset++]);
-
-- v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
-  - fast resampling, cache aware tiles...
-  - MemoryPool stuff in parser?
 
 - api.cpp: Create* vs Make*, etc.
 
@@ -48,6 +58,8 @@ template <PixelFormat format, typename Op> ApplyInternal(Bounds2i b, Op op) {
     - nuke shadowalpha: alpha can be made physical, not shadow...
 
 - do we actually use tHit at this point? (for anything besides far hit culling)
+
+- implement improved delta/ratio tracking stuff...
 
 - store Integrator and Camera in Scene
 

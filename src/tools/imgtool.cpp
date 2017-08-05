@@ -841,7 +841,7 @@ int maketiled(int argc, char *argv[]) {
         return 1;
     }
 
-    std::vector<Image> mips = image.GenerateMIPMap(wrapMode);
+    std::vector<Image> mips = Image::GenerateMIPMap(image, wrapMode);
     int tileSize = TextureCache::TileSize(image.format);
     if (!TiledImagePyramid::Create(std::move(mips), outfile, wrapMode, tileSize)) {
         fprintf(stderr, "imgtool: unable to create tiled image \"%s\"\n",

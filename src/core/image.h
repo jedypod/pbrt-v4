@@ -255,8 +255,10 @@ class Image {
                          SpectrumType spectrumType = SpectrumType::Reflectance,
                          WrapMode wrapMode = WrapMode::Clamp) const;
 
+    // FIXME: could be / should be const...
     void CopyRectOut(const Bounds2i &extent,
-                     gtl::MutableArraySlice<Float> buf);
+                     gtl::MutableArraySlice<Float> buf,
+                     WrapMode wrapMode = WrapMode::Clamp);
     void CopyRectIn(const Bounds2i &extent,
                     gtl::ArraySlice<Float> buf);
 
@@ -271,9 +273,9 @@ class Image {
     void SetY(Point2i p, Float value);
     void SetSpectrum(Point2i p, const Spectrum &value);
 
-    void Resize(Point2i newResolution, WrapMode wrap);
+    Image FloatResize(Point2i newResolution, WrapMode wrap) const;
     void FlipY();
-    std::vector<Image> GenerateMIPMap(WrapMode wrapMode) const;
+    static std::vector<Image> GenerateMIPMap(Image image, WrapMode wrapMode);
 
     int nChannels() const { return pbrt::nChannels(format); }
     size_t BytesUsed() const {
@@ -309,6 +311,60 @@ class Image {
     bool WritePFM(const std::string &name) const;
     bool WritePNG(const std::string &name) const;
     bool WriteTGA(const std::string &name) const;
+
+    template <typename F> void ForExtent1(const Bounds2i &extent, WrapMode wrapMode, F op) {
+        CHECK_LT(extent.pMin.x, extent.pMax.x);
+        CHECK_LT(extent.pMin.y, extent.pMax.y);
+        CHECK_EQ(nChannels(), 1);
+
+        int nu = extent.pMax[0] - extent.pMin[0];
+        if (Intersect(extent, Bounds2i({0, 0}, resolution)) == extent) {
+            // All in bounds
+            for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+                int offset = PixelOffset({extent.pMin[0], v}, 0);
+                for (int u = 0; u < nu; ++u)
+                    op(offset++);
+            }
+        } else {
+            for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+                for (int u = 0; u < nu; ++u) {
+                    Point2i p(extent.pMin[0] + u, v);
+                    // FIXME: this will return false on Black wrap mode
+                    CHECK(RemapPixelCoords(&p, resolution, wrapMode));
+                    int offset = PixelOffset(p, 0);
+                    op(offset++);
+                }
+            }
+        }
+    }
+    template <typename F> void ForExtent3(const Bounds2i &extent, WrapMode wrapMode,
+                                          F op) {
+        CHECK_LT(extent.pMin.x, extent.pMax.x);
+        CHECK_LT(extent.pMin.y, extent.pMax.y);
+        CHECK_EQ(nChannels(), 3);
+
+        int nu = extent.pMax[0] - extent.pMin[0];
+        if (Intersect(extent, Bounds2i({0, 0}, resolution)) == extent) {
+            // All in bounds
+            for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+                int offset = PixelOffset({extent.pMin[0], v}, 0);
+                for (int u = 0; u < nu; ++u)
+                    for (int c = 0; c < 3; ++c)
+                        op(offset++);
+            }
+        } else {
+            for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
+                for (int u = 0; u < nu; ++u) {
+                    Point2i p(extent.pMin[0] + u, v);
+                    // FIXME: this will return false on Black wrap mode
+                    CHECK(RemapPixelCoords(&p, resolution, wrapMode));
+                    int offset = PixelOffset(p, 0);
+                    for (int c = 0; c < 3; ++c)
+                        op(offset++);
+                }
+            }
+        }
+    }
 
     std::vector<uint8_t> p8;
     std::vector<uint16_t> p16;

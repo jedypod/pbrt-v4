@@ -129,7 +129,7 @@ Spectrum CachedTexelProvider::BilerpSpectrum(int level, Point2f st) const {
 ImageTexelProvider::ImageTexelProvider(Image image, WrapMode wrapMode,
                                        SpectrumType spectrumType)
     : wrapMode(wrapMode), spectrumType(spectrumType) {
-    pyramid = image.GenerateMIPMap(wrapMode);
+    pyramid = Image::GenerateMIPMap(std::move(image), wrapMode);
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapMemory += im.BytesUsed(); });
 }

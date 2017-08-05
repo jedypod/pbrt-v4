@@ -166,149 +166,101 @@ Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
 }
 
 void Image::CopyRectOut(const Bounds2i &extent,
-                        gtl::MutableArraySlice<Float> buf) {
+                        gtl::MutableArraySlice<Float> buf, WrapMode wrapMode) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
-    CHECK_LT(extent.pMin.x, extent.pMax.x);
-    CHECK_LT(extent.pMin.y, extent.pMax.y);
 
-    int nu = extent.pMax[0] - extent.pMin[0];
     auto bufIter = buf.begin();
 
     switch (format) {
     case PixelFormat::SY8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                *bufIter++ = SRGB8ToLinear(p8[offset++]);
-        }
+        ForExtent1(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = SRGB8ToLinear(p8[offset]);
+        });
         break;
     case PixelFormat::SRGB8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    *bufIter++ = SRGB8ToLinear(p8[offset++]);
-        }
+        ForExtent3(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = SRGB8ToLinear(p8[offset]);
+        });
         break;
     case PixelFormat::Y8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                *bufIter++ = p8[offset++] * (1.f / 255.f);
-        }
+        ForExtent1(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = p8[offset] * (1.f / 255.f);
+        });
         break;
     case PixelFormat::RGB8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    *bufIter++ = p8[offset++] * (1.f / 255.f);
-        }
+        ForExtent3(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = p8[offset] * (1.f / 255.f);
+        });
         break;
     case PixelFormat::Y16:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                *bufIter++ = HalfToFloat(p16[offset++]);
-        }
+        ForExtent1(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = HalfToFloat(p16[offset]);
+        });
         break;
     case PixelFormat::RGB16:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    *bufIter++ = HalfToFloat(p16[offset++]);
-        }
+        ForExtent3(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = HalfToFloat(p16[offset]);
+        });
         break;
     case PixelFormat::Y32:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                *bufIter++ = Float(p32[offset++]);
-        }
+        ForExtent1(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = Float(p32[offset]);
+        });
         break;
     case PixelFormat::RGB32:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    *bufIter++ = Float(p32[offset++]);
-        }
+        ForExtent3(extent, wrapMode, [&bufIter, this](int offset) {
+            *bufIter++ = Float(p32[offset]);
+        });
         break;
     default:
         LOG(FATAL) << "Unhandled PixelFormat";
     }
 }
 
-void Image::CopyRectIn(const Bounds2i &extent,
-                       gtl::ArraySlice<Float> buf) {
+void Image::CopyRectIn(const Bounds2i &extent, gtl::ArraySlice<Float> buf) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
-    CHECK_LT(extent.pMin.x, extent.pMax.x);
-    CHECK_LT(extent.pMin.y, extent.pMax.y);
 
     int nu = extent.pMax[0] - extent.pMin[0];
     auto bufIter = buf.begin();
 
     switch (format) {
     case PixelFormat::SY8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                p8[offset++] = LinearToSRGB8(*bufIter++);
-        }
+        ForExtent1(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p8[offset] = LinearToSRGB8(*bufIter++);
+        });
         break;
     case PixelFormat::SRGB8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    p8[offset++] = LinearToSRGB8(*bufIter++);
-        }
+        ForExtent3(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p8[offset] = LinearToSRGB8(*bufIter++);
+        });
         break;
     case PixelFormat::Y8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                p8[offset++] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
-        }
+        ForExtent1(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p8[offset] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
+        });
         break;
     case PixelFormat::RGB8:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    p8[offset++] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
-        }
+        ForExtent3(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p8[offset] = Clamp(255.f * *bufIter++ + 0.5f, 0, 255);
+        });
         break;
     case PixelFormat::Y16:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                p16[offset++] = FloatToHalf(*bufIter++);
-        }
+        ForExtent1(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p16[offset] = FloatToHalf(*bufIter++);
+        });
         break;
     case PixelFormat::RGB16:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    p16[offset++] = FloatToHalf(*bufIter++);
-        }
+        ForExtent3(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
+            p16[offset] = FloatToHalf(*bufIter++);
+        });
         break;
     case PixelFormat::Y32:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                p32[offset++] = *bufIter++;
-        }
+        ForExtent1(extent, WrapMode::Clamp,
+                   [&bufIter, this](int offset) { p32[offset] = *bufIter++; });
         break;
     case PixelFormat::RGB32:
-        for (int v = extent.pMin[1]; v < extent.pMax[1]; ++v) {
-            int offset = PixelOffset({extent.pMin[0], v}, 0);
-            for (int u = 0; u < nu; ++u)
-                for (int c = 0; c < 3; ++c)
-                    p32[offset++] = *bufIter++;
-        }
+        ForExtent3(extent, WrapMode::Clamp,
+                   [&bufIter, this](int offset) { p32[offset] = *bufIter++; });
         break;
     default:
         LOG(FATAL) << "Unhandled PixelFormat";
@@ -389,10 +341,9 @@ struct ResampleWeight {
     Float weight[4];
 };
 
-static std::unique_ptr<ResampleWeight[]> resampleWeights(int oldRes,
-                                                         int newRes) {
+static std::vector<ResampleWeight> resampleWeights(int oldRes, int newRes) {
     CHECK_GE(newRes, oldRes);
-    std::unique_ptr<ResampleWeight[]> wt = std::make_unique<ResampleWeight[]>(newRes);
+    std::vector<ResampleWeight> wt(newRes);
     Float filterwidth = 2.f;
     for (int i = 0; i < newRes; ++i) {
         // Compute image resampling weights for _i_th texel
@@ -411,78 +362,108 @@ static std::unique_ptr<ResampleWeight[]> resampleWeights(int oldRes,
     return wt;
 }
 
-void Image::Resize(Point2i newResolution, WrapMode wrapMode) {
+Image Image::FloatResize(Point2i newResolution, WrapMode wrapMode) const {
     CHECK_GE(newResolution.x, resolution.x);
     CHECK_GE(newResolution.y, resolution.y);
 
-    // Resample image in $s$ direction
-    std::unique_ptr<ResampleWeight[]> sWeights =
+    std::vector<ResampleWeight> sWeights =
         resampleWeights(resolution[0], newResolution[0]);
+    std::vector<ResampleWeight> tWeights =
+        resampleWeights(resolution[1], newResolution[1]);
     const int nc = nChannels();
     CHECK(nc == 1 || nc == 3);
     Image resampledImage(nc == 1 ? PixelFormat::Y32 : PixelFormat::RGB32,
                          newResolution);
 
-    // Apply _sWeights_ to zoom in $s$ direction
-    ParallelFor(0, resolution[1], 16,
-        [&](int t) {
-            for (int s = 0; s < newResolution[0]; ++s) {
-                // Compute texel $(s,t)$ in $s$-zoomed image
-                for (int c = 0; c < nc; ++c) {
-                    Float value = 0;
-                    for (int j = 0; j < 4; ++j) {
-                        int origS = sWeights[s].firstTexel + j;
-                        value += sWeights[s].weight[j] *
-                                 GetChannel({origS, t}, c, wrapMode);
-                    }
-                    resampledImage.SetChannel({s, t}, c, value);
+    // Note: these aren't freed until the corresponding worker thread exits, but
+    // that's
+    // probably ok...
+    thread_local std::vector<Float> inBuf, sBuf, outBuf;
+
+    ParallelFor2D(Bounds2i({0, 0}, newResolution), 16, [&](Bounds2i outExtent) {
+        Bounds2i inExtent({sWeights[outExtent[0][0]].firstTexel,
+                           tWeights[outExtent[0][1]].firstTexel},
+                          {sWeights[outExtent[1][0] - 1].firstTexel + 4,
+                           tWeights[outExtent[1][1] - 1].firstTexel + 4});
+
+        if (inBuf.size() < nc * inExtent.Area())
+            inBuf.resize(nc * inExtent.Area());
+
+        // Copy the tile of the input image into inBuf. (The
+        // main motivation for this copy is to convert it
+        // into floats all at once, rather than repeatedly
+        // and pixel-by-pixel during the first resampling
+        // step.)
+        // FIXME CAST
+        ((Image *)this)->CopyRectOut(inExtent, &inBuf, wrapMode);
+
+        // Zoom in s. We need to do this across all scanlines
+        // in inExtent's t dimension so we have the border
+        // pixels available for the zoom in t.
+        int nsOut = outExtent[1][0] - outExtent[0][0];
+        int ntOut = outExtent[1][1] - outExtent[0][1];
+        int nsIn = inExtent[1][0] - inExtent[0][0];
+        int ntIn = inExtent[1][1] - inExtent[0][1];
+
+        if (sBuf.size() < nc * ntIn * nsOut) sBuf.resize(nc * ntIn * nsOut);
+
+        int sBufOffset = 0;
+        for (int t = 0; t < ntIn; ++t) {
+            for (int s = 0; s < nsOut; ++s) {
+                int sOut = s + outExtent[0][0];
+                DCHECK(sOut >= 0 && sOut < sWeights.size());
+                const ResampleWeight &rsw = sWeights[sOut];
+
+                // w.r.t. inBuf
+                int sIn = rsw.firstTexel - inExtent[0][0];
+                DCHECK_GE(sIn, 0);
+                DCHECK_LT(sIn + 3, nsIn);
+
+                int inOffset = nc * (sIn + t * nsIn);
+                DCHECK_GE(inOffset, 0);
+                DCHECK_LT(inOffset + 3 * nc, inBuf.size());
+                for (int c = 0; c < nc; ++c, ++sBufOffset, ++inOffset) {
+                    sBuf[sBufOffset] =
+                        (rsw.weight[0] * inBuf[inOffset] +
+                         rsw.weight[1] * inBuf[inOffset + nc] +
+                         rsw.weight[2] * inBuf[inOffset + 2 * nc] +
+                         rsw.weight[3] * inBuf[inOffset + 3 * nc]);
                 }
             }
-        });
+        }
 
-    // Resample image in $t$ direction
-    std::unique_ptr<ResampleWeight[]> tWeights =
-        resampleWeights(resolution[1], newResolution[1]);
-    std::vector<Float *> resampleBufs;
-    int nThreads = MaxThreadIndex();
-    for (int i = 0; i < nThreads; ++i)
-        resampleBufs.push_back(new Float[nc * newResolution[1]]);
-    ParallelFor(0, newResolution[0], 32,
-        [&](int s) {
-            Float *workData = resampleBufs[ThreadIndex];
-            memset(workData, 0, sizeof(Float) * nc * newResolution[1]);
+        if (outBuf.size() < nc * nsOut * ntOut)
+            outBuf.resize(nc * nsOut * ntOut);
 
-            for (int t = 0; t < newResolution[1]; ++t) {
-                for (int j = 0; j < 4; ++j) {
-                    int tSrc = tWeights[t].firstTexel + j;
-                    for (int c = 0; c < nc; ++c)
-                        workData[t * nc + c] +=
-                            tWeights[t].weight[j] *
-                            resampledImage.GetChannel({s, tSrc}, c);
-                }
+        // Zoom in t from sBuf to outBuf
+        for (int s = 0; s < nsOut; ++s) {
+            for (int t = 0; t < ntOut; ++t) {
+                int tOut = t + outExtent[0][1];
+                DCHECK(tOut >= 0 && tOut < tWeights.size());
+                const ResampleWeight &rsw = tWeights[tOut];
+
+                DCHECK_GE(rsw.firstTexel - inExtent[0][1], 0);
+                int sBufOffset =
+                    nc * (s + nsOut * (rsw.firstTexel - inExtent[0][1]));
+                DCHECK_GE(sBufOffset, 0);
+                int step = nc * nsOut;
+                DCHECK_LT(sBufOffset + 3 * step, sBuf.size());
+
+                int outOffset = nc * (s + t * nsOut);
+                ;
+                for (int c = 0; c < nc; ++c, ++outOffset, ++sBufOffset)
+                    outBuf[outOffset] =
+                        (rsw.weight[0] * sBuf[sBufOffset] +
+                         rsw.weight[1] * sBuf[sBufOffset + step] +
+                         rsw.weight[2] * sBuf[sBufOffset + 2 * step] +
+                         rsw.weight[3] * sBuf[sBufOffset + 3 * step]);
             }
-            for (int t = 0; t < newResolution[1]; ++t)
-                for (int c = 0; c < nc; ++c) {
-                    Float v = Clamp(workData[nc * t + c], 0, Infinity);
-                    resampledImage.SetChannel({s, t}, c, v);
-                }
-        });
+        }
+        // Copy out...
+        resampledImage.CopyRectIn(outExtent, outBuf);
+    });
 
-    resolution = newResolution;
-    if (Is8Bit(format))
-        p8.resize(nc * newResolution[0] * newResolution[1]);
-    else if (Is16Bit(format))
-        p16.resize(nc * newResolution[0] * newResolution[1]);
-    else if (Is32Bit(format))
-        p32.resize(nc * newResolution[0] * newResolution[1]);
-    else
-        LOG(FATAL) << "unexpected PixelFormat";
-
-    for (int t = 0; t < resolution[1]; ++t)
-        for (int s = 0; s < resolution[0]; ++s)
-            for (int c = 0; c < nc; ++c)
-                SetChannel(Point2i(s, t), c,
-                           resampledImage.GetChannel({s, t}, c));
+    return resampledImage;
 }
 
 void Image::FlipY() {
@@ -505,52 +486,88 @@ void Image::FlipY() {
     }
 }
 
-std::vector<Image> Image::GenerateMIPMap(WrapMode wrapMode) const {
-    // Make a copy for level 0.
-    Image image = *this;
-
-    if (!IsPowerOf2(resolution[0]) || !IsPowerOf2(resolution[1])) {
+std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
+    PixelFormat origFormat = image.format;
+    // Set things up so we have a power-of-two sized image stored with
+    // floats.
+    if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1])) {
         // Resample image to power-of-two resolution
-        image.Resize({RoundUpPow2(resolution[0]), RoundUpPow2(resolution[1])},
-                     wrapMode);
-    }
+        image = image.FloatResize({RoundUpPow2(image.resolution[0]),
+                                   RoundUpPow2(image.resolution[1])},
+                                  wrapMode);
+    } else if (!Is32Bit(image.format))
+        image = image.ConvertToFormat(
+            image.nChannels() == 1 ? PixelFormat::Y32 : PixelFormat::RGB32);
+    CHECK(Is32Bit(image.format));
 
     // Initialize levels of MIPMap from image
     int nLevels =
         1 + Log2Int(std::max(image.resolution[0], image.resolution[1]));
     std::vector<Image> pyramid(nLevels);
 
-    // Initialize most detailed level of MIPMap
-    pyramid[0] = std::move(image);
+    Point2i levelResolution = image.resolution;
+    const int nc = image.nChannels();
+    for (int i = 0; i < nLevels - 1; ++i) {
+        // Initialize $i+1$st MIPMap level from $i$th level and also convert
+        // i'th level to the internal format
+        pyramid[i] = Image(origFormat, levelResolution);
 
-    Point2i levelResolution = pyramid[0].resolution;
-    const int nc = nChannels();
-    for (int i = 1; i < nLevels; ++i) {
-        // Initialize $i$th MIPMap level from $i-1$st level
-        levelResolution[0] = std::max(1, levelResolution[0] / 2);
-        levelResolution[1] = std::max(1, levelResolution[1] / 2);
-        pyramid[i] = Image(pyramid[0].format, levelResolution);
+        Point2i nextResolution(std::max(1, levelResolution[0] / 2),
+                               std::max(1, levelResolution[1] / 2));
+        Image nextImage(image.format, nextResolution);
 
-        // Filter four texels from finer level of pyramid
-        ParallelFor(0, levelResolution[1], 16,
-            [&](int t) {
-                for (int s = 0; s < levelResolution[0]; ++s) {
-                    for (int c = 0; c < nc; ++c) {
-                        Float texel =
-                            .25f *
-                            (pyramid[i - 1].GetChannel(Point2i(2 * s, 2 * t), c,
-                                                       wrapMode) +
-                             pyramid[i - 1].GetChannel(
-                                 Point2i(2 * s + 1, 2 * t), c, wrapMode) +
-                             pyramid[i - 1].GetChannel(
-                                 Point2i(2 * s, 2 * t + 1), c, wrapMode) +
-                             pyramid[i - 1].GetChannel(
-                                 Point2i(2 * s + 1, 2 * t + 1), c, wrapMode));
-                        pyramid[i].SetChannel(Point2i(s, t), c, texel);
-                    }
+        // Offsets from the base pixel to the four neighbors that we'll
+        // downfilter.
+        int srcDeltas[4] = {0, nc, nc * levelResolution[0],
+                            nc * levelResolution[0] + nc};
+        // Clamp offsets once a dimension has a single texel.
+        if (levelResolution[0] == 1) {
+            srcDeltas[1] = 0;
+            srcDeltas[3] -= nc;
+        }
+        if (levelResolution[1] == 1) {
+            srcDeltas[2] = 0;
+            srcDeltas[3] -= nc * levelResolution[0];
+        }
+
+        // Work in scanlines for best cache coherence (vs 2d tiles).
+        ParallelFor(0, nextResolution[1], 16, [&](int t) {
+            // Downfilter with a box filter for the next MIP level
+            int srcOffset = image.PixelOffset({0, 2 * t}, 0);
+            int nextOffset = nextImage.PixelOffset({0, t}, 0);
+            for (int s = 0; s < nextResolution[0]; ++s) {
+                for (int c = 0; c < nc; ++c) {
+                    nextImage.p32[nextOffset] =
+                        .25f * (image.p32[srcOffset] +
+                                image.p32[srcOffset + srcDeltas[1]] +
+                                image.p32[srcOffset + srcDeltas[2]] +
+                                image.p32[srcOffset + srcDeltas[3]]);
+                    ++srcOffset;
+                    ++nextOffset;
                 }
-            });
+                srcOffset += nc;
+            }
+
+            // Copy the current level out to the current pyramid level
+            int tStart = 2 * t;
+            int tEnd = std::min(2 * t + 2, levelResolution[1]);
+            int offset = image.PixelOffset({0, tStart}, 0);
+            size_t count = (tEnd - tStart) * nc * levelResolution[0];
+            pyramid[i].CopyRectIn(
+                Bounds2i({0, tStart}, {levelResolution[0], tEnd}),
+                {image.p32.data() + offset, count});
+        });
+
+        image = std::move(nextImage);
+        levelResolution = nextResolution;
     }
+
+    // Top level
+    CHECK(levelResolution[0] == 1 && levelResolution[1] == 1);
+    pyramid[nLevels - 1] = Image(origFormat, levelResolution);
+    pyramid[nLevels - 1].CopyRectIn({{0, 0}, {1, 1}},
+                                    {image.p32.data(), size_t(nc)});
+
     return pyramid;
 }
 
