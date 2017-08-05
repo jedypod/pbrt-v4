@@ -153,7 +153,11 @@ void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
 void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     DCHECK(lock->owns_lock());
 
-    activeWorkers++;
+    if (nextStart.y >= extent.pMax.y) {
+        lock->unlock();
+        lock->lock();
+        return;
+    }
 
     // Compute extent for this step
     Point2i end = nextStart + Vector2i(chunkSize, chunkSize);
@@ -167,15 +171,19 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     }
     if (nextStart.y >= extent.pMax.y) workList = next;
 
+    activeWorkers++;
+
     lock->unlock();
 
-    // Run the loop iteration
-    uint64_t oldState = ProfilerState;
-    ProfilerState = profilerState;
+    if (!b.Empty()) {
+        // Run the loop iteration
+        uint64_t oldState = ProfilerState;
+        ProfilerState = profilerState;
 
-    func(b);
+        func(b);
 
-    ProfilerState = oldState;
+        ProfilerState = oldState;
+    }
 
     lock->lock();
 
