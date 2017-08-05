@@ -380,7 +380,7 @@ Image Image::FloatResize(Point2i newResolution, WrapMode wrapMode) const {
     // probably ok...
     thread_local std::vector<Float> inBuf, sBuf, outBuf;
 
-    ParallelFor2D(Bounds2i({0, 0}, newResolution), 16, [&](Bounds2i outExtent) {
+    ParallelFor2D(Bounds2i({0, 0}, newResolution), 64, [&](Bounds2i outExtent) {
         Bounds2i inExtent({sWeights[outExtent[0][0]].firstTexel,
                            tWeights[outExtent[0][1]].firstTexel},
                           {sWeights[outExtent[1][0] - 1].firstTexel + 4,
@@ -531,7 +531,7 @@ std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
         }
 
         // Work in scanlines for best cache coherence (vs 2d tiles).
-        ParallelFor(0, nextResolution[1], 16, [&](int t) {
+        ParallelFor(0, nextResolution[1], 8, [&](int t) {
             // Downfilter with a box filter for the next MIP level
             int srcOffset = image.PixelOffset({0, 2 * t}, 0);
             int nextOffset = nextImage.PixelOffset({0, t}, 0);
