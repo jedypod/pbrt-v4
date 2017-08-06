@@ -171,11 +171,9 @@ static void initBoolParameter(const std::vector<bool> &bools,
 // to the desired type T.  These T values are accumulated into a vector,
 // which is then passed to the |add| function after all of the original
 // array values have been processed.
-template <typename T>
+template <typename T, typename C, typename A>
 static void initNumericParameter(int n, const std::vector<double> &numbers,
-                                 const std::string &name,
-                                 std::function<T(const double *)> convert,
-                                 std::function<void(std::vector<T>)> add) {
+                                 const std::string &name, C convert, A add) {
     if (numbers.empty()) {
         Error("No numeric values provided for \"%s\"", name.c_str());
         return;
@@ -249,7 +247,7 @@ ParamSet ParseParameters(const parse::ParameterAndValues *parameters,
                             *v, std::numeric_limits<int>::lowest());
                     else if (double(int(*v)) != *v)
                         Warning(
-                            "Floating-point value %f will be rounted to an "
+                            "Floating-point value %f will be rounded to an "
                             "integer",
                             *v);
 

@@ -1,10 +1,4 @@
 
-- make initNumericParameter tempalted on the convert and add function types
-  rather than taking lambdas...
-
-- er 'rounted'
-
-
 - parallelize bvh build
 
 - avx 2 support, half to float, etc...
