@@ -50,8 +50,37 @@ extern int yydebug;
 
 namespace pbrt {
 
+namespace parse {
+
+std::unique_ptr<MemoryPool<std::string>> stringPool;
+std::unique_ptr<MemoryPool<ParameterAndValues>> paramArrayPool;
+
+} // namespace parse
+
 // Parsing Global Interface
 bool ParseFile(const std::string &filename) {
+    CHECK(!parse::stringPool && !parse::paramArrayPool);
+    parse::stringPool = std::make_unique<MemoryPool<std::string>>(
+        [](std::string *str) { str->clear(); });
+    parse::paramArrayPool = std::make_unique<MemoryPool<parse::ParameterAndValues>>(
+        [](parse::ParameterAndValues *pa) {
+            pa->name = nullptr;
+            pa->next = nullptr;
+
+            size_t cap = pa->numbers.capacity();
+            pa->numbers.clear();
+            // Part of why we want to reuse these is to reuse the internal
+            // allocations done by the vectors. The C++ standard doesn't
+            // require that clear() maintain the current capacity, but
+            // current implementations seem to do this. Verify that this
+            // remains so (and figure out what to do about it if this ever
+            // starts to hit...)
+            CHECK_EQ(cap, pa->numbers.capacity());
+
+            pa->strings.clear();
+            pa->bools.clear();
+        });
+
     LOG(INFO) << "Starting to parse input file " << filename;
 
     if (getenv("PBRT_YYDEBUG") != nullptr) yydebug = 1;
@@ -72,28 +101,34 @@ bool ParseFile(const std::string &filename) {
     parse::currentFilename = "";
     parse::currentLineNumber = 0;
     LOG(INFO) << "Done parsing input file " << filename;
+
+    parse::stringPool = nullptr;
+    parse::paramArrayPool = nullptr;
+
     return (yyin != nullptr);
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// ParamArray Method Definitions
+// ParameterAndValues Method Definitions
 
-void ParamArray::AddNumber(double d) {
+namespace parse {
+
+void ParameterAndValues::AddNumber(double d) {
     if (strings.size() || bools.size())
         Error("Ignoring number \"%f\" in non-numeric parameter list", d);
     else
         numbers.push_back(d);
 }
 
-void ParamArray::AddString(const std::string &str) {
+void ParameterAndValues::AddString(std::string *str) {
     if (numbers.size() || bools.size())
         Error("Ignoring string \"%s\" in non-string parameter list",
-              str.c_str());
+              str->c_str());
     else
         strings.push_back(str);
 }
 
-void ParamArray::AddBool(bool v) {
+void ParameterAndValues::AddBool(bool v) {
     if (numbers.size() || strings.size())
         Error("Ignoring bool \"%s\" in non-bool parameter list",
               v ? "true" : "false");
@@ -101,10 +136,12 @@ void ParamArray::AddBool(bool v) {
         bools.push_back(v);
 }
 
+} // namespace parse
+
 ///////////////////////////////////////////////////////////////////////////
 
 static void initBoolParameter(const std::vector<bool> &bools,
-                              const std::vector<std::string> &strings,
+                              const std::vector<std::string *> &strings,
                               const std::string &fullname,
                               const std::string &name, ParamSet *ps) {
     if (!bools.empty()) {
@@ -114,14 +151,14 @@ static void initBoolParameter(const std::vector<bool> &bools,
     } else if (!strings.empty()) {
         // Legacy string-based bools
         std::vector<uint8_t> values;
-        for (const auto &s : strings) {
-            if (s == "true")
+        for (const std::string *s : strings) {
+            if (*s == "true")
                 values.push_back(true);
-            else if (s == "false")
+            else if (*s == "false")
                 values.push_back(false);
             else
                 Warning("Ignoring non \"true\"/\"false\" bool value \"%s\"",
-                        s.c_str());
+                        s->c_str());
         }
         ps->AddBool(name, std::move(values));
     } else
@@ -185,21 +222,20 @@ Spectrum readSpectrumFromFile(const std::string &filename) {
     return s;
 }
 
-ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
+ParamSet ParseParameters(const parse::ParameterAndValues *parameters,
                          SpectrumType spectrumType) {
     ParamSet ps;
-    for (const auto &item : paramList) {
-        const ParamArray &array = *item.array;
-        if (item.name.find(' ') == std::string::npos) {
-            Error("Syntax error in parameter name \"%s\"", item.name.c_str());
+    for (const parse::ParameterAndValues *param = parameters; param; param = param->next) {
+        if (param->name->find(' ') == std::string::npos) {
+            Error("Syntax error in parameter name \"%s\"", param->name->c_str());
             continue;
         }
-        std::string type = item.name.substr(0, item.name.find(' '));
-        std::string name = item.name.substr(item.name.rfind(' ') + 1);
+        std::string type = param->name->substr(0, param->name->find(' '));
+        std::string name = param->name->substr(param->name->rfind(' ') + 1);
 
         if (type == "integer") {
             initNumericParameter<int>(
-                1, array.numbers, item.name,
+                1, param->numbers, *param->name,
                 [](const double *v) {
                     if (*v > std::numeric_limits<int>::max())
                         Warning(
@@ -225,51 +261,51 @@ ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
                 });
         } else if (type == "float") {
             initNumericParameter<Float>(
-                1, array.numbers, item.name,
+                1, param->numbers, *param->name,
                 [](const double *v) { return Float(*v); },
                 [&ps, &name](std::vector<Float> v) {
                     ps.AddFloat(name, std::move(v));
                 });
         } else if (type == "bool") {
-            initBoolParameter(array.bools, array.strings, item.name, name, &ps);
+            initBoolParameter(param->bools, param->strings, *param->name, name, &ps);
         } else if (type == "point2") {
             initNumericParameter<Point2f>(
-                2, array.numbers, item.name,
+                2, param->numbers, *param->name,
                 [](const double *v) { return Point2f(v[0], v[1]); },
                 [&ps, &name](std::vector<Point2f> v) {
                     ps.AddPoint2f(name, std::move(v));
                 });
         } else if (type == "vector2") {
             initNumericParameter<Vector2f>(
-                2, array.numbers, item.name,
+                2, param->numbers, *param->name,
                 [](const double *v) { return Vector2f(v[0], v[1]); },
                 [&ps, &name](std::vector<Vector2f> v) {
                     ps.AddVector2f(name, std::move(v));
                 });
         } else if (type == "point" || type == "point3") {
             initNumericParameter<Point3f>(
-                3, array.numbers, item.name,
+                3, param->numbers, *param->name,
                 [](const double *v) { return Point3f(v[0], v[1], v[2]); },
                 [&ps, &name](std::vector<Point3f> v) {
                     ps.AddPoint3f(name, std::move(v));
                 });
         } else if (type == "vector" || type == "vector3") {
             initNumericParameter<Vector3f>(
-                3, array.numbers, item.name,
+                3, param->numbers, *param->name,
                 [](const double *v) { return Vector3f(v[0], v[1], v[2]); },
                 [&ps, &name](std::vector<Vector3f> v) {
                     ps.AddVector3f(name, std::move(v));
                 });
         } else if (type == "normal") {
             initNumericParameter<Normal3f>(
-                3, array.numbers, item.name,
+                3, param->numbers, *param->name,
                 [](const double *v) { return Normal3f(v[0], v[1], v[2]); },
                 [&ps, &name](std::vector<Normal3f> v) {
                     ps.AddNormal3f(name, std::move(v));
                 });
         } else if (type == "color" || type == "rgb") {
             initNumericParameter<Spectrum>(
-                3, array.numbers, item.name,
+                3, param->numbers, *param->name,
                 [spectrumType](const double *v) -> Spectrum {
                     Float rgb[3] = {Float(v[0]), Float(v[1]), Float(v[2])};
                     return Spectrum::FromRGB(rgb, spectrumType);
@@ -279,7 +315,7 @@ ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
                 });
         } else if (type == "xyz") {
             initNumericParameter<Spectrum>(
-                3, array.numbers, item.name,
+                3, param->numbers, *param->name,
                 [spectrumType](const double *v) -> Spectrum {
                     Float xyz[3] = {Float(v[0]), Float(v[1]), Float(v[2])};
                     return Spectrum::FromXYZ(xyz, spectrumType);
@@ -290,7 +326,7 @@ ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
         } else if (type == "blackbody") {
             std::vector<Float> values(nCIESamples);
             initNumericParameter<Spectrum>(
-                2, array.numbers, item.name,
+                2, param->numbers, *param->name,
                 [&values](const double *v) -> Spectrum {
                     Float T = v[0], scale = v[1];
                     BlackbodyNormalized(CIE_lambda, T, &values);
@@ -300,40 +336,44 @@ ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
                     ps.AddSpectrum(name, std::move(v));
                 });
         } else if (type == "spectrum") {
-            if (array.numbers.size()) {
-                if (array.numbers.size() % 2 != 0) {
+            if (param->numbers.size()) {
+                if (param->numbers.size() % 2 != 0) {
                     Error("Found odd number of values for \"%s\"",
-                          item.name.c_str());
+                          param->name->c_str());
                     continue;
                 }
-                int nSamples = array.numbers.size() / 2;
+                int nSamples = param->numbers.size() / 2;
                 std::vector<Float> lambda(nSamples), value(nSamples);
                 for (int i = 0; i < nSamples; ++i) {
-                    lambda[i] = array.numbers[2 * i];
-                    value[i] = array.numbers[2 * i + 1];
+                    lambda[i] = param->numbers[2 * i];
+                    value[i] = param->numbers[2 * i + 1];
                 }
                 std::vector<Spectrum> spectrum(1);
                 spectrum[0] = Spectrum::FromSampled(lambda, value);
                 ps.AddSpectrum(name, std::move(spectrum));
-            } else if (array.strings.size()) {
+            } else if (param->strings.size()) {
                 std::vector<Spectrum> values;
-                for (const auto &filename : array.strings)
-                    values.push_back(readSpectrumFromFile(filename));
+                for (const std::string *filename : param->strings)
+                    values.push_back(readSpectrumFromFile(*filename));
                 ps.AddSpectrum(name, std::move(values));
             } else {
-                Error("No values found for \"%s\"", item.name.c_str());
+                Error("No values found for \"%s\"", param->name->c_str());
             }
         } else if (type == "string") {
-            if (array.strings.empty())
-                Error("No strings provided for \"%s\"", item.name.c_str());
-            else
-                ps.AddString(name, std::move(array.strings));
+            if (param->strings.empty())
+                Error("No strings provided for \"%s\"", param->name->c_str());
+            else {
+                std::vector<std::string> strings;
+                for (const std::string *s : param->strings)
+                    strings.push_back(*s);
+                ps.AddString(name, std::move(strings));
+            }
         } else if (type == "texture") {
-            if (array.strings.size() != 1)
+            if (param->strings.size() != 1)
                 Error("Expecting a single string for \"%s\"",
-                      item.name.c_str());
+                      param->name->c_str());
             else
-                ps.AddTexture(name, array.strings[0]);
+                ps.AddTexture(name, *param->strings[0]);
         } else
             Error("Unexpected parameter type \"%s\"", type.c_str());
     }

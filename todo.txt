@@ -1,9 +1,11 @@
 
-- v4 start up is much slower (e.g. landscape). big issue with MIP Map generation?
-  - fast resampling, cache aware tiles...
-  - MemoryPool stuff in parser?
-  - there is borkage in stats hierarchy in v4, e.g. with landsacpe, scene
-    creation parts...
+- make initNumericParameter tempalted on the convert and add function types
+  rather than taking lambdas...
+
+- er 'rounted'
+
+
+- parallelize bvh build
 
 - avx 2 support, half to float, etc...
 
@@ -11,12 +13,7 @@
 
 - aovs
 
-- ThreadIndex is borked with TBB :-(
-
 - try jacopo/heitz stuff for inf env map sampling e.g.
-
-- parallelfor2d: allow providing both min and max grain size (subdivide on
-  our side when tbb gives us too much/)
 
 - encode rendering time in exr headers, compute mc efficiency in imgtool
   diff

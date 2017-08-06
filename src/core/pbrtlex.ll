@@ -186,14 +186,18 @@ WorldEnd                { return WORLDEND; }
 }
 
 {IDENT} {
-    yylval.string = new std::string(yytext);
+    yylval.string = pbrt::parse::stringPool->Alloc();
+    *yylval.string = yytext;
     return ID;
 }
 
 "[" { return LBRACK; }
 "]" { return RBRACK; }
 
-\" { BEGIN STR; yylval.string = new std::string; }
+\" {
+  BEGIN STR;
+  yylval.string = pbrt::parse::stringPool->Alloc();
+}
 <STR>\\n { *yylval.string += '\n'; }
 <STR>\\t { *yylval.string += '\t'; }
 <STR>\\r { *yylval.string += '\r'; }

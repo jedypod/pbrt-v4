@@ -45,8 +45,10 @@
 #include "ext/google/array_slice.h"
 
 #include <cstddef>
+#include <functional>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #ifdef PBRT_HAVE_MALLOC_H
@@ -149,6 +151,58 @@ MemoryArena {
     size_t currentBlockPos = 0, currentAllocSize = 0;
     std::unique_ptr<char[]> currentBlock;
     std::list<std::pair<size_t, std::unique_ptr<char[]>>> usedBlocks, availableBlocks;
+};
+
+// Pool of up to a limited number of allocated objects of type T so that they can be
+// reused without repeated dynamic memory allocation.
+template <typename T> class MemoryPool {
+ public:
+    MemoryPool(std::function<void(T *)> reset, int maxAlloc = 64)
+       : reset(std::move(reset)), maxAlloc(maxAlloc) {}
+    ~MemoryPool() {
+        CHECK_EQ(nAllocs, pool.size());  // Otherwise they haven't all been returned.
+        for (T *ptr : pool)
+            delete ptr;
+    }
+
+    T *Alloc() {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (pool.empty()) {
+            ++nAllocs;
+            // For current usage in the parser, hitting here implies a memory leak.
+            // This may not be the case for other use-cases.
+            CHECK_LT(nAllocs, maxAlloc);
+            return new T;
+        }
+
+        T *ptr = pool.back();
+        pool.pop_back();
+        if (reset) reset(ptr);
+        return ptr;
+    }
+    void Release (T *ptr) {
+        CHECK_NOTNULL(ptr);
+        std::lock_guard<std::mutex> lock(mutex);
+#ifndef NDEBUG
+        // Check for double-free.
+        for (T *other : pool)
+            CHECK_NE(ptr, other);
+#endif  // !NDEBUG
+
+        if (pool.size() == maxAlloc)
+            delete ptr;
+        else
+            pool.push_back(ptr);
+    }
+
+ private:
+    int nAllocs = 0;
+    // If provided, this function is applied to reused T *s before they are
+    // returned by Alloc() so that they can be restored to a default state.
+    std::function<void(T *)> reset;
+    const int maxAlloc;
+    std::vector<T *> pool;
+    std::mutex mutex;
 };
 
 }  // namespace pbrt

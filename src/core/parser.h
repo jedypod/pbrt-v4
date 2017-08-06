@@ -41,8 +41,10 @@
 // core/parser.h*
 #include "pbrt.h"
 
+#include "memory.h"
 #include "spectrum.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -52,30 +54,27 @@ bool ParseFile(const std::string &filename);
 
 namespace parse {
 
-extern std::string currentFilename;
-extern int currentLineNumber;
-
-}  // namespace parse
-
-struct ParamArray {
+struct ParameterAndValues {
     void AddNumber(double d);
-    void AddString(const std::string &str);
+    void AddString(std::string *str);
     void AddBool(bool v);
 
+    std::string *name = nullptr;
+    ParameterAndValues *next = nullptr;
+
     std::vector<double> numbers;
-    std::vector<std::string> strings;
+    std::vector<std::string *> strings;
     std::vector<bool> bools;
 };
 
-struct ParamListItem {
-    ParamListItem(const std::string &name, std::unique_ptr<ParamArray> array)
-        : name(name), array(std::move(array)) {}
+extern std::string currentFilename;
+extern int currentLineNumber;
+extern std::unique_ptr<MemoryPool<std::string>> stringPool;
+extern std::unique_ptr<MemoryPool<ParameterAndValues>> paramArrayPool;
 
-    std::string name;
-    std::unique_ptr<ParamArray> array;
-};
+}  // namespace parse
 
-ParamSet ParseParameters(const std::vector<ParamListItem> &paramList,
+ParamSet ParseParameters(const parse::ParameterAndValues *parameters,
                          SpectrumType spectrumType);
 
 }  // namespace pbrt
