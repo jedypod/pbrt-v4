@@ -208,7 +208,7 @@ WorldEnd                { return WORLDEND; }
     *yylval.string += val; 
 }
 <STR>\\\n { pbrt::parse::currentLineNumber++; }
-<STR>\\. {  yylval.string += yytext[1]; }
+<STR>\\. {  *yylval.string += yytext[1]; }
 <STR>\" {
     BEGIN INITIAL;
     CHECK(yylval.string != nullptr);
