@@ -183,7 +183,6 @@ MIPMap::MIPMap(std::unique_ptr<TexelProvider> tp,
 std::unique_ptr<MIPMap> MIPMap::CreateFromFile(
     const std::string &filename, const MIPMapFilterOptions &options,
     WrapMode wrapMode, bool gamma) {
-    ProfilePhase _(Prof::MIPMapCreation);
 
     if (HasExtension(filename, "txp")) {
         std::unique_ptr<TexelProvider> tp =
@@ -194,6 +193,7 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(
         if (!Image::Read(filename, &image, gamma)) return nullptr;
 
         // TODO: make spectrum type configurable, or eliminate...
+        ProfilePhase _(Prof::MIPMapCreation);
         std::unique_ptr<TexelProvider> tp = std::make_unique<ImageTexelProvider>(
             std::move(image), wrapMode, SpectrumType::Reflectance);
         return std::make_unique<MIPMap>(std::move(tp), options);
