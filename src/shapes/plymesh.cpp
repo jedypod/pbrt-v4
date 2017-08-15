@@ -144,6 +144,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params) {
+    ProfilePhase _(Prof::PLYLoading);
     const std::string filename = params.GetOneFilename("filename", "");
     p_ply ply = ply_open(filename.c_str(), rply_message_callback, 0, nullptr);
     if (!ply) {
