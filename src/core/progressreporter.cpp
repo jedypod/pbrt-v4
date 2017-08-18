@@ -70,7 +70,7 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
         // time. (Which in turn calls malloc, which isn't allowed in a
         // signal handler.)
         SuspendProfiler();
-        std::shared_ptr<Barrier> barrier = std::make_shared<Barrier>(2);
+        std::shared_ptr<Barrier> barrier = Barrier::Create(2);
         updateThread = std::thread([this, barrier]() {
             ProfilerWorkerThreadInit();
             ProfilerState = 0;

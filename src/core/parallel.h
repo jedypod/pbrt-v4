@@ -95,29 +95,61 @@ class AtomicFloat {
 // successfully cleared it.
 class Barrier {
   public:
-    Barrier(int count) : count(count) { CHECK_GT(count, 0); }
+    static std::shared_ptr<Barrier> Create(int count) {
+        // It would be nice to use make_shared, but it's complicated...
+        // https://stackoverflow.com/questions/8147027/how-do-i-call-stdmake-shared-on-a-class-with-only-protected-or-private-const
+        return std::shared_ptr<Barrier>(new Barrier(count));
+    }
     ~Barrier() { CHECK_EQ(count, 0); }
     void Wait();
 
   private:
+    Barrier(int count) : count(count) { CHECK_GT(count, 0); }
+
     std::mutex mutex;
     std::condition_variable cv;
     int count;
 };
 
 void ParallelFor(int64_t start, int64_t end, int chunkSize,
-                 std::function<void(int64_t)> func);
+                 std::function<void(int64_t, int64_t)> func);
+
 inline void ParallelFor(int64_t start, int64_t end,
                         std::function<void(int64_t)> func) {
-    ParallelFor(start, end, 1, std::move(func));
+    ParallelFor(start, end, 1, [&func](int64_t start, int64_t end) {
+            for (int64_t i = start; i < end; ++i)
+                func(i);
+        });
 }
-extern PBRT_THREAD_LOCAL int ThreadIndex;
+
 void ParallelFor2D(const Bounds2i &extent, int chunkSize,
                    std::function<void(Bounds2i)> func);
+
 inline void ParallelFor2D(const Bounds2i &extent,
                           std::function<void(Bounds2i)> func) {
     ParallelFor2D(extent, 1, std::move(func));
 }
+
+template <typename T, typename F, typename R> T
+ParallelReduce(int64_t start, int64_t end, int chunkSize, F func, R reduce) {
+    if (start == end) return T{};
+    if (end - start < chunkSize) {
+        return func(start, end);
+    } else {
+        std::mutex mutex;
+        T final;
+        ParallelFor(start, end, chunkSize,
+                    [&](int64_t start, int64_t end) {
+                        T result = func(start, end);
+                        std::lock_guard<std::mutex> lock(mutex);
+                        reduce(final, result);
+                    });
+        return final;
+    }
+}
+
+extern PBRT_THREAD_LOCAL int ThreadIndex;
+
 int MaxThreadIndex();
 
 void ParallelInit();

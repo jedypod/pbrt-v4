@@ -58,13 +58,15 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
 
     float fwidth = 0.5f / std::min(width, height);
     ParallelFor(0, height, 32,
-        [&](int64_t v) {
-            Float vp = (v + .5f) / (Float)height;
-            Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-            for (int u = 0; u < width; ++u) {
-                Float up = (u + .5f) / (Float)width;
-                img[u + v * width] = image.BilerpY({up, vp});
-                img[u + v * width] *= sinTheta;
+        [&](int64_t start, int64_t end) {
+            for (int v = start; v < end; ++v) {
+                Float vp = (v + .5f) / (Float)height;
+                Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
+                for (int u = 0; u < width; ++u) {
+                    Float up = (u + .5f) / (Float)width;
+                    img[u + v * width] = image.BilerpY({up, vp});
+                    img[u + v * width] *= sinTheta;
+                }
             }
         });
 

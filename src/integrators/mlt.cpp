@@ -200,19 +200,21 @@ void MLTIntegrator::Render(const Scene &scene) {
                                   "Generating bootstrap paths");
         std::vector<MemoryArena> bootstrapThreadArenas(MaxThreadIndex());
         int chunkSize = Clamp(nBootstrap / 128, 1, 8192);
-        ParallelFor(0, nBootstrap, chunkSize, [&](int i) {
-            // Generate _i_th bootstrap sample
+        ParallelFor(0, nBootstrap, chunkSize, [&](int64_t start, int64_t end) {
             MemoryArena &arena = bootstrapThreadArenas[ThreadIndex];
-            for (int depth = 0; depth <= maxDepth; ++depth) {
-                int rngIndex = i * (maxDepth + 1) + depth;
-                MLTSampler sampler(mutationsPerPixel, rngIndex, sigma,
-                                   largeStepProbability, nSampleStreams);
-                Point2f pRaster;
-                bootstrapWeights[rngIndex] =
-                    L(scene, arena, *lightDistr, lightToIndex, sampler, depth, &pRaster).y();
-                arena.Reset();
+            for (int64_t i = start; i < end; ++i) {
+                // Generate _i_th bootstrap sample
+                for (int depth = 0; depth <= maxDepth; ++depth) {
+                    int rngIndex = i * (maxDepth + 1) + depth;
+                    MLTSampler sampler(mutationsPerPixel, rngIndex, sigma,
+                                       largeStepProbability, nSampleStreams);
+                    Point2f pRaster;
+                    bootstrapWeights[rngIndex] =
+                        L(scene, arena, *lightDistr, lightToIndex, sampler, depth, &pRaster).y();
+                    arena.Reset();
+                }
+                if ((i + 1 % 256) == 0) progress.Update();
             }
-            if ((i + 1 % 256) == 0) progress.Update();
         });
         progress.Done();
     }

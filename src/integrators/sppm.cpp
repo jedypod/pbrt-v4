@@ -130,8 +130,6 @@ void SPPMIntegrator::Render(const Scene &scene) {
     // Compute number of tiles to use for SPPM camera pass
     Vector2i pixelExtent = pixelBounds.Diagonal();
     const int tileSize = 16;
-    Point2i nTiles((pixelExtent.x + tileSize - 1) / tileSize,
-                   (pixelExtent.y + tileSize - 1) / tileSize);
     ProgressReporter progress(2 * nIterations, "Rendering");
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
@@ -140,6 +138,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
             ProfilePhase _(Prof::SPPMCameraPass);
             ParallelFor2D(pixelBounds, tileSize, [&](Bounds2i tileBounds) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
+
                 // Follow camera paths for _tile_ in image for SPPM
                 std::unique_ptr<Sampler> tileSampler = sampler.Clone();
 
@@ -259,36 +258,38 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 gridRes[i] = std::max((int)(baseGridRes * diag[i] / maxDiag), 1);
 
             // Add visible points to SPPM grid
-            ParallelFor(0, nPixels, 4096, [&](int pixelIndex) {
+            ParallelFor(0, nPixels, 4096, [&](int64_t start, int64_t end) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
-                SPPMPixel &pixel = pixels[pixelIndex];
-                if (!pixel.vp.beta.IsBlack()) {
-                    // Add pixel's visible point to applicable grid cells
-                    Float radius = pixel.radius;
-                    Point3i pMin, pMax;
-                    ToGrid(pixel.vp.p - Vector3f(radius, radius, radius),
-                           gridBounds, gridRes, &pMin);
-                    ToGrid(pixel.vp.p + Vector3f(radius, radius, radius),
-                           gridBounds, gridRes, &pMax);
-                    for (int z = pMin.z; z <= pMax.z; ++z)
-                        for (int y = pMin.y; y <= pMax.y; ++y)
-                            for (int x = pMin.x; x <= pMax.x; ++x) {
-                                // Add visible point to grid cell $(x, y, z)$
-                                int h = hash(Point3i(x, y, z), hashSize);
-                                SPPMPixelListNode *node =
-                                    arena.Alloc<SPPMPixelListNode>();
-                                node->pixel = &pixel;
+                for (int64_t pixelIndex = start; pixelIndex < end; ++pixelIndex) {
+                    SPPMPixel &pixel = pixels[pixelIndex];
+                    if (!pixel.vp.beta.IsBlack()) {
+                        // Add pixel's visible point to applicable grid cells
+                        Float radius = pixel.radius;
+                        Point3i pMin, pMax;
+                        ToGrid(pixel.vp.p - Vector3f(radius, radius, radius),
+                               gridBounds, gridRes, &pMin);
+                        ToGrid(pixel.vp.p + Vector3f(radius, radius, radius),
+                               gridBounds, gridRes, &pMax);
+                        for (int z = pMin.z; z <= pMax.z; ++z)
+                            for (int y = pMin.y; y <= pMax.y; ++y)
+                                for (int x = pMin.x; x <= pMax.x; ++x) {
+                                    // Add visible point to grid cell $(x, y, z)$
+                                    int h = hash(Point3i(x, y, z), hashSize);
+                                    SPPMPixelListNode *node =
+                                        arena.Alloc<SPPMPixelListNode>();
+                                    node->pixel = &pixel;
 
-                                // Atomically add _node_ to the start of
-                                // _grid[h]_'s linked list
-                                node->next = grid[h];
-                                while (grid[h].compare_exchange_weak(
-                                           node->next, node) == false)
-                                    ;
-                            }
-                    ReportValue(gridCellsPerVisiblePoint,
-                                (1 + pMax.x - pMin.x) * (1 + pMax.y - pMin.y) *
+                                    // Atomically add _node_ to the start of
+                                    // _grid[h]_'s linked list
+                                    node->next = grid[h];
+                                    while (grid[h].compare_exchange_weak(
+                                               node->next, node) == false)
+                                        ;
+                                }
+                        ReportValue(gridCellsPerVisiblePoint,
+                                    (1 + pMax.x - pMin.x) * (1 + pMax.y - pMin.y) *
                                     (1 + pMax.z - pMin.z));
+                    }
                 }
             });
         }
@@ -297,8 +298,9 @@ void SPPMIntegrator::Render(const Scene &scene) {
         {
             ProfilePhase _(Prof::SPPMPhotonPass);
             std::vector<MemoryArena> photonShootArenas(MaxThreadIndex());
-            ParallelFor(0, photonsPerIteration, 8192, [&](int photonIndex) {
+            ParallelFor(0, photonsPerIteration, 8192, [&](int64_t start, int64_t end) {
                 MemoryArena &arena = photonShootArenas[ThreadIndex];
+                for (int64_t photonIndex = start; photonIndex < end; ++photonIndex) {
                 // Follow photon path for _photonIndex_
                 uint64_t haltonIndex =
                     (uint64_t)iter * (uint64_t)photonsPerIteration +
@@ -329,10 +331,10 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 Spectrum Le =
                     light->Sample_Le(uLight0, uLight1, uLightTime, &photonRay,
                                      &nLight, &pdfPos, &pdfDir);
-                if (pdfPos == 0 || pdfDir == 0 || Le.IsBlack()) return;
+                if (pdfPos == 0 || pdfDir == 0 || Le.IsBlack()) continue;
                 Spectrum beta = (AbsDot(nLight, photonRay.d) * Le) /
                                 (lightPdf * pdfPos * pdfDir);
-                if (beta.IsBlack()) return;
+                if (beta.IsBlack()) continue;
 
                 // Follow photon path through scene and record intersections
                 SurfaceInteraction isect;
@@ -402,6 +404,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                     photonRay = (RayDifferential)isect.SpawnRay(wi);
                 }
                 arena.Reset();
+                }
             });
             progress.Update();
             photonPaths += photonsPerIteration;
@@ -410,29 +413,31 @@ void SPPMIntegrator::Render(const Scene &scene) {
         // Update pixel values from this pass's photons
         {
             ProfilePhase _(Prof::SPPMStatsUpdate);
-            ParallelFor(0, nPixels, 4096, [&](int i) {
-                SPPMPixel &p = pixels[i];
-                int M = p.M.load();
-                if (M > 0) {
-                    // Update pixel photon count, search radius, and $\tau$ from
-                    // photons
-                    Float gamma = (Float)2 / (Float)3;
-                    Float Nnew = p.N + gamma * M;
-                    Float Rnew = p.radius * std::sqrt(Nnew / (p.N + M));
-                    Spectrum Phi;
-                    for (int j = 0; j < Spectrum::nSamples; ++j)
-                        Phi[j] = p.Phi[j];
-                    p.tau = (p.tau + p.vp.beta * Phi) * (Rnew * Rnew) /
+            ParallelFor(0, nPixels, 4096, [&](int64_t start, int64_t end) {
+                for (int64_t i = start; i < end; ++i) {
+                    SPPMPixel &p = pixels[i];
+                    int M = p.M.load();
+                    if (M > 0) {
+                        // Update pixel photon count, search radius, and $\tau$ from
+                        // photons
+                        Float gamma = (Float)2 / (Float)3;
+                        Float Nnew = p.N + gamma * M;
+                        Float Rnew = p.radius * std::sqrt(Nnew / (p.N + M));
+                        Spectrum Phi;
+                        for (int j = 0; j < Spectrum::nSamples; ++j)
+                            Phi[j] = p.Phi[j];
+                        p.tau = (p.tau + p.vp.beta * Phi) * (Rnew * Rnew) /
                             (p.radius * p.radius);
-                    p.N = Nnew;
-                    p.radius = Rnew;
-                    p.M = 0;
-                    for (int j = 0; j < Spectrum::nSamples; ++j)
-                        p.Phi[j] = (Float)0;
+                        p.N = Nnew;
+                        p.radius = Rnew;
+                        p.M = 0;
+                        for (int j = 0; j < Spectrum::nSamples; ++j)
+                            p.Phi[j] = (Float)0;
+                    }
+                    // Reset _VisiblePoint_ in pixel
+                    p.vp.beta = 0.;
+                    p.vp.bsdf = nullptr;
                 }
-                // Reset _VisiblePoint_ in pixel
-                p.vp.beta = 0.;
-                p.vp.bsdf = nullptr;
             });
         }
 

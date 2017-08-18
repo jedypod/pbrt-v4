@@ -531,31 +531,33 @@ std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
         }
 
         // Work in scanlines for best cache coherence (vs 2d tiles).
-        ParallelFor(0, nextResolution[1], 8, [&](int t) {
-            // Downfilter with a box filter for the next MIP level
-            int srcOffset = image.PixelOffset({0, 2 * t}, 0);
-            int nextOffset = nextImage.PixelOffset({0, t}, 0);
-            for (int s = 0; s < nextResolution[0]; ++s) {
-                for (int c = 0; c < nc; ++c) {
-                    nextImage.p32[nextOffset] =
-                        .25f * (image.p32[srcOffset] +
-                                image.p32[srcOffset + srcDeltas[1]] +
-                                image.p32[srcOffset + srcDeltas[2]] +
-                                image.p32[srcOffset + srcDeltas[3]]);
-                    ++srcOffset;
-                    ++nextOffset;
+        ParallelFor(0, nextResolution[1], 8, [&](int64_t start, int64_t end) {
+            for (int t = start; t < end; ++t) {
+                // Downfilter with a box filter for the next MIP level
+                int srcOffset = image.PixelOffset({0, 2 * t}, 0);
+                int nextOffset = nextImage.PixelOffset({0, t}, 0);
+                for (int s = 0; s < nextResolution[0]; ++s) {
+                    for (int c = 0; c < nc; ++c) {
+                        nextImage.p32[nextOffset] =
+                            .25f * (image.p32[srcOffset] +
+                                    image.p32[srcOffset + srcDeltas[1]] +
+                                    image.p32[srcOffset + srcDeltas[2]] +
+                                    image.p32[srcOffset + srcDeltas[3]]);
+                        ++srcOffset;
+                        ++nextOffset;
+                    }
+                    srcOffset += nc;
                 }
-                srcOffset += nc;
-            }
 
-            // Copy the current level out to the current pyramid level
-            int tStart = 2 * t;
-            int tEnd = std::min(2 * t + 2, levelResolution[1]);
-            int offset = image.PixelOffset({0, tStart}, 0);
-            size_t count = (tEnd - tStart) * nc * levelResolution[0];
-            pyramid[i].CopyRectIn(
-                Bounds2i({0, tStart}, {levelResolution[0], tEnd}),
-                {image.p32.data() + offset, count});
+                // Copy the current level out to the current pyramid level
+                int tStart = 2 * t;
+                int tEnd = std::min(2 * t + 2, levelResolution[1]);
+                int offset = image.PixelOffset({0, tStart}, 0);
+                size_t count = (tEnd - tStart) * nc * levelResolution[0];
+                pyramid[i].CopyRectIn(
+                    Bounds2i({0, tStart}, {levelResolution[0], tEnd}),
+                    {image.p32.data() + offset, count});
+            }
         });
 
         image = std::move(nextImage);

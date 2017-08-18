@@ -142,31 +142,33 @@ int makesky(int argc, char *argv[]) {
 
     ParallelInit();
     ParallelFor(0, nTheta, 32,
-        [&](int64_t t) {
-            Float theta = float(t + 0.5) / nTheta * Pi;
-            if (theta > Pi / 2.) return;
-            for (int p = 0; p < nPhi; ++p) {
-                Float phi = float(p + 0.5) / nPhi * 2. * Pi;
+        [&](int64_t start, int64_t end) {
+            for (int64_t t = start; t < end; ++t) {
+                Float theta = float(t + 0.5) / nTheta * Pi;
+                if (theta > Pi / 2.) continue;
+                for (int p = 0; p < nPhi; ++p) {
+                    Float phi = float(p + 0.5) / nPhi * 2. * Pi;
 
-                // Vector corresponding to the direction for this pixel.
-                Vector3f v(std::cos(phi) * std::sin(theta), std::cos(theta),
-                           std::sin(phi) * std::sin(theta));
-                // Compute the angle between the pixel's direction and the sun
-                // direction.
-                Float gamma = SafeACos(Dot(v, sunDir));
-                CHECK(gamma >= 0 && gamma <= Pi);
+                    // Vector corresponding to the direction for this pixel.
+                    Vector3f v(std::cos(phi) * std::sin(theta), std::cos(theta),
+                               std::sin(phi) * std::sin(theta));
+                    // Compute the angle between the pixel's direction and the sun
+                    // direction.
+                    Float gamma = SafeACos(Dot(v, sunDir));
+                    CHECK(gamma >= 0 && gamma <= Pi);
 
-                Float rgb[3] = {Float(0), Float(0), Float(0)};
-                for (int c = 0; c < num_channels; ++c) {
-                    float val = arhosekskymodel_solar_radiance(
-                        skymodel_state[c], theta, gamma, lambda[c]);
-                    // For each of red, green, and blue, average the three
-                    // values for the three wavelengths for the color.
-                    // TODO: do a better spectral->RGB conversion.
-                    rgb[c / 3] += val / 3.f;
+                    Float rgb[3] = {Float(0), Float(0), Float(0)};
+                    for (int c = 0; c < num_channels; ++c) {
+                        float val = arhosekskymodel_solar_radiance(
+                                                                   skymodel_state[c], theta, gamma, lambda[c]);
+                        // For each of red, green, and blue, average the three
+                        // values for the three wavelengths for the color.
+                        // TODO: do a better spectral->RGB conversion.
+                        rgb[c / 3] += val / 3.f;
+                    }
+                    for (int c = 0; c < 3; ++c)
+                        img.SetChannel({p, (int)t}, c, rgb[c]);
                 }
-                for (int c = 0; c < 3; ++c)
-                    img.SetChannel({p, (int)t}, c, rgb[c]);
             }
         });
 

@@ -402,13 +402,15 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
 
     // Compute Morton indices of primitives
     std::vector<MortonPrimitive> mortonPrims(primitiveInfo.size());
-    ParallelFor(0, primitiveInfo.size(), 512, [&](int i) {
-        // Initialize _mortonPrims[i]_ for _i_th primitive
-        constexpr int mortonBits = 10;
-        constexpr int mortonScale = 1 << mortonBits;
-        mortonPrims[i].primitiveIndex = primitiveInfo[i].primitiveNumber;
-        Vector3f centroidOffset = bounds.Offset(primitiveInfo[i].centroid);
-        mortonPrims[i].mortonCode = EncodeMorton3(centroidOffset * mortonScale);
+    ParallelFor(0, primitiveInfo.size(), 512, [&](int64_t start, int64_t end) {
+        for (int64_t i = start; i < end; ++i) {
+            // Initialize _mortonPrims[i]_ for _i_th primitive
+            constexpr int mortonBits = 10;
+            constexpr int mortonScale = 1 << mortonBits;
+            mortonPrims[i].primitiveIndex = primitiveInfo[i].primitiveNumber;
+            Vector3f centroidOffset = bounds.Offset(primitiveInfo[i].centroid);
+            mortonPrims[i].mortonCode = EncodeMorton3(centroidOffset * mortonScale);
+        }
     });
 
     // Radix sort primitive Morton indices

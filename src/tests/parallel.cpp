@@ -14,7 +14,14 @@ TEST(Parallel, Basics) {
     EXPECT_EQ(1000, counter);
 
     counter = 0;
-    ParallelFor(10, 1010, 19, [&](int64_t) { ++counter; });
+    ParallelFor(10, 1010, 19, [&](int64_t start, int64_t end) {
+            EXPECT_GT(end, start);
+            EXPECT_LE(end - start, 19);
+            EXPECT_TRUE(start >= 10 && start < 1010);
+            EXPECT_TRUE(end > 10 && end <= 1010);
+            for (int64_t i = start; i < end; ++i)
+                ++counter;
+        });
     EXPECT_EQ(1000, counter);
 
     counter = 0;

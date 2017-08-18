@@ -1,4 +1,6 @@
 
+- look at Bounds Union() asm...
+
 - parallelize bvh build
 
 - avx 2 support, half to float, etc...
