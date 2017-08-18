@@ -72,12 +72,14 @@ class BVHAccel : public Aggregate {
   private:
     // BVHAccel Private Methods
     BVHBuildNode *recursiveBuild(
-        MemoryArena &arena, std::vector<BVHPrimitiveInfo> &primitiveInfo,
-        int start, int end, int *totalNodes,
-        std::vector<std::shared_ptr<Primitive>> &orderedPrims);
+        std::vector<MemoryArena> &threadArenas,
+        std::vector<BVHPrimitiveInfo> &primitiveInfo,
+        int start, int end, std::atomic<int> *totalNodes,
+        std::vector<std::shared_ptr<Primitive>> &orderedPrims,
+        std::atomic<int> *orderedPrimsOffset);
     BVHBuildNode *HLBVHBuild(
         MemoryArena &arena, const std::vector<BVHPrimitiveInfo> &primitiveInfo,
-        int *totalNodes,
+        std::atomic<int> *totalNodes,
         std::vector<std::shared_ptr<Primitive>> &orderedPrims) const;
     BVHBuildNode *emitLBVH(
         BVHBuildNode *&buildNodes,
@@ -87,7 +89,7 @@ class BVHAccel : public Aggregate {
         std::atomic<int> *orderedPrimsOffset, int bitIndex) const;
     BVHBuildNode *buildUpperSAH(MemoryArena &arena,
                                 std::vector<BVHBuildNode *> &treeletRoots,
-                                int start, int end, int *totalNodes) const;
+                                int start, int end, std::atomic<int> *totalNodes) const;
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
     // BVHAccel Private Data

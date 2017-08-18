@@ -190,21 +190,24 @@ BVHAccel::BVHAccel(const std::vector<std::shared_ptr<Primitive>> &p,
     }
 
     // Build BVH tree for primitives using _primitiveInfo_
-    MemoryArena arena(1024 * 1024);
-    int totalNodes = 0;
-    std::vector<std::shared_ptr<Primitive>> orderedPrims;
-    orderedPrims.reserve(primitives.size());
+    MemoryArena arena;
+    std::vector<MemoryArena> threadArenas(MaxThreadIndex());
+    std::atomic<int> totalNodes{0};
+    std::vector<std::shared_ptr<Primitive>> orderedPrims(primitives.size());
     BVHBuildNode *root;
-    if (splitMethod == SplitMethod::HLBVH)
+    if (splitMethod == SplitMethod::HLBVH) {
         root = HLBVHBuild(arena, primitiveInfo, &totalNodes, orderedPrims);
-    else
-        root = recursiveBuild(arena, primitiveInfo, 0, primitives.size(),
-                              &totalNodes, orderedPrims);
+    } else {
+        std::atomic<int> orderedPrimsOffset{0};
+        root = recursiveBuild(threadArenas, primitiveInfo, 0, primitives.size(),
+                              &totalNodes, orderedPrims, &orderedPrimsOffset);
+        CHECK_EQ(orderedPrimsOffset.load(), orderedPrims.size());
+    }
     primitives.swap(orderedPrims);
     LOG(INFO) << StringPrintf("BVH created with %d nodes for %d "
-                              "primitives (%.2f MB)", totalNodes,
+                              "primitives (%.2f MB)", totalNodes.load(),
                               (int)primitives.size(),
-                              float(totalNodes * sizeof(LinearBVHNode)) /
+                              float(totalNodes.load() * sizeof(LinearBVHNode)) /
                               (1024.f * 1024.f));
 
     // Compute representation of depth-first traversal of BVH tree
@@ -226,10 +229,13 @@ struct BucketInfo {
 };
 
 BVHBuildNode *BVHAccel::recursiveBuild(
-    MemoryArena &arena, std::vector<BVHPrimitiveInfo> &primitiveInfo, int start,
-    int end, int *totalNodes,
-    std::vector<std::shared_ptr<Primitive>> &orderedPrims) {
+    std::vector<MemoryArena> &threadArenas,
+    std::vector<BVHPrimitiveInfo> &primitiveInfo, int start,
+    int end, std::atomic<int> *totalNodes,
+    std::vector<std::shared_ptr<Primitive>> &orderedPrims,
+    std::atomic<int> *orderedPrimsOffset) {
     CHECK_NE(start, end);
+    MemoryArena &arena = threadArenas[ThreadIndex];
     BVHBuildNode *node = arena.Alloc<BVHBuildNode>();
     (*totalNodes)++;
     // Compute bounds of all primitives in BVH node
@@ -239,10 +245,10 @@ BVHBuildNode *BVHAccel::recursiveBuild(
     int nPrimitives = end - start;
     if (bounds.SurfaceArea() == 0 || nPrimitives == 1) {
         // Create leaf _BVHBuildNode_
-        int firstPrimOffset = orderedPrims.size();
+        int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
         for (int i = start; i < end; ++i) {
             int primNum = primitiveInfo[i].primitiveNumber;
-            orderedPrims.push_back(primitives[primNum]);
+            orderedPrims[firstPrimOffset + i - start] = std::move(primitives[primNum]);
         }
         node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
         return node;
@@ -257,10 +263,10 @@ BVHBuildNode *BVHAccel::recursiveBuild(
         int mid = (start + end) / 2;
         if (centroidBounds.pMax[dim] == centroidBounds.pMin[dim]) {
             // Create leaf _BVHBuildNode_
-            int firstPrimOffset = orderedPrims.size();
+            int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
             for (int i = start; i < end; ++i) {
                 int primNum = primitiveInfo[i].primitiveNumber;
-                orderedPrims.push_back(primitives[primNum]);
+                orderedPrims[firstPrimOffset + i - start] = std::move(primitives[primNum]);
             }
             node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
             return node;
@@ -381,10 +387,10 @@ BVHBuildNode *BVHAccel::recursiveBuild(
                         mid = pmid - &primitiveInfo[0];
                     } else {
                         // Create leaf _BVHBuildNode_
-                        int firstPrimOffset = orderedPrims.size();
+                        int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
                         for (int i = start; i < end; ++i) {
                             int primNum = primitiveInfo[i].primitiveNumber;
-                            orderedPrims.push_back(primitives[primNum]);
+                            orderedPrims[firstPrimOffset + i - start] = std::move(primitives[primNum]);
                         }
                         node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
                         return node;
@@ -393,11 +399,27 @@ BVHBuildNode *BVHAccel::recursiveBuild(
                 break;
             }
             }
-            node->InitInterior(dim,
-                               recursiveBuild(arena, primitiveInfo, start, mid,
-                                              totalNodes, orderedPrims),
-                               recursiveBuild(arena, primitiveInfo, mid, end,
-                                              totalNodes, orderedPrims));
+            BVHBuildNode *children[2];
+            if (end - start > 4096) {
+                ParallelFor(0, 2, [&](int i) {
+                        if (i == 0)
+                            children[0] = recursiveBuild(threadArenas, primitiveInfo,
+                                                         start, mid,
+                                                         totalNodes, orderedPrims, orderedPrimsOffset);
+                        else
+                            children[1] = recursiveBuild(threadArenas, primitiveInfo,
+                                                         mid, end,
+                                                         totalNodes, orderedPrims, orderedPrimsOffset);
+                    });
+            } else {
+                children[0] = recursiveBuild(threadArenas, primitiveInfo,
+                                             start, mid,
+                                             totalNodes, orderedPrims, orderedPrimsOffset);
+                children[1] = recursiveBuild(threadArenas, primitiveInfo,
+                                             mid, end,
+                                             totalNodes, orderedPrims, orderedPrimsOffset);
+            }
+            node->InitInterior(dim, children[0], children[1]);
         }
     }
     return node;
@@ -405,7 +427,7 @@ BVHBuildNode *BVHAccel::recursiveBuild(
 
 BVHBuildNode *BVHAccel::HLBVHBuild(
     MemoryArena &arena, const std::vector<BVHPrimitiveInfo> &primitiveInfo,
-    int *totalNodes,
+    std::atomic<int> *totalNodes,
     std::vector<std::shared_ptr<Primitive>> &orderedPrims) const {
     // Compute bounding box of all primitive centroids
     Bounds3f bounds;
@@ -447,8 +469,7 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
     }
 
     // Create LBVHs for treelets in parallel
-    std::atomic<int> atomicTotal(0), orderedPrimsOffset(0);
-    orderedPrims.resize(primitives.size());
+    std::atomic<int> orderedPrimsOffset(0);
     ParallelFor(0, treeletsToBuild.size(), [&](int i) {
         // Generate _i_th LBVH treelet
         int nodesCreated = 0;
@@ -458,9 +479,8 @@ BVHBuildNode *BVHAccel::HLBVHBuild(
             emitLBVH(tr.buildNodes, primitiveInfo, &mortonPrims[tr.startIndex],
                      tr.nPrimitives, &nodesCreated, orderedPrims,
                      &orderedPrimsOffset, firstBitIndex);
-        atomicTotal += nodesCreated;
+        *totalNodes += nodesCreated;
     });
-    *totalNodes = atomicTotal;
 
     // Create and return SAH BVH from LBVH treelets
     std::vector<BVHBuildNode *> finishedTreelets;
@@ -538,7 +558,7 @@ BVHBuildNode *BVHAccel::emitLBVH(
 BVHBuildNode *BVHAccel::buildUpperSAH(MemoryArena &arena,
                                       std::vector<BVHBuildNode *> &treeletRoots,
                                       int start, int end,
-                                      int *totalNodes) const {
+                                      std::atomic<int> *totalNodes) const {
     CHECK_LT(start, end);
     int nNodes = end - start;
     if (nNodes == 1) return treeletRoots[start];
