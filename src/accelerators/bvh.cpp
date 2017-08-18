@@ -184,8 +184,10 @@ BVHAccel::BVHAccel(const std::vector<std::shared_ptr<Primitive>> &p,
 
     // Initialize _primitiveInfo_ array for primitives
     std::vector<BVHPrimitiveInfo> primitiveInfo(primitives.size());
+    {         ProfilePhase _(Prof::BVHInitialBound);
     for (size_t i = 0; i < primitives.size(); ++i)
         primitiveInfo[i] = {i, primitives[i]->WorldBound()};
+    }
 
     // Build BVH tree for primitives using _primitiveInfo_
     MemoryArena arena(1024 * 1024);
@@ -235,7 +237,7 @@ BVHBuildNode *BVHAccel::recursiveBuild(
     for (int i = start; i < end; ++i)
         bounds = Union(bounds, primitiveInfo[i].bounds);
     int nPrimitives = end - start;
-    if (nPrimitives == 1) {
+    if (bounds.SurfaceArea() == 0 || nPrimitives == 1) {
         // Create leaf _BVHBuildNode_
         int firstPrimOffset = orderedPrims.size();
         for (int i = start; i < end; ++i) {
@@ -324,32 +326,42 @@ BVHBuildNode *BVHAccel::recursiveBuild(
                     }
 
                     // Compute costs for splitting after each bucket
-                    Float cost[nBuckets - 1];
-                    for (int i = 0; i < nBuckets - 1; ++i) {
-                        Bounds3f b0, b1;
-                        int count0 = 0, count1 = 0;
-                        for (int j = 0; j <= i; ++j) {
-                            b0 = Union(b0, buckets[j].bounds);
-                            count0 += buckets[j].count;
-                        }
-                        for (int j = i + 1; j < nBuckets; ++j) {
-                            b1 = Union(b1, buckets[j].bounds);
-                            count1 += buckets[j].count;
-                        }
-                        cost[i] = 1 +
-                                  (count0 * b0.SurfaceArea() +
-                                   count1 * b1.SurfaceArea()) /
-                                      bounds.SurfaceArea();
-                    }
+                    int minCostSplitBucket = -1;
+                    Float minCost = Infinity;
+                    { ProfilePhase _(Prof::BVHFindBestSplit);
+                        constexpr int nSplits = nBuckets - 1;
+                        int countBelow[nSplits], countAbove[nSplits];
+                        Bounds3f boundsBelow[nSplits], boundsAbove[nSplits];
 
-                    // Find bucket to split at that minimizes SAH metric
-                    Float minCost = cost[0];
-                    int minCostSplitBucket = 0;
-                    for (int i = 1; i < nBuckets - 1; ++i) {
-                        if (cost[i] < minCost) {
-                            minCost = cost[i];
-                            minCostSplitBucket = i;
+                        countBelow[0] = buckets[0].count;
+                        boundsBelow[0] = buckets[0].bounds;
+                        for (int i = 1; i < nSplits; ++i) {
+                            countBelow[i] = countBelow[i - 1] + buckets[i].count;
+                            boundsBelow[i] = Union(boundsBelow[i - 1], buckets[i].bounds);
                         }
+
+                        countAbove[nSplits - 1] = buckets[nBuckets - 1].count;
+                        boundsAbove[nSplits - 1] = buckets[nBuckets - 1].bounds;
+                        for (int i = nSplits - 2; i >= 0; --i) {
+                            countAbove[i] = countAbove[i + 1] + buckets[i + 1].count;
+                            boundsAbove[i] = Union(boundsAbove[i + 1], buckets[i + 1].bounds);
+                        }
+
+                        // Find bucket to split at that minimizes SAH metric
+                        // consider split after bucket i;
+                        for (int i = 0; i < nSplits; ++i) {
+                            if (countBelow[i] == 0 || countAbove[i] == 0)
+                                continue;
+
+                            Float cost = (countBelow[i] * boundsBelow[i].SurfaceArea() +
+                                          countAbove[i] * boundsAbove[i].SurfaceArea());
+                            if (cost < minCost) {
+                                minCost = cost;
+                                minCostSplitBucket = i;
+                            }
+                        }
+
+                        minCost = 1 + minCost / bounds.SurfaceArea();
                     }
 
                     // Either create leaf or split primitives at selected SAH
