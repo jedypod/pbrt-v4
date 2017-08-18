@@ -155,8 +155,10 @@ class Bounds3 {
         Vector3<T> d = Diagonal();
         return d.x * d.y * d.z;
     }
+    // Tricky: Empty() means zero volume, not necessarily zero surface
+    // area.
     bool Empty() const {
-        return pMin.x >= pMax.x || pMin.y >= pMax.y || pMin.x >= pMax.z;
+        return pMin.x >= pMax.x || pMin.y >= pMax.y || pMin.z >= pMax.z;
     }
     int MaximumExtent() const {
         Vector3<T> d = Diagonal();
@@ -253,12 +255,20 @@ inline Point3<T> &Bounds3<T>::operator[](int i) {
 
 template <typename T>
 Bounds3<T> Union(const Bounds3<T> &b, const Point3<T> &p) {
-    return { Min(b.pMin, p), Max(b.pMax, p) };
+    // Here also, be careful to not run the constructor.
+    Bounds3<T> ret;
+    ret.pMin = Min(b.pMin, p);
+    ret.pMax = Max(b.pMax, p);
+    return ret;
 }
 
 template <typename T>
 Bounds3<T> Union(const Bounds3<T> &b1, const Bounds3<T> &b2) {
-    return { Min(b1.pMin, b2.pMin), Max(b1.pMax, b2.pMax) };
+    // Here also, be careful to not run the constructor.
+    Bounds3<T> ret;
+    ret.pMin = Min(b1.pMin, b2.pMin);
+    ret.pMax = Max(b1.pMax, b2.pMax);
+    return ret;
 }
 
 template <typename T>
@@ -293,8 +303,10 @@ bool InsideExclusive(const Point3<T> &p, const Bounds3<T> &b) {
 
 template <typename T, typename U>
 inline Bounds3<T> Expand(const Bounds3<T> &b, U delta) {
-    return { b.pMin - Vector3<T>(delta, delta, delta),
-             b.pMax + Vector3<T>(delta, delta, delta) };
+    Bounds3<T> ret;
+    ret.pMin = b.pMin - Vector3<T>(delta, delta, delta);
+    ret.pMax = b.pMax + Vector3<T>(delta, delta, delta);
+    return ret;
 }
 
 // Minimum squared distance from point to box; returns zero if point is
@@ -330,12 +342,20 @@ inline Bounds2iIterator end(const Bounds2i &b) {
 
 template <typename T>
 Bounds2<T> Union(const Bounds2<T> &b, const Point2<T> &p) {
-    return { Min(b.pMin, p), Max(b.pMax, p) };
+    // Here also, be careful to not run the constructor.
+    Bounds2<T> ret;
+    ret.pMin = Min(b.pMin, p);
+    ret.pMax = Max(b.pMax, p);
+    return ret;
 }
 
 template <typename T>
-Bounds2<T> Union(const Bounds2<T> &b, const Bounds2<T> &b2) {
-    return { Min(b.pMin, b2.pMin), Max(b.pMax, b2.pMax) };
+Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2) {
+    // Here also, be careful to not run the constructor.
+    Bounds2<T> ret;
+    ret.pMin = Min(b1.pMin, b2.pMin);
+    ret.pMax = Max(b1.pMax, b2.pMax);
+    return ret;
 }
 
 template <typename T>
@@ -369,8 +389,10 @@ bool InsideExclusive(const Point2<T> &pt, const Bounds2<T> &b) {
 
 template <typename T, typename U>
 Bounds2<T> Expand(const Bounds2<T> &b, U delta) {
-    return { b.pMin - Vector2<T>(delta, delta),
-             b.pMax + Vector2<T>(delta, delta) };
+    Bounds2<T> ret;
+    ret.pMin = b.pMin - Vector2<T>(delta, delta);
+    ret.pMax = b.pMax + Vector2<T>(delta, delta);
+    return ret;
 }
 
 template <typename T>
