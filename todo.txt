@@ -1,20 +1,32 @@
 
-- look at Bounds Union() asm...
+- aovs
+  - multiple layers
+  - id  Attribute "shape" "string name" "table"
+    -> then store the mapping in metadata. (Also for namedmaterials)
 
-- parallelize bvh build
+- encode rendering time in exr headers, compute mc efficiency in imgtool
+  diff
+struct ImageMetadata {
+    float renderTimeSeconds;
+    float worldToCamera[16], cameraToFilm[16];
+};
+
+--
+
+- try jacopo/heitz stuff for inf env map sampling e.g.
+
+- explicit path representation
+
+-----
+
+- rho() should take an array slice...
+
+- could get rid of a lot of annoying plumbing
+  (e.g. VIsibilityTester::Unoccluded if scene was a global)
 
 - avx 2 support, half to float, etc...
 
 - remove black filtering mode?
-
-- aovs
-
-- try jacopo/heitz stuff for inf env map sampling e.g.
-
-- encode rendering time in exr headers, compute mc efficiency in imgtool
-  diff
-
-- explicit path representation
 
 - use kahan summation for accumulating into the image, not for accumulating
   into the tile!!!
@@ -49,6 +61,7 @@
 - alpha masking really doesn't work with area lights (do we care, or is
   this just for leaves?)
     - nuke shadowalpha: alpha can be made physical, not shadow...
+   + render san miguels to see if it matters...
 
 - do we actually use tHit at this point? (for anything besides far hit culling)
 

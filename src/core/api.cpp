@@ -55,6 +55,7 @@
 #include "filters/mitchell.h"
 #include "filters/sinc.h"
 #include "filters/triangle.h"
+#include "integrators/aov.h"
 #include "integrators/bdpt.h"
 #include "integrators/directlighting.h"
 #include "integrators/mlt.h"
@@ -1435,15 +1436,17 @@ std::unique_ptr<Integrator> RenderOptions::MakeIntegrator() const {
         integrator = CreatePathIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "volpath")
         integrator = CreateVolPathIntegrator(IntegratorParams, std::move(sampler), camera);
-    else if (IntegratorName == "bdpt") {
+    else if (IntegratorName == "bdpt")
         integrator = CreateBDPTIntegrator(IntegratorParams, std::move(sampler), camera);
-    } else if (IntegratorName == "mlt") {
+    else if (IntegratorName == "aov")
+        integrator = CreateAOVIntegrator(IntegratorParams, camera);
+    else if (IntegratorName == "mlt")
         integrator = CreateMLTIntegrator(IntegratorParams, camera);
-    } else if (IntegratorName == "ambientocclusion") {
+    else if (IntegratorName == "ambientocclusion")
         integrator = CreateAOIntegrator(IntegratorParams, std::move(sampler), camera);
-    } else if (IntegratorName == "sppm") {
+    else if (IntegratorName == "sppm")
         integrator = CreateSPPMIntegrator(IntegratorParams, camera);
-    } else {
+    else {
         Error("Integrator \"%s\" unknown.", IntegratorName.c_str());
         exit(1);
     }
