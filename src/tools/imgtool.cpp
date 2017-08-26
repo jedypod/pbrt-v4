@@ -198,49 +198,42 @@ int assemble(int argc, char *argv[]) {
     Image fullImage;
     std::vector<bool> seenPixel;
     int seenMultiple = 0;
-    Point2i fullRes;
-    Bounds2i displayWindow;
+    Bounds2i fullBounds;
     for (const std::string &file : infiles) {
         if (!HasExtension(file, ".exr"))
             usage(
                 "only EXR images include the image bounding boxes that "
                 "\"assemble\" needs.");
 
-        Bounds2i dataWindow, dspw;
-        Point2i res;
         Image img;
-        if (!Image::Read(file, &img, true, &dataWindow, &dspw)) continue;
+        ImageMetadata metadata;
+        if (!Image::Read(file, &img, &metadata, true)) continue;
 
         if (fullImage.resolution == Point2i(0, 0)) {
             // First image read.
-            fullRes = Point2i(dspw.pMax - dspw.pMin);
-            fullImage = Image(img.format, fullRes);
-            seenPixel.resize(fullRes.x * fullRes.y);
-            displayWindow = dspw;
+            fullImage = Image(img.format, metadata.fullResolution);
+            seenPixel.resize(fullImage.resolution.x * fullImage.resolution.y);
+            fullBounds = Bounds2i({0, 0}, fullImage.resolution);
         } else {
             // Make sure that this image's info is compatible with the
             // first image's.
-            if (dspw != displayWindow) {
+            if (metadata.fullResolution != fullImage.resolution) {
                 fprintf(stderr,
-                        "%s: displayWindow (%d,%d) - (%d,%d) in EXR file "
-                        "doesn't match the displayWindow of first EXR file "
-                        "(%d,%d) - (%d,%d). "
+                        "%s: full resolution (%d, %d) in EXR file doesn't match "
+                        "the full resolution of first EXR file (%d, %d). "
                         "Ignoring this file.\n",
-                        file.c_str(), dspw.pMin.x, dspw.pMin.y, dspw.pMax.x,
-                        dspw.pMax.y, displayWindow.pMin.x, displayWindow.pMin.y,
-                        displayWindow.pMax.x, displayWindow.pMax.y);
+                        file.c_str(), metadata.fullResolution.x,
+                        metadata.fullResolution.y, fullImage.resolution.x,
+                        fullImage.resolution.y);
                 continue;
             }
-            if (Union(dataWindow, displayWindow) != displayWindow) {
+            if (Union(metadata.pixelBounds, fullBounds) != fullBounds) {
                 fprintf(stderr,
-                        "%s: dataWindow (%d,%d) - (%d,%d) in EXR file isn't "
-                        "inside the displayWindow of first EXR file (%d,%d) - "
-                        "(%d,%d). "
-                        "Ignoring this file.\n",
-                        file.c_str(), dataWindow.pMin.x, dataWindow.pMin.y,
-                        dataWindow.pMax.x, dataWindow.pMax.y,
-                        displayWindow.pMin.x, displayWindow.pMin.y,
-                        displayWindow.pMax.x, displayWindow.pMax.y);
+                        "%s: pixel bounds (%d, %d) - (%d, %d) in EXR file isn't "
+                        "inside the the full image (0, 0) - (%d, %d). Ignoring this file.\n",
+                        file.c_str(), metadata.pixelBounds.pMin.x, metadata.pixelBounds.pMin.y,
+                        metadata.pixelBounds.pMax.x, metadata.pixelBounds.pMax.y,
+                        fullBounds.pMax.x, fullBounds.pMax.y);
                 continue;
             }
             if (fullImage.nChannels() != img.nChannels()) {
@@ -252,22 +245,22 @@ int assemble(int argc, char *argv[]) {
         }
 
         // Copy pixels.
-        for (int y = 0; y < res.y; ++y)
-            for (int x = 0; x < res.x; ++x) {
-                int fullOffset = (y + dataWindow.pMin.y) * fullRes.x +
-                                 (x + dataWindow.pMin.x);
+        for (int y = 0; y < img.resolution.y; ++y)
+            for (int x = 0; x < img.resolution.x; ++x) {
+                Point2i fullp{x + metadata.pixelBounds.pMin.x,
+                              y + metadata.pixelBounds.pMin.y};
+                size_t fullOffset = fullImage.PixelOffset(fullp);
                 if (seenPixel[fullOffset]) ++seenMultiple;
                 seenPixel[fullOffset] = true;
-                Point2i fullXY{x + dataWindow.pMin.x, y + dataWindow.pMin.y};
                 for (int c = 0; c < fullImage.nChannels(); ++c)
-                    fullImage.SetChannel(fullXY, c, img.GetChannel({x, y}, c));
+                    fullImage.SetChannel(fullp, c, img.GetChannel({x, y}, c));
             }
     }
 
     int unseenPixels = 0;
-    for (int y = 0; y < fullRes.y; ++y)
-        for (int x = 0; x < fullRes.x; ++x)
-            if (!seenPixel[y * fullRes.x + x]) ++unseenPixels;
+    for (int y = 0; y < fullImage.resolution.y; ++y)
+        for (int x = 0; x < fullImage.resolution.x; ++x)
+            if (!seenPixel[y * fullImage.resolution.x + x]) ++unseenPixels;
 
     if (seenMultiple > 0)
         fprintf(stderr, "%s: %d pixels present in multiple images.\n", outfile.c_str(),
@@ -432,9 +425,36 @@ int diff(int argc, char *argv[]) {
     return 0;
 }
 
-static void printImageStats(const char *name, const Image &image) {
-    printf("%s: resolution %d, %d\n", name, image.resolution.x,
+static void printImageStats(const char *name, const Image &image,
+                            const ImageMetadata *metadata = nullptr) {
+    printf("%s\n\tresolution (%d, %d)\n", name, image.resolution.x,
            image.resolution.y);
+    if (metadata) {
+        if (metadata->fullResolution != Point2i(0, 0))
+            printf("\tfull resolution (%d, %d)\n", metadata->fullResolution.x,
+                   metadata->fullResolution.y);
+        if (metadata->pixelBounds != Bounds2i({0, 0}, {0, 0}))
+            printf("\tpixel bounds (%d, %d) - (%d, %d)\n",
+                   metadata->pixelBounds.pMin.x, metadata->pixelBounds.pMin.y,
+                   metadata->pixelBounds.pMax.x, metadata->pixelBounds.pMax.y);
+        if (metadata->renderTimeSeconds != 0) {
+            float s = metadata->renderTimeSeconds;
+            int h = int(s) / 3600;
+            s -= h * 3600;
+            int m = int(s) / 60;
+            s -= m * 60;
+
+            printf("\trender time: %dh %dm %d.%02ds\n", h, m,
+                   int(s), int(100 * (s - int(s))));
+        }
+        if (!metadata->worldToCamera.IsZero())
+            printf("\tworld to camera: %s\n",
+                   metadata->worldToCamera.ToString().c_str());
+        if (!metadata->worldToNDC.IsZero())
+            printf("\tworld to NDC: %s\n",
+                   metadata->worldToNDC.ToString().c_str());
+    }
+
     Float min[3] = {Infinity, Infinity, Infinity};
     Float max[3] = {-Infinity, -Infinity, -Infinity};
     double sum[3] = {0., 0., 0.};
@@ -463,19 +483,19 @@ static void printImageStats(const char *name, const Image &image) {
             }
         }
 
-    printf("%s: %d infinite pixel components, %d NaN, %d valid.\n", name, nInf,
+    printf("\t%d infinite pixel components, %d NaN, %d valid.\n", nInf,
            nNaN, nValid);
-    printf("%s: log average luminance %f\n", name,
+    printf("\tlog average luminance %f\n",
            std::exp(logYSum / (image.resolution.x * image.resolution.y)));
-    printf("%s: min channel:", name);
+    printf("\tmin channel:");
     for (int c = 0; c < nc; ++c)
         printf(" %f%c", min[c], (c < nc - 1) ? ',' : ' ');
     printf("\n");
-    printf("%s: max channel:", name);
+    printf("\tmax channel:");
     for (int c = 0; c < nc; ++c)
         printf(" %f%c", max[c], (c < nc - 1) ? ',' : ' ');
     printf("\n");
-    printf("%s: avg channel:", name);
+    printf("\tavg channel:");
     for (int c = 0; c < nc; ++c)
         printf(" %f%c", sum[c] / nValid, (c < nc - 1) ? ',' : ' ');
     printf("\n");
@@ -502,13 +522,14 @@ int info(int argc, char *argv[]) {
         } else {
             Point2i res;
             Image image;
-            if (!Image::Read(argv[i], &image)) {
+            ImageMetadata metadata;
+            if (!Image::Read(argv[i], &image, &metadata)) {
                 fprintf(stderr, "%s: unable to load image.\n", argv[i]);
                 err = 1;
                 continue;
             }
 
-            printImageStats(argv[i], image);
+            printImageStats(argv[i], image, &metadata);
         }
     }
     return err;

@@ -45,6 +45,7 @@
 #include "geometry.h"
 #include "fp16.h"
 #include "spectrum.h"
+#include "transform.h"
 #include <glog/logging.h>
 #include <ext/google/array_slice.h>
 
@@ -222,6 +223,16 @@ inline const char *WrapModeString(WrapMode mode) {
 
 bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
 
+struct ImageMetadata {
+    // These may come back from Read() with zero values; this signifies
+    // that either the image format doesn't allow encoding this metadata or
+    // that it isn't present in the image.
+    Float renderTimeSeconds = 0;
+    Matrix4x4 worldToCamera, worldToNDC;
+    Bounds2i pixelBounds;
+    Point2i fullResolution;
+};
+
 // Important: coordinate system for our images has (0,0) at the
 // upper left corner.
 // Write code does this.
@@ -238,11 +249,10 @@ class Image {
     // TODO: make gamme option more flexible: sRGB vs provided gamma
     // exponent...
     static bool Read(const std::string &filename, Image *image,
-                     bool gamma = true, Bounds2i *dataWindow = nullptr,
-                     Bounds2i *displayWindow = nullptr);
-    bool Write(const std::string &name) const;
-    bool Write(const std::string &name, const Bounds2i &pixelBounds,
-               Point2i fullResolution) const;
+                     ImageMetadata *metadata = nullptr,
+                     bool gamma = true);
+    bool Write(const std::string &name,
+               const ImageMetadata *metadata = nullptr) const;
 
     Image ConvertToFormat(PixelFormat format) const;
 
@@ -306,11 +316,10 @@ class Image {
   private:
     std::array<Float, 3> GetRGB(Point2i p, WrapMode wrapMode) const;
 
-    bool WriteEXR(const std::string &name, const Bounds2i &pixelBounds,
-                  Point2i fullResolution) const;
-    bool WritePFM(const std::string &name) const;
-    bool WritePNG(const std::string &name) const;
-    bool WriteTGA(const std::string &name) const;
+    bool WriteEXR(const std::string &name, const ImageMetadata *metadata) const;
+    bool WritePFM(const std::string &name, const ImageMetadata *metadata) const;
+    bool WritePNG(const std::string &name, const ImageMetadata *metadata) const;
+    bool WriteTGA(const std::string &name, const ImageMetadata *metadata) const;
 
     template <typename F> void ForExtent1(const Bounds2i &extent, WrapMode wrapMode, F op) {
         CHECK_LT(extent.pMin.x, extent.pMax.x);

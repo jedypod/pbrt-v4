@@ -190,7 +190,7 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(
         return std::make_unique<MIPMap>(std::move(tp), options);
     } else {
         Image image;
-        if (!Image::Read(filename, &image, gamma)) return nullptr;
+        if (!Image::Read(filename, &image, nullptr, gamma)) return nullptr;
 
         // TODO: make spectrum type configurable, or eliminate...
         ProfilePhase _(Prof::MIPMapCreation);

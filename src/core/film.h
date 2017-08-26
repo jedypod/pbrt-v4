@@ -77,7 +77,7 @@ class Film {
     void MergeFilmTile(std::unique_ptr<FilmTile> tile);
     void SetImage(gtl::ArraySlice<Spectrum> img) const;
     void AddSplat(const Point2f &p, Spectrum v);
-    void WriteImage(Float splatScale = 1);
+    void WriteImage(ImageMetadata *metadata, Float splatScale = 1);
     void Clear();
 
     // Film Public Data

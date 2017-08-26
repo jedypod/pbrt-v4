@@ -93,6 +93,8 @@ class SurfaceInteraction;
 class Shape;
 class Primitive;
 class GeometricPrimitive;
+class Image;
+class ImageMetadata;
 template <typename Child, int nSpectrumSamples>
 class CoefficientSpectrum;
 class RGBSpectrum;

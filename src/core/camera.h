@@ -67,6 +67,8 @@ class Camera {
                                Vector3f *wi, Float *pdf, Point2f *pRaster,
                                VisibilityTester *vis) const;
 
+    virtual void WriteImage(ImageMetadata *metadata, Float splatScale = 1) const;
+
     // Camera Public Data
     AnimatedTransform CameraToWorld;
     const Float shutterOpen, shutterClose;
@@ -112,6 +114,7 @@ class ProjectiveCamera : public Camera {
         RasterToScreen = Inverse(ScreenToRaster);
         RasterToCamera = Inverse(CameraToScreen) * RasterToScreen;
     }
+    void WriteImage(ImageMetadata *metadata, Float splatScale) const;
 
   protected:
     // ProjectiveCamera Protected Data

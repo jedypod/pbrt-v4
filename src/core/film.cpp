@@ -173,7 +173,7 @@ void Film::AddSplat(const Point2f &p, Spectrum v) {
     for (int i = 0; i < 3; ++i) pixel.splatXYZ[i].Add(xyz[i]);
 }
 
-void Film::WriteImage(Float splatScale) {
+void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
     // Convert image to RGB and compute final pixel values
     std::vector<Float> rgb(3 * croppedPixelBounds.Area());
     LOG(INFO) <<
@@ -206,7 +206,9 @@ void Film::WriteImage(Float splatScale) {
     // Write RGB image
     LOG(INFO) << "Writing image " << filename << " with bounds " <<
         croppedPixelBounds;
-    rgb32.Write(filename, croppedPixelBounds, fullResolution);
+    metadata->pixelBounds = croppedPixelBounds;
+    metadata->fullResolution = fullResolution;
+    rgb32.Write(filename, metadata);
 }
 
 std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {

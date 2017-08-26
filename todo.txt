@@ -1,15 +1,21 @@
 
+- more tests from v3-scenes in regress
+
+- use lodepng_inspect to figure out when we can return a 1-channel image
+  careful about palleted images -- blow them out to RGB...
+  landscape and san miguel have many greyscale alpha textures
+  png_info.color.
+  could use lodepng_add_text for image metadata (?)
+
 - aovs
-  - multiple layers
   - id  Attribute "shape" "string name" "table"
     -> then store the mapping in metadata. (Also for namedmaterials)
 
-- encode rendering time in exr headers, compute mc efficiency in imgtool
-  diff
-struct ImageMetadata {
-    float renderTimeSeconds;
-    float worldToCamera[16], cameraToFilm[16];
-};
+- stuff like AnimatedTransform::Interpolate should return a transform
+  rather than using a pointer parameter to return
+
+- time reported by profiling system vs progress reporter (and reported in
+  stats) doesn't match... (only for short renders? need more investigation)
 
 --
 

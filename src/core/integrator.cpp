@@ -35,6 +35,7 @@
 
 #include "camera.h"
 #include "film.h"
+#include "image.h"
 #include "integrator.h"
 #include "interaction.h"
 #include "memory.h"
@@ -327,7 +328,9 @@ void SamplerIntegrator::Render(const Scene &scene) {
     LOG(INFO) << "Rendering finished";
 
     // Save final image after rendering
-    camera->film->WriteImage();
+    ImageMetadata metadata;
+    metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.f;
+    camera->WriteImage(&metadata);
 }
 
 Spectrum SamplerIntegrator::SpecularReflect(

@@ -36,6 +36,7 @@
 #include "error.h"
 #include "film.h"
 #include "filters/box.h"
+#include "image.h"
 #include "integrator.h"
 #include "lightdistrib.h"
 #include "paramset.h"
@@ -427,13 +428,18 @@ void BDPTIntegrator::Render(const Scene &scene) {
         });
         reporter.Done();
     }
-    film->WriteImage(1.0f / sampler->samplesPerPixel);
+    ImageMetadata metadata;
+    metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
+    camera->WriteImage(&metadata, 1.0f / sampler->samplesPerPixel);
 
     // Write buffers for debug visualization
     if (visualizeStrategies || visualizeWeights) {
         const Float invSampleCount = 1.0f / sampler->samplesPerPixel;
-        for (size_t i = 0; i < weightFilms.size(); ++i)
-            if (weightFilms[i]) weightFilms[i]->WriteImage(invSampleCount);
+        for (size_t i = 0; i < weightFilms.size(); ++i) {
+            ImageMetadata metadata;
+            if (weightFilms[i]) weightFilms[i]->WriteImage(&metadata,
+                                                           invSampleCount);
+        }
     }
 }
 

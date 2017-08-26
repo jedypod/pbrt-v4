@@ -1,4 +1,3 @@
-
 /*
     pbrt source code is Copyright(c) 1998-2016
                         Matt Pharr, Greg Humphreys, and Wenzel Jakob.
@@ -42,33 +41,37 @@
 
 #include "ext/lodepng.h"
 #include "ext/targa.h"
-#include <ImfRgba.h>
-#include <ImfRgbaFile.h>
+
+#include <ImfChannelList.h>
+#include <ImfFloatAttribute.h>
+#include <ImfMatrixAttribute.h>
+#include <ImfInputFile.h>
+#include <ImfOutputFile.h>
+#include <ImfFrameBuffer.h>
 
 namespace pbrt {
 
 // ImageIO Local Declarations
-static bool ReadImageEXR(const std::string &name, Image *image,
-                         Bounds2i *dataWindow, Bounds2i *displayWindow);
-static bool ReadImageTGA(const std::string &name, bool gamma, Image *image);
-static bool ReadImagePNG(const std::string &name, bool gamma, Image *image);
-static bool ReadImagePFM(const std::string &filename, Image *image);
+static bool ReadEXR(const std::string &name, Image *image,
+                    ImageMetadata *metadata);
+static bool ReadTGA(const std::string &name, bool gamma, Image *image,
+                    ImageMetadata *metadata);
+static bool ReadPNG(const std::string &name, bool gamma, Image *image,
+                    ImageMetadata *metadata);
+static bool ReadPFM(const std::string &filename, Image *image,
+                    ImageMetadata *metadata);
 
 // ImageIO Function Definitions
-bool Image::Read(const std::string &name, Image *image, bool gamma,
-                 Bounds2i *dataWindow, Bounds2i *displayWindow) {
+bool Image::Read(const std::string &name, Image *image, ImageMetadata *metadata,
+                 bool gamma) {
     if (HasExtension(name, ".exr"))
-        return ReadImageEXR(name, image, dataWindow, displayWindow);
-
-    LOG_IF(ERROR, dataWindow != nullptr || displayWindow != nullptr) <<
-        "Data window and display window not available for non-EXR images.";
-
-    if (HasExtension(name, ".tga"))
-        return ReadImageTGA(name, gamma, image);
+        return ReadEXR(name, image, metadata);
+    else if (HasExtension(name, ".tga"))
+        return ReadTGA(name, gamma, image, metadata);
     else if (HasExtension(name, ".png"))
-        return ReadImagePNG(name, gamma, image);
+        return ReadPNG(name, gamma, image, metadata);
     else if (HasExtension(name, ".pfm"))
-        return ReadImagePFM(name, image);
+        return ReadPFM(name, image, metadata);
     else {
         Error("%s: no support for reading images with this extension",
               name.c_str());
@@ -76,62 +79,117 @@ bool Image::Read(const std::string &name, Image *image, bool gamma,
     }
 }
 
-bool Image::Write(const std::string &name) const {
-    return Write(name, Bounds2i({0, 0}, resolution), resolution);
-}
+bool Image::Write(const std::string &name, const ImageMetadata *metadata) const {
+    if (!metadata->pixelBounds.Empty())
+        CHECK_EQ(metadata->pixelBounds.Area(), resolution.x * resolution.y);
 
-bool Image::Write(const std::string &name, const Bounds2i &pixelBounds,
-                  Point2i fullResolution) const {
     if (HasExtension(name, ".exr"))
-        return WriteEXR(name, pixelBounds, fullResolution);
+        return WriteEXR(name, metadata);
     else if (HasExtension(name, ".pfm"))
-        return WritePFM(name);
+        return WritePFM(name, metadata);
     else if (HasExtension(name, ".png"))
-        return WritePNG(name);
+        return WritePNG(name, metadata);
     else if (HasExtension(name, ".tga"))
-        return WriteTGA(name);
+        return WriteTGA(name, metadata);
     else {
-        Error("Can't determine image file type from suffix of filename \"%s\"",
+        Error("%s: no support for writing images with this extension",
               name.c_str());
         return false;
     }
 }
 
-static bool ReadImageEXR(const std::string &name, Image *image,
-                         Bounds2i *dataWindow, Bounds2i *displayWindow) {
-    using namespace Imf;
-    using namespace Imath;
-    try {
-        // TODO: handle single channel EXRs directly...
-        RgbaInputFile file(name.c_str());
-        Box2i dw = file.dataWindow();
+///////////////////////////////////////////////////////////////////////////
+// OpenEXR
 
-        // OpenEXR uses inclusive pixel bounds; adjust to non-inclusive
-        // (the convention pbrt uses) in the values returned.
-        if (dataWindow)
-            *dataWindow = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
-        if (displayWindow) {
-            Box2i dispw = file.displayWindow();
-            *displayWindow = {{dispw.min.x, dispw.min.y},
-                              {dispw.max.x + 1, dispw.max.y + 1}};
+static Imf::FrameBuffer imageToFrameBuffer(Image &image,
+                                           const Imath::Box2i &dataWindow) {
+    size_t xStride = TexelBytes(image.format);
+    size_t yStride = image.resolution.x * xStride;
+    // Would be nice to use PixelOffset(-dw.min.x, -dw.min.y) but
+    // it checks to make sure the coordiantes are >= 0 (which
+    // usually makes sense...)
+    char *originPtr = (((char *)image.RawPointer({0, 0})) -
+                       dataWindow.min.x * xStride - dataWindow.min.y * yStride);
+
+    Imf::FrameBuffer fb;
+    switch (image.format) {
+    case PixelFormat::RGB16:
+        fb.insert("R", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
+        fb.insert("G", Imf::Slice(Imf::HALF, originPtr + sizeof(uint16_t), xStride, yStride));
+        fb.insert("B", Imf::Slice(Imf::HALF, originPtr + 2 * sizeof(uint16_t), xStride, yStride));
+        break;
+    case PixelFormat::Y16:
+        fb.insert("Y", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
+        break;
+    default:
+        LOG(FATAL) << "TODO image format";
+    }
+    return fb;
+}
+
+static bool ReadEXR(const std::string &name, Image *image,
+                    ImageMetadata *metadata) {
+    try {
+        Imf::InputFile file(name.c_str());
+        Imath::Box2i dw = file.header().dataWindow();
+
+        if (metadata) {
+            const Imf::FloatAttribute *renderTimeAttrib =
+                file.header().findTypedAttribute<Imf::FloatAttribute>("renderTimeSeconds");
+            if (renderTimeAttrib)
+                metadata->renderTimeSeconds = renderTimeAttrib->value();
+
+            const Imf::M44fAttribute *worldToCameraAttrib =
+                file.header().findTypedAttribute<Imf::M44fAttribute>("worldToCamera");
+            if (worldToCameraAttrib)
+                for (int i = 0; i < 4; ++i)
+                    for (int j = 0; j < 4; ++j)
+                        // Can't memcpy since Float may be a double...
+                        metadata->worldToCamera.m[i][j] =
+                            worldToCameraAttrib->value().getValue()[4*i+j];
+
+            const Imf::M44fAttribute *worldToNDCAttrib =
+                file.header().findTypedAttribute<Imf::M44fAttribute>("worldToNDC");
+            if (worldToNDCAttrib)
+                for (int i = 0; i < 4; ++i)
+                    for (int j = 0; j < 4; ++j)
+                        metadata->worldToNDC.m[i][j] =
+                            worldToNDCAttrib->value().getValue()[4*i+j];
+
+            // OpenEXR uses inclusive pixel bounds; adjust to non-inclusive
+            // (the convention pbrt uses) in the values returned.
+            metadata->pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
+
+            Imath::Box2i dispw = file.header().displayWindow();
+            metadata->fullResolution.x = dispw.max.x - dispw.min.x + 1;
+            metadata->fullResolution.y = dispw.max.y - dispw.min.y + 1;
         }
 
         int width = dw.max.x - dw.min.x + 1;
         int height = dw.max.y - dw.min.y + 1;
-        std::vector<Rgba> pixels(width * height);
-        file.setFrameBuffer(&pixels[0] - dw.min.x - dw.min.y * width, 1, width);
+
+        const Imf::ChannelList &channels = file.header().channels();
+        if (channels.findChannel("R") && channels.findChannel("G") &&
+            channels.findChannel("B")) {
+            // TODO: do rgb32 if that matches the file: channel.type...
+            *image = Image(PixelFormat::RGB16, {width, height});
+        } else if (channels.findChannel("Y")) {
+            *image = Image(PixelFormat::Y16, {width, height});
+        } else {
+            std::string channelNames;
+            for (auto iter = channels.begin(); iter != channels.end(); ++iter) {
+                channelNames += iter.name();
+                channelNames += ' ';
+            }
+            Error("%s: didn't find RGB or Y stored in image. Channels: %s",
+                  name.c_str(), channelNames.c_str());
+            return false;
+        }
+        file.setFrameBuffer(imageToFrameBuffer(*image, dw));
         file.readPixels(dw.min.y, dw.max.y);
 
-        std::vector<uint16_t> rgb(3 * width * height);
-        for (int i = 0; i < width * height; ++i) {
-            memcpy(&rgb[3 * i], &pixels[i].r, sizeof(half));
-            memcpy(&rgb[3 * i + 1], &pixels[i].g, sizeof(half));
-            memcpy(&rgb[3 * i + 2], &pixels[i].b, sizeof(half));
-        }
         LOG(INFO) << StringPrintf("Read EXR image %s (%d x %d)", name.c_str(),
                                   width, height);
-        *image =
-            Image(std::move(rgb), PixelFormat::RGB16, Point2i(width, height));
         return true;
     } catch (const std::exception &e) {
         Error("Unable to read image file \"%s\": %s", name.c_str(), e.what());
@@ -140,34 +198,50 @@ static bool ReadImageEXR(const std::string &name, Image *image,
     return false;
 }
 
-bool Image::WriteEXR(const std::string &name, const Bounds2i &pixelBounds,
-                     Point2i fullResolution) const {
-    using namespace Imf;
-    using namespace Imath;
+bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) const {
+    // TODO: write out one-channel images if that's what we've got
 
-    // FIXME: if we have RGB32, it seems like we should write out float32;
+    // TODO: if we have RGB32, it seems like we should write out float32;
     // require the caller to explicitly downcast/ask for float16 if
     // desired?
 
-    std::unique_ptr<Rgba[]> hrgba = std::make_unique<Rgba[]>(resolution.x * resolution.y);
-    for (int y = 0; y < resolution.y; ++y)
-        for (int x = 0; x < resolution.x; ++x)
-            // TODO: skip the half -> float -> half round trip...
-            hrgba[y * resolution.x + x] =
-                Rgba(GetChannel({x, y}, 0), GetChannel({x, y}, 1),
-                     GetChannel({x, y}, 2));
-
-    Box2i displayWindow(V2i(0, 0),
-                        V2i(fullResolution.x - 1, fullResolution.y - 1));
-    Box2i dataWindow(V2i(pixelBounds.pMin.x, pixelBounds.pMin.y),
-                     V2i(pixelBounds.pMax.x - 1, pixelBounds.pMax.y - 1));
-
     try {
-        RgbaOutputFile file(name.c_str(), displayWindow, dataWindow,
-                            WRITE_RGBA);
-        file.setFrameBuffer(hrgba.get() - pixelBounds.pMin.x -
-                            pixelBounds.pMin.y * resolution.x,
-                            1, resolution.x);
+        // Note that we do still need to convert 8-bit formats to 16-bit.
+        // We do correctly convert to linear if appropriate in that case, right?
+        Image imOut = ConvertToFormat(PixelFormat::RGB16);  // FIXME FIXME
+
+        Imath::Box2i displayWindow, dataWindow;
+        if (metadata) {
+            // Agan, -1 offsets to handle inclusive indexing in OpenEXR...
+            displayWindow = {Imath::V2i(0, 0),
+                             Imath::V2i(metadata->fullResolution.x - 1,
+                                        metadata->fullResolution.y - 1)};
+            dataWindow = {Imath::V2i(metadata->pixelBounds.pMin.x,
+                                     metadata->pixelBounds.pMin.y),
+                          Imath::V2i(metadata->pixelBounds.pMax.x - 1,
+                                     metadata->pixelBounds.pMax.y - 1)};
+        } else
+            displayWindow = dataWindow =
+                {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
+
+        Imf::FrameBuffer fb = imageToFrameBuffer(imOut, dataWindow);
+
+        Imf::Header header(displayWindow, dataWindow);
+        for (auto iter = fb.begin(); iter != fb.end(); ++iter)
+            header.channels().insert(iter.name(), iter.slice().type);
+
+        if (metadata) {
+            if (metadata->renderTimeSeconds > 0)
+                header.insert("renderTimeSeconds", Imf::FloatAttribute(metadata->renderTimeSeconds));
+            // TODO: fix this for Float = double builds.
+            if (!metadata->worldToCamera.IsZero())
+                header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera.m));
+            if (!metadata->worldToNDC.IsZero())
+                header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC.m));
+        }
+
+        Imf::OutputFile file(name.c_str(), header);
+        file.setFrameBuffer(fb);
         file.writePixels(resolution.y);
     } catch (const std::exception &exc) {
         Error("Error writing \"%s\": %s", name.c_str(), exc.what());
@@ -184,7 +258,8 @@ static inline uint8_t FloatToSRGB(Float v) {
     return uint8_t(Clamp(255.f * LinearToSRGB(v) + 0.5f, 0.f, 255.f));
 }
 
-static bool ReadImagePNG(const std::string &name, bool gamma, Image *image) {
+static bool ReadPNG(const std::string &name, bool gamma, Image *image,
+                    ImageMetadata *metadata) {
     unsigned char *rgb;
     unsigned width, height;
     unsigned int error =
@@ -207,10 +282,11 @@ static bool ReadImagePNG(const std::string &name, bool gamma, Image *image) {
     PixelFormat format = gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8;
     *image = Image(std::move(rgb8), format, Point2i(width, height));
     free(rgb);
+
     return true;
 }
 
-bool Image::WritePNG(const std::string &name) const {
+bool Image::WritePNG(const std::string &name, const ImageMetadata *metadata) const {
     unsigned int error = 0;
     switch (format) {
     case PixelFormat::SRGB8:
@@ -262,7 +338,7 @@ bool Image::WritePNG(const std::string &name) const {
 ///////////////////////////////////////////////////////////////////////////
 // TGA Function Definitions
 
-bool Image::WriteTGA(const std::string &name) const {
+bool Image::WriteTGA(const std::string &name, const ImageMetadata *metadata) const {
     int nc = nChannels();
     std::unique_ptr<uint8_t[]> outBuf =
         std::make_unique<uint8_t[]>(nc * resolution.x * resolution.y);
@@ -316,7 +392,7 @@ bool Image::WriteTGA(const std::string &name) const {
     return true;
 }
 
-static bool ReadImageTGA(const std::string &name, bool gamma, Image *image) {
+static bool ReadTGA(const std::string &name, bool gamma, Image *image, ImageMetadata *metadata) {
     tga_image img;
     tga_result result;
     if ((result = tga_read(&img, name.c_str())) != TGA_NOERR) {
@@ -427,7 +503,7 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
     return -1;
 }
 
-static bool ReadImagePFM(const std::string &filename, Image *image) {
+static bool ReadPFM(const std::string &filename, Image *image, ImageMetadata *metadata) {
     std::vector<float> rgb32;
     char buffer[BUFFER_SIZE];
     unsigned int nFloats;
@@ -498,7 +574,7 @@ fail:
     return false;
 }
 
-bool Image::WritePFM(const std::string &filename) const {
+bool Image::WritePFM(const std::string &filename, const ImageMetadata *metadata) const {
     FILE *fp;
     float scale;
 

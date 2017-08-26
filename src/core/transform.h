@@ -78,19 +78,6 @@ class Matrix4x4 {
                 if (m[i][j] != m2.m[i][j]) return true;
         return false;
     }
-    friend Matrix4x4 Transpose(const Matrix4x4 &);
-    void Print(FILE *f) const {
-        fprintf(f, "[ ");
-        for (int i = 0; i < 4; ++i) {
-            fprintf(f, "  [ ");
-            for (int j = 0; j < 4; ++j) {
-                fprintf(f, "%f", m[i][j]);
-                if (j != 3) fprintf(f, ", ");
-            }
-            fprintf(f, " ]\n");
-        }
-        fprintf(f, " ] ");
-    }
     static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;
         for (int i = 0; i < 4; ++i)
@@ -99,24 +86,31 @@ class Matrix4x4 {
                             m1.m[i][2] * m2.m[2][j] + m1.m[i][3] * m2.m[3][j];
         return r;
     }
-    friend Matrix4x4 Inverse(const Matrix4x4 &);
-
-    friend std::ostream &operator<<(std::ostream &os, const Matrix4x4 &m) {
-        // clang-format off
-        os << StringPrintf("[ [ %f, %f, %f, %f ] "
-                           "[ %f, %f, %f, %f ] "
-                           "[ %f, %f, %f, %f ] "
-                           "[ %f, %f, %f, %f ] ]",
-                           m.m[0][0], m.m[0][1], m.m[0][2], m.m[0][3],
-                           m.m[1][0], m.m[1][1], m.m[1][2], m.m[1][3],
-                           m.m[2][0], m.m[2][1], m.m[2][2], m.m[2][3],
-                           m.m[3][0], m.m[3][1], m.m[3][2], m.m[3][3]);
-        // clang-format on
-        return os;
+    bool IsIdentity() const {
+        return (m[0][0] == 1.f && m[0][1] == 0.f && m[0][2] == 0.f &&
+                m[0][3] == 0.f && m[1][0] == 0.f && m[1][1] == 1.f &&
+                m[1][2] == 0.f && m[1][3] == 0.f && m[2][0] == 0.f &&
+                m[2][1] == 0.f && m[2][2] == 1.f && m[2][3] == 0.f &&
+                m[3][0] == 0.f && m[3][1] == 0.f && m[3][2] == 0.f &&
+                m[3][3] == 1.f);
     }
+    bool IsZero() const {
+        return (m[0][0] == 0.f && m[0][0] == 0.f && m[0][2] == 0.f &&
+                m[0][3] == 0.f && m[0][0] == 0.f && m[0][0] == 0.f &&
+                m[0][2] == 0.f && m[0][3] == 0.f && m[2][0] == 0.f &&
+                m[2][0] == 0.f && m[2][2] == 0.f && m[2][3] == 0.f &&
+                m[3][0] == 0.f && m[3][0] == 0.f && m[3][2] == 0.f &&
+                m[3][3] == 0.f);
+    }
+    std::string ToString() const;
 
     Float m[4][4];
 };
+
+std::ostream &operator<<(std::ostream &os, const Matrix4x4 &m);
+
+Matrix4x4 Transpose(const Matrix4x4 &);
+Matrix4x4 Inverse(const Matrix4x4 &);
 
 // Transform Declarations
 class Transform {

@@ -36,6 +36,7 @@
 #include "integrators/bdpt.h"
 #include "scene.h"
 #include "film.h"
+#include "image.h"
 #include "sampler.h"
 #include "integrator.h"
 #include "camera.h"
@@ -225,10 +226,10 @@ void MLTIntegrator::Render(const Scene &scene) {
     Film &film = *camera->film;
     int64_t nTotalMutations =
         (int64_t)mutationsPerPixel * (int64_t)film.GetSampleBounds().Area();
+    const int progressFrequency = 32768;
+    ProgressReporter progress(nTotalMutations / progressFrequency,
+                              "Rendering");
     if (scene.lights.size() > 0) {
-        const int progressFrequency = 32768;
-        ProgressReporter progress(nTotalMutations / progressFrequency,
-                                  "Rendering");
         ParallelFor(0, nChains, [&](int i) {
             int64_t nChainMutations =
                 std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
@@ -278,11 +279,13 @@ void MLTIntegrator::Render(const Scene &scene) {
                 arena.Reset();
             }
         });
-        progress.Done();
     }
+    progress.Done();
 
     // Store final image computed with MLT
-    camera->film->WriteImage(b / mutationsPerPixel);
+    ImageMetadata metadata;
+    metadata.renderTimeSeconds = progress.ElapsedMS() / 1000.;
+    camera->WriteImage(&metadata, b / mutationsPerPixel);
 }
 
 std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(

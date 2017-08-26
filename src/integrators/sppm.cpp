@@ -459,7 +459,10 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 }
             }
             camera->film->SetImage(image);
-            camera->film->WriteImage();
+            ImageMetadata metadata;
+            metadata.renderTimeSeconds = progress.ElapsedMS() / 1000.;
+            camera->WriteImage(&metadata);
+
             // Write SPPM radius image, if requested
             if (getenv("SPPM_RADIUS")) {
                 Image rimg(PixelFormat::Y32, Point2i(pixelBounds.Diagonal()));
@@ -486,8 +489,10 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         rimg.SetY({x - x0, y - pixelBounds.pMin.y}, v);
                     }
                 }
-                rimg.Write("sppm_radius.png", pixelBounds,
-                           camera->film->fullResolution);
+                ImageMetadata metadata;
+                metadata.pixelBounds = pixelBounds;
+                metadata.fullResolution = camera->film->fullResolution;
+                rimg.Write("sppm_radius.png", &metadata);
             }
         }
     }

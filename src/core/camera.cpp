@@ -36,6 +36,7 @@
 
 #include "error.h"
 #include "film.h"
+#include "image.h"
 
 namespace pbrt {
 
@@ -96,6 +97,27 @@ Spectrum Camera::Sample_Wi(const Interaction &ref, const Point2f &u,
                            VisibilityTester *vis) const {
     LOG(FATAL) << "Camera::Sample_Wi() is not implemented!";
     return Spectrum(0.f);
+}
+
+void Camera::WriteImage(ImageMetadata *metadata, Float splatScale) const {
+    Transform c2w;
+    CameraToWorld.Interpolate(shutterOpen, &c2w);
+    metadata->worldToCamera = c2w.GetInverseMatrix();
+    film->WriteImage(metadata, splatScale);
+}
+
+void ProjectiveCamera::WriteImage(ImageMetadata *metadata,
+                                  Float splatScale) const {
+    Transform c2w;
+    CameraToWorld.Interpolate(shutterOpen, &c2w);
+    metadata->worldToCamera = c2w.GetInverseMatrix();
+
+    // TODO: double check this
+    Transform worldToNDC = Translate(Vector3f(0.5, 0.5, 0.5)) * Scale(0.5, 0.5, 0.5) *
+        CameraToScreen * metadata->worldToCamera;
+    metadata->worldToNDC = worldToNDC.GetMatrix();
+
+    film->WriteImage(metadata, splatScale);
 }
 
 }  // namespace pbrt

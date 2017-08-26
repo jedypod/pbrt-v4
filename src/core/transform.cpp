@@ -86,6 +86,24 @@ Matrix4x4 Transpose(const Matrix4x4 &m) {
                      m.m[3][3]);
 }
 
+std::string Matrix4x4::ToString() const {
+     // clang-format off
+    return StringPrintf("[ [ %f, %f, %f, %f ] "
+                        "[ %f, %f, %f, %f ] "
+                        "[ %f, %f, %f, %f ] "
+                        "[ %f, %f, %f, %f ] ]",
+                        m[0][0], m[0][1], m[0][2], m[0][3],
+                        m[1][0], m[1][1], m[1][2], m[1][3],
+                        m[2][0], m[2][1], m[2][2], m[2][3],
+                        m[3][0], m[3][1], m[3][2], m[3][3]);
+     // clang-format on
+}
+
+std::ostream &operator<<(std::ostream &os, const Matrix4x4 &m) {
+    os << m.ToString();
+    return os;
+}
+
 Matrix4x4 Inverse(const Matrix4x4 &m) {
     int indxc[4], indxr[4];
     int ipiv[4] = {0, 0, 0, 0};
@@ -143,7 +161,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 }
 
 // Transform Method Definitions
-void Transform::Print(FILE *f) const { m.Print(f); }
+void Transform::Print(FILE *f) const { fputs(m.ToString().c_str(), f); }
 
 Transform Translate(const Vector3f &delta) {
     Matrix4x4 m(1, 0, 0, delta.x, 0, 1, 0, delta.y, 0, 0, 1, delta.z, 0, 0, 0,
