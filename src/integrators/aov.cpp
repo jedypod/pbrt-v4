@@ -137,8 +137,7 @@ void AOVIntegrator::Render(const Scene &scene) {
                 // Order--albedo, ao, e is important--must match order of
                 // sample array requests.
                 Spectrum albedo = isect.bsdf->rho(
-                    -ray.d, albedoSamples,
-                    tileSampler->Get2DArray(albedoSamples).data());
+                    -ray.d, tileSampler->Get2DArray(albedoSamples));
                 albedoImage.SetSpectrum(p, albedo);
 
                 Float ao = 0;

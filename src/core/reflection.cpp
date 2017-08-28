@@ -639,21 +639,23 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
     return (rho > 0 && Y > 0) ? (Y / rho) : 0;
 }
 
-Spectrum BxDF::rho(const Vector3f &w, int nSamples, const Point2f *u) const {
+Spectrum BxDF::rho(const Vector3f &w, gtl::ArraySlice<Point2f> samples) const {
     Spectrum r(0.);
-    for (int i = 0; i < nSamples; ++i) {
+    for (Point2f u : samples) {
         // Estimate one term of $\rho_\roman{hd}$
         Vector3f wi;
         Float pdf = 0;
-        Spectrum f = Sample_f(w, &wi, u[i], &pdf);
+        Spectrum f = Sample_f(w, &wi, u, &pdf);
         if (pdf > 0) r += f * AbsCosTheta(wi) / pdf;
     }
-    return r / nSamples;
+    return r / samples.size();
 }
 
-Spectrum BxDF::rho(int nSamples, const Point2f *u1, const Point2f *u2) const {
+Spectrum BxDF::rho(gtl::ArraySlice<Point2f> u1,
+                   gtl::ArraySlice<Point2f> u2) const {
+    DCHECK_EQ(u1.size(), u2.size());
     Spectrum r(0.f);
-    for (int i = 0; i < nSamples; ++i) {
+    for (int i = 0; i < u1.size(); ++i) {
         // Estimate one term of $\rho_\roman{hh}$
         Vector3f wo, wi;
         wo = UniformSampleHemisphere(u1[i]);
@@ -662,7 +664,7 @@ Spectrum BxDF::rho(int nSamples, const Point2f *u1, const Point2f *u2) const {
         if (pdfi > 0)
             r += f * AbsCosTheta(wi) * AbsCosTheta(wo) / (pdfo * pdfi);
     }
-    return r / (Pi * nSamples);
+    return r / (Pi * u1.size());
 }
 
 // BSDF Method Definitions
@@ -681,21 +683,21 @@ Spectrum BSDF::f(const Vector3f &woW, const Vector3f &wiW,
     return f;
 }
 
-Spectrum BSDF::rho(int nSamples, const Point2f *samples1,
-                   const Point2f *samples2, BxDFType flags) const {
+Spectrum BSDF::rho(gtl::ArraySlice<Point2f> samples1,
+                   gtl::ArraySlice<Point2f> samples2, BxDFType flags) const {
     Spectrum ret(0.f);
     for (int i = 0; i < nBxDFs; ++i)
         if (bxdfs[i]->MatchesFlags(flags))
-            ret += bxdfs[i]->rho(nSamples, samples1, samples2);
+            ret += bxdfs[i]->rho(samples1, samples2);
     return ret;
 }
 
-Spectrum BSDF::rho(const Vector3f &wo, int nSamples, const Point2f *samples,
+Spectrum BSDF::rho(const Vector3f &wo, gtl::ArraySlice<Point2f> samples,
                    BxDFType flags) const {
     Spectrum ret(0.f);
     for (int i = 0; i < nBxDFs; ++i)
         if (bxdfs[i]->MatchesFlags(flags))
-            ret += bxdfs[i]->rho(wo, nSamples, samples);
+            ret += bxdfs[i]->rho(wo, samples);
     return ret;
 }
 

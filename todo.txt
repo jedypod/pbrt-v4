@@ -23,8 +23,6 @@
 
 -----
 
-- rho() should take an array slice...
-
 - could get rid of a lot of annoying plumbing
   (e.g. VIsibilityTester::Unoccluded if scene was a global)
 
