@@ -147,8 +147,7 @@ Float PerspectiveCamera::GenerateRayDifferential(const CameraSample &sample,
 
 Spectrum PerspectiveCamera::We(const Ray &ray, Point2f *pRaster2) const {
     // Interpolate camera matrix and check if $\w{}$ is forward-facing
-    Transform c2w;
-    CameraToWorld.Interpolate(ray.time, &c2w);
+    Transform c2w = CameraToWorld.Interpolate(ray.time);
     Float cosTheta = Dot(ray.d, c2w(Vector3f(0, 0, 1)));
     if (cosTheta <= 0) return 0;
 
@@ -176,8 +175,7 @@ Spectrum PerspectiveCamera::We(const Ray &ray, Point2f *pRaster2) const {
 void PerspectiveCamera::Pdf_We(const Ray &ray, Float *pdfPos,
                                Float *pdfDir) const {
     // Interpolate camera matrix and fail if $\w{}$ is not forward-facing
-    Transform c2w;
-    CameraToWorld.Interpolate(ray.time, &c2w);
+    Transform c2w = CameraToWorld.Interpolate(ray.time);
     Float cosTheta = Dot(ray.d, c2w(Vector3f(0, 0, 1)));
     if (cosTheta <= 0) {
         *pdfPos = *pdfDir = 0;

@@ -78,8 +78,7 @@ TransformedPrimitive::TransformedPrimitive(std::shared_ptr<Primitive> &primitive
 bool TransformedPrimitive::Intersect(const Ray &r,
                                      SurfaceInteraction *isect) const {
     // Compute _ray_ after transformation by _PrimitiveToWorld_
-    Transform InterpolatedPrimToWorld;
-    PrimitiveToWorld.Interpolate(r.time, &InterpolatedPrimToWorld);
+    Transform InterpolatedPrimToWorld = PrimitiveToWorld.Interpolate(r.time);
     Ray ray = Inverse(InterpolatedPrimToWorld)(r);
     if (!primitive->Intersect(ray, isect)) return false;
     r.tMax = ray.tMax;
@@ -91,8 +90,7 @@ bool TransformedPrimitive::Intersect(const Ray &r,
 }
 
 bool TransformedPrimitive::IntersectP(const Ray &r) const {
-    Transform InterpolatedPrimToWorld;
-    PrimitiveToWorld.Interpolate(r.time, &InterpolatedPrimToWorld);
+    Transform InterpolatedPrimToWorld = PrimitiveToWorld.Interpolate(r.time);
     Transform InterpolatedWorldToPrim = Inverse(InterpolatedPrimToWorld);
     return primitive->IntersectP(InterpolatedWorldToPrim(r));
 }

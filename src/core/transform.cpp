@@ -1163,16 +1163,13 @@ void AnimatedTransform::Decompose(const Matrix4x4 &m, Vector3f *T,
     *S = Matrix4x4::Mul(Inverse(R), M);
 }
 
-void AnimatedTransform::Interpolate(Float time, Transform *t) const {
+Transform AnimatedTransform::Interpolate(Float time) const {
     // Handle boundary conditions for matrix interpolation
-    if (!actuallyAnimated || time <= startTime) {
-        *t = *startTransform;
-        return;
-    }
-    if (time >= endTime) {
-        *t = *endTransform;
-        return;
-    }
+    if (!actuallyAnimated || time <= startTime)
+        return *startTransform;
+    if (time >= endTime)
+        return *endTransform;
+
     Float dt = (time - startTime) / (endTime - startTime);
     // Interpolate translation at _dt_
     Vector3f trans = (1 - dt) * T[0] + dt * T[1];
@@ -1187,7 +1184,7 @@ void AnimatedTransform::Interpolate(Float time, Transform *t) const {
             scale.m[i][j] = Lerp(dt, S[0].m[i][j], S[1].m[i][j]);
 
     // Compute interpolated matrix as product of interpolated components
-    *t = Translate(trans) * rotate.ToTransform() * Transform(scale);
+    return Translate(trans) * rotate.ToTransform() * Transform(scale);
 }
 
 Ray AnimatedTransform::operator()(const Ray &r) const {
@@ -1196,8 +1193,7 @@ Ray AnimatedTransform::operator()(const Ray &r) const {
     else if (r.time >= endTime)
         return (*endTransform)(r);
     else {
-        Transform t;
-        Interpolate(r.time, &t);
+        Transform t = Interpolate(r.time);
         return t(r);
     }
 }
@@ -1208,8 +1204,7 @@ RayDifferential AnimatedTransform::operator()(const RayDifferential &r) const {
     else if (r.time >= endTime)
         return (*endTransform)(r);
     else {
-        Transform t;
-        Interpolate(r.time, &t);
+        Transform t = Interpolate(r.time);
         return t(r);
     }
 }
@@ -1219,8 +1214,7 @@ Point3f AnimatedTransform::operator()(Float time, const Point3f &p) const {
         return (*startTransform)(p);
     else if (time >= endTime)
         return (*endTransform)(p);
-    Transform t;
-    Interpolate(time, &t);
+    Transform t = Interpolate(time);
     return t(p);
 }
 
@@ -1229,8 +1223,7 @@ Vector3f AnimatedTransform::operator()(Float time, const Vector3f &v) const {
         return (*startTransform)(v);
     else if (time >= endTime)
         return (*endTransform)(v);
-    Transform t;
-    Interpolate(time, &t);
+    Transform t = Interpolate(time);
     return t(v);
 }
 

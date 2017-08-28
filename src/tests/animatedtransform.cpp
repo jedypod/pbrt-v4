@@ -47,8 +47,7 @@ TEST(AnimatedTransform, Randoms) {
                 // Now, interpolate the transformations at a bunch of times
                 // along the time range and then transform the bounding box
                 // with the result.
-                Transform tr;
-                at.Interpolate(t, &tr);
+                Transform tr = at.Interpolate(t);
                 Bounds3f tb = tr(bounds);
 
                 // Add a little slop to allow for floating-point round-off

@@ -100,17 +100,15 @@ Spectrum Camera::Sample_Wi(const Interaction &ref, const Point2f &u,
 }
 
 void Camera::WriteImage(ImageMetadata *metadata, Float splatScale) const {
-    Transform c2w;
-    CameraToWorld.Interpolate(shutterOpen, &c2w);
-    metadata->worldToCamera = c2w.GetInverseMatrix();
+    metadata->worldToCamera =
+        CameraToWorld.Interpolate(shutterOpen).GetInverseMatrix();
     film->WriteImage(metadata, splatScale);
 }
 
 void ProjectiveCamera::WriteImage(ImageMetadata *metadata,
                                   Float splatScale) const {
-    Transform c2w;
-    CameraToWorld.Interpolate(shutterOpen, &c2w);
-    metadata->worldToCamera = c2w.GetInverseMatrix();
+    metadata->worldToCamera =
+        CameraToWorld.Interpolate(shutterOpen).GetInverseMatrix();
 
     // TODO: double check this
     Transform worldToNDC = Translate(Vector3f(0.5, 0.5, 0.5)) * Scale(0.5, 0.5, 0.5) *

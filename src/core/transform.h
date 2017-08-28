@@ -419,7 +419,7 @@ class AnimatedTransform {
                       std::shared_ptr<const Transform> endTransform, Float endTime);
     static void Decompose(const Matrix4x4 &m, Vector3f *T, Quaternion *R,
                           Matrix4x4 *S);
-    void Interpolate(Float time, Transform *t) const;
+    Transform Interpolate(Float time) const;
     Ray operator()(const Ray &r) const;
     RayDifferential operator()(const RayDifferential &r) const;
     Point3f operator()(Float time, const Point3f &p) const;

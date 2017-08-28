@@ -11,8 +11,6 @@
   - id  Attribute "shape" "string name" "table"
     -> then store the mapping in metadata. (Also for namedmaterials)
 
-- stuff like AnimatedTransform::Interpolate should return a transform
-  rather than using a pointer parameter to return
 
 - time reported by profiling system vs progress reporter (and reported in
   stats) doesn't match... (only for short renders? need more investigation)
