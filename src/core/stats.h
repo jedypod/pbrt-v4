@@ -59,7 +59,7 @@ class StatRegisterer {
     StatRegisterer(std::function<void(StatsAccumulator &)> func) {
         if (!funcs)
             funcs = new std::vector<std::function<void(StatsAccumulator &)>>;
-        funcs->push_back(func);
+        funcs->push_back(std::move(func));
     }
     static void CallCallbacks(StatsAccumulator &accum);
 

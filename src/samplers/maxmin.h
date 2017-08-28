@@ -75,8 +75,8 @@ class MaxMinDistSampler : public PixelSampler {
                   if (!IsPowerOf2(spp)) {
                       spp = RoundUpPow2(spp);
                       Warning(
-                          "Non power-of-two sample count rounded up to %" PRId64
-                          " for MaxMinDistSampler.",
+                          "Non power-of-two sample count rounded up to %d "
+                          "for MaxMinDistSampler.",
                           spp);
                   }
                   return spp;
