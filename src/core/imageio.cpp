@@ -80,7 +80,7 @@ bool Image::Read(const std::string &name, Image *image, ImageMetadata *metadata,
 }
 
 bool Image::Write(const std::string &name, const ImageMetadata *metadata) const {
-    if (!metadata->pixelBounds.Empty())
+    if (metadata && !metadata->pixelBounds.Empty())
         CHECK_EQ(metadata->pixelBounds.Area(), resolution.x * resolution.y);
 
     if (HasExtension(name, ".exr"))
