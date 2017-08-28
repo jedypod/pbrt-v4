@@ -1,16 +1,27 @@
 
-- more tests from v3-scenes in regress
-
 - use lodepng_inspect to figure out when we can return a 1-channel image
   careful about palleted images -- blow them out to RGB...
   landscape and san miguel have many greyscale alpha textures
   png_info.color.
   could use lodepng_add_text for image metadata (?)
 
+- exr i/o: handle fp32 input/output as appropriate
+
+- std::string_view (in many places) (absl equivalent?)
+
+- harmonize Print(FILE) vs operator<< vs ToString()
+  operator std::string() ?
+
+- spherical traiangle sampling (https://www.shadertoy.com/view/4tGGzd)
+
+- more tests from v3-scenes in regress
+
+- should light distribution api take a sample and point and return a light *
+  and pdf (not a distribution1d?)
+
 - aovs
   - id  Attribute "shape" "string name" "table"
     -> then store the mapping in metadata. (Also for namedmaterials)
-
 
 - time reported by profiling system vs progress reporter (and reported in
   stats) doesn't match... (only for short renders? need more investigation)
@@ -21,10 +32,8 @@
 
 - explicit path representation
 
------
-
 - could get rid of a lot of annoying plumbing
-  (e.g. VIsibilityTester::Unoccluded if scene was a global)
+  (e.g. VIsibilityTester::Unoccluded) if scene was a global
 
 - avx 2 support, half to float, etc...
 
