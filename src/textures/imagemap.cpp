@@ -160,4 +160,7 @@ std::shared_ptr<ImageTexture<Spectrum>> CreateImageSpectrumTexture(
         std::move(map), filename, filter, maxAniso, wrapMode, scale, gamma);
 }
 
+template class ImageTexture<Float>;
+template class ImageTexture<Spectrum>;
+
 }  // namespace pbrt

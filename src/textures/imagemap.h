@@ -102,6 +102,9 @@ class ImageTexture : public Texture<T> {
     static std::map<TexInfo, std::unique_ptr<MIPMap>> textures;
 };
 
+extern template class ImageTexture<Float>;
+extern template class ImageTexture<Spectrum>;
+
 std::shared_ptr<ImageTexture<Float>> CreateImageFloatTexture(
     const Transform &tex2world, const TextureParams &tp);
 std::shared_ptr<ImageTexture<Spectrum>> CreateImageSpectrumTexture(

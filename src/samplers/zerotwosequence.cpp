@@ -45,8 +45,7 @@ ZeroTwoSequenceSampler::ZeroTwoSequenceSampler(int samplesPerPixel,
     : PixelSampler(RoundUpPow2(samplesPerPixel), nSampledDimensions) {
     if (!IsPowerOf2(samplesPerPixel))
         Warning(
-            "Pixel samples being rounded up to power of 2 "
-            "(from %" PRId64 " to %" PRId64 ").",
+            "Pixel samples being rounded up to power of 2 (from %d to %d).",
             samplesPerPixel, RoundUpPow2(samplesPerPixel));
 }
 
