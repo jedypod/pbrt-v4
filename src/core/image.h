@@ -319,7 +319,6 @@ class Image {
     bool WriteEXR(const std::string &name, const ImageMetadata *metadata) const;
     bool WritePFM(const std::string &name, const ImageMetadata *metadata) const;
     bool WritePNG(const std::string &name, const ImageMetadata *metadata) const;
-    bool WriteTGA(const std::string &name, const ImageMetadata *metadata) const;
 
     template <typename F> void ForExtent1(const Bounds2i &extent, WrapMode wrapMode, F op) {
         CHECK_LT(extent.pMin.x, extent.pMax.x);

@@ -40,7 +40,6 @@
 #include "spectrum.h"
 
 #include "ext/lodepng.h"
-#include "ext/targa.h"
 
 #include <ImfChannelList.h>
 #include <ImfFloatAttribute.h>
@@ -54,8 +53,6 @@ namespace pbrt {
 // ImageIO Local Declarations
 static bool ReadEXR(const std::string &name, Image *image,
                     ImageMetadata *metadata);
-static bool ReadTGA(const std::string &name, bool gamma, Image *image,
-                    ImageMetadata *metadata);
 static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                     ImageMetadata *metadata);
 static bool ReadPFM(const std::string &filename, Image *image,
@@ -66,8 +63,6 @@ bool Image::Read(const std::string &name, Image *image, ImageMetadata *metadata,
                  bool gamma) {
     if (HasExtension(name, ".exr"))
         return ReadEXR(name, image, metadata);
-    else if (HasExtension(name, ".tga"))
-        return ReadTGA(name, gamma, image, metadata);
     else if (HasExtension(name, ".png"))
         return ReadPNG(name, gamma, image, metadata);
     else if (HasExtension(name, ".pfm"))
@@ -89,8 +84,6 @@ bool Image::Write(const std::string &name, const ImageMetadata *metadata) const 
         return WritePFM(name, metadata);
     else if (HasExtension(name, ".png"))
         return WritePNG(name, metadata);
-    else if (HasExtension(name, ".tga"))
-        return WriteTGA(name, metadata);
     else {
         Error("%s: no support for writing images with this extension",
               name.c_str());
@@ -350,111 +343,6 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata *metadata) con
               lodepng_error_text(error));
         return false;
     }
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////
-// TGA Function Definitions
-
-bool Image::WriteTGA(const std::string &name, const ImageMetadata *metadata) const {
-    int nc = nChannels();
-    std::unique_ptr<uint8_t[]> outBuf =
-        std::make_unique<uint8_t[]>(nc * resolution.x * resolution.y);
-    uint8_t *dst = outBuf.get();
-    for (int y = 0; y < resolution.y; ++y) {
-        for (int x = 0; x < resolution.x; ++x) {
-            switch (format) {
-            case PixelFormat::SRGB8:
-                // Reformat to 8-bit BGR layout.
-                dst[0] = p8[3 * (y * resolution.x + x) + 2];
-                dst[1] = p8[3 * (y * resolution.x + x) + 1];
-                dst[2] = p8[3 * (y * resolution.x + x)];
-                dst += 3;
-                break;
-            case PixelFormat::SY8:
-                *dst++ = p8[x * resolution.x + x];
-                break;
-            case PixelFormat::Y8:
-            case PixelFormat::Y16:
-            case PixelFormat::Y32:
-                *dst++ = FloatToSRGB(GetChannel({x, y}, 0));
-                break;
-            case PixelFormat::RGB8:
-            case PixelFormat::RGB16:
-            case PixelFormat::RGB32:
-                // Again, reorder to BGR...
-                dst[0] = FloatToSRGB(GetChannel({x, y}, 2));
-                dst[1] = FloatToSRGB(GetChannel({x, y}, 1));
-                dst[2] = FloatToSRGB(GetChannel({x, y}, 0));
-                dst += 3;
-                break;
-            default:
-                LOG(FATAL) << "Unhandled pixel format in WriteTGA";
-            }
-        }
-    }
-
-    tga_result result;
-    if (nc == 1)
-        result = tga_write_mono(name.c_str(), outBuf.get(), resolution.x,
-                                resolution.y);
-    else
-        result = tga_write_bgr(name.c_str(), outBuf.get(), resolution.x,
-                               resolution.y, 24);
-
-    if (result != TGA_NOERR) {
-        Error("Unable to write output file \"%s\" (%s)", name.c_str(),
-              tga_error(result));
-        return false;
-    }
-    return true;
-}
-
-static bool ReadTGA(const std::string &name, bool gamma, Image *image, ImageMetadata *metadata) {
-    tga_image img;
-    tga_result result;
-    if ((result = tga_read(&img, name.c_str())) != TGA_NOERR) {
-        Error("Unable to read from TGA file \"%s\" (%s)", name.c_str(),
-              tga_error(result));
-        return false;
-    }
-
-    if (tga_is_right_to_left(&img)) tga_flip_horiz(&img);
-    if (tga_is_top_to_bottom(&img)) tga_flip_vert(&img);
-    if (tga_is_colormapped(&img)) tga_color_unmap(&img);
-
-    int nChannels = tga_is_mono(&img) ? 1 : 3;
-    std::vector<uint8_t> pixels(img.width * img.height * nChannels);
-
-    // "Unpack" the pixels (origin in the lower left corner).
-    uint8_t *dst = &pixels[0];
-    for (int y = 0; y < img.height; y++)
-        for (int x = 0; x < img.width; x++) {
-            uint8_t *src = tga_find_pixel(&img, x, y);
-            if (nChannels == 1)
-                *dst++ = *src;
-            else {
-                // TGA pixels are in BGRA format.
-                *dst++ = src[2];
-                *dst++ = src[1];
-                *dst++ = src[0];
-            }
-        }
-
-    LOG(INFO) << StringPrintf("Read TGA image %s (%d x %d)",
-                              name.c_str(), img.width, img.height);
-
-    PixelFormat format;
-    if (nChannels == 3)
-      format = gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8;
-    else {
-        CHECK_EQ(1, nChannels);
-        format = gamma ? PixelFormat::SY8 : PixelFormat::Y8;
-    }
-    *image = Image(std::move(pixels), format,
-                   Point2i(img.width, img.height));
-
-    tga_free_buffers(&img);
     return true;
 }
 
