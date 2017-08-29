@@ -70,7 +70,8 @@ class Film {
     Film(const Point2i &resolution, const Bounds2f &cropWindow,
          std::unique_ptr<Filter> filter, Float diagonal,
          const std::string &filename, Float scale,
-         Float maxSampleLuminance = Infinity);
+         Float maxSampleLuminance = Infinity,
+         bool writeFP16 = true);
     Bounds2i GetSampleBounds() const;
     Bounds2f GetPhysicalExtent() const;
     std::unique_ptr<FilmTile> GetFilmTile(const Bounds2i &sampleBounds);
@@ -102,6 +103,7 @@ class Film {
     std::mutex mutex;
     const Float scale;
     const Float maxSampleLuminance;
+    const bool writeFP16;
 
     // Film Private Methods
     Pixel &GetPixel(const Point2i &p) {

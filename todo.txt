@@ -5,8 +5,6 @@
   png_info.color.
   could use lodepng_add_text for image metadata (?)
 
-- exr i/o: handle fp32 input/output as appropriate
-
 - std::string_view (in many places) (absl equivalent?)
 
 - harmonize Print(FILE) vs operator<< vs ToString()
@@ -25,8 +23,6 @@
 
 - time reported by profiling system vs progress reporter (and reported in
   stats) doesn't match... (only for short renders? need more investigation)
-
---
 
 - try jacopo/heitz stuff for inf env map sampling e.g.
 

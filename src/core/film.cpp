@@ -50,13 +50,15 @@ constexpr int Film::filterTableWidth;
 // Film Method Definitions
 Film::Film(const Point2i &resolution, const Bounds2f &cropWindow,
            std::unique_ptr<Filter> filt, Float diagonal,
-           const std::string &filename, Float scale, Float maxSampleLuminance)
+           const std::string &filename, Float scale, Float maxSampleLuminance,
+           bool writeFP16)
     : fullResolution(resolution),
       diagonal(diagonal * .001),
       filter(std::move(filt)),
       filename(filename),
       scale(scale),
-      maxSampleLuminance(maxSampleLuminance) {
+      maxSampleLuminance(maxSampleLuminance),
+      writeFP16(writeFP16) {
     // Compute film image bounds
     croppedPixelBounds =
         Bounds2i(Point2i(std::ceil(fullResolution.x * cropWindow.pMin.x),
@@ -175,10 +177,10 @@ void Film::AddSplat(const Point2f &p, Spectrum v) {
 
 void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
     // Convert image to RGB and compute final pixel values
-    std::vector<Float> rgb(3 * croppedPixelBounds.Area());
     LOG(INFO) <<
         "Converting image to RGB and computing final weighted pixel values";
-    Image rgb32(PixelFormat::RGB32, Point2i(croppedPixelBounds.Diagonal()));
+    PixelFormat format = writeFP16 ? PixelFormat::RGB16 : PixelFormat::RGB32;
+    Image rgbImage(format, Point2i(croppedPixelBounds.Diagonal()));
     for (Point2i p : croppedPixelBounds) {
         // Convert pixel XYZ color to RGB
         Pixel &pixel = GetPixel(p);
@@ -200,7 +202,7 @@ void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
 
         Point2i pOffset(p.x - croppedPixelBounds.pMin.x,
                         p.y - croppedPixelBounds.pMin.y);
-        rgb32.SetSpectrum(pOffset, Spectrum::FromXYZ(&xyz[0]));
+        rgbImage.SetSpectrum(pOffset, Spectrum::FromXYZ(&xyz[0]));
     }
 
     // Write RGB image
@@ -208,7 +210,7 @@ void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
         croppedPixelBounds;
     metadata->pixelBounds = croppedPixelBounds;
     metadata->fullResolution = fullResolution;
-    rgb32.Write(filename, metadata);
+    rgbImage.Write(filename, metadata);
 }
 
 std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
@@ -245,9 +247,11 @@ std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter>
     Float scale = params.GetOneFloat("scale", 1.);
     Float diagonal = params.GetOneFloat("diagonal", 35.);
     Float maxSampleLuminance = params.GetOneFloat("maxsampleluminance",
-                                                   Infinity);
+                                                  Infinity);
+    bool writeFP16 = params.GetOneBool("savefp16", true);
     return std::make_unique<Film>(Point2i(xres, yres), crop, std::move(filter),
-                                  diagonal, filename, scale, maxSampleLuminance);
+                                  diagonal, filename, scale, maxSampleLuminance,
+                                  writeFP16);
 }
 
 }  // namespace pbrt

@@ -101,7 +101,7 @@ bool Image::Write(const std::string &name, const ImageMetadata *metadata) const 
 ///////////////////////////////////////////////////////////////////////////
 // OpenEXR
 
-static Imf::FrameBuffer imageToFrameBuffer(Image &image,
+static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
                                            const Imath::Box2i &dataWindow) {
     size_t xStride = TexelBytes(image.format);
     size_t yStride = image.resolution.x * xStride;
@@ -113,16 +113,28 @@ static Imf::FrameBuffer imageToFrameBuffer(Image &image,
 
     Imf::FrameBuffer fb;
     switch (image.format) {
-    case PixelFormat::RGB16:
-        fb.insert("R", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
-        fb.insert("G", Imf::Slice(Imf::HALF, originPtr + sizeof(uint16_t), xStride, yStride));
-        fb.insert("B", Imf::Slice(Imf::HALF, originPtr + 2 * sizeof(uint16_t), xStride, yStride));
-        break;
     case PixelFormat::Y16:
         fb.insert("Y", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
         break;
+    case PixelFormat::RGB16:
+        fb.insert("R", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
+        fb.insert("G", Imf::Slice(Imf::HALF, originPtr + sizeof(uint16_t),
+                                  xStride, yStride));
+        fb.insert("B", Imf::Slice(Imf::HALF, originPtr + 2 * sizeof(uint16_t),
+                                  xStride, yStride));
+        break;
+    case PixelFormat::Y32:
+        fb.insert("Y", Imf::Slice(Imf::FLOAT, originPtr, xStride, yStride));
+        break;
+    case PixelFormat::RGB32:
+        fb.insert("R", Imf::Slice(Imf::FLOAT, originPtr, xStride, yStride));
+        fb.insert("G", Imf::Slice(Imf::FLOAT, originPtr + sizeof(float),
+                                  xStride, yStride));
+        fb.insert("B", Imf::Slice(Imf::FLOAT, originPtr + 2 * sizeof(float),
+                                  xStride, yStride));
+        break;
     default:
-        LOG(FATAL) << "TODO image format";
+        LOG(FATAL) << "Unexpected image format";
     }
     return fb;
 }
@@ -169,12 +181,20 @@ static bool ReadEXR(const std::string &name, Image *image,
         int height = dw.max.y - dw.min.y + 1;
 
         const Imf::ChannelList &channels = file.header().channels();
-        if (channels.findChannel("R") && channels.findChannel("G") &&
-            channels.findChannel("B")) {
-            // TODO: do rgb32 if that matches the file: channel.type...
-            *image = Image(PixelFormat::RGB16, {width, height});
+        const Imf::Channel *rc = channels.findChannel("R");
+        const Imf::Channel *gc = channels.findChannel("G");
+        const Imf::Channel *bc = channels.findChannel("B");
+        if (rc && gc && bc) {
+            if (rc->type == Imf::HALF && gc->type == Imf::HALF &&
+                bc->type == Imf::HALF)
+                *image = Image(PixelFormat::RGB16, {width, height});
+            else
+                *image = Image(PixelFormat::RGB32, {width, height});
         } else if (channels.findChannel("Y")) {
-            *image = Image(PixelFormat::Y16, {width, height});
+            if (channels.findChannel("Y")->type == Imf::HALF)
+                *image = Image(PixelFormat::Y16, {width, height});
+            else
+                *image = Image(PixelFormat::Y32, {width, height});
         } else {
             std::string channelNames;
             for (auto iter = channels.begin(); iter != channels.end(); ++iter) {
@@ -199,17 +219,15 @@ static bool ReadEXR(const std::string &name, Image *image,
 }
 
 bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) const {
-    // TODO: write out one-channel images if that's what we've got
-
-    // TODO: if we have RGB32, it seems like we should write out float32;
-    // require the caller to explicitly downcast/ask for float16 if
-    // desired?
+    if (Is8Bit(format)) {
+        if (nChannels() == 1)
+            return ConvertToFormat(PixelFormat::Y16).WriteEXR(name, metadata);
+        else
+            return ConvertToFormat(PixelFormat::RGB16).WriteEXR(name, metadata);
+    }
+    CHECK(Is16Bit(format) || Is32Bit(format));
 
     try {
-        // Note that we do still need to convert 8-bit formats to 16-bit.
-        // We do correctly convert to linear if appropriate in that case, right?
-        Image imOut = ConvertToFormat(PixelFormat::RGB16);  // FIXME FIXME
-
         Imath::Box2i displayWindow, dataWindow;
         if (metadata) {
             // Agan, -1 offsets to handle inclusive indexing in OpenEXR...
@@ -224,7 +242,7 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
             displayWindow = dataWindow =
                 {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
 
-        Imf::FrameBuffer fb = imageToFrameBuffer(imOut, dataWindow);
+        Imf::FrameBuffer fb = imageToFrameBuffer(*this, dataWindow);
 
         Imf::Header header(displayWindow, dataWindow);
         for (auto iter = fb.begin(); iter != fb.end(); ++iter)
