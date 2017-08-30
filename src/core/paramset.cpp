@@ -44,6 +44,29 @@ using gtl::ArraySlice;
 
 namespace pbrt {
 
+void NamedValues::AddNumber(double d) {
+    if (strings.size() || bools.size())
+        Error("Ignoring number \"%f\" in non-numeric parameter list", d);
+    else
+        numbers.push_back(d);
+}
+
+void NamedValues::AddString(std::string *str) {
+    if (numbers.size() || bools.size())
+        Error("Ignoring string \"%s\" in non-string parameter list",
+              str->c_str());
+    else
+        strings.push_back(str);
+}
+
+void NamedValues::AddBool(bool v) {
+    if (numbers.size() || strings.size())
+        Error("Ignoring bool \"%s\" in non-bool parameter list",
+              v ? "true" : "false");
+    else
+        bools.push_back(v);
+}
+
 template <typename T>
 static void addParam(const std::string &name, std::vector<T> values,
                      std::vector<ParamSetItem<T>> &vec) {
@@ -254,6 +277,244 @@ void ParamSet::ReportUnused() const {
     checkUnused(textures);
 }
 
+///////////////////////////////////////////////////////////////////////////
+
+static void initBoolParameter(const std::vector<bool> &bools,
+                              const std::vector<std::string *> &strings,
+                              const std::string &fullname,
+                              const std::string &name, ParamSet *ps) {
+    if (!bools.empty()) {
+        std::vector<uint8_t> values(bools.size());
+        std::copy(bools.begin(), bools.end(), values.begin());
+        ps->AddBool(name, std::move(values));
+    } else if (!strings.empty()) {
+        // Legacy string-based bools
+        std::vector<uint8_t> values;
+        for (const std::string *s : strings) {
+            if (*s == "true")
+                values.push_back(true);
+            else if (*s == "false")
+                values.push_back(false);
+            else
+                Warning("Ignoring non \"true\"/\"false\" bool value \"%s\"",
+                        s->c_str());
+        }
+        ps->AddBool(name, std::move(values));
+    } else
+        Error("No bool values provided for \"%s\"", fullname.c_str());
+}
+
+// General numeric parameter array extraction function.  Given the vector
+// of values, |numbers|, provide pointers to every |n|th of them in turn to
+// the given |convert| function, which is responsible for converting them
+// to the desired type T.  These T values are accumulated into a vector,
+// which is then passed to the |add| function after all of the original
+// array values have been processed.
+template <typename T, typename C, typename A>
+static void initNumericParameter(int n, const std::vector<double> &numbers,
+                                 const std::string &name, C convert, A add) {
+    if (numbers.empty()) {
+        Error("No numeric values provided for \"%s\"", name.c_str());
+        return;
+    }
+    if (numbers.size() % n != 0) {
+        Error("Number of values provided for \"%s\" not a multiple of %d",
+              name.c_str(), n);
+        return;
+    }
+
+    std::vector<T> values(numbers.size() / n);
+    for (size_t i = 0; i < values.size(); ++i)
+        values[i] = convert(&numbers[n * i]);
+
+    add(std::move(values));
+}
+
+static std::map<std::string, Spectrum> cachedSpectra;
+
+// TODO: move this functionality (but not the caching?) to a Spectrum method.
+Spectrum readSpectrumFromFile(const std::string &filename) {
+    std::string fn = AbsolutePath(ResolveFilename(filename));
+    if (cachedSpectra.find(fn) != cachedSpectra.end()) return cachedSpectra[fn];
+
+    std::vector<Float> vals;
+    Spectrum s;
+    if (!ReadFloatFile(fn.c_str(), &vals)) {
+        Warning("Unable to read SPD file \"%s\".  Using black distribution.",
+                fn.c_str());
+        s = Spectrum(0.);
+    } else {
+        if (vals.size() % 2 != 0) {
+            Warning("Extra value found in spectrum file \"%s\". Ignoring it.",
+                    fn.c_str());
+        }
+        std::vector<Float> lambda, v;
+        for (size_t i = 0; i < vals.size() / 2; ++i) {
+            lambda.push_back(vals[2 * i]);
+            v.push_back(vals[2 * i + 1]);
+        }
+        s = Spectrum::FromSampled(lambda, v);
+    }
+    cachedSpectra[fn] = s;
+    return s;
+}
+
+void ParamSet::Parse(const NamedValues *namedValues,
+                     SpectrumType spectrumType) {
+    for (const NamedValues *nv = namedValues; nv; nv = nv->next) {
+        if (nv->name->find(' ') == std::string::npos) {
+            Error("Syntax error in parameter name \"%s\"", nv->name->c_str());
+            continue;
+        }
+        std::string type = nv->name->substr(0, nv->name->find(' '));
+        std::string name = nv->name->substr(nv->name->rfind(' ') + 1);
+
+        if (type == "integer") {
+            initNumericParameter<int>(
+                1, nv->numbers, *nv->name,
+                [](const double *v) {
+                    if (*v > std::numeric_limits<int>::max())
+                        Warning(
+                            "Numeric value %f too large to represent as an "
+                            "integer. Clamping to %d",
+                            *v, std::numeric_limits<int>::max());
+                    else if (*v < std::numeric_limits<int>::lowest())
+                        Warning(
+                            "Numeric value %f too low to represent as an "
+                            "integer. Clamping to %d",
+                            *v, std::numeric_limits<int>::lowest());
+                    else if (double(int(*v)) != *v)
+                        Warning(
+                            "Floating-point value %f will be rounded to an "
+                            "integer",
+                            *v);
+
+                    return int(Clamp(*v, std::numeric_limits<int>::lowest(),
+                                     std::numeric_limits<int>::max()));
+                },
+                [this, &name](std::vector<int> v) {
+                    AddInt(name, std::move(v));
+                });
+        } else if (type == "float") {
+            initNumericParameter<Float>(
+                1, nv->numbers, *nv->name,
+                [](const double *v) { return Float(*v); },
+                [this, &name](std::vector<Float> v) {
+                    AddFloat(name, std::move(v));
+                });
+        } else if (type == "bool") {
+            initBoolParameter(nv->bools, nv->strings, *nv->name, name, this);
+        } else if (type == "point2") {
+            initNumericParameter<Point2f>(
+                2, nv->numbers, *nv->name,
+                [](const double *v) { return Point2f(v[0], v[1]); },
+                [this, &name](std::vector<Point2f> v) {
+                    AddPoint2f(name, std::move(v));
+                });
+        } else if (type == "vector2") {
+            initNumericParameter<Vector2f>(
+                2, nv->numbers, *nv->name,
+                [](const double *v) { return Vector2f(v[0], v[1]); },
+                [this, &name](std::vector<Vector2f> v) {
+                    AddVector2f(name, std::move(v));
+                });
+        } else if (type == "point" || type == "point3") {
+            initNumericParameter<Point3f>(
+                3, nv->numbers, *nv->name,
+                [](const double *v) { return Point3f(v[0], v[1], v[2]); },
+                [this, &name](std::vector<Point3f> v) {
+                    AddPoint3f(name, std::move(v));
+                });
+        } else if (type == "vector" || type == "vector3") {
+            initNumericParameter<Vector3f>(
+                3, nv->numbers, *nv->name,
+                [](const double *v) { return Vector3f(v[0], v[1], v[2]); },
+                [this, &name](std::vector<Vector3f> v) {
+                    AddVector3f(name, std::move(v));
+                });
+        } else if (type == "normal") {
+            initNumericParameter<Normal3f>(
+                3, nv->numbers, *nv->name,
+                [](const double *v) { return Normal3f(v[0], v[1], v[2]); },
+                [this, &name](std::vector<Normal3f> v) {
+                    AddNormal3f(name, std::move(v));
+                });
+        } else if (type == "color" || type == "rgb") {
+            initNumericParameter<Spectrum>(
+                3, nv->numbers, *nv->name,
+                [spectrumType](const double *v) -> Spectrum {
+                    Float rgb[3] = {Float(v[0]), Float(v[1]), Float(v[2])};
+                    return Spectrum::FromRGB(rgb, spectrumType);
+                },
+                [this, &name](std::vector<Spectrum> v) {
+                    AddSpectrum(name, std::move(v));
+                });
+        } else if (type == "xyz") {
+            initNumericParameter<Spectrum>(
+                3, nv->numbers, *nv->name,
+                [spectrumType](const double *v) -> Spectrum {
+                    Float xyz[3] = {Float(v[0]), Float(v[1]), Float(v[2])};
+                    return Spectrum::FromXYZ(xyz, spectrumType);
+                },
+                [this, &name](std::vector<Spectrum> v) {
+                    AddSpectrum(name, std::move(v));
+                });
+        } else if (type == "blackbody") {
+            std::vector<Float> values(nCIESamples);
+            initNumericParameter<Spectrum>(
+                2, nv->numbers, *nv->name,
+                [&values](const double *v) -> Spectrum {
+                    Float T = v[0], scale = v[1];
+                    BlackbodyNormalized(CIE_lambda, T, &values);
+                    return scale * Spectrum::FromSampled(CIE_lambda, values);
+                },
+                [this, &name](std::vector<Spectrum> v) {
+                    AddSpectrum(name, std::move(v));
+                });
+        } else if (type == "spectrum") {
+            if (nv->numbers.size()) {
+                if (nv->numbers.size() % 2 != 0) {
+                    Error("Found odd number of values for \"%s\"",
+                          nv->name->c_str());
+                    continue;
+                }
+                int nSamples = nv->numbers.size() / 2;
+                std::vector<Float> lambda(nSamples), value(nSamples);
+                for (int i = 0; i < nSamples; ++i) {
+                    lambda[i] = nv->numbers[2 * i];
+                    value[i] = nv->numbers[2 * i + 1];
+                }
+                std::vector<Spectrum> spectrum(1);
+                spectrum[0] = Spectrum::FromSampled(lambda, value);
+                AddSpectrum(name, std::move(spectrum));
+            } else if (nv->strings.size()) {
+                std::vector<Spectrum> values;
+                for (const std::string *filename : nv->strings)
+                    values.push_back(readSpectrumFromFile(*filename));
+                AddSpectrum(name, std::move(values));
+            } else {
+                Error("No values found for \"%s\"", nv->name->c_str());
+            }
+        } else if (type == "string") {
+            if (nv->strings.empty())
+                Error("No strings provided for \"%s\"", nv->name->c_str());
+            else {
+                std::vector<std::string> strings;
+                for (const std::string *s : nv->strings)
+                    strings.push_back(*s);
+                AddString(name, std::move(strings));
+            }
+        } else if (type == "texture") {
+            if (nv->strings.size() != 1)
+                Error("Expecting a single string for \"%s\"",
+                      nv->name->c_str());
+            else
+                AddTexture(name, *nv->strings[0]);
+        } else
+            Error("Unexpected parameter type \"%s\"", type.c_str());
+    }
+}
+
 static std::string toString(int v) { return std::to_string(v); }
 
 static std::string toString(bool v) { return v ? "\"true\"" : "\"false\""; }
@@ -328,7 +589,9 @@ std::string ParamSet::ToString(int indent) const {
     return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////
 // TextureParams Method Definitions
+
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &name, const Spectrum &def) const {
     auto tex = GetSpectrumTextureOrNull(name);

@@ -42,11 +42,10 @@
 #include "pbrt.h"
 
 #include "memory.h"
-#include "spectrum.h"
+#include "paramset.h"
 
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace pbrt {
 
@@ -54,28 +53,12 @@ bool ParseFile(const std::string &filename);
 
 namespace parse {
 
-struct ParameterAndValues {
-    void AddNumber(double d);
-    void AddString(std::string *str);
-    void AddBool(bool v);
-
-    std::string *name = nullptr;
-    ParameterAndValues *next = nullptr;
-
-    std::vector<double> numbers;
-    std::vector<std::string *> strings;
-    std::vector<bool> bools;
-};
-
 extern std::string currentFilename;
 extern int currentLineNumber;
 extern std::unique_ptr<MemoryPool<std::string>> stringPool;
-extern std::unique_ptr<MemoryPool<ParameterAndValues>> paramArrayPool;
+extern std::unique_ptr<MemoryPool<NamedValues>> namedValuesPool;
 
 }  // namespace parse
-
-ParamSet ParseParameters(const parse::ParameterAndValues *parameters,
-                         SpectrumType spectrumType);
 
 }  // namespace pbrt
 

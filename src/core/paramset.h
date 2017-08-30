@@ -53,6 +53,23 @@
 
 namespace pbrt {
 
+// Note the std::string *s. We assume that the caller will handle
+// allocating and deallocating these (e.g. via a MemoryPool);
+// NamedValues doesn't do anything to free them itself.
+class NamedValues {
+ public:
+    void AddNumber(double d);
+    void AddString(std::string *str);
+    void AddBool(bool v);
+
+    std::string *name = nullptr;
+    NamedValues *next = nullptr;
+
+    std::vector<double> numbers;
+    std::vector<std::string *> strings;
+    std::vector<bool> bools;
+};
+
 template <typename T>
 struct ParamSetItem {
     // ParamSetItem Public Methods
@@ -69,6 +86,9 @@ struct ParamSetItem {
 class ParamSet {
   public:
     // ParamSet Public Methods
+
+    void Parse(const NamedValues *namedValuesList, SpectrumType spectrumType);
+
     void AddFloat(const std::string &, std::vector<Float> v);
     void AddInt(const std::string &, std::vector<int> v);
     // Use uint8_t for bool rather than an actual bool so that the

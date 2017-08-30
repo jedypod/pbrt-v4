@@ -63,17 +63,17 @@ std::string currentFilename;
 
 extern void includePush(const std::string &filename);
 
-static ParameterAndValues *activeParameterList = nullptr;
+static NamedValues *activeParameterList = nullptr;
 
-static ParameterAndValues *currentParameter = nullptr;
+static NamedValues *currentParameter = nullptr;
 
 static void deallocActiveParameterList() {
-    for (ParameterAndValues *p = activeParameterList; p;) {
+    for (NamedValues *p = activeParameterList; p;) {
         stringPool->Release(p->name);
         for (std::string *s : p->strings)
             stringPool->Release(s);
-        ParameterAndValues *next = p->next;
-        paramArrayPool->Release(p);
+        NamedValues *next = p->next;
+        namedValuesPool->Release(p);
         p = next;
     }
 }
@@ -89,7 +89,7 @@ using namespace pbrt::parse;
 %union {
 std::string *string;
 double num;
-pbrt::parse::ParameterAndValues *paramArray;
+pbrt::NamedValues *namedValues;
 }
 
 %token <string> STRING ID
@@ -107,7 +107,7 @@ pbrt::parse::ParameterAndValues *paramArray;
 
 %token HIGH_PRECEDENCE
 
-%type<paramArray> array num_array string_array bool_array
+%type<namedValues> array num_array string_array bool_array
 
 %%
 start: pbrt_stmt_list
@@ -144,7 +144,7 @@ paramlist_entry: STRING array
     // twice, then the last one is the one that's used.
     if (!activeParameterList) activeParameterList = $2;
     else {
-        ParameterAndValues *tail = activeParameterList;
+        NamedValues *tail = activeParameterList;
         while (tail->next) tail = tail->next;
         tail->next = $2;
     }
@@ -177,7 +177,7 @@ string_array: array_init LBRACK string_list RBRACK
 array_init: %prec HIGH_PRECEDENCE
 {
     CHECK(currentParameter == nullptr);
-    currentParameter = paramArrayPool->Alloc();
+    currentParameter = namedValuesPool->Alloc();
 };
 
 string_array_init: %prec HIGH_PRECEDENCE
@@ -257,7 +257,8 @@ bool_list_entry: bool_array_init TRUE
 
 pbrt_stmt: ACCELERATOR STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtAccelerator(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -276,7 +277,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | AREALIGHTSOURCE STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Illuminant);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Illuminant);
     pbrtAreaLightSource(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -291,7 +293,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | CAMERA STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtCamera(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -306,7 +309,7 @@ pbrt_stmt: ACCELERATOR STRING paramlist
         std::copy($2->numbers.begin(), $2->numbers.end(), m);
         pbrtConcatTransform(m);
     }
-    paramArrayPool->Release($2);
+    namedValuesPool->Release($2);
 }
 | COORDINATESYSTEM STRING
 {
@@ -320,7 +323,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | FILM STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtFilm(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -336,14 +340,16 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | INTEGRATOR STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtIntegrator(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
 }
 | LIGHTSOURCE STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Illuminant);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Illuminant);
     pbrtLightSource(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -354,21 +360,24 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | MAKENAMEDMATERIAL STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtMakeNamedMaterial(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
 }
 | MAKENAMEDMEDIUM STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtMakeNamedMedium(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
 }
 | MATERIAL STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtMaterial(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -405,7 +414,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | PIXELFILTER STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtPixelFilter(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -420,7 +430,8 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | SAMPLER STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtSampler(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
@@ -431,14 +442,16 @@ pbrt_stmt: ACCELERATOR STRING paramlist
 }
 | SHAPE STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtShape(*$2, std::move(params));
     stringPool->Release($2);
     deallocActiveParameterList();
 }
 | TEXTURE STRING STRING STRING paramlist
 {
-    ParamSet params = ParseParameters(activeParameterList, SpectrumType::Reflectance);
+    ParamSet params;
+    params.Parse(activeParameterList, SpectrumType::Reflectance);
     pbrtTexture(*$2, *$3, *$4, std::move(params));
     stringPool->Release($2);
     stringPool->Release($3);
@@ -467,7 +480,7 @@ pbrt_stmt: ACCELERATOR STRING paramlist
         std::copy($2->numbers.begin(), $2->numbers.end(), m);
         pbrtTransform(m);
     }
-    paramArrayPool->Release($2);
+    namedValuesPool->Release($2);
 }
 | TRANSLATE NUM NUM NUM
 {
