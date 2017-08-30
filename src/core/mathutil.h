@@ -245,10 +245,10 @@ inline int CountTrailingZeros(uint32_t v) {
 }
 
 template <typename Predicate>
-int FindInterval(int size, const Predicate &pred) {
-    int first = 0, len = size;
+size_t FindInterval(size_t size, const Predicate &pred) {
+    size_t first = 0, len = size;
     while (len > 0) {
-        int half = len >> 1, middle = first + half;
+        size_t half = len >> 1, middle = first + half;
         // Bisect range based on value of _pred_ at _middle_
         if (pred(middle)) {
             first = middle + 1;
