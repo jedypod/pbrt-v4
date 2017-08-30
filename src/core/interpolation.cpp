@@ -45,7 +45,7 @@ namespace pbrt {
 Float CatmullRom(ArraySlice<Float> nodes, ArraySlice<Float> values, Float x) {
     CHECK_EQ(nodes.size(), values.size());
     if (!(x >= nodes.front() && x <= nodes.back())) return 0;
-    int idx = GetIntArrayerval(nodes.size(), [&](int i) { return nodes[i] <= x; });
+    int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
     Float x0 = nodes[idx], x1 = nodes[idx + 1];
     Float f0 = values[idx], f1 = values[idx + 1];
     Float width = x1 - x0;
@@ -72,7 +72,7 @@ bool CatmullRomWeights(ArraySlice<Float> nodes, Float x, int *offset,
     if (!(x >= nodes.front() && x <= nodes.back())) return false;
 
     // Search for the interval _idx_ containing _x_
-    int idx = GetIntArrayerval(nodes.size(), [&](int i) { return nodes[i] <= x; });
+    int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
     *offset = idx - 1;
     Float x0 = nodes[idx], x1 = nodes[idx + 1];
 
@@ -116,7 +116,7 @@ Float SampleCatmullRom(ArraySlice<Float> x, ArraySlice<Float> f,
 
     // Map _u_ to a spline interval by inverting _F_
     u *= F.back();
-    int i = GetIntArrayerval(F.size(), [&](int i) { return F[i] <= u; });
+    int i = FindInterval(F.size(), [&](int i) { return F[i] <= u; });
 
     // Look up $x_i$ and function values of spline segment _i_
     Float x0 = x[i], x1 = x[i + 1];
@@ -200,7 +200,7 @@ Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
     // Map _u_ to a spline interval by inverting the interpolated _cdf_
     Float maximum = interpolate(cdf, nodes2.size() - 1);
     u *= maximum;
-    int idx = GetIntArrayerval(nodes2.size(),
+    int idx = FindInterval(nodes2.size(),
                            [&](int i) { return interpolate(cdf, i) <= u; });
 
     // Look up node positions and interpolated function values
@@ -304,7 +304,7 @@ Float InvertCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values, Float u) {
         return x.back();
 
     // Map _u_ to a spline interval by inverting _values_
-    int i = GetIntArrayerval(values.size(), [&](int i) { return values[i] <= u; });
+    int i = FindInterval(values.size(), [&](int i) { return values[i] <= u; });
 
     // Look up $x_i$ and function values of spline segment _i_
     Float x0 = x[i], x1 = x[i + 1];

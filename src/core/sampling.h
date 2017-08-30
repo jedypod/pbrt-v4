@@ -82,7 +82,7 @@ class Distribution1D {
     int Count() const { return func.size(); }
     Float SampleContinuous(Float u, Float *pdf, int *off = nullptr) const {
         // Find surrounding CDF segments and _offset_
-        int offset = GetIntArrayerval(cdf.size(),
+        int offset = FindInterval(cdf.size(),
                                   [&](int index) { return cdf[index] <= u; });
         if (off) *off = offset;
         // Compute offset along CDF segment
@@ -102,7 +102,7 @@ class Distribution1D {
     int SampleDiscrete(Float u, Float *pdf = nullptr,
                        Float *uRemapped = nullptr) const {
         // Find surrounding CDF segments and _offset_
-        int offset = GetIntArrayerval(cdf.size(),
+        int offset = FindInterval(cdf.size(),
                                   [&](int index) { return cdf[index] <= u; });
         if (pdf) *pdf = (funcInt > 0) ? func[offset] / (funcInt * Count()) : 0;
         if (uRemapped)
