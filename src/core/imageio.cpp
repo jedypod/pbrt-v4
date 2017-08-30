@@ -283,8 +283,8 @@ static bool ReadPNG(const std::string &name, bool gamma, Image *image,
 
     std::vector<uint8_t> rgb8(3 * width * height);
     unsigned char *src = rgb;
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x, src += 3) {
+    for (unsigned int y = 0; y < height; ++y) {
+        for (unsigned int x = 0; x < width; ++x, src += 3) {
             for (int c = 0; c < 3; ++c)
                 rgb8[3 * ((y * width) + x) + c] = src[c];
         }
