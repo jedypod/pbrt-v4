@@ -11,6 +11,14 @@
 
 - Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
 
+- more tests from v3-scenes in regress
+
+- aov integrator should include metadata
+
+- more std::optional: ReadImage, ... ?
+
+- report pixel format in imgtool info
+
 - use lodepng_inspect to figure out when we can return a 1-channel image
   careful about palleted images -- blow them out to RGB...
   landscape and san miguel have many greyscale alpha textures

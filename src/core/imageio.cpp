@@ -271,28 +271,88 @@ static inline uint8_t FloatToSRGB(Float v) {
 
 static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                     ImageMetadata *metadata) {
-    unsigned char *rgb;
+    auto contents = ReadFileContents(name);
+    if (!contents)
+        return false;
+
     unsigned width, height;
-    unsigned int error =
-        lodepng_decode24_file(&rgb, &width, &height, name.c_str());
+    LodePNGState state;
+    lodepng_state_init(&state);
+    unsigned int error = lodepng_inspect(&width, &height, &state,
+                                         (const unsigned char *)contents->data(),
+                                         contents->size());
     if (error != 0) {
-        Error("Error reading PNG \"%s\": %s", name.c_str(),
-              lodepng_error_text(error));
+        Error("%s: %s", name.c_str(), lodepng_error_text(error));
         return false;
     }
 
-    std::vector<uint8_t> rgb8(3 * width * height);
-    unsigned char *src = rgb;
-    for (unsigned int y = 0; y < height; ++y) {
-        for (unsigned int x = 0; x < width; ++x, src += 3) {
-            for (int c = 0; c < 3; ++c)
-                rgb8[3 * ((y * width) + x) + c] = src[c];
+    switch (state.info_png.color.colortype) {
+    case LCT_GREY:
+    case LCT_GREY_ALPHA: {
+        std::vector<unsigned char> buf;
+        int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
+        error = lodepng::decode(buf, width, height,
+                                (const unsigned char *)contents->data(),
+                                contents->size(), LCT_GREY, bpp);
+        if (error != 0) {
+            Error("%s: %s", name.c_str(), lodepng_error_text(error));
+            return false;
+        }
+
+        if (state.info_png.color.bitdepth == 16) {
+            *image = Image(PixelFormat::Y16, Point2i(width, height));
+            auto bufIter = buf.begin();
+            for (unsigned int y = 0; y < height; ++y)
+                for (unsigned int x = 0; x < width; ++x, bufIter += 2) {
+                    // Convert from little endian.
+                    Float v = (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f;
+                    if (gamma) v = SRGBToLinear(v);
+                    image->SetChannel(Point2i(x, y), 0, v);
+                }
+            CHECK(bufIter == buf.end());
+        } else {
+            *image = Image(gamma ? PixelFormat::SY8 : PixelFormat::Y8,
+                           Point2i(width, height));
+            std::copy(buf.begin(), buf.end(), (uint8_t *)image->RawPointer({0, 0}));
+        }
+        break;
+    }
+    default: {
+        std::vector<unsigned char> buf;
+        int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
+        error = lodepng::decode(buf, width, height,
+                                (const unsigned char *)contents->data(),
+                                contents->size(), LCT_RGB, bpp);
+        if (error != 0) {
+            Error("%s: %s", name.c_str(), lodepng_error_text(error));
+            return false;
+        }
+
+        if (state.info_png.color.bitdepth == 16) {
+            *image = Image(PixelFormat::RGB16, Point2i(width, height));
+            auto bufIter = buf.begin();
+            for (unsigned int y = 0; y < height; ++y)
+                for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
+                    CHECK(bufIter < buf.end()) ;
+                    // Convert from little endian.
+                    Float rgb[3] = {
+                        (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
+                        (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
+                        (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f };
+                    if (gamma)
+                        for (int c = 0; c < 3; ++c)
+                            // TODO: this is slow; could replace with a LUT
+                            rgb[c] = SRGBToLinear(rgb[c]);
+                    image->SetSpectrum(Point2i(x, y), Spectrum::FromRGB(rgb));
+                }
+            CHECK(bufIter == buf.end());
+        } else {
+            *image = Image(gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8,
+                           Point2i(width, height));
+            std::copy(buf.begin(), buf.end(), (uint8_t *)image->RawPointer({0, 0}));
         }
     }
-
-    PixelFormat format = gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8;
-    *image = Image(std::move(rgb8), format, Point2i(width, height));
-    free(rgb);
+    }
 
     return true;
 }

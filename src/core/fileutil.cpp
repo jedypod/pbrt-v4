@@ -33,8 +33,13 @@
 
 // core/fileutil.cpp*
 #include "fileutil.h"
+
+#include "error.h"
+
 #include <cstdlib>
 #include <climits>
+#include <fstream>
+
 #ifndef PBRT_IS_WINDOWS
 #include <libgen.h>
 #endif
@@ -125,6 +130,16 @@ std::string DirectoryContaining(const std::string &filename) {
 
 void SetSearchDirectory(const std::string &dirname) {
     searchDirectory = dirname;
+}
+
+std::experimental::optional<std::string> ReadFileContents(const std::string &filename) {
+    std::ifstream ifs(filename, std::ios::binary);
+    if (!ifs) {
+        Error("%s: %s", filename.c_str(), strerror(errno));
+        return {};
+    }
+    return std::string((std::istreambuf_iterator<char>(ifs)),
+                       (std::istreambuf_iterator<char>()));
 }
 
 }  // namespace pbrt

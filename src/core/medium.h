@@ -47,6 +47,7 @@
 #include "stringprint.h"
 
 #include <cmath>
+#include <memory>
 
 namespace pbrt {
 

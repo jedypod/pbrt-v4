@@ -41,8 +41,9 @@
 // core/fileutil.h*
 #include "pbrt.h"
 
-#include <string>
 #include <cctype>
+#include <experimental/optional>
+#include <string>
 
 namespace pbrt {
 
@@ -52,6 +53,7 @@ std::string AbsolutePath(const std::string &filename);
 std::string ResolveFilename(const std::string &filename);
 std::string DirectoryContaining(const std::string &filename);
 void SetSearchDirectory(const std::string &dirname);
+std::experimental::optional<std::string> ReadFileContents(const std::string &filename);
 
 inline bool HasExtension(const std::string &value, const std::string &ending) {
     if (ending.size() > value.size()) return false;
