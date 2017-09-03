@@ -79,6 +79,4 @@ TEST(ImageIO, RoundTripEXR) { TestRoundTrip("out.exr", false); }
 
 TEST(ImageIO, RoundTripPFM) { TestRoundTrip("out.pfm", false); }
 
-TEST(ImageIO, RoundTripTGA) { TestRoundTrip("out.tga", true); }
-
 TEST(ImageIO, RoundTripPNG) { TestRoundTrip("out.png", true); }
