@@ -43,8 +43,9 @@ namespace pbrt {
 ProjectionLight::ProjectionLight(const Transform &LightToWorld,
                                  const MediumInterface &mediumInterface,
                                  const Spectrum &I, const std::string &texname,
-                                 Float fov)
-    : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface),
+                                 Float fov, const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
+            attributes),
       pLight(LightToWorld(Point3f(0, 0, 0))),
       I(I) {
     // Create _ProjectionLight_ MIP map
@@ -129,13 +130,13 @@ void ProjectionLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
 
 std::shared_ptr<ProjectionLight> CreateProjectionLight(
     const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet) {
+    const ParamSet &paramSet, const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     Float fov = paramSet.GetOneFloat("fov", 45.);
     std::string texname = paramSet.GetOneFilename("mapname", "");
     return std::make_shared<ProjectionLight>(light2world, medium, I * sc,
-                                             texname, fov);
+                                             texname, fov, attributes);
 }
 
 }  // namespace pbrt

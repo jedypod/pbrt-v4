@@ -61,8 +61,10 @@ class KdSubsurfaceMaterial : public Material {
                          const std::shared_ptr<Texture<Float>> &uRoughness,
                          const std::shared_ptr<Texture<Float>> &vRoughness,
                          const std::shared_ptr<Texture<Float>> &bumpMap,
-                         bool remapRoughness)
-        : scale(scale),
+                         bool remapRoughness,
+                         const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          scale(scale),
           Kd(Kd),
           Kr(Kr),
           Kt(Kt),
@@ -90,7 +92,7 @@ class KdSubsurfaceMaterial : public Material {
 };
 
 std::shared_ptr<KdSubsurfaceMaterial> CreateKdSubsurfaceMaterial(
-    const TextureParams &mp);
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

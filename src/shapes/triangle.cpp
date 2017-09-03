@@ -59,13 +59,14 @@ TriangleMesh::TriangleMesh(
     const Transform &ObjectToWorld, bool reverseOrientation,
     ArraySlice<int> vertexIndices, ArraySlice<Point3f> P,
     ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV,
-    ArraySlice<int> faceIndices)
+    ArraySlice<int> faceIndices, const std::shared_ptr<const ParamSet> &attributes)
     : reverseOrientation(reverseOrientation),
       transformSwapsHandedness(ObjectToWorld.SwapsHandedness()),
       nTriangles(vertexIndices.size() / 3),
       nVertices(P.size()),
       vertexIndices(vertexIndices.begin(), vertexIndices.end()),
-      faceIndices(faceIndices.begin(), faceIndices.end()) {
+      faceIndices(faceIndices.begin(), faceIndices.end()),
+      attributes(attributes) {
     CHECK_EQ((vertexIndices.size() % 3), 0);
     ++nMeshes;
     nTris += nTriangles;
@@ -99,10 +100,11 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
     bool reverseOrientation, ArraySlice<int> vertexIndices,
     ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
-    ArraySlice<Point2f> uv, ArraySlice<int> faceIndices) {
+    ArraySlice<Point2f> uv, ArraySlice<int> faceIndices,
+    const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
         ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv,
-        faceIndices);
+        faceIndices, attributes);
     std::vector<std::shared_ptr<Shape>> tris;
     size_t nTriangles = vertexIndices.size() / 3;
     tris.reserve(nTriangles);
@@ -572,7 +574,7 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     ArraySlice<int> vi = params.GetIntArray("indices");
     ArraySlice<Point3f> P = params.GetPoint3fArray("P");
     ArraySlice<Point2f> uvs = params.GetPoint2fArray("uv");
@@ -646,7 +648,7 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
 
     return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
                               reverseOrientation, vi, P, S, N, uvs,
-                              faceIndices);
+                              faceIndices, attributes);
 }
 
 }  // namespace pbrt

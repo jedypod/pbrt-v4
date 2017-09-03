@@ -89,7 +89,7 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
 }
 
 std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
-    const TextureParams &mp) {
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
           sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
@@ -124,7 +124,7 @@ std::shared_ptr<SubsurfaceMaterial> CreateSubsurfaceMaterial(
     bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<SubsurfaceMaterial>(scale, Kr, Kt, sigma_a, sigma_s,
                                                 g, eta, roughu, roughv, bumpMap,
-                                                remapRoughness);
+                                                remapRoughness, attributes);
 }
 
 }  // namespace pbrt

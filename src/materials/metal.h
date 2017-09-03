@@ -57,7 +57,8 @@ class MetalMaterial : public Material {
                   const std::shared_ptr<Texture<Float>> &urough,
                   const std::shared_ptr<Texture<Float>> &vrough,
                   const std::shared_ptr<Texture<Float>> &bump,
-                  bool remapRoughness);
+                  bool remapRoughness,
+                  const std::shared_ptr<const ParamSet> &attributes);
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode) const;
 
@@ -69,7 +70,8 @@ class MetalMaterial : public Material {
     bool remapRoughness;
 };
 
-std::shared_ptr<MetalMaterial> CreateMetalMaterial(const TextureParams &mp);
+std::shared_ptr<MetalMaterial> CreateMetalMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

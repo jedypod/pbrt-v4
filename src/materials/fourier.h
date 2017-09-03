@@ -57,7 +57,8 @@ class FourierMaterial : public Material {
   public:
     // FourierMaterial Public Methods
     FourierMaterial(const std::string &filename,
-                    const std::shared_ptr<Texture<Float>> &bump);
+                    const std::shared_ptr<Texture<Float>> &bump,
+                    const std::shared_ptr<const ParamSet> &attributes);
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode) const;
 
@@ -68,7 +69,8 @@ class FourierMaterial : public Material {
     static std::map<std::string, std::unique_ptr<FourierBSDFTable>> loadedBSDFs;
 };
 
-std::shared_ptr<FourierMaterial> CreateFourierMaterial(const TextureParams &mp);
+std::shared_ptr<FourierMaterial> CreateFourierMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

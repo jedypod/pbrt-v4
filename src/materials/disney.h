@@ -64,8 +64,10 @@ class DisneyMaterial : public Material {
                    const std::shared_ptr<Texture<Spectrum>> &scatterDistance,
                    bool thin, const std::shared_ptr<Texture<Float>> &flatness,
                    const std::shared_ptr<Texture<Float>> &diffTrans,
-                   const std::shared_ptr<Texture<Float>> &bumpMap)
-        : color(color),
+                   const std::shared_ptr<Texture<Float>> &bumpMap,
+                   const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          color(color),
           metallic(metallic),
           eta(eta),
           roughness(roughness),
@@ -96,7 +98,8 @@ class DisneyMaterial : public Material {
     std::shared_ptr<Texture<Float>> flatness, diffTrans, bumpMap;
 };
 
-std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(const TextureParams &mp);
+std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

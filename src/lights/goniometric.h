@@ -54,8 +54,10 @@ class GonioPhotometricLight : public Light {
                        Float *pdf, VisibilityTester *vis) const;
     GonioPhotometricLight(const Transform &LightToWorld,
                           const MediumInterface &mediumInterface,
-                          const Spectrum &I, const std::string &texname)
-        : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface),
+                          const Spectrum &I, const std::string &texname,
+                          const std::shared_ptr<const ParamSet> &attributes)
+        : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
+                attributes),
           pLight(LightToWorld(Point3f(0, 0, 0))),
           I(I) {
         if (!Image::Read(texname, &image)) {
@@ -88,7 +90,7 @@ class GonioPhotometricLight : public Light {
 
 std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
     const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet);
+    const ParamSet &paramSet, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

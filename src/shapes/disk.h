@@ -50,8 +50,9 @@ class Disk : public TransformedShape {
     Disk(std::shared_ptr<const Transform> ObjectToWorld,
          std::shared_ptr<const Transform> WorldToObject,
          bool reverseOrientation, Float height, Float radius, Float innerRadius,
-         Float phiMax)
-        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
+         Float phiMax, const std::shared_ptr<const ParamSet> &attributes)
+        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation,
+                           attributes),
           height(height),
           radius(radius),
           innerRadius(innerRadius),
@@ -70,7 +71,7 @@ class Disk : public TransformedShape {
 std::shared_ptr<Disk> CreateDiskShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

@@ -50,8 +50,10 @@ MetalMaterial::MetalMaterial(const std::shared_ptr<Texture<Spectrum>> &eta,
                              const std::shared_ptr<Texture<Float>> &uRoughness,
                              const std::shared_ptr<Texture<Float>> &vRoughness,
                              const std::shared_ptr<Texture<Float>> &bumpMap,
-                             bool remapRoughness)
-    : eta(eta),
+                             bool remapRoughness,
+                             const std::shared_ptr<const ParamSet> &attributes)
+    : Material(attributes),
+      eta(eta),
       k(k),
       roughness(roughness),
       uRoughness(uRoughness),
@@ -114,7 +116,8 @@ const Float CopperK[CopperSamples] = {
     2.678062, 2.809, 3.01075,  3.24,  3.458187, 3.67,  3.863125, 4.05,
     4.239563, 4.43,  4.619563, 4.817, 5.034125, 5.26,  5.485625, 5.717};
 
-std::shared_ptr<MetalMaterial> CreateMetalMaterial(const TextureParams &mp) {
+std::shared_ptr<MetalMaterial> CreateMetalMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     static Spectrum copperN = Spectrum::FromSampled(CopperWavelengths, CopperN);
     std::shared_ptr<Texture<Spectrum>> eta =
         mp.GetSpectrumTexture("eta", copperN);
@@ -130,7 +133,7 @@ std::shared_ptr<MetalMaterial> CreateMetalMaterial(const TextureParams &mp) {
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<MetalMaterial>(eta, k, roughness, uRoughness,
-                                           vRoughness, bumpMap, remapRoughness);
+                                           vRoughness, bumpMap, remapRoughness, attributes);
 }
 
 }  // namespace pbrt

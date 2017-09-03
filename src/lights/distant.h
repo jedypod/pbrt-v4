@@ -56,7 +56,7 @@ class DistantLight : public Light {
   public:
     // DistantLight Public Methods
     DistantLight(const Transform &LightToWorld, const Spectrum &L,
-                 const Vector3f &w);
+                 const Vector3f &w, const std::shared_ptr<const ParamSet> &attributes);
     void Preprocess(const Scene &scene) {
         scene.WorldBound().BoundingSphere(&worldCenter, &worldRadius);
     }
@@ -78,8 +78,9 @@ class DistantLight : public Light {
     Float worldRadius;
 };
 
-std::shared_ptr<DistantLight> CreateDistantLight(const Transform &light2world,
-                                                 const ParamSet &paramSet);
+std::shared_ptr<DistantLight> CreateDistantLight(
+    const Transform &light2world, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

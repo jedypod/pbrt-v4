@@ -51,10 +51,11 @@ class MirrorMaterial : public Material {
   public:
     // MirrorMaterial Public Methods
     MirrorMaterial(const std::shared_ptr<Texture<Spectrum>> &r,
-                   const std::shared_ptr<Texture<Float>> &bump) {
-        Kr = r;
-        bumpMap = bump;
-    }
+                   const std::shared_ptr<Texture<Float>> &bump,
+                   const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          Kr(r),
+          bumpMap(bump) { }
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode) const;
 
@@ -64,7 +65,8 @@ class MirrorMaterial : public Material {
     std::shared_ptr<Texture<Float>> bumpMap;
 };
 
-std::shared_ptr<MirrorMaterial> CreateMirrorMaterial(const TextureParams &mp);
+std::shared_ptr<MirrorMaterial> CreateMirrorMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

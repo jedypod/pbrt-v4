@@ -72,7 +72,7 @@ void PlasticMaterial::ComputeScatteringFunctions(
 }
 
 std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(
-    const TextureParams &mp) {
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Spectrum>> Kd =
         mp.GetSpectrumTexture("Kd", Spectrum(0.25f));
     std::shared_ptr<Texture<Spectrum>> Ks =
@@ -83,7 +83,7 @@ std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(
         mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.GetOneBool("remaproughness", true);
     return std::make_shared<PlasticMaterial>(Kd, Ks, roughness, bumpMap,
-                                             remapRoughness);
+                                             remapRoughness, attributes);
 }
 
 }  // namespace pbrt

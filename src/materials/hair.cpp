@@ -171,7 +171,8 @@ void HairMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     si->bsdf->Add(arena.Alloc<HairBSDF>(h, e, sig_a, bm, bn, a));
 }
 
-std::shared_ptr<HairMaterial> CreateHairMaterial(const TextureParams &mp) {
+std::shared_ptr<HairMaterial> CreateHairMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Spectrum>> sigma_a =
         mp.GetSpectrumTextureOrNull("sigma_a");
     std::shared_ptr<Texture<Spectrum>> color =
@@ -225,7 +226,7 @@ std::shared_ptr<HairMaterial> CreateHairMaterial(const TextureParams &mp) {
     std::shared_ptr<Texture<Float>> alpha = mp.GetFloatTexture("alpha", 2.f);
 
     return std::make_shared<HairMaterial>(
-        sigma_a, color, eumelanin, pheomelanin, eta, beta_m, beta_n, alpha);
+        sigma_a, color, eumelanin, pheomelanin, eta, beta_m, beta_n, alpha, attributes);
 }
 
 // HairBSDF Method Definitions

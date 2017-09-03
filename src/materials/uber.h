@@ -61,8 +61,10 @@ class UberMaterial : public Material {
                  const std::shared_ptr<Texture<Spectrum>> &opacity,
                  const std::shared_ptr<Texture<Float>> &eta,
                  const std::shared_ptr<Texture<Float>> &bumpMap,
-                 bool remapRoughness)
-        : Kd(Kd),
+                 bool remapRoughness,
+                 const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          Kd(Kd),
           Ks(Ks),
           Kr(Kr),
           Kt(Kt),
@@ -85,7 +87,8 @@ class UberMaterial : public Material {
     bool remapRoughness;
 };
 
-std::shared_ptr<UberMaterial> CreateUberMaterial(const TextureParams &mp);
+std::shared_ptr<UberMaterial> CreateUberMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

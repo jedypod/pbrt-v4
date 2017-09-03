@@ -1,4 +1,16 @@
 
+- find interval test is broken
+
+- pbrtAttribute:
+   - auto add named material attribute for pbrtMakeNamedMaterial
+   - aov output of materialName, shapeName?
+   - use attributes for parameter initialization backup...
+     can we pass something to the Create functions that helps abstract this?
+  - id  Attribute "shape" "string name" "table"
+    -> then store the mapping in metadata. (Also for namedmaterials)
+
+- Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
+
 - use lodepng_inspect to figure out when we can return a 1-channel image
   careful about palleted images -- blow them out to RGB...
   landscape and san miguel have many greyscale alpha textures
@@ -8,7 +20,7 @@
 - std::string_view (in many places) (absl equivalent?)
 
 - harmonize Print(FILE) vs operator<< vs ToString()
-  operator std::string() ?
+  explicit operator std::string() ?
 
 - spherical traiangle sampling (https://www.shadertoy.com/view/4tGGzd)
 
@@ -17,16 +29,13 @@
 - should light distribution api take a sample and point and return a light *
   and pdf (not a distribution1d?)
 
-- aovs
-  - id  Attribute "shape" "string name" "table"
-    -> then store the mapping in metadata. (Also for namedmaterials)
-
 - time reported by profiling system vs progress reporter (and reported in
   stats) doesn't match... (only for short renders? need more investigation)
 
 - try jacopo/heitz stuff for inf env map sampling e.g.
 
-- explicit path representation
+- explicit path representation (review mitsuba libbidir stuff). Also, just
+  build on top of bdpt Vertex stuff?
 
 - could get rid of a lot of annoying plumbing
   (e.g. VIsibilityTester::Unoccluded) if scene was a global

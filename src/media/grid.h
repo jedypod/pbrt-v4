@@ -60,8 +60,10 @@ class GridDensityMedium : public Medium {
     // GridDensityMedium Public Methods
     GridDensityMedium(const Spectrum &sigma_a, const Spectrum &sigma_s, Float g,
                       int nx, int ny, int nz, const Transform &mediumToWorld,
-                      gtl::ArraySlice<Float> d)
-        : sigma_a(sigma_a),
+                      gtl::ArraySlice<Float> d,
+                      const std::shared_ptr<const ParamSet> &attributes)
+        : Medium(attributes),
+          sigma_a(sigma_a),
           sigma_s(sigma_s),
           g(g),
           nx(nx),
@@ -83,7 +85,8 @@ class GridDensityMedium : public Medium {
         invMaxDensity = 1 / maxDensity;
     }
     static std::shared_ptr<GridDensityMedium> Create(
-        const ParamSet &ps, const Transform &mediumToWorld);
+        const ParamSet &ps, const Transform &mediumToWorld,
+        const std::shared_ptr<const ParamSet> &attributes);
 
     Float Density(const Point3f &p) const;
     Float D(const Point3i &p) const {

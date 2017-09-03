@@ -53,8 +53,9 @@ class Cylinder : public TransformedShape {
     Cylinder(std::shared_ptr<const Transform> ObjectToWorld,
              std::shared_ptr<const Transform> WorldToObject,
              bool reverseOrientation, Float radius, Float zMin, Float zMax,
-             Float phiMax)
-        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation),
+             Float phiMax, const std::shared_ptr<const ParamSet> &attributes)
+        : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation,
+                           attributes),
           radius(radius),
           zMin(std::min(zMin, zMax)),
           zMax(std::max(zMin, zMax)),
@@ -73,7 +74,7 @@ class Cylinder : public TransformedShape {
 std::shared_ptr<Cylinder> CreateCylinderShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

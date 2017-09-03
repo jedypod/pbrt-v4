@@ -97,7 +97,7 @@ pbrt::NamedValues *namedValues;
 
 %token LBRACK RBRACK
 
-%token ACCELERATOR ACTIVETRANSFORM ALL AREALIGHTSOURCE ATTRIBUTEBEGIN
+%token ACCELERATOR ACTIVETRANSFORM ALL AREALIGHTSOURCE ATTRIBUTE ATTRIBUTEBEGIN
 %token ATTRIBUTEEND CAMERA CONCATTRANSFORM COORDINATESYSTEM COORDSYSTRANSFORM
 %token ENDTIME FALSE FILM IDENTITY INCLUDE INTEGRATOR LIGHTSOURCE LOOKAT
 %token MAKENAMEDMATERIAL MAKENAMEDMEDIUM MATERIAL MEDIUMINTERFACE NAMEDMATERIAL
@@ -280,6 +280,12 @@ pbrt_stmt: ACCELERATOR STRING paramlist
     ParamSet params;
     params.Parse(activeParameterList, SpectrumType::Illuminant);
     pbrtAreaLightSource(*$2, std::move(params));
+    stringPool->Release($2);
+    deallocActiveParameterList();
+}
+| ATTRIBUTE STRING paramlist_init paramlist_entry
+{
+    pbrtAttribute(*$2, *activeParameterList);
     stringPool->Release($2);
     deallocActiveParameterList();
 }

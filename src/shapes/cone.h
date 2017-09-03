@@ -49,7 +49,8 @@ class Cone : public TransformedShape {
     // Cone Public Methods
     Cone(std::shared_ptr<const Transform> ObjectToWorld,
          std::shared_ptr<const Transform> WorldToObject,
-         bool reverseOrientation, Float height, Float radius, Float phiMax);
+         bool reverseOrientation, Float height, Float radius, Float phiMax,
+         const std::shared_ptr<const ParamSet> &attributes);
     Bounds3f ObjectBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
@@ -64,7 +65,7 @@ class Cone : public TransformedShape {
 std::shared_ptr<Cone> CreateConeShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

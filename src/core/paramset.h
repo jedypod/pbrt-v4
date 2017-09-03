@@ -77,7 +77,7 @@ struct ParamSetItem {
        : name(name), values(std::move(values)) {}
 
     // ParamSetItem Data
-    const std::string name;
+    std::string name;
     std::vector<T> values;
     mutable bool lookedUp = false;
 };
@@ -134,13 +134,6 @@ class ParamSet {
     void ReportUnused() const;
 
     std::string ToString(int indent = 0) const;
-
-    // Should only be moving these, so enforce that. (Remove if this is a pain?)
-    ParamSet() = default;
-    ParamSet(const ParamSet &) = delete;
-    ParamSet &operator=(const ParamSet &) = delete;
-    ParamSet(ParamSet &&) = default;
-    ParamSet &operator=(ParamSet &&) = default;
 
   private:
     // ParamSet Private Data

@@ -45,9 +45,11 @@ STAT_COUNTER("Scene/AreaLights", numAreaLights);
 
 // Light Method Definitions
 Light::Light(int flags, const Transform &LightToWorld,
-             const MediumInterface &mediumInterface)
+             const MediumInterface &mediumInterface,
+             const std::shared_ptr<const ParamSet> &attributes)
     : flags(flags),
       mediumInterface(mediumInterface),
+      attributes(attributes),
       LightToWorld(LightToWorld),
       WorldToLight(Inverse(LightToWorld)) {
     ++numLights;
@@ -81,8 +83,9 @@ Spectrum VisibilityTester::Tr(const Scene &scene, Sampler &sampler) const {
 
 Spectrum Light::Le(const RayDifferential &ray) const { return Spectrum(0.f); }
 
-AreaLight::AreaLight(const Transform &LightToWorld, const MediumInterface &medium)
-    : Light((int)LightFlags::Area, LightToWorld, medium) {
+AreaLight::AreaLight(const Transform &LightToWorld, const MediumInterface &medium,
+                     const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::Area, LightToWorld, medium, attributes) {
     ++numAreaLights;
 }
 

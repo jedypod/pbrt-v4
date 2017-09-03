@@ -65,10 +65,10 @@ void MixMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
 std::shared_ptr<MixMaterial> CreateMixMaterial(
     const TextureParams &mp, const std::shared_ptr<Material> &m1,
-    const std::shared_ptr<Material> &m2) {
+    const std::shared_ptr<Material> &m2, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Spectrum>> scale =
         mp.GetSpectrumTexture("amount", Spectrum(0.5f));
-    return std::make_shared<MixMaterial>(m1, m2, scale);
+    return std::make_shared<MixMaterial>(m1, m2, scale, attributes);
 }
 
 }  // namespace pbrt

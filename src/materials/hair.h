@@ -67,8 +67,10 @@ class HairMaterial : public Material {
                  const std::shared_ptr<Texture<Float>> &eta,
                  const std::shared_ptr<Texture<Float>> &beta_m,
                  const std::shared_ptr<Texture<Float>> &beta_n,
-                 const std::shared_ptr<Texture<Float>> &alpha)
-        : sigma_a(sigma_a),
+                 const std::shared_ptr<Texture<Float>> &alpha,
+                 const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          sigma_a(sigma_a),
           color(color),
           eumelanin(eumelanin),
           pheomelanin(pheomelanin),
@@ -86,7 +88,8 @@ class HairMaterial : public Material {
     std::shared_ptr<Texture<Float>> beta_m, beta_n, alpha;
 };
 
-std::shared_ptr<HairMaterial> CreateHairMaterial(const TextureParams &mp);
+std::shared_ptr<HairMaterial> CreateHairMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 // HairBSDF Constants
 static const int pMax = 3;

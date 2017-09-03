@@ -49,7 +49,7 @@ namespace pbrt {
 std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

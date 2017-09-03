@@ -583,7 +583,8 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
 }
 
-std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(const TextureParams &mp) {
+std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Spectrum>> color =
         mp.GetSpectrumTexture("color", Spectrum(0.5f));
     std::shared_ptr<Texture<Float>> metallic =
@@ -616,7 +617,7 @@ std::shared_ptr<DisneyMaterial> CreateDisneyMaterial(const TextureParams &mp) {
     return std::make_shared<DisneyMaterial>(
         color, metallic, eta, roughness, specularTint, anisotropic, sheen,
         sheenTint, clearcoat, clearcoatGloss, specTrans, scatterDistance, thin,
-        flatness, diffTrans, bumpMap);
+        flatness, diffTrans, bumpMap, attributes);
 }
 
 }  // namespace pbrt

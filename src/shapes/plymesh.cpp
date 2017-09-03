@@ -143,7 +143,7 @@ int rply_face_callback(p_ply_argument argument) {
 std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     ProfilePhase _(Prof::PLYLoading);
     const std::string filename = params.GetOneFilename("filename", "");
     p_ply ply = ply_open(filename.c_str(), rply_message_callback, 0, nullptr);
@@ -247,7 +247,7 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
     return CreateTriangleMesh(
         *ObjectToWorld, *WorldToObject, reverseOrientation,
         {context.indices, context.indexCtr}, {context.p, vertexCount}, {}, N,
-        uv);
+        uv, {}, attributes);
 }
 
 }  // namespace pbrt

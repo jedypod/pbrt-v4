@@ -38,6 +38,7 @@
 #include "interaction.h"
 #include "spectrum.h"
 #include "texture.h"
+#include "paramset.h"
 
 #include <cmath>
 

@@ -206,8 +206,9 @@ fail:
 }
 
 FourierMaterial::FourierMaterial(const std::string &filename,
-                                 const std::shared_ptr<Texture<Float>> &bumpMap)
-    : bumpMap(bumpMap) {
+                                 const std::shared_ptr<Texture<Float>> &bumpMap,
+                                 const std::shared_ptr<const ParamSet> &attributes)
+    : Material(attributes), bumpMap(bumpMap) {
     if (loadedBSDFs.find(filename) == loadedBSDFs.end()) {
         std::unique_ptr<FourierBSDFTable> table = std::make_unique<FourierBSDFTable>();
         FourierBSDFTable::Read(filename, table.get());
@@ -228,11 +229,11 @@ void FourierMaterial::ComputeScatteringFunctions(
 }
 
 std::shared_ptr<FourierMaterial> CreateFourierMaterial(
-    const TextureParams &mp) {
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
     return std::make_shared<FourierMaterial>(mp.GetOneFilename("bsdffile", ""),
-                                             bumpMap);
+                                             bumpMap, attributes);
 }
 
 }  // namespace pbrt

@@ -60,6 +60,7 @@ class Primitive {
     virtual bool IntersectP(const Ray &r) const = 0;
     virtual const AreaLight *GetAreaLight() const = 0;
     virtual const Material *GetMaterial() const = 0;
+    virtual const ParamSet *GetAttributes() const = 0;
     virtual void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                             MemoryArena &arena,
                                             TransportMode mode) const = 0;
@@ -80,6 +81,7 @@ class GeometricPrimitive : public Primitive {
                        const std::shared_ptr<Texture<Float>> &shadowAlpha = nullptr);
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
+    const ParamSet *GetAttributes() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode) const;
 
@@ -105,6 +107,7 @@ class SimplePrimitive : public Primitive {
                     const std::shared_ptr<Material> &material);
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
+    const ParamSet *GetAttributes() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode) const;
 
@@ -124,6 +127,7 @@ class TransformedPrimitive : public Primitive {
     bool IntersectP(const Ray &r) const;
     const AreaLight *GetAreaLight() const { return nullptr; }
     const Material *GetMaterial() const { return nullptr; }
+    const ParamSet *GetAttributes() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode) const {
         LOG(FATAL) <<
@@ -146,6 +150,7 @@ class Aggregate : public Primitive {
     // Aggregate Public Methods
     const AreaLight *GetAreaLight() const;
     const Material *GetMaterial() const;
+    const ParamSet *GetAttributes() const;
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode) const;
 };

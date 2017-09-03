@@ -57,7 +57,8 @@ class DiffuseAreaLight : public AreaLight {
     DiffuseAreaLight(const Transform &LightToWorld,
                      const MediumInterface &mediumInterface, const Spectrum &Le,
                      const std::shared_ptr<Shape> &shape,
-                     bool twoSided = false);
+                     bool twoSided,
+                     const std::shared_ptr<const ParamSet> &attributes);
     Spectrum L(const Interaction &intr, const Vector3f &w) const {
         return (twoSided || Dot(intr.n, w) > 0) ? Lemit : Spectrum(0.f);
     }
@@ -84,7 +85,8 @@ class DiffuseAreaLight : public AreaLight {
 
 std::shared_ptr<AreaLight> CreateDiffuseAreaLight(
     const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape);
+    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

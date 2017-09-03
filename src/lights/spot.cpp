@@ -42,8 +42,10 @@ namespace pbrt {
 // SpotLight Method Definitions
 SpotLight::SpotLight(const Transform &LightToWorld,
                      const MediumInterface &mediumInterface, const Spectrum &I,
-                     Float totalWidth, Float falloffStart)
-    : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface),
+                     Float totalWidth, Float falloffStart,
+                     const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
+            attributes),
       pLight(LightToWorld(Point3f(0, 0, 0))),
       I(I),
       cosTotalWidth(std::cos(Radians(totalWidth))),
@@ -100,9 +102,9 @@ void SpotLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
                   : 0;
 }
 
-std::shared_ptr<SpotLight> CreateSpotLight(const Transform &l2w,
-                                           const Medium *medium,
-                                           const ParamSet &paramSet) {
+std::shared_ptr<SpotLight> CreateSpotLight(
+        const Transform &l2w, const Medium *medium, const ParamSet &paramSet,
+        const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     Float coneangle = paramSet.GetOneFloat("coneangle", 30.);
@@ -119,7 +121,7 @@ std::shared_ptr<SpotLight> CreateSpotLight(const Transform &l2w,
     Transform light2world =
         l2w * Translate(Vector3f(from.x, from.y, from.z)) * Inverse(dirToZ);
     return std::make_shared<SpotLight>(light2world, medium, I * sc, coneangle,
-                                       coneangle - conedelta);
+                                       coneangle - conedelta, attributes);
 }
 
 }  // namespace pbrt

@@ -45,7 +45,8 @@ STAT_RATIO("Media/Grid steps per Tr() call", nTrSteps, nTrCalls);
 
 // GridDensityMedium Method Definitions
 std::shared_ptr<GridDensityMedium> GridDensityMedium::Create(
-        const ParamSet &ps, const Transform &mediumToWorld) {
+        const ParamSet &ps, const Transform &mediumToWorld,
+        const std::shared_ptr<const ParamSet> &attributes) {
     Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
           sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
@@ -81,7 +82,8 @@ std::shared_ptr<GridDensityMedium> GridDensityMedium::Create(
     Transform dataToMedium = Translate(Vector3f(p0)) *
         Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
     return std::make_shared<GridDensityMedium>(
-        sig_a, sig_s, g, nx, ny, nz, mediumToWorld * dataToMedium, data);
+        sig_a, sig_s, g, nx, ny, nz, mediumToWorld * dataToMedium, data,
+        attributes);
 }
 
 

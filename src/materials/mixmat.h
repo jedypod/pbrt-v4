@@ -52,8 +52,9 @@ class MixMaterial : public Material {
     // MixMaterial Public Methods
     MixMaterial(const std::shared_ptr<Material> &m1,
                 const std::shared_ptr<Material> &m2,
-                const std::shared_ptr<Texture<Spectrum>> &scale)
-        : m1(m1), m2(m2), scale(scale) {}
+                const std::shared_ptr<Texture<Spectrum>> &scale,
+                const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes), m1(m1), m2(m2), scale(scale) {}
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode) const;
 
@@ -65,7 +66,7 @@ class MixMaterial : public Material {
 
 std::shared_ptr<MixMaterial> CreateMixMaterial(
     const TextureParams &mp, const std::shared_ptr<Material> &m1,
-    const std::shared_ptr<Material> &m2);
+    const std::shared_ptr<Material> &m2, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

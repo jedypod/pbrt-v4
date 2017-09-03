@@ -193,7 +193,11 @@ struct GraphicsState {
     GraphicsState() {
         ParamSet params;
         TextureParams tp(std::move(params), floatTextures, spectrumTextures);
-        material = CreateMatteMaterial(tp);
+        material = CreateMatteMaterial(tp, nullptr);
+        shapeAttributes = std::make_shared<ParamSet>();
+        lightAttributes = std::make_shared<ParamSet>();
+        materialAttributes = std::make_shared<ParamSet>();
+        mediumAttributes = std::make_shared<ParamSet>();
     }
     MediumInterface CreateMediumInterface();
 
@@ -206,6 +210,8 @@ struct GraphicsState {
     std::shared_ptr<ParamSet> areaLightParams;
     std::string areaLightName;
     bool reverseOrientation = false;
+    std::shared_ptr<ParamSet> shapeAttributes, lightAttributes;
+    std::shared_ptr<ParamSet> materialAttributes, mediumAttributes;
 };
 
 class TransformCache {
@@ -311,28 +317,31 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
     std::shared_ptr<Shape> s;
     if (name == "sphere")
         s = CreateSphereShape(object2world, world2object, reverseOrientation,
-                              paramSet);
+                              paramSet, graphicsState.shapeAttributes);
     // Create remaining single _Shape_ types
     else if (name == "cylinder")
         s = CreateCylinderShape(object2world, world2object, reverseOrientation,
-                                paramSet);
+                                paramSet, graphicsState.shapeAttributes);
     else if (name == "disk")
         s = CreateDiskShape(object2world, world2object, reverseOrientation,
-                            paramSet);
+                            paramSet, graphicsState.shapeAttributes);
     else if (name == "cone")
         s = CreateConeShape(object2world, world2object, reverseOrientation,
-                            paramSet);
+                            paramSet, graphicsState.shapeAttributes);
     else if (name == "paraboloid")
         s = CreateParaboloidShape(object2world, world2object,
-                                  reverseOrientation, paramSet);
+                                  reverseOrientation, paramSet,
+                                  graphicsState.shapeAttributes);
     else if (name == "hyperboloid")
         s = CreateHyperboloidShape(object2world, world2object,
-                                   reverseOrientation, paramSet);
+                                   reverseOrientation, paramSet,
+                                   graphicsState.shapeAttributes);
     if (s != nullptr) shapes.push_back(s);
 
     // Create multiple-_Shape_ types
     else if (name == "curve")
-        shapes = CreateCurveShape(object2world, world2object, reverseOrientation, paramSet);
+        shapes = CreateCurveShape(object2world, world2object, reverseOrientation,
+                                  paramSet, graphicsState.shapeAttributes);
     else if (name == "trianglemesh") {
         if (PbrtOptions.toPly) {
             static int count = 1;
@@ -390,16 +399,17 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
             printf("\n");
         } else
             shapes = CreateTriangleMeshShape(object2world, world2object,
-                                             reverseOrientation, paramSet);
+                                             reverseOrientation, paramSet,
+                                             graphicsState.shapeAttributes);
     } else if (name == "plymesh")
         shapes = CreatePLYMesh(object2world, world2object, reverseOrientation,
-                               paramSet);
+                               paramSet, graphicsState.shapeAttributes);
     else if (name == "loopsubdiv")
         shapes = CreateLoopSubdiv(object2world, world2object,
-                                  reverseOrientation, paramSet);
+                                  reverseOrientation, paramSet, graphicsState.shapeAttributes);
     else if (name == "nurbs")
         shapes = CreateNURBS(object2world, world2object, reverseOrientation,
-                             paramSet);
+                             paramSet, graphicsState.shapeAttributes);
     else
         Warning("Shape \"%s\" unknown.", name.c_str());
 
@@ -414,19 +424,19 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     if (name == "" || name == "none")
         return nullptr;
     else if (name == "matte")
-        material = CreateMatteMaterial(mp);
+        material = CreateMatteMaterial(mp, graphicsState.materialAttributes);
     else if (name == "plastic")
-        material = CreatePlasticMaterial(mp);
+        material = CreatePlasticMaterial(mp, graphicsState.materialAttributes);
     else if (name == "translucent")
-        material = CreateTranslucentMaterial(mp);
+        material = CreateTranslucentMaterial(mp, graphicsState.materialAttributes);
     else if (name == "glass")
-        material = CreateGlassMaterial(mp);
+        material = CreateGlassMaterial(mp, graphicsState.materialAttributes);
     else if (name == "mirror")
-        material = CreateMirrorMaterial(mp);
+        material = CreateMirrorMaterial(mp, graphicsState.materialAttributes);
     else if (name == "hair")
-        material = CreateHairMaterial(mp);
+        material = CreateHairMaterial(mp, graphicsState.materialAttributes);
     else if (name == "disney")
-        material = CreateDisneyMaterial(mp);
+        material = CreateDisneyMaterial(mp, graphicsState.materialAttributes);
     else if (name == "mix") {
         std::string m1 = mp.GetOneString("namedmaterial1", "");
         std::string m2 = mp.GetOneString("namedmaterial2", "");
@@ -435,30 +445,30 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         if (!mat1) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m1.c_str());
-            mat1 = CreateMatteMaterial(mp);
+            mat1 = CreateMatteMaterial(mp, graphicsState.materialAttributes);
         }
         if (!mat2) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m2.c_str());
-            mat2 = CreateMatteMaterial(mp);
+            mat2 = CreateMatteMaterial(mp, graphicsState.materialAttributes);
         }
 
-        material = CreateMixMaterial(mp, mat1, mat2);
+        material = CreateMixMaterial(mp, mat1, mat2, graphicsState.materialAttributes);
     } else if (name == "metal")
-        material = CreateMetalMaterial(mp);
+        material = CreateMetalMaterial(mp, graphicsState.materialAttributes);
     else if (name == "substrate")
-        material = CreateSubstrateMaterial(mp);
+        material = CreateSubstrateMaterial(mp, graphicsState.materialAttributes);
     else if (name == "uber")
-        material = CreateUberMaterial(mp);
+        material = CreateUberMaterial(mp, graphicsState.materialAttributes);
     else if (name == "subsurface")
-        material = CreateSubsurfaceMaterial(mp);
+        material = CreateSubsurfaceMaterial(mp, graphicsState.materialAttributes);
     else if (name == "kdsubsurface")
-        material = CreateKdSubsurfaceMaterial(mp);
+        material = CreateKdSubsurfaceMaterial(mp, graphicsState.materialAttributes);
     else if (name == "fourier")
-        material = CreateFourierMaterial(mp);
+        material = CreateFourierMaterial(mp, graphicsState.materialAttributes);
     else {
         Warning("Material \"%s\" unknown. Using \"matte\".", name.c_str());
-        material = CreateMatteMaterial(mp);
+        material = CreateMatteMaterial(mp, graphicsState.materialAttributes);
     }
 
     if ((name == "subsurface" || name == "kdsubsurface") &&
@@ -552,11 +562,12 @@ std::shared_ptr<Medium> MakeMedium(const std::string &name,
                                    const ParamSet &paramSet,
                                    const Transform &medium2world) {
     std::shared_ptr<Medium> m;
-    if (name == "homogeneous") {
-        m = HomogeneousMedium::Create(paramSet);
-    } else if (name == "heterogeneous") {
-        m = GridDensityMedium::Create(paramSet, medium2world);
-    } else
+    if (name == "homogeneous")
+        m = HomogeneousMedium::Create(paramSet, graphicsState.mediumAttributes);
+    else if (name == "heterogeneous")
+        m = GridDensityMedium::Create(paramSet, medium2world,
+                                      graphicsState.mediumAttributes);
+    else
         Warning("Medium \"%s\" unknown.", name.c_str());
 
     paramSet.ReportUnused();
@@ -570,19 +581,23 @@ std::shared_ptr<Light> MakeLight(const std::string &name,
     std::shared_ptr<Light> light;
     if (name == "point")
         light =
-            CreatePointLight(light2world, mediumInterface.outside, paramSet);
+            CreatePointLight(light2world, mediumInterface.outside, paramSet,
+                             graphicsState.lightAttributes);
     else if (name == "spot")
-        light = CreateSpotLight(light2world, mediumInterface.outside, paramSet);
+        light = CreateSpotLight(light2world, mediumInterface.outside, paramSet,
+                                graphicsState.lightAttributes);
     else if (name == "goniometric")
         light = CreateGoniometricLight(light2world, mediumInterface.outside,
-                                       paramSet);
+                                       paramSet, graphicsState.lightAttributes);
     else if (name == "projection")
         light = CreateProjectionLight(light2world, mediumInterface.outside,
-                                      paramSet);
+                                      paramSet, graphicsState.lightAttributes);
     else if (name == "distant")
-        light = CreateDistantLight(light2world, paramSet);
+        light = CreateDistantLight(light2world, paramSet,
+                                   graphicsState.lightAttributes);
     else if (name == "infinite")
-        light = CreateInfiniteLight(light2world, paramSet);
+        light = CreateInfiniteLight(light2world, paramSet,
+                                    graphicsState.lightAttributes);
     else
         Warning("Light \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();
@@ -597,7 +612,7 @@ std::shared_ptr<AreaLight> MakeAreaLight(const std::string &name,
     std::shared_ptr<AreaLight> area;
     if (name == "diffuse")
         area = CreateDiffuseAreaLight(light2world, mediumInterface.outside,
-                                      paramSet, shape);
+                                      paramSet, shape, graphicsState.lightAttributes);
     else
         Warning("Area light \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();
@@ -980,7 +995,8 @@ void pbrtAttributeEnd() {
             "Ignoring it.");
         return;
     }
-    graphicsState = pushedGraphicsStates.back();
+
+    graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
     curTransform = pushedTransforms.back();
     pushedTransforms.pop_back();
@@ -990,6 +1006,28 @@ void pbrtAttributeEnd() {
         catIndentCount -= 4;
         printf("%*sAttributeEnd\n", catIndentCount, "");
     }
+}
+
+void pbrtAttribute(const std::string &target, const NamedValues &attrib) {
+    VERIFY_INITIALIZED("Attribute");
+    CHECK(attrib.next == nullptr);
+    std::shared_ptr<ParamSet> *attributes = nullptr;
+    if (target == "shape")
+        attributes = &graphicsState.shapeAttributes;
+    else if (target == "light")
+        attributes = &graphicsState.lightAttributes;
+    else if (target == "material")
+        attributes = &graphicsState.materialAttributes;
+    else if (target == "medium")
+        attributes = &graphicsState.mediumAttributes;
+    else {
+        Error("Unknown attribute target \"%s\". Must be \"shape\", \"light\", "
+              "\"material\", or \"medium\".", target.c_str());
+        return;
+    }
+    if (attributes->use_count() > 1)
+        *attributes = std::make_shared<ParamSet>(**attributes);
+    (*attributes)->Parse(&attrib, SpectrumType::Reflectance);
 }
 
 void pbrtTransformBegin() {
@@ -1099,7 +1137,8 @@ void pbrtNamedMaterial(const std::string &name) {
             std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
             std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
             TextureParams tp(std::move(params), floatTextures, spectrumTextures);
-            graphicsState.material = CreateMatteMaterial(tp);
+            graphicsState.material = CreateMatteMaterial(
+                tp, graphicsState.materialAttributes);
         } else
             graphicsState.material = graphicsState.namedMaterials[name];
     }

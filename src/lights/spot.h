@@ -53,7 +53,8 @@ class SpotLight : public Light {
   public:
     // SpotLight Public Methods
     SpotLight(const Transform &LightToWorld, const MediumInterface &m,
-              const Spectrum &I, Float totalWidth, Float falloffStart);
+              const Spectrum &I, Float totalWidth, Float falloffStart,
+              const std::shared_ptr<const ParamSet> &attributes);
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
                        Float *pdf, VisibilityTester *vis) const;
     Float Falloff(const Vector3f &w) const;
@@ -72,9 +73,9 @@ class SpotLight : public Light {
     const Float cosTotalWidth, cosFalloffStart;
 };
 
-std::shared_ptr<SpotLight> CreateSpotLight(const Transform &l2w,
-                                           const Medium *medium,
-                                           const ParamSet &paramSet);
+std::shared_ptr<SpotLight> CreateSpotLight(
+    const Transform &l2w, const Medium *medium, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

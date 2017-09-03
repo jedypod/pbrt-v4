@@ -41,17 +41,24 @@
 // core/material.h*
 #include "pbrt.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // Material Declarations
 class Material {
   public:
+    Material(const std::shared_ptr<const ParamSet> &attributes)
+        : attributes(attributes) { }
+
     // Material Interface
     virtual void ComputeScatteringFunctions(SurfaceInteraction *si,
                                             MemoryArena &arena,
                                             TransportMode mode) const = 0;
     virtual ~Material();
     static void Bump(const Texture<Float> &d, SurfaceInteraction *si);
+
+    std::shared_ptr<const ParamSet> attributes;
 };
 
 }  // namespace pbrt

@@ -53,8 +53,10 @@ class PointLight : public Light {
   public:
     // PointLight Public Methods
     PointLight(const Transform &LightToWorld,
-               const MediumInterface &mediumInterface, const Spectrum &I)
-        : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface),
+               const MediumInterface &mediumInterface, const Spectrum &I,
+               const std::shared_ptr<const ParamSet> &attributes)
+        : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
+                attributes),
           pLight(LightToWorld(Point3f(0, 0, 0))),
           I(I) {}
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
@@ -73,9 +75,9 @@ class PointLight : public Light {
     const Spectrum I;
 };
 
-std::shared_ptr<PointLight> CreatePointLight(const Transform &light2world,
-                                             const Medium *medium,
-                                             const ParamSet &paramSet);
+std::shared_ptr<PointLight> CreatePointLight(
+    const Transform &light2world, const Medium *medium, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

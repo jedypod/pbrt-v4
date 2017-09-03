@@ -53,7 +53,8 @@ struct CurveCommon {
                 gtl::ArraySlice<Normal3f> norm,
                 std::shared_ptr<const Transform> ObjectToWorld,
                 std::shared_ptr<const Transform> WorldToObject,
-                bool reverseOrientation);
+                bool reverseOrientation,
+                const std::shared_ptr<const ParamSet> &attributes);
 
     const CurveType type;
     Point3f cpObj[4];
@@ -62,6 +63,8 @@ struct CurveCommon {
     Float normalAngle, invSinNormalAngle;
     std::shared_ptr<const Transform> ObjectToWorld, WorldToObject;
     const bool reverseOrientation, transformSwapsHandedness;
+    std::shared_ptr<const ParamSet> attributes;
+
 };
 
 // Curve Declarations
@@ -79,6 +82,9 @@ class Curve : public Shape {
     bool TransformSwapsHandedness() const {
         return common->transformSwapsHandedness;
     }
+    const ParamSet *GetAttributes() const {
+        return common->attributes.get();
+    }
 
   private:
     // Curve Private Methods
@@ -95,7 +101,7 @@ class Curve : public Shape {
 std::vector<std::shared_ptr<Shape>> CreateCurveShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

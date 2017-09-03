@@ -59,7 +59,8 @@ struct TriangleMesh {
     TriangleMesh(const Transform &ObjectToWorld, bool reverseOrientation,
                  gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
                  gtl::ArraySlice<Vector3f> S, gtl::ArraySlice<Normal3f> N,
-                 gtl::ArraySlice<Point2f> uv, gtl::ArraySlice<int> faceIndices);
+                 gtl::ArraySlice<Point2f> uv, gtl::ArraySlice<int> faceIndices,
+                 const std::shared_ptr<const ParamSet> &attributes);
 
     // TriangleMesh Data
     const bool reverseOrientation, transformSwapsHandedness;
@@ -70,6 +71,7 @@ struct TriangleMesh {
     std::vector<Vector3f> s;
     std::vector<Point2f> uv;
     std::vector<int> faceIndices;
+    std::shared_ptr<const ParamSet> attributes;
 };
 
 class Triangle : public Shape {
@@ -95,6 +97,7 @@ class Triangle : public Shape {
     bool TransformSwapsHandedness() const {
         return mesh->transformSwapsHandedness;
     }
+    const ParamSet *GetAttributes() const { return mesh->attributes.get(); }
 
   private:
     // Triangle Private Methods
@@ -116,12 +119,14 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     bool reverseOrientation, gtl::ArraySlice<int> vertexIndices,
     gtl::ArraySlice<Point3f> p, gtl::ArraySlice<Vector3f> s,
     gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv,
-    gtl::ArraySlice<int> faceIndices = {});
+    gtl::ArraySlice<int> faceIndices,
+    const std::shared_ptr<const ParamSet> &attributes);
+
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 bool WritePlyFile(const std::string &filename,
                   gtl::ArraySlice<int> vertexIndices,

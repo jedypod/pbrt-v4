@@ -79,11 +79,16 @@ inline Float PhaseHG(Float cosTheta, Float g) {
 class Medium {
   public:
     // Medium Interface
+    Medium(const std::shared_ptr<const ParamSet> &attributes)
+        : attributes(attributes) {}
+
     virtual ~Medium() {}
     virtual Spectrum Tr(const Ray &ray, Sampler &sampler) const = 0;
     virtual Spectrum Sample(const Ray &ray, Sampler &sampler,
                             MemoryArena &arena,
                             MediumInteraction *mi) const = 0;
+
+    std::shared_ptr<const ParamSet> attributes;
 };
 
 // HenyeyGreenstein Declarations

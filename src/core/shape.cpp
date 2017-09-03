@@ -94,11 +94,13 @@ Float Shape::SolidAngle(const Point3f &p, int nSamples) const {
 
 TransformedShape::TransformedShape(
     std::shared_ptr<const Transform> ObjectToWorld,
-    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation)
+    std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
+    const std::shared_ptr<const ParamSet> &attributes)
     : ObjectToWorld(ObjectToWorld),
       WorldToObject(WorldToObject),
       reverseOrientation(reverseOrientation),
-      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()) {}
+      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()),
+      attributes(attributes) {}
 
 Bounds3f TransformedShape::WorldBound() const {
     return (*ObjectToWorld)(ObjectBound());

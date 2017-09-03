@@ -82,25 +82,29 @@ class Shape {
 
     virtual bool ReverseOrientation() const = 0;
     virtual bool TransformSwapsHandedness() const = 0;
+    virtual const ParamSet *GetAttributes() const = 0;
 };
 
 class TransformedShape : public Shape {
   public:
     TransformedShape(std::shared_ptr<const Transform> ObjectToWorld,
                      std::shared_ptr<const Transform> WorldToObject,
-                     bool reverseOrientation);
+                     bool reverseOrientation,
+                     const std::shared_ptr<const ParamSet> &attributes);
 
     Bounds3f WorldBound() const;
     virtual Bounds3f ObjectBound() const = 0;
 
     bool ReverseOrientation() const { return reverseOrientation; }
     bool TransformSwapsHandedness() const { return transformSwapsHandedness; }
+    const ParamSet *GetAttributes() const { return attributes.get(); }
 
   protected:
     // Shape Public Data
     std::shared_ptr<const Transform> ObjectToWorld, WorldToObject;
     const bool reverseOrientation;
     const bool transformSwapsHandedness;
+    std::shared_ptr<const ParamSet> attributes;
 };
 
 }  // namespace pbrt

@@ -52,7 +52,8 @@ class ProjectionLight : public Light {
     // ProjectionLight Public Methods
     ProjectionLight(const Transform &LightToWorld,
                     const MediumInterface &medium, const Spectrum &I,
-                    const std::string &texname, Float fov);
+                    const std::string &texname, Float fov,
+                    const std::shared_ptr<const ParamSet> &attributes);
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
                        Float *pdf, VisibilityTester *vis) const;
     Spectrum Projection(const Vector3f &w) const;
@@ -77,7 +78,8 @@ class ProjectionLight : public Light {
 
 std::shared_ptr<ProjectionLight> CreateProjectionLight(
     const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet);
+    const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

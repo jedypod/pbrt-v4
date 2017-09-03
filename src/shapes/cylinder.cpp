@@ -224,14 +224,14 @@ Interaction Cylinder::Sample(const Point2f &u, Float *pdf) const {
 std::shared_ptr<Cylinder> CreateCylinderShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     Float radius = params.GetOneFloat("radius", 1);
     Float zmin = params.GetOneFloat("zmin", -1);
     Float zmax = params.GetOneFloat("zmax", 1);
     Float phimax = params.GetOneFloat("phimax", 360);
     return std::make_shared<Cylinder>(ObjectToWorld, WorldToObject,
                                       reverseOrientation, radius, zmin, zmax,
-                                      phimax);
+                                      phimax, attributes);
 }
 
 }  // namespace pbrt

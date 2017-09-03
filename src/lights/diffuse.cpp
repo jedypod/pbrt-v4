@@ -46,8 +46,9 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &LightToWorld,
                                    const MediumInterface &mediumInterface,
                                    const Spectrum &Lemit,
                                    const std::shared_ptr<Shape> &shape,
-                                   bool twoSided)
-    : AreaLight(LightToWorld, mediumInterface),
+                                   bool twoSided,
+                                   const std::shared_ptr<const ParamSet> &attributes)
+    : AreaLight(LightToWorld, mediumInterface, attributes),
       Lemit(Lemit),
       shape(shape),
       twoSided(twoSided),
@@ -136,12 +137,13 @@ void DiffuseAreaLight::Pdf_Le(const Ray &ray, const Normal3f &n, Float *pdfPos,
 
 std::shared_ptr<AreaLight> CreateDiffuseAreaLight(
     const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape) {
+    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape,
+    const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     bool twoSided = paramSet.GetOneBool("twosided", false);
     return std::make_shared<DiffuseAreaLight>(light2world, medium, L * sc,
-                                              shape, twoSided);
+                                              shape, twoSided, attributes);
 }
 
 }  // namespace pbrt

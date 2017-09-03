@@ -42,8 +42,10 @@ namespace pbrt {
 // InfiniteAreaLight Method Definitions
 InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
                                      const Spectrum &L,
-                                     const std::string &filename)
-    : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface()),
+                                     const std::string &filename,
+                                     const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(),
+            attributes),
       Lscale(L) {
     if (!Image::Read(filename, &image)) {
         std::vector<Float> one = {(Float)1};
@@ -173,11 +175,13 @@ void InfiniteAreaLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
 }
 
 std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
-    const Transform &light2world, const ParamSet &paramSet) {
+    const Transform &light2world, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     std::string texmap = paramSet.GetOneFilename("mapname", "");
-    return std::make_shared<InfiniteAreaLight>(light2world, L * sc, texmap);
+    return std::make_shared<InfiniteAreaLight>(light2world, L * sc, texmap,
+                                               attributes);
 }
 
 }  // namespace pbrt

@@ -56,8 +56,10 @@ class GlassMaterial : public Material {
                   const std::shared_ptr<Texture<Float>> &vRoughness,
                   const std::shared_ptr<Texture<Float>> &index,
                   const std::shared_ptr<Texture<Float>> &bumpMap,
-                  bool remapRoughness)
-        : Kr(Kr),
+                  bool remapRoughness,
+                  const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          Kr(Kr),
           Kt(Kt),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
@@ -76,7 +78,8 @@ class GlassMaterial : public Material {
     bool remapRoughness;
 };
 
-std::shared_ptr<GlassMaterial> CreateGlassMaterial(const TextureParams &mp);
+std::shared_ptr<GlassMaterial> CreateGlassMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

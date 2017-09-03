@@ -60,6 +60,12 @@ const Material *Aggregate::GetMaterial() const {
     return nullptr;
 }
 
+const ParamSet *Aggregate::GetAttributes() const {
+    LOG(FATAL) << "Aggregate::GetAttributes() method called; should have gone "
+        "to GeometricPrimitive";
+    return nullptr;
+}
+
 void Aggregate::ComputeScatteringFunctions(SurfaceInteraction *isect,
                                            MemoryArena &arena,
                                            TransportMode mode) const {
@@ -93,6 +99,10 @@ bool TransformedPrimitive::IntersectP(const Ray &r) const {
     Transform InterpolatedPrimToWorld = PrimitiveToWorld.Interpolate(r.time);
     Transform InterpolatedWorldToPrim = Inverse(InterpolatedPrimToWorld);
     return primitive->IntersectP(InterpolatedWorldToPrim(r));
+}
+
+const ParamSet *TransformedPrimitive::GetAttributes() const {
+    return primitive->GetAttributes();
 }
 
 // GeometricPrimitive Method Definitions
@@ -170,6 +180,10 @@ const Material *GeometricPrimitive::GetMaterial() const {
     return material.get();
 }
 
+const ParamSet *GeometricPrimitive::GetAttributes() const {
+    return shape->GetAttributes();
+}
+
 void GeometricPrimitive::ComputeScatteringFunctions(
     SurfaceInteraction *isect, MemoryArena &arena, TransportMode mode) const {
     ProfilePhase p(Prof::ComputeScatteringFuncs);
@@ -212,6 +226,10 @@ const AreaLight *SimplePrimitive::GetAreaLight() const {
 
 const Material *SimplePrimitive::GetMaterial() const {
     return material.get();
+}
+
+const ParamSet *SimplePrimitive::GetAttributes() const {
+    return shape->GetAttributes();
 }
 
 void SimplePrimitive::ComputeScatteringFunctions(

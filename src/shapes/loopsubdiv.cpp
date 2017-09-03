@@ -157,7 +157,7 @@ inline Float loopGamma(int valence) {
 static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     const Transform *ObjectToWorld, const Transform *WorldToObject,
     bool reverseOrientation, int nLevels, ArraySlice<int> vertexIndices,
-    ArraySlice<Point3f> p) {
+    ArraySlice<Point3f> p, const std::shared_ptr<const ParamSet> &attributes) {
     std::vector<SDVertex *> vertices;
     std::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
@@ -401,14 +401,15 @@ static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
             }
         }
         return CreateTriangleMesh(*ObjectToWorld, *WorldToObject,
-                                  reverseOrientation, verts, pLimit, {}, Ns, {});
+                                  reverseOrientation, verts, pLimit, {}, Ns, {},
+                                  {}, attributes);
     }
 }
 
 std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     int nLevels = params.GetOneInt("levels", params.GetOneInt("nlevels", 3));
     ArraySlice<int> vertexIndices = params.GetIntArray("indices");
     ArraySlice<Point3f> P = params.GetPoint3fArray("P");
@@ -424,7 +425,8 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     // don't actually use this for now...
     std::string scheme = params.GetOneString("scheme", "loop");
     return LoopSubdivide(ObjectToWorld.get(), WorldToObject.get(),
-                         reverseOrientation, nLevels, vertexIndices, P);
+                         reverseOrientation, nLevels, vertexIndices, P,
+                         attributes);
 }
 
 static Point3f weightOneRing(SDVertex *vert, Float beta) {

@@ -175,7 +175,8 @@ int main(int argc, char* argv[]) {
             ParamSet p;
 
             std::shared_ptr<Shape> disk =
-                std::make_shared<Disk>(t, tInv, reverseOrientation, 0., 1., 0, 360.);
+                std::make_shared<Disk>(t, tInv, reverseOrientation, 0., 1., 0, 360.,
+                                       nullptr);
             Point3f origin(
                 0.1, 1, 0);  // offset slightly so we don't hit center of disk
             Vector3f direction(0, -1, 0);

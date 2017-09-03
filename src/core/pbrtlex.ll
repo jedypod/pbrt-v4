@@ -138,6 +138,7 @@ Accelerator             { return ACCELERATOR; }
 ActiveTransform         { return ACTIVETRANSFORM; }
 All                     { return ALL; }
 AreaLightSource         { return AREALIGHTSOURCE; }
+Attribute               { return ATTRIBUTE; }
 AttributeBegin          { return ATTRIBUTEBEGIN; }
 AttributeEnd            { return ATTRIBUTEEND; }
 Camera                  { return CAMERA; }

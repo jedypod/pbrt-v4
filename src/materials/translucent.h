@@ -56,7 +56,8 @@ class TranslucentMaterial : public Material {
                         const std::shared_ptr<Texture<Spectrum>> &refl,
                         const std::shared_ptr<Texture<Spectrum>> &trans,
                         const std::shared_ptr<Texture<Float>> &bump,
-                        bool remap) {
+                        bool remap, const std::shared_ptr<const ParamSet> &attributes)
+      : Material(attributes) {
         Kd = kd;
         Ks = ks;
         roughness = rough;
@@ -78,7 +79,7 @@ class TranslucentMaterial : public Material {
 };
 
 std::shared_ptr<TranslucentMaterial> CreateTranslucentMaterial(
-    const TextureParams &mp);
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

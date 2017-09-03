@@ -45,8 +45,10 @@ namespace pbrt {
 Hyperboloid::Hyperboloid(std::shared_ptr<const Transform> ObjectToWorld,
                          std::shared_ptr<const Transform> WorldToObject,
                          bool reverseOrientation, const Point3f &point1,
-                         const Point3f &point2, Float tm)
-    : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation) {
+                         const Point3f &point2, Float tm,
+                         const std::shared_ptr<const ParamSet> &attributes)
+    : TransformedShape(ObjectToWorld, WorldToObject, reverseOrientation,
+                       attributes) {
     p1 = point1;
     p2 = point2;
     phiMax = Radians(Clamp(tm, 0, 360));
@@ -255,12 +257,13 @@ Interaction Hyperboloid::Sample(const Point2f &u, Float *pdf) const {
 std::shared_ptr<Shape> CreateHyperboloidShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     Point3f p1 = params.GetOnePoint3f("p1", Point3f(0, 0, 0));
     Point3f p2 = params.GetOnePoint3f("p2", Point3f(1, 1, 1));
     Float phimax = params.GetOneFloat("phimax", 360);
     return std::make_shared<Hyperboloid>(ObjectToWorld, WorldToObject,
-                                         reverseOrientation, p1, p2, phimax);
+                                         reverseOrientation, p1, p2, phimax,
+                                         attributes);
 }
 
 }  // namespace pbrt

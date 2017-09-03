@@ -74,6 +74,7 @@ void pbrtMediumInterface(const std::string &insideName,
 void pbrtWorldBegin();
 void pbrtAttributeBegin();
 void pbrtAttributeEnd();
+void pbrtAttribute(const std::string &target, const NamedValues &attrib);
 void pbrtTransformBegin();
 void pbrtTransformEnd();
 void pbrtTexture(const std::string &name, const std::string &type,

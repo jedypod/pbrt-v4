@@ -55,8 +55,10 @@ class SubstrateMaterial : public Material {
                       const std::shared_ptr<Texture<Float>> &nu,
                       const std::shared_ptr<Texture<Float>> &nv,
                       const std::shared_ptr<Texture<Float>> &bumpMap,
-                      bool remapRoughness)
-        : Kd(Kd),
+                      bool remapRoughness,
+                      const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          Kd(Kd),
           Ks(Ks),
           nu(nu),
           nv(nv),
@@ -74,7 +76,7 @@ class SubstrateMaterial : public Material {
 };
 
 std::shared_ptr<SubstrateMaterial> CreateSubstrateMaterial(
-    const TextureParams &mp);
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

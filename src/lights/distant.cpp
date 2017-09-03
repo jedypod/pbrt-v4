@@ -40,8 +40,10 @@ namespace pbrt {
 
 // DistantLight Method Definitions
 DistantLight::DistantLight(const Transform &LightToWorld, const Spectrum &L,
-                           const Vector3f &wLight)
-    : Light((int)LightFlags::DeltaDirection, LightToWorld, MediumInterface()),
+                           const Vector3f &wLight,
+                           const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::DeltaDirection, LightToWorld, MediumInterface(),
+            attributes),
       L(L),
       wLight(Normalize(LightToWorld(wLight))) {}
 
@@ -90,14 +92,15 @@ void DistantLight::Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
     *pdfDir = 0;
 }
 
-std::shared_ptr<DistantLight> CreateDistantLight(const Transform &light2world,
-                                                 const ParamSet &paramSet) {
+std::shared_ptr<DistantLight> CreateDistantLight(
+    const Transform &light2world, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     Point3f from = paramSet.GetOnePoint3f("from", Point3f(0, 0, 0));
     Point3f to = paramSet.GetOnePoint3f("to", Point3f(0, 0, 1));
     Vector3f dir = from - to;
-    return std::make_shared<DistantLight>(light2world, L * sc, dir);
+    return std::make_shared<DistantLight>(light2world, L * sc, dir, attributes);
 }
 
 }  // namespace pbrt

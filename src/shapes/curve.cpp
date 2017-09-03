@@ -81,12 +81,14 @@ CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
                          CurveType type, ArraySlice<Normal3f> norm,
                          std::shared_ptr<const Transform> ObjectToWorld,
                          std::shared_ptr<const Transform> WorldToObject,
-                         bool reverseOrientation)
+                         bool reverseOrientation,
+                         const std::shared_ptr<const ParamSet> &attributes)
     : type(type),
       ObjectToWorld(ObjectToWorld),
       WorldToObject(WorldToObject),
       reverseOrientation(reverseOrientation),
-      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()) {
+      transformSwapsHandedness(ObjectToWorld->SwapsHandedness()),
+      attributes(attributes) {
     width[0] = width0;
     width[1] = width1;
     CHECK_EQ(c.size(), 4);
@@ -104,11 +106,13 @@ std::vector<std::shared_ptr<Shape>> CreateCurve(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
-    ArraySlice<Normal3f> norm, int splitDepth) {
+    ArraySlice<Normal3f> norm, int splitDepth,
+    const std::shared_ptr<const ParamSet> &attributes) {
     std::vector<std::shared_ptr<Shape>> segments;
     std::shared_ptr<CurveCommon> common =
         std::make_shared<CurveCommon>(c, w0, w1, type, norm, ObjectToWorld,
-                                      WorldToObject, reverseOrientation);
+                                      WorldToObject, reverseOrientation,
+                                      attributes);
     const int nSegments = 1 << splitDepth;
     segments.reserve(nSegments);
     for (int i = 0; i < nSegments; ++i) {
@@ -396,7 +400,7 @@ Interaction Curve::Sample(const Point2f &u, Float *pdf) const {
 std::vector<std::shared_ptr<Shape>> CreateCurveShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params) {
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     Float width = params.GetOneFloat("width", 1.f);
     Float width0 = params.GetOneFloat("width0", width);
     Float width1 = params.GetOneFloat("width1", width);
@@ -447,7 +451,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
         return std::vector<std::shared_ptr<Shape>>();
     } else
         return CreateCurve(ObjectToWorld, WorldToObject, reverseOrientation, cp,
-                           width0, width1, type, n, sd);
+                           width0, width1, type, n, sd, attributes);
 }
 
 }  // namespace pbrt

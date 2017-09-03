@@ -50,7 +50,7 @@ class Paraboloid : public TransformedShape {
     Paraboloid(std::shared_ptr<const Transform> ObjectToWorld,
                std::shared_ptr<const Transform> WorldToObject,
                bool reverseOrientation, Float radius, Float z0, Float z1,
-               Float phiMax);
+               Float phiMax, const std::shared_ptr<const ParamSet> &attributes);
     Bounds3f ObjectBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
@@ -65,7 +65,7 @@ class Paraboloid : public TransformedShape {
 std::shared_ptr<Paraboloid> CreateParaboloidShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    const ParamSet &params);
+    const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

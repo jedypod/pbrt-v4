@@ -53,7 +53,8 @@ class InfiniteAreaLight : public Light {
   public:
     // InfiniteAreaLight Public Methods
     InfiniteAreaLight(const Transform &LightToWorld, const Spectrum &power,
-                      const std::string &texmap);
+                      const std::string &texmap,
+                      const std::shared_ptr<const ParamSet> &attributes);
     void Preprocess(const Scene &scene) {
         scene.WorldBound().BoundingSphere(&worldCenter, &worldRadius);
     }
@@ -78,7 +79,8 @@ class InfiniteAreaLight : public Light {
 };
 
 std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
-    const Transform &light2world, const ParamSet &paramSet);
+    const Transform &light2world, const ParamSet &paramSet,
+    const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 

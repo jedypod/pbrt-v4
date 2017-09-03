@@ -45,6 +45,8 @@
 #include "medium.h"
 #include "transform.h"
 
+#include <memory>
+
 namespace pbrt {
 
 // LightFlags Declarations
@@ -66,7 +68,8 @@ class Light {
     // Light Interface
     virtual ~Light();
     Light(int flags, const Transform &LightToWorld,
-          const MediumInterface &mediumInterface);
+          const MediumInterface &mediumInterface,
+          const std::shared_ptr<const ParamSet> &attributes);
     virtual Spectrum Sample_Li(const Interaction &ref, const Point2f &u,
                                Vector3f *wi, Float *pdf,
                                VisibilityTester *vis) const = 0;
@@ -83,6 +86,7 @@ class Light {
     // Light Public Data
     const int flags;
     const MediumInterface mediumInterface;
+    std::shared_ptr<const ParamSet> attributes;
 
   protected:
     // Light Protected Data
@@ -107,7 +111,8 @@ class VisibilityTester {
 class AreaLight : public Light {
   public:
     // AreaLight Interface
-    AreaLight(const Transform &LightToWorld, const MediumInterface &medium);
+    AreaLight(const Transform &LightToWorld, const MediumInterface &medium,
+              const std::shared_ptr<const ParamSet> &attributes);
     virtual Spectrum L(const Interaction &intr, const Vector3f &w) const = 0;
 };
 

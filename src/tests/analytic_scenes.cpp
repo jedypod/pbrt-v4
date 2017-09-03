@@ -72,14 +72,14 @@ std::vector<TestScene> GetScenes() {
         // Unit sphere, Kd = 0.5, point light I = 3.1415 at center
         // -> With GI, should have radiance of 1.
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            id, id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360, nullptr);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
         std::shared_ptr<Texture<Float>> sigma =
             std::make_shared<ConstantTexture<Float>>(0.);
         std::shared_ptr<Material> material =
-            std::make_shared<MatteMaterial>(Kd, sigma, nullptr);
+            std::make_shared<MatteMaterial>(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
         std::vector<std::shared_ptr<Primitive>> prims;
@@ -89,7 +89,8 @@ std::vector<TestScene> GetScenes() {
 
         std::vector<std::shared_ptr<Light>> lights;
         lights.push_back(
-            std::make_shared<PointLight>(Transform(), nullptr, Spectrum(Pi)));
+            std::make_shared<PointLight>(Transform(), nullptr, Spectrum(Pi),
+                                         std::make_shared<ParamSet>()));
 
         std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
@@ -100,14 +101,14 @@ std::vector<TestScene> GetScenes() {
         // Unit sphere, Kd = 0.5, 4 point lights I = 3.1415/4 at center
         // -> With GI, should have radiance of 1.
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            id, id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360, nullptr);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
         std::shared_ptr<Texture<Float>> sigma =
             std::make_shared<ConstantTexture<Float>>(0.);
         std::shared_ptr<Material> material =
-            std::make_shared<MatteMaterial>(Kd, sigma, nullptr);
+            std::make_shared<MatteMaterial>(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
         std::vector<std::shared_ptr<Primitive>> prims;
@@ -117,13 +118,17 @@ std::vector<TestScene> GetScenes() {
 
         std::vector<std::shared_ptr<Light>> lights;
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
-                                                      Spectrum(Pi / 4)));
+                                                      Spectrum(Pi / 4),
+                                                      std::make_shared<ParamSet>()));
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
-                                                      Spectrum(Pi / 4)));
+                                                      Spectrum(Pi / 4),
+                                                      std::make_shared<ParamSet>()));
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
-                                                      Spectrum(Pi / 4)));
+                                                      Spectrum(Pi / 4),
+                                                      std::make_shared<ParamSet>()));
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
-                                                      Spectrum(Pi / 4)));
+                                                      Spectrum(Pi / 4),
+                                                      std::make_shared<ParamSet>()));
 
         std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
@@ -134,18 +139,19 @@ std::vector<TestScene> GetScenes() {
         // Unit sphere, Kd = 0.5, Le = 0.5
         // -> With GI, should have radiance of 1.
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            id, id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360, nullptr);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5));
         std::shared_ptr<Texture<Float>> sigma =
             std::make_shared<ConstantTexture<Float>>(0.);
         std::shared_ptr<Material> material =
-            std::make_shared<MatteMaterial>(Kd, sigma, nullptr);
+            std::make_shared<MatteMaterial>(Kd, sigma, nullptr, nullptr);
 
         std::shared_ptr<AreaLight> areaLight =
             std::make_shared<DiffuseAreaLight>(Transform(), nullptr,
-                                               Spectrum(0.5), sphere);
+                                               Spectrum(0.5), sphere, false,
+                                               std::make_shared<ParamSet>());
 
         std::vector<std::shared_ptr<Light>> lights;
         lights.push_back(areaLight);
@@ -165,7 +171,7 @@ std::vector<TestScene> GetScenes() {
         // Unit sphere, Kd = 0.25, Kr = .5, point light I = 7.4 at center
         // -> With GI, should have radiance of ~1.
         std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-            id, id, true /* reverse orientation */, 1, -1, 1, 360);
+            id, id, true /* reverse orientation */, 1, -1, 1, 360, nullptr);
 
         std::shared_ptr<Texture<Spectrum>> Kd =
             std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.25));
@@ -180,7 +186,7 @@ std::vector<TestScene> GetScenes() {
         std::shared_ptr<Texture<Float>> one =
             std::make_shared<ConstantTexture<Float>>(1.);
         std::shared_ptr<Material> material = std::make_shared<UberMaterial>(
-            Kd, black, Kr, black, zero, zero, zero, white, one, nullptr, false);
+            Kd, black, Kr, black, zero, zero, zero, white, one, nullptr, false, nullptr);
 
         MediumInterface mediumInterface;
         std::vector<std::shared_ptr<Primitive>> prims;
@@ -190,7 +196,8 @@ std::vector<TestScene> GetScenes() {
 
         std::vector<std::shared_ptr<Light>> lights;
         lights.push_back(std::make_shared<PointLight>(Transform(), nullptr,
-                                                      Spectrum(3. * Pi)));
+                                                      Spectrum(3. * Pi),
+                                                      std::make_shared<ParamSet>()));
 
         std::unique_ptr<Scene> scene = std::make_unique<Scene>(bvh, lights);
 
@@ -203,7 +210,7 @@ std::vector<TestScene> GetScenes() {
     // Unit sphere, Kd = 0.25, Kr = .5, Le .587
     // -> With GI, should have radiance of ~1.
     std::shared_ptr<Shape> sphere = std::make_shared<Sphere>(
-        id, id, true /* reverse orientation */, 1, -1, 1, 360);
+        id, id, true /* reverse orientation */, 1, -1, 1, 360, nullptr);
 
     std::shared_ptr<Texture<Spectrum>> Kd =
         std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.25));
@@ -218,10 +225,11 @@ std::vector<TestScene> GetScenes() {
     std::shared_ptr<Texture<Float>> one =
         std::make_shared<ConstantTexture<Float>>(1.);
     std::shared_ptr<Material> material = std::make_shared<UberMaterial>(
-        Kd, black, Kr, black, zero, zero, zero, white, one, nullptr, false);
+        Kd, black, Kr, black, zero, zero, zero, white, one, nullptr, false, nullptr);
 
     std::shared_ptr<AreaLight> areaLight = std::make_shared<DiffuseAreaLight>(
-        Transform(), nullptr, Spectrum(0.587), 8, sphere);
+        Transform(), nullptr, Spectrum(0.587), 8, sphere, true, false,
+        std::make_shared<ParamSet>());
 
     MediumInterface mediumInterface;
     std::vector<std::shared_ptr<Primitive>> prims;

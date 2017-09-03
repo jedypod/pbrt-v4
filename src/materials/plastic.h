@@ -54,8 +54,10 @@ class PlasticMaterial : public Material {
                     const std::shared_ptr<Texture<Spectrum>> &Ks,
                     const std::shared_ptr<Texture<Float>> &roughness,
                     const std::shared_ptr<Texture<Float>> &bumpMap,
-                    bool remapRoughness)
-        : Kd(Kd),
+                    bool remapRoughness,
+                    const std::shared_ptr<const ParamSet> &attributes)
+        : Material(attributes),
+          Kd(Kd),
           Ks(Ks),
           roughness(roughness),
           bumpMap(bumpMap),
@@ -70,7 +72,8 @@ class PlasticMaterial : public Material {
     const bool remapRoughness;
 };
 
-std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(const TextureParams &mp);
+std::shared_ptr<PlasticMaterial> CreatePlasticMaterial(
+    const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes);
 
 }  // namespace pbrt
 
