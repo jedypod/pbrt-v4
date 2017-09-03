@@ -263,7 +263,7 @@ inline constexpr Float Lerp(Float t, Float v1, Float v2) {
     return (1 - t) * v1 + t * v2;
 }
 
-inline Float Sqr(Float v) { return v * v; }
+inline constexpr Float Sqr(Float v) { return v * v; }
 
 inline Float SafeASin(Float x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
@@ -286,19 +286,19 @@ inline double SafeSqrt(double x) {
 }
 
 template <int n>
-static Float Pow(Float v) {
+inline constexpr Float Pow(Float v) {
     static_assert(n > 0, "Power can't be negative");
     Float n2 = Pow<n / 2>(v);
     return n2 * n2 * Pow<n & 1>(v);
 }
 
 template <>
-inline Float Pow<1>(Float v) {
+inline constexpr Float Pow<1>(Float v) {
     return v;
 }
 
 template <>
-inline Float Pow<0>(Float v) {
+inline constexpr Float Pow<0>(Float v) {
     return 1;
 }
 
