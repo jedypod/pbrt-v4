@@ -446,7 +446,7 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
         return s;
     }
     std::array<Float, 3> ToRGB() const {
-        return { c[0], c[0], c[2] };
+        return { c[0], c[1], c[2] };
     }
     std::array<Float, 3> ToXYZ() const { return RGBToXYZ(c); }
     static RGBSpectrum FromXYZ(gtl::ArraySlice<Float> xyz,
