@@ -208,30 +208,41 @@ int assemble(int argc, char *argv[]) {
         std::experimental::optional<Image> img = Image::Read(file, &metadata, true);
         if (!img) continue;
 
+        if (!metadata.fullResolution) {
+            fprintf(stderr, "%s: doesn't have full resolution in image metadata. Skipping.\n",
+                    file.c_str());
+            continue;
+        }
+        if (!metadata.pixelBounds) {
+            fprintf(stderr, "%s: doesn't have pixel bounds in image metadata. Skipping.\n",
+                    file.c_str());
+            continue;
+        }
+
         if (fullImage.resolution == Point2i(0, 0)) {
             // First image read.
-            fullImage = Image(img->format, metadata.fullResolution);
+            fullImage = Image(img->format, *metadata.fullResolution);
             seenPixel.resize(fullImage.resolution.x * fullImage.resolution.y);
             fullBounds = Bounds2i({0, 0}, fullImage.resolution);
         } else {
             // Make sure that this image's info is compatible with the
             // first image's.
-            if (metadata.fullResolution != fullImage.resolution) {
+            if (*metadata.fullResolution != fullImage.resolution) {
                 fprintf(stderr,
                         "%s: full resolution (%d, %d) in EXR file doesn't match "
                         "the full resolution of first EXR file (%d, %d). "
                         "Ignoring this file.\n",
-                        file.c_str(), metadata.fullResolution.x,
-                        metadata.fullResolution.y, fullImage.resolution.x,
+                        file.c_str(), metadata.fullResolution->x,
+                        metadata.fullResolution->y, fullImage.resolution.x,
                         fullImage.resolution.y);
                 continue;
             }
-            if (Union(metadata.pixelBounds, fullBounds) != fullBounds) {
+            if (Union(*metadata.pixelBounds, fullBounds) != fullBounds) {
                 fprintf(stderr,
                         "%s: pixel bounds (%d, %d) - (%d, %d) in EXR file isn't "
                         "inside the the full image (0, 0) - (%d, %d). Ignoring this file.\n",
-                        file.c_str(), metadata.pixelBounds.pMin.x, metadata.pixelBounds.pMin.y,
-                        metadata.pixelBounds.pMax.x, metadata.pixelBounds.pMax.y,
+                        file.c_str(), metadata.pixelBounds->pMin.x, metadata.pixelBounds->pMin.y,
+                        metadata.pixelBounds->pMax.x, metadata.pixelBounds->pMax.y,
                         fullBounds.pMax.x, fullBounds.pMax.y);
                 continue;
             }
@@ -246,8 +257,8 @@ int assemble(int argc, char *argv[]) {
         // Copy pixels.
         for (int y = 0; y < img->resolution.y; ++y)
             for (int x = 0; x < img->resolution.x; ++x) {
-                Point2i fullp{x + metadata.pixelBounds.pMin.x,
-                              y + metadata.pixelBounds.pMin.y};
+                Point2i fullp{x + metadata.pixelBounds->pMin.x,
+                              y + metadata.pixelBounds->pMin.y};
                 size_t fullOffset = fullImage.PixelOffset(fullp);
                 if (seenPixel[fullOffset]) ++seenMultiple;
                 seenPixel[fullOffset] = true;
@@ -433,15 +444,15 @@ static void printImageStats(const char *name, const Image &image,
     printf("\tpixel format: %s\n", FormatName(image.format));
 
     if (metadata) {
-        if (metadata->fullResolution != Point2i(0, 0))
-            printf("\tfull resolution (%d, %d)\n", metadata->fullResolution.x,
-                   metadata->fullResolution.y);
-        if (metadata->pixelBounds != Bounds2i({0, 0}, {0, 0}))
+        if (metadata->fullResolution)
+            printf("\tfull resolution (%d, %d)\n", metadata->fullResolution->x,
+                   metadata->fullResolution->y);
+        if (metadata->pixelBounds)
             printf("\tpixel bounds (%d, %d) - (%d, %d)\n",
-                   metadata->pixelBounds.pMin.x, metadata->pixelBounds.pMin.y,
-                   metadata->pixelBounds.pMax.x, metadata->pixelBounds.pMax.y);
-        if (metadata->renderTimeSeconds != 0) {
-            float s = metadata->renderTimeSeconds;
+                   metadata->pixelBounds->pMin.x, metadata->pixelBounds->pMin.y,
+                   metadata->pixelBounds->pMax.x, metadata->pixelBounds->pMax.y);
+        if (metadata->renderTimeSeconds) {
+            float s = *metadata->renderTimeSeconds;
             int h = int(s) / 3600;
             s -= h * 3600;
             int m = int(s) / 60;

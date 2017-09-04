@@ -227,13 +227,11 @@ bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
 // ImageMetadata
 
 struct ImageMetadata {
-    // These may come back from Read() with zero values; this signifies
-    // that either the image format doesn't allow encoding this metadata or
-    // that it isn't present in the image.
-    Float renderTimeSeconds = 0;
+    // These may or may not be present in the metadata of a image.
+    std::experimental::optional<Float> renderTimeSeconds;
     std::experimental::optional<Matrix4x4> worldToCamera, worldToNDC;
-    Bounds2i pixelBounds;
-    Point2i fullResolution;
+    std::experimental::optional<Bounds2i> pixelBounds;
+    std::experimental::optional<Point2i> fullResolution;
 };
 
 ///////////////////////////////////////////////////////////////////////////

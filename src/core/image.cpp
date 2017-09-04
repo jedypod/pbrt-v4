@@ -613,8 +613,8 @@ std::experimental::optional<Image> Image::Read(const std::string &name,
 }
 
 bool Image::Write(const std::string &name, const ImageMetadata *metadata) const {
-    if (metadata && !metadata->pixelBounds.Empty())
-        CHECK_EQ(metadata->pixelBounds.Area(), resolution.x * resolution.y);
+    if (metadata && metadata->pixelBounds)
+        CHECK_EQ(metadata->pixelBounds->Area(), resolution.x * resolution.y);
 
     if (HasExtension(name, ".exr"))
         return WriteEXR(name, metadata);
@@ -705,11 +705,11 @@ static std::experimental::optional<Image> ReadEXR(const std::string &name,
 
             // OpenEXR uses inclusive pixel bounds; adjust to non-inclusive
             // (the convention pbrt uses) in the values returned.
-            metadata->pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
+            *metadata->pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
 
             Imath::Box2i dispw = file.header().displayWindow();
-            metadata->fullResolution.x = dispw.max.x - dispw.min.x + 1;
-            metadata->fullResolution.y = dispw.max.y - dispw.min.y + 1;
+            metadata->fullResolution->x = dispw.max.x - dispw.min.x + 1;
+            metadata->fullResolution->y = dispw.max.y - dispw.min.y + 1;
         }
 
         int width = dw.max.x - dw.min.x + 1;
@@ -765,17 +765,22 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
 
     try {
         Imath::Box2i displayWindow, dataWindow;
-        if (metadata) {
+        if (metadata && metadata->fullResolution)
             // Agan, -1 offsets to handle inclusive indexing in OpenEXR...
             displayWindow = {Imath::V2i(0, 0),
-                             Imath::V2i(metadata->fullResolution.x - 1,
-                                        metadata->fullResolution.y - 1)};
-            dataWindow = {Imath::V2i(metadata->pixelBounds.pMin.x,
-                                     metadata->pixelBounds.pMin.y),
-                          Imath::V2i(metadata->pixelBounds.pMax.x - 1,
-                                     metadata->pixelBounds.pMax.y - 1)};
-        } else
-            displayWindow = dataWindow =
+                             Imath::V2i(metadata->fullResolution->x - 1,
+                                        metadata->fullResolution->y - 1)};
+        else
+            displayWindow =
+                {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
+
+        if (metadata && metadata->pixelBounds)
+            dataWindow = {Imath::V2i(metadata->pixelBounds->pMin.x,
+                                     metadata->pixelBounds->pMin.y),
+                          Imath::V2i(metadata->pixelBounds->pMax.x - 1,
+                                     metadata->pixelBounds->pMax.y - 1)};
+        else
+            dataWindow =
                 {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
 
         Imf::FrameBuffer fb = imageToFrameBuffer(*this, dataWindow);
@@ -785,8 +790,8 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
             header.channels().insert(iter.name(), iter.slice().type);
 
         if (metadata) {
-            if (metadata->renderTimeSeconds > 0)
-                header.insert("renderTimeSeconds", Imf::FloatAttribute(metadata->renderTimeSeconds));
+            if (metadata->renderTimeSeconds)
+                header.insert("renderTimeSeconds", Imf::FloatAttribute(*metadata->renderTimeSeconds));
             // TODO: fix this for Float = double builds.
             if (metadata->worldToCamera)
                 header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera->m));
