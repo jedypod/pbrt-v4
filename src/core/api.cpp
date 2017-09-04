@@ -1123,11 +1123,31 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
         if (matName == "")
             Error("No parameter string \"type\" found in MakeNamedMaterial");
 
+        bool setNameAttribute = false;
+        if (graphicsState.materialAttributes->GetOneString("name", "") == "") {
+            // The user hasn't explicitly specified a name via
+            // 'Attribute "material" "string name" "..."', so set it based
+            // on the given mmaterial name;
+            setNameAttribute = true;
+            pbrtAttributeBegin();
+
+            std::string decl = "string name";
+            NamedValues nv;
+            nv.name = &decl;
+            nv.strings.push_back(&name);
+            pbrtAttribute("material", nv);
+        }
+
         std::shared_ptr<Material> mtl = MakeMaterial(matName, mp);
+
+        if (setNameAttribute)
+            pbrtAttributeEnd();
+
         if (graphicsState.namedMaterials.find(name) !=
             graphicsState.namedMaterials.end())
             Warning("Named material \"%s\" redefined.", name.c_str());
         graphicsState.namedMaterials[name] = mtl;
+
     }
 }
 
@@ -1328,6 +1348,14 @@ void pbrtReverseOrientation() {
 void pbrtObjectBegin(const std::string &name) {
     VERIFY_WORLD("ObjectBegin");
     pbrtAttributeBegin();
+
+    // Set the shape name attribute using the instance name.
+    std::string decl = "string name";
+    NamedValues nv;
+    nv.name = &decl;
+    nv.strings.push_back(&name);
+    pbrtAttribute("shape", nv);
+
     if (renderOptions->currentInstance)
         Error("ObjectBegin called inside of instance definition");
     renderOptions->instances[name] = std::vector<std::shared_ptr<Primitive>>();

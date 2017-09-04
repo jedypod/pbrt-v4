@@ -53,6 +53,7 @@
 #include <cstdint>
 #include <cstring>
 #include <experimental/optional>
+#include <map>
 #include <vector>
 
 namespace pbrt {
@@ -227,11 +228,12 @@ bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
 // ImageMetadata
 
 struct ImageMetadata {
-    // These may or may not be present in the metadata of a image.
+    // These may or may not be present in the metadata of an Image.
     std::experimental::optional<Float> renderTimeSeconds;
     std::experimental::optional<Matrix4x4> worldToCamera, worldToNDC;
     std::experimental::optional<Bounds2i> pixelBounds;
     std::experimental::optional<Point2i> fullResolution;
+    std::map<std::string, std::vector<std::string>> stringVectors;
 };
 
 ///////////////////////////////////////////////////////////////////////////

@@ -39,6 +39,7 @@
 #include "image.h"
 #include "interaction.h"
 #include "lightdistrib.h"
+#include "lowdiscrepancy.h"
 #include "parallel.h"
 #include "paramset.h"
 #include "progressreporter.h"
@@ -46,6 +47,8 @@
 #include "samplers/halton.h"
 #include "stats.h"
 #include "scene.h"
+
+#include <mutex>
 
 using gtl::ArraySlice;
 
@@ -65,8 +68,14 @@ void AOVIntegrator::Render(const Scene &scene) {
     Image albedoImage(PixelFormat::RGB32, resolution);
     Image aoImage(PixelFormat::Y32, resolution);
     Image eImage(PixelFormat::RGB32, resolution);
+    Image shapeIdImage(PixelFormat::RGB32, resolution);
+    Image materialIdImage(PixelFormat::RGB32, resolution);
     int totalChannels = 6 * 3 + 1 * 1;
     aovImageBytes += totalChannels * sizeof(Float) * croppedPixelBounds.Area();
+
+    std::mutex nameToSpectrumMutex;
+    std::map<std::string, Spectrum> shapeNameToSpectrum, materialNameToSpectrum;
+    std::vector<std::string> shapeNameMetadata, materialNameMetadata;
 
     std::unique_ptr<Sampler> sampler =
         std::make_unique<HaltonSampler>(1, croppedPixelBounds);
@@ -134,6 +143,57 @@ void AOVIntegrator::Render(const Scene &scene) {
             if (findIntersectionAndShade(ray, &isect)) {
                 Point2i p = Point2i(pPixel - croppedPixelBounds.pMin);
 
+                for (int c = 0; c < 3; ++c) {
+                    pImage.SetChannel(p, c, isect.p[c]);
+                    nImage.SetChannel(p, c, isect.n[c]);
+                    nsImage.SetChannel(p, c, isect.shading.n[c]);
+                }
+                for (int c = 0; c < 2; ++c)
+                    uvImage.SetChannel(p, c, isect.uv[c]);
+
+                std::string shapeName = isect.primitive->GetAttributes() ?
+                    isect.primitive->GetAttributes()->GetOneString("name", "") : "";
+                Spectrum shapeIdSpectrum(0.f);
+                if (shapeName != "") {
+                    std::lock_guard<std::mutex> lock(nameToSpectrumMutex);
+                    if (shapeNameToSpectrum.find(shapeName) ==
+                        shapeNameToSpectrum.end()) {
+                        int index = shapeNameToSpectrum.size() + 1;
+                        std::array<Float, 3> rgb = {
+                            SobolSampleFloat(index, 0),
+                            SobolSampleFloat(index, 1),
+                            SobolSampleFloat(index, 2) };
+                        shapeNameToSpectrum[shapeName] = Spectrum::FromRGB(rgb);
+                        shapeNameMetadata.push_back(
+                            StringPrintf("%f %f %f %s", rgb[0], rgb[1], rgb[2], shapeName.c_str()));
+                    }
+                    shapeIdSpectrum = shapeNameToSpectrum[shapeName];
+                }
+                shapeIdImage.SetSpectrum(p, shapeIdSpectrum);
+
+                std::string materialName = "";
+                if (isect.primitive->GetMaterial() &&
+                    isect.primitive->GetMaterial()->attributes)
+                    materialName = isect.primitive->GetMaterial()->attributes->
+                        GetOneString("name", "");
+                Spectrum materialIdSpectrum(0.f);
+                if (materialName != "") {
+                    std::lock_guard<std::mutex> lock(nameToSpectrumMutex);
+                    if (materialNameToSpectrum.find(materialName) ==
+                        materialNameToSpectrum.end()) {
+                        int index = materialNameToSpectrum.size() + 1;
+                        std::array<Float, 3> rgb = {
+                            SobolSampleFloat(index, 0),
+                            SobolSampleFloat(index, 1),
+                            SobolSampleFloat(index, 2) };
+                        materialNameToSpectrum[materialName] = Spectrum::FromRGB(rgb);
+                        materialNameMetadata.push_back(
+                            StringPrintf("%f %f %f %s", rgb[0], rgb[1], rgb[2], materialName.c_str()));
+                    }
+                    materialIdSpectrum = materialNameToSpectrum[materialName];
+                }
+                materialIdImage.SetSpectrum(p, materialIdSpectrum);
+
                 // Order--albedo, ao, e is important--must match order of
                 // sample array requests.
                 Spectrum albedo = isect.bsdf->rho(
@@ -190,14 +250,6 @@ void AOVIntegrator::Render(const Scene &scene) {
                     }
                     eImage.SetSpectrum(p, E);
                 }
-
-                for (int c = 0; c < 3; ++c) {
-                    pImage.SetChannel(p, c, isect.p[c]);
-                    nImage.SetChannel(p, c, isect.n[c]);
-                    nsImage.SetChannel(p, c, isect.shading.n[c]);
-                }
-                for (int c = 0; c < 2; ++c)
-                    uvImage.SetChannel(p, c, isect.uv[c]);
             }
 
             // Free _MemoryArena_ memory from computing image sample
@@ -217,14 +269,31 @@ void AOVIntegrator::Render(const Scene &scene) {
         CHECK_NE(dot, std::string::npos);
         return base.insert(dot, aov);
     };
-    pImage.Write(mungeFilename(camera->film->filename, "_p"));
-    nImage.Write(mungeFilename(camera->film->filename, "_n"));
-    nsImage.Write(mungeFilename(camera->film->filename, "_ns"));
-    uvImage.Write(mungeFilename(camera->film->filename, "_uv"));
-    albedoImage.Write(mungeFilename(camera->film->filename, "_albedo"));
+
+    ImageMetadata metadata;
+    metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
+    metadata.pixelBounds = camera->film->croppedPixelBounds;
+    metadata.fullResolution = camera->film->fullResolution;
+    pImage.Write(mungeFilename(camera->film->filename, "_p"), &metadata);
+    nImage.Write(mungeFilename(camera->film->filename, "_n"), &metadata);
+    nsImage.Write(mungeFilename(camera->film->filename, "_ns"), &metadata);
+    uvImage.Write(mungeFilename(camera->film->filename, "_uv"), &metadata);
+    albedoImage.Write(mungeFilename(camera->film->filename, "_albedo"), &metadata);
+
+    ImageMetadata shapeImageMetadata = metadata;
+    shapeImageMetadata.stringVectors["shapeIds"] = shapeNameMetadata;
+    shapeIdImage.Write(mungeFilename(camera->film->filename, "_shapeid"),
+                       &shapeImageMetadata);
+
+    ImageMetadata materialImageMetadata = metadata;
+    materialImageMetadata.stringVectors["materialIds"] = materialNameMetadata;
+    materialIdImage.Write(mungeFilename(camera->film->filename, "_materialid"),
+                          &materialImageMetadata);
+
     if (aoSamples > 0)
-        aoImage.Write(mungeFilename(camera->film->filename, "_ao"));
-    if (eSamples > 0) eImage.Write(mungeFilename(camera->film->filename, "_E"));
+        aoImage.Write(mungeFilename(camera->film->filename, "_ao"), &metadata);
+    if (eSamples > 0) eImage.Write(mungeFilename(camera->film->filename, "_E"),
+                                   &metadata);
 }
 
 std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(

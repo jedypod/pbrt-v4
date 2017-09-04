@@ -1,4 +1,11 @@
 
+- Image::SetRGB method? Spectrum in general is sort of out of place, since
+  we're explicit about "this is a 3 channel image", etc...
+
+- how come sampler test wasn't failing on gce?
+
+- Explicit class for Half, rather than typedef / uint16 overload
+
 - ToString(), etc:
   BSSRDF
   Camera
@@ -28,11 +35,8 @@
 
 - find interval test is broken
 
-- pbrtAttribute:
-   + auto add named material attribute for pbrtMakeNamedMaterial
-   + aov output of material/name, shape/name?
-   - use attributes for parameter initialization backup...
-     can we pass something to the Create functions that helps abstract this?
+- pbrtAttribute: use attributes for parameter initialization backup...  can
+  we pass something to the Create functions that helps abstract this?
 
 - Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
 

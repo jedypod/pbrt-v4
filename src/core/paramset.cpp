@@ -55,7 +55,7 @@ void NamedValues::AddNumber(double d) {
         numbers.push_back(d);
 }
 
-void NamedValues::AddString(std::string *str) {
+void NamedValues::AddString(const std::string *str) {
     if (numbers.size() || bools.size())
         Error("Ignoring string \"%s\" in non-string parameter list",
               str->c_str());
@@ -98,7 +98,7 @@ static void addParam(const std::string &name, std::vector<T> values,
                      std::vector<ParamSetItem<T>> &vec) {
     for (auto &v : vec) {
         if (v.name == name) {
-            Warning("%s: parameter redefined", name.c_str());
+            //Warning("%s: parameter redefined", name.c_str());
             v.values = std::move(values);
             return;
         }
@@ -306,7 +306,7 @@ void ParamSet::ReportUnused() const {
 ///////////////////////////////////////////////////////////////////////////
 
 static void initBoolParameter(const std::vector<bool> &bools,
-                              const std::vector<std::string *> &strings,
+                              const std::vector<const std::string *> &strings,
                               const std::string &fullname,
                               const std::string &name, ParamSet *ps) {
     if (!bools.empty()) {

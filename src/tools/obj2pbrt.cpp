@@ -1422,8 +1422,10 @@ int main(int argc, char *argv[]) {
     for (const shape_t &shape : shapes) {
         const mesh_t &mesh = shape.mesh;
 
-        fprintf(f, "# Name \"%s\"\n", shape.name.c_str());
         fprintf(f, "AttributeBegin\n");
+        if (shape.name != "")
+            fprintf(f, "Attribute \"shape\" \"string name\" \"%s\"\n",
+                    shape.name.c_str());
 
         assert(mesh.indices.size() / 3 == mesh.material_ids.size());
 

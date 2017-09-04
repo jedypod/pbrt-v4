@@ -467,6 +467,12 @@ static void printImageStats(const char *name, const Image &image,
         if (metadata->worldToNDC)
             printf("\tworld to NDC: %s\n",
                    metadata->worldToNDC->ToString().c_str());
+        for (const auto iter : metadata->stringVectors) {
+            printf("\t\"%s\": [ ", iter.first.c_str());
+            for (const std::string &str : iter.second)
+                printf("\"%s\" ", str.c_str());
+            printf("]\n");
+        }
     }
 
     Float min[3] = {Infinity, Infinity, Infinity};

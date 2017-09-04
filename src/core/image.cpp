@@ -45,10 +45,11 @@
 
 #include <ImfChannelList.h>
 #include <ImfFloatAttribute.h>
-#include <ImfMatrixAttribute.h>
-#include <ImfInputFile.h>
-#include <ImfOutputFile.h>
 #include <ImfFrameBuffer.h>
+#include <ImfInputFile.h>
+#include <ImfMatrixAttribute.h>
+#include <ImfOutputFile.h>
+#include <ImfStringVectorAttribute.h>
 
 namespace pbrt {
 
@@ -710,6 +711,15 @@ static std::experimental::optional<Image> ReadEXR(const std::string &name,
             Imath::Box2i dispw = file.header().displayWindow();
             metadata->fullResolution->x = dispw.max.x - dispw.min.x + 1;
             metadata->fullResolution->y = dispw.max.y - dispw.min.y + 1;
+
+            // Find any string vector attributes
+            for (auto iter = file.header().begin(); iter != file.header().end();
+                 ++iter) {
+                if (!strcmp(iter.attribute().typeName(), "stringvector")) {
+                    Imf::StringVectorAttribute &sv = (Imf::StringVectorAttribute &)iter.attribute();
+                    metadata->stringVectors[iter.name()] = sv.value();
+                }
+            }
         }
 
         int width = dw.max.x - dw.min.x + 1;
@@ -797,6 +807,8 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
                 header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera->m));
             if (metadata->worldToNDC)
                 header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC->m));
+            for (const auto &iter : metadata->stringVectors)
+                header.insert(iter.first, Imf::StringVectorAttribute(iter.second));
         }
 
         Imf::OutputFile file(name.c_str(), header);

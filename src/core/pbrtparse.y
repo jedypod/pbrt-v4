@@ -70,8 +70,8 @@ static NamedValues *currentParameter = nullptr;
 static void deallocActiveParameterList() {
     for (NamedValues *p = activeParameterList; p;) {
         stringPool->Release(p->name);
-        for (std::string *s : p->strings)
-            stringPool->Release(s);
+        for (const std::string *s : p->strings)
+            stringPool->Release((std::string *)s);
         NamedValues *next = p->next;
         namedValuesPool->Release(p);
         p = next;

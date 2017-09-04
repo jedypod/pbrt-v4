@@ -59,7 +59,7 @@ namespace pbrt {
 class NamedValues {
  public:
     void AddNumber(double d);
-    void AddString(std::string *str);
+    void AddString(const std::string *str);
     void AddBool(bool v);
 
     std::string ToString() const;
@@ -68,7 +68,7 @@ class NamedValues {
     NamedValues *next = nullptr;
 
     std::vector<double> numbers;
-    std::vector<std::string *> strings;
+    std::vector<const std::string *> strings;
     std::vector<bool> bools;
 };
 
