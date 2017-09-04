@@ -63,7 +63,7 @@ void StratifiedSampler::GeneratePixelSamples(RNG &rng) {
         for (int64_t j = 0; j < samplesPerPixel; ++j) {
             int count = samples2DArraySizes[i];
             gtl::MutableArraySlice<Float> samples(
-                &sampleArray2D[i][j * count].x, count);
+                &sampleArray2D[i][j * count].x, 2 * count);
             LatinHypercube(samples, 2, rng);
         }
 }

@@ -65,8 +65,10 @@ void StratifiedSample2D(MutableArraySlice<Point2f> samp, int nx, int ny,
 
 void LatinHypercube(MutableArraySlice<Float> samples, int nDim, RNG &rng) {
     // Generate LHS samples along diagonal
-    Float invNSamples = (Float)1 / samples.size();
-    for (size_t i = 0; i < samples.size(); ++i)
+    DCHECK_EQ(0, samples.size() % nDim);
+    int nSamples = samples.size() / nDim;
+    Float invNSamples = (Float)1 / nSamples;
+    for (size_t i = 0; i < nSamples; ++i)
         for (int j = 0; j < nDim; ++j) {
             Float sj = (i + (rng.UniformFloat())) * invNSamples;
             samples[nDim * i + j] = std::min(sj, OneMinusEpsilon);
@@ -74,8 +76,8 @@ void LatinHypercube(MutableArraySlice<Float> samples, int nDim, RNG &rng) {
 
     // Permute LHS samples in each dimension
     for (int i = 0; i < nDim; ++i) {
-        for (size_t j = 0; j < samples.size(); ++j) {
-            size_t other = j + rng.UniformUInt32(samples.size() - j);
+        for (size_t j = 0; j < nSamples; ++j) {
+            size_t other = j + rng.UniformUInt32(nSamples - j);
             std::swap(samples[nDim * j + i], samples[nDim * other + i]);
         }
     }
