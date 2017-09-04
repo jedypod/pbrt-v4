@@ -62,6 +62,8 @@ class NamedValues {
     void AddString(std::string *str);
     void AddBool(bool v);
 
+    std::string ToString() const;
+
     std::string *name = nullptr;
     NamedValues *next = nullptr;
 

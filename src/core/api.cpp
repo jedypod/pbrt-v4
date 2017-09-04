@@ -1011,6 +1011,7 @@ void pbrtAttributeEnd() {
 void pbrtAttribute(const std::string &target, const NamedValues &attrib) {
     VERIFY_INITIALIZED("Attribute");
     CHECK(attrib.next == nullptr);
+
     std::shared_ptr<ParamSet> *attributes = nullptr;
     if (target == "shape")
         attributes = &graphicsState.shapeAttributes;
@@ -1028,6 +1029,11 @@ void pbrtAttribute(const std::string &target, const NamedValues &attrib) {
     if (attributes->use_count() > 1)
         *attributes = std::make_shared<ParamSet>(**attributes);
     (*attributes)->Parse(&attrib, SpectrumType::Reflectance);
+
+    if (PbrtOptions.cat || PbrtOptions.toPly) {
+        printf("%*sAttribute \"%s\" ", catIndentCount, "", target.c_str());
+        printf("%*s%s\n", catIndentCount, "", attrib.ToString().c_str());
+    }
 }
 
 void pbrtTransformBegin() {

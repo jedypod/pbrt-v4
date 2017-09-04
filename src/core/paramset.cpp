@@ -36,6 +36,7 @@
 #include "error.h"
 #include "fileutil.h"
 #include "floatfile.h"
+#include "stringprint.h"
 #include "textures/constant.h"
 
 #include <glog/logging.h>
@@ -43,6 +44,9 @@
 using gtl::ArraySlice;
 
 namespace pbrt {
+
+///////////////////////////////////////////////////////////////////////////
+// NamedValues
 
 void NamedValues::AddNumber(double d) {
     if (strings.size() || bools.size())
@@ -66,6 +70,28 @@ void NamedValues::AddBool(bool v) {
     else
         bools.push_back(v);
 }
+
+
+std::string NamedValues::ToString() const {
+    CHECK_NOTNULL(name);
+    std::string str = std::string("\"") + *name + std::string("\" [");
+    if (!numbers.empty())
+        for (double d : numbers)
+            str += StringPrintf("%f ", d);
+    else if (!strings.empty())
+        for (const std::string *s : strings)
+            str += *s + " ";
+    else if (!bools.empty())
+        for (bool b : bools)
+            str += b ? "true " : "false ";
+    str += "] ";
+
+    if (next) str += " " + next->ToString();
+    return str;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// ParamSet
 
 template <typename T>
 static void addParam(const std::string &name, std::vector<T> values,
