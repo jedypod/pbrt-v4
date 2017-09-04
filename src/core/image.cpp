@@ -177,7 +177,7 @@ Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
                             WrapMode wrapMode) const {
     if (nChannels() == 1) return GetChannel(p, 0, wrapMode);
     std::array<Float, 3> rgb = GetRGB(p, wrapMode);
-    return Spectrum::FromRGB(&rgb[0], spectrumType);
+    return Spectrum::FromRGB(rgb, spectrumType);
 }
 
 void Image::CopyRectOut(const Bounds2i &extent,
@@ -307,7 +307,7 @@ Spectrum Image::BilerpSpectrum(Point2f p, SpectrumType spectrumType,
     std::array<Float, 3> rgb = {BilerpChannel(p, 0, wrapMode),
                                 BilerpChannel(p, 1, wrapMode),
                                 BilerpChannel(p, 2, wrapMode)};
-    return Spectrum::FromRGB(&rgb[0], spectrumType);
+    return Spectrum::FromRGB(rgb, spectrumType);
 }
 
 void Image::SetChannel(Point2i p, int c, Float value) {
@@ -345,8 +345,7 @@ void Image::SetSpectrum(Point2i p, const Spectrum &s) {
         SetChannel(p, 0, s.Average());
     else {
         CHECK_EQ(3, nChannels());
-        Float rgb[3];
-        s.ToRGB(rgb);
+        std::array<Float, 3> rgb = s.ToRGB();
         for (int c = 0; c < 3; ++c) SetChannel(p, c, rgb[c]);
     }
 }
@@ -1115,8 +1114,7 @@ bool Image::WritePFM(const std::string &filename, const ImageMetadata *metadata)
     for (int y = resolution.y - 1; y >= 0; y--) {
         for (int x = 0; x < resolution.x; ++x) {
             Spectrum s = GetSpectrum({x, y});
-            Float rgb[3];
-            s.ToRGB(rgb);
+            std::array<Float, 3> rgb = s.ToRGB();
             for (int c = 0; c < 3; ++c)
                 // Assign element-wise in case Float is typedefed as 'double'.
                 scanline[3 * x + c] = rgb[c];

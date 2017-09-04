@@ -573,8 +573,7 @@ static std::string toString(const Normal3f &n) {
 static std::string toString(const std::string &s) { return '\"' + s + "\""; }
 
 static std::string toString(const Spectrum &s) {
-    Float rgb[3];
-    s.ToRGB(rgb);
+    std::array<Float, 3> rgb = s.ToRGB();
     return StringPrintf("%f %f %f", rgb[0], rgb[1], rgb[2]);
 }
 

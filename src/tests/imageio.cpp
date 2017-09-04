@@ -28,8 +28,7 @@ static void TestRoundTrip(const char *fn, bool gamma) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x) {
             Spectrum s = readImage->GetSpectrum({x, y});
-            Float rgb[3];
-            s.ToRGB(rgb);
+            std::array<Float, 3> rgb = s.ToRGB();
 
             for (int c = 0; c < 3; ++c) {
                 float wrote = image.GetChannel({x, y}, c);

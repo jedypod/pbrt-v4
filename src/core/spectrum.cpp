@@ -96,14 +96,9 @@ Float AverageSpectrumSamples(ArraySlice<Float> lambda, ArraySlice<Float> vals,
     return sum / (lambdaEnd - lambdaStart);
 }
 
-RGBSpectrum SampledSpectrum::ToRGBSpectrum() const {
-    Float rgb[3];
-    ToRGB(rgb);
-    return RGBSpectrum::FromRGB(rgb);
-}
-
-SampledSpectrum SampledSpectrum::FromRGB(const Float rgb[3],
+SampledSpectrum SampledSpectrum::FromRGB(gtl::ArraySlice<Float> rgb,
                                          SpectrumType type) {
+    DCHECK_EQ(3, rgb.size());
     SampledSpectrum r;
     if (type == SpectrumType::Reflectance) {
         // Convert reflectance spectrum to RGB
@@ -178,9 +173,7 @@ SampledSpectrum SampledSpectrum::FromRGB(const Float rgb[3],
 }
 
 SampledSpectrum::SampledSpectrum(const RGBSpectrum &r, SpectrumType t) {
-    Float rgb[3];
-    r.ToRGB(rgb);
-    *this = SampledSpectrum::FromRGB(rgb, t);
+    *this = SampledSpectrum::FromRGB(r.ToRGB(), t);
 }
 
 Float InterpolateSpectrumSamples(ArraySlice<Float> lambda,

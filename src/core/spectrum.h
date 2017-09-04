@@ -47,6 +47,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -65,16 +66,18 @@ extern void SortSpectrumSamples(gtl::MutableArraySlice<Float> lambda,
 extern Float AverageSpectrumSamples(gtl::ArraySlice<Float> lambda,
                                     gtl::ArraySlice<Float> vals,
                                     Float lambdaStart, Float lambdaEnd);
-inline void XYZToRGB(const Float xyz[3], Float rgb[3]) {
-    rgb[0] = 3.240479f * xyz[0] - 1.537150f * xyz[1] - 0.498535f * xyz[2];
-    rgb[1] = -0.969256f * xyz[0] + 1.875991f * xyz[1] + 0.041556f * xyz[2];
-    rgb[2] = 0.055648f * xyz[0] - 0.204043f * xyz[1] + 1.057311f * xyz[2];
+inline std::array<Float, 3> XYZToRGB(gtl::ArraySlice<Float> xyz) {
+    DCHECK_EQ(3, xyz.size());
+    return { 3.240479f * xyz[0] - 1.537150f * xyz[1] - 0.498535f * xyz[2],
+            -0.969256f * xyz[0] + 1.875991f * xyz[1] + 0.041556f * xyz[2],
+            0.055648f * xyz[0] - 0.204043f * xyz[1] + 1.057311f * xyz[2] };
 }
 
-inline void RGBToXYZ(const Float rgb[3], Float xyz[3]) {
-    xyz[0] = 0.412453f * rgb[0] + 0.357580f * rgb[1] + 0.180423f * rgb[2];
-    xyz[1] = 0.212671f * rgb[0] + 0.715160f * rgb[1] + 0.072169f * rgb[2];
-    xyz[2] = 0.019334f * rgb[0] + 0.119193f * rgb[1] + 0.950227f * rgb[2];
+inline std::array<Float, 3> RGBToXYZ(gtl::ArraySlice<Float> rgb) {
+    DCHECK_EQ(3, rgb.size());
+    return { 0.412453f * rgb[0] + 0.357580f * rgb[1] + 0.180423f * rgb[2],
+            0.212671f * rgb[0] + 0.715160f * rgb[1] + 0.072169f * rgb[2],
+            0.019334f * rgb[0] + 0.119193f * rgb[1] + 0.950227f * rgb[2] };
 }
 
 enum class SpectrumType { Reflectance, Illuminant };
@@ -374,8 +377,8 @@ class SampledSpectrum :
                 RGB2SpectLambda, RGBIllum2SpectBlue, wl0, wl1);
         }
     }
-    void ToXYZ(Float xyz[3]) const {
-        xyz[0] = xyz[1] = xyz[2] = 0.f;
+    std::array<Float, 3> ToXYZ() const {
+        std::array<Float, 3> xyz = { Float(0), Float(0), Float(0) };
         for (int i = 0; i < nSpectralSamples; ++i) {
             xyz[0] += X.c[i] * c[i];
             xyz[1] += Y.c[i] * c[i];
@@ -386,6 +389,7 @@ class SampledSpectrum :
         xyz[0] *= scale;
         xyz[1] *= scale;
         xyz[2] *= scale;
+        return xyz;
     }
     Float y() const {
         Float yy = 0.f;
@@ -393,18 +397,15 @@ class SampledSpectrum :
         return yy * Float(sampledLambdaEnd - sampledLambdaStart) /
                Float(CIE_Y_integral * nSpectralSamples);
     }
-    void ToRGB(Float rgb[3]) const {
-        Float xyz[3];
-        ToXYZ(xyz);
-        XYZToRGB(xyz, rgb);
+    std::array<Float, 3> ToRGB() const {
+        return XYZToRGB(ToXYZ());
     }
-    RGBSpectrum ToRGBSpectrum() const;
     static SampledSpectrum FromRGB(
-        const Float rgb[3], SpectrumType type = SpectrumType::Illuminant);
+        gtl::ArraySlice<Float> rgb, SpectrumType type = SpectrumType::Illuminant);
     static SampledSpectrum FromXYZ(
-        const Float xyz[3], SpectrumType type = SpectrumType::Reflectance) {
-        Float rgb[3];
-        XYZToRGB(xyz, rgb);
+        gtl::ArraySlice<Float> xyz, SpectrumType type = SpectrumType::Reflectance) {
+        DCHECK_EQ(3, xyz.size());
+        std::array<Float, 3> rgb = XYZToRGB(xyz);
         return FromRGB(rgb, type);
     }
     SampledSpectrum(const RGBSpectrum &r,
@@ -434,8 +435,9 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
                 SpectrumType type = SpectrumType::Reflectance) {
         *this = s;
     }
-    static RGBSpectrum FromRGB(const Float rgb[3],
+    static RGBSpectrum FromRGB(gtl::ArraySlice<Float> rgb,
                                SpectrumType type = SpectrumType::Reflectance) {
+        DCHECK_EQ(3, rgb.size());
         RGBSpectrum s;
         s.c[0] = rgb[0];
         s.c[1] = rgb[1];
@@ -443,18 +445,15 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
         DCHECK(!s.HasNaNs());
         return s;
     }
-    void ToRGB(Float *rgb) const {
-        rgb[0] = c[0];
-        rgb[1] = c[1];
-        rgb[2] = c[2];
+    std::array<Float, 3> ToRGB() const {
+        return { c[0], c[0], c[2] };
     }
-    const RGBSpectrum &ToRGBSpectrum() const { return *this; }
-    void ToXYZ(Float xyz[3]) const { RGBToXYZ(c, xyz); }
-    static RGBSpectrum FromXYZ(const Float xyz[3],
+    std::array<Float, 3> ToXYZ() const { return RGBToXYZ(c); }
+    static RGBSpectrum FromXYZ(gtl::ArraySlice<Float> xyz,
                                SpectrumType type = SpectrumType::Reflectance) {
-        RGBSpectrum r;
-        XYZToRGB(xyz, r.c);
-        return r;
+        DCHECK_EQ(3, xyz.size());
+        std::array<Float, 3> rgb = XYZToRGB(xyz);
+        return FromRGB(rgb);
     }
     Float y() const {
         const Float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};

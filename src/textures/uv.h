@@ -59,9 +59,9 @@ class UVTexture : public Texture<Spectrum> {
     Spectrum Evaluate(const SurfaceInteraction &si) const {
         Vector2f dstdx, dstdy;
         Point2f st = mapping->Map(si, &dstdx, &dstdy);
-        Float rgb[3] = {st[0] - std::floor(st[0]), st[1] - std::floor(st[1]),
-                        0};
-        return Spectrum::FromRGB(rgb);
+        return Spectrum::FromRGB({st[0] - std::floor(st[0]),
+                                  st[1] - std::floor(st[1]),
+                                  Float(0)});
     }
 
   private:

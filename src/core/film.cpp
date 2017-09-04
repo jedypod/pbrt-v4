@@ -130,8 +130,7 @@ void Film::MergeFilmTile(std::unique_ptr<FilmTile> tile) {
         // Merge _pixel_ into _Film::pixels_
         const FilmTilePixel &tilePixel = tile->GetPixel(pixel);
         Pixel &mergePixel = GetPixel(pixel);
-        Float xyz[3];
-        tilePixel.contribSum.ToXYZ(xyz);
+        std::array<Float, 3> xyz =  tilePixel.contribSum.ToXYZ();
         for (int i = 0; i < 3; ++i) mergePixel.xyz[i] += xyz[i];
         mergePixel.filterWeightSum += tilePixel.filterWeightSum;
     }
@@ -142,7 +141,9 @@ void Film::SetImage(gtl::ArraySlice<Spectrum> img) const {
     CHECK_EQ(img.size(), nPixels);
     for (int i = 0; i < nPixels; ++i) {
         Pixel &p = pixels[i];
-        img[i].ToXYZ(p.xyz);
+        std::array<Float, 3> xyz = img[i].ToXYZ();
+        for (int c = 0; c < 3; ++c)
+            p.xyz[c] = xyz[c];
         p.filterWeightSum = 1;
         p.splatXYZ[0] = p.splatXYZ[1] = p.splatXYZ[2] = 0;
     }
@@ -168,8 +169,7 @@ void Film::AddSplat(const Point2f &p, Spectrum v) {
     if (!InsideExclusive((Point2i)p, croppedPixelBounds)) return;
     if (v.y() > maxSampleLuminance)
         v *= maxSampleLuminance / v.y();
-    Float xyz[3];
-    v.ToXYZ(xyz);
+    std::array<Float, 3> xyz = v.ToXYZ();
     Pixel &pixel = GetPixel((Point2i)p);
     for (int i = 0; i < 3; ++i) pixel.splatXYZ[i].Add(xyz[i]);
 }
@@ -201,7 +201,7 @@ void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
 
         Point2i pOffset(p.x - croppedPixelBounds.pMin.x,
                         p.y - croppedPixelBounds.pMin.y);
-        rgbImage.SetSpectrum(pOffset, Spectrum::FromXYZ(&xyz[0]));
+        rgbImage.SetSpectrum(pOffset, Spectrum::FromXYZ(xyz));
     }
 
     // Write RGB image

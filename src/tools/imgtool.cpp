@@ -295,8 +295,7 @@ int cat(int argc, char *argv[]) {
             for (int y = 0; y < img->resolution.y; ++y)
                 for (int x = 0; x < img->resolution.x; ++x) {
                     Spectrum s = img->GetSpectrum({x, y});
-                    std::array<Float, 3> rgb;
-                    s.ToRGB(&rgb[0]);
+                    std::array<Float, 3> rgb = s.ToRGB();
                     sorted.push_back(std::make_tuple(x, y, rgb));
                 }
 
@@ -317,8 +316,7 @@ int cat(int argc, char *argv[]) {
             for (int y = 0; y < img->resolution.y; ++y) {
                 for (int x = 0; x < img->resolution.x; ++x) {
                     Spectrum s = img->GetSpectrum({x, y});
-                    std::array<Float, 3> rgb;
-                    s.ToRGB(&rgb[0]);
+                    std::array<Float, 3> rgb = s.ToRGB();
                     printf("(%d, %d): (%.9g %.9g %.9g)\n", x, y, rgb[0], rgb[1],
                            rgb[2]);
                 }

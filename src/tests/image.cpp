@@ -141,8 +141,7 @@ TEST(Image, GetSetRGB) {
         for (int y = 0; y < res[1]; ++y)
             for (int x = 0; x < res[0]; ++x) {
                 Spectrum s = image.GetSpectrum({x, y});
-                Float rgb[3];
-                s.ToRGB(rgb);
+                std::array<Float, 3> rgb = s.ToRGB();
 
                 for (int c = 0; c < 3; ++c) {
                     // This is assuming Spectrum==RGBSpectrum, which is bad.
@@ -408,8 +407,7 @@ TEST(ImageTexelProvider, RGB32) {
         Spectrum ps = provider.TexelSpectrum(0, p);
         EXPECT_EQ(is, ps) << "At pixel " << p << ", image gives : " << is <<
             ", image provider gives " << ps;
-        Float rgb[3];
-        is.ToRGB(rgb);
+        std::array<Float, 3> rgb = is.ToRGB();
         for (int c = 0; c < 3; ++c) {
             EXPECT_EQ(pixels[3 * (p.x + p.y * res.x) + c], rgb[c]);
         }
