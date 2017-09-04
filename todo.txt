@@ -40,12 +40,9 @@
 
 - aov integrator should include metadata
 
-- more std::optional: ReadImage, ... ?
+- more std::optional usage ...
 
 - std::string_view (in many places) (absl equivalent?)
-
-- harmonize Print(FILE) vs operator<< vs ToString()
-  explicit operator std::string() ?
 
 - spherical traiangle sampling (https://www.shadertoy.com/view/4tGGzd)
 

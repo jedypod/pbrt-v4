@@ -49,7 +49,10 @@ ProjectionLight::ProjectionLight(const Transform &LightToWorld,
       pLight(LightToWorld(Point3f(0, 0, 0))),
       I(I) {
     // Create _ProjectionLight_ MIP map
-    if (!Image::Read(texname, &image)) {
+    auto im = Image::Read(texname);
+    if (im)
+        image = *im;
+    else {
         std::vector<Float> one = {(Float)1};
         image = Image(std::move(one), PixelFormat::Y32, {1, 1});
     }

@@ -188,13 +188,13 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(
             CachedTexelProvider::CreateFromFile(filename, wrapMode);
         return std::make_unique<MIPMap>(std::move(tp), options);
     } else {
-        Image image;
-        if (!Image::Read(filename, &image, nullptr, gamma)) return nullptr;
+        auto image = Image::Read(filename, nullptr, gamma);
+        if (!image) return nullptr;
 
         // TODO: make spectrum type configurable, or eliminate...
         ProfilePhase _(Prof::MIPMapCreation);
         std::unique_ptr<TexelProvider> tp = std::make_unique<ImageTexelProvider>(
-            std::move(image), wrapMode, SpectrumType::Reflectance);
+            std::move(*image), wrapMode, SpectrumType::Reflectance);
         return std::make_unique<MIPMap>(std::move(tp), options);
     }
 }

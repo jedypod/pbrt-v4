@@ -390,9 +390,8 @@ Image Image::FloatResize(Point2i newResolution, WrapMode wrapMode) const {
     Image resampledImage(nc == 1 ? PixelFormat::Y32 : PixelFormat::RGB32,
                          newResolution);
 
-    // Note: these aren't freed until the corresponding worker thread exits, but
-    // that's
-    // probably ok...
+    // Note: these aren't freed until the corresponding worker thread
+    // exits, but that's probably ok...
     thread_local std::vector<Float> inBuf, sBuf, outBuf;
 
     ParallelFor2D(Bounds2i({0, 0}, newResolution), 64, [&](Bounds2i outExtent) {
@@ -589,26 +588,28 @@ std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
 }
 
 // ImageIO Local Declarations
-static bool ReadEXR(const std::string &name, Image *image,
-                    ImageMetadata *metadata);
-static bool ReadPNG(const std::string &name, bool gamma, Image *image,
-                    ImageMetadata *metadata);
-static bool ReadPFM(const std::string &filename, Image *image,
-                    ImageMetadata *metadata);
+static std::experimental::optional<Image> ReadEXR(const std::string &name,
+                                                  ImageMetadata *metadata);
+static std::experimental::optional<Image> ReadPNG(const std::string &name,
+                                                  bool gamma,
+                                                  ImageMetadata *metadata);
+static std::experimental::optional<Image> ReadPFM(const std::string &filename,
+                                                  ImageMetadata *metadata);
 
 // ImageIO Function Definitions
-bool Image::Read(const std::string &name, Image *image, ImageMetadata *metadata,
-                 bool gamma) {
+std::experimental::optional<Image> Image::Read(const std::string &name,
+                                               ImageMetadata *metadata,
+                                               bool gamma) {
     if (HasExtension(name, ".exr"))
-        return ReadEXR(name, image, metadata);
+        return ReadEXR(name, metadata);
     else if (HasExtension(name, ".png"))
-        return ReadPNG(name, gamma, image, metadata);
+        return ReadPNG(name, gamma, metadata);
     else if (HasExtension(name, ".pfm"))
-        return ReadPFM(name, image, metadata);
+        return ReadPFM(name, metadata);
     else {
         Error("%s: no support for reading images with this extension",
               name.c_str());
-        return false;
+        return {};
     }
 }
 
@@ -670,8 +671,8 @@ static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
     return fb;
 }
 
-static bool ReadEXR(const std::string &name, Image *image,
-                    ImageMetadata *metadata) {
+static std::experimental::optional<Image> ReadEXR(const std::string &name,
+                                                  ImageMetadata *metadata) {
     try {
         Imf::InputFile file(name.c_str());
         Imath::Box2i dw = file.header().dataWindow();
@@ -719,17 +720,18 @@ static bool ReadEXR(const std::string &name, Image *image,
         const Imf::Channel *rc = channels.findChannel("R");
         const Imf::Channel *gc = channels.findChannel("G");
         const Imf::Channel *bc = channels.findChannel("B");
+        Image image;
         if (rc && gc && bc) {
             if (rc->type == Imf::HALF && gc->type == Imf::HALF &&
                 bc->type == Imf::HALF)
-                *image = Image(PixelFormat::RGB16, {width, height});
+                image = Image(PixelFormat::RGB16, {width, height});
             else
-                *image = Image(PixelFormat::RGB32, {width, height});
+                image = Image(PixelFormat::RGB32, {width, height});
         } else if (channels.findChannel("Y")) {
             if (channels.findChannel("Y")->type == Imf::HALF)
-                *image = Image(PixelFormat::Y16, {width, height});
+                image = Image(PixelFormat::Y16, {width, height});
             else
-                *image = Image(PixelFormat::Y32, {width, height});
+                image = Image(PixelFormat::Y32, {width, height});
         } else {
             std::string channelNames;
             for (auto iter = channels.begin(); iter != channels.end(); ++iter) {
@@ -738,19 +740,19 @@ static bool ReadEXR(const std::string &name, Image *image,
             }
             Error("%s: didn't find RGB or Y stored in image. Channels: %s",
                   name.c_str(), channelNames.c_str());
-            return false;
+            return {};
         }
-        file.setFrameBuffer(imageToFrameBuffer(*image, dw));
+        file.setFrameBuffer(imageToFrameBuffer(image, dw));
         file.readPixels(dw.min.y, dw.max.y);
 
         LOG(INFO) << StringPrintf("Read EXR image %s (%d x %d)", name.c_str(),
                                   width, height);
-        return true;
+        return image;
     } catch (const std::exception &e) {
         Error("Unable to read image file \"%s\": %s", name.c_str(), e.what());
     }
 
-    return false;
+    return {};
 }
 
 bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) const {
@@ -811,11 +813,12 @@ static inline uint8_t FloatToSRGB(Float v) {
     return uint8_t(Clamp(255.f * LinearToSRGB(v) + 0.5f, 0.f, 255.f));
 }
 
-static bool ReadPNG(const std::string &name, bool gamma, Image *image,
-                    ImageMetadata *metadata) {
+static std::experimental::optional<Image> ReadPNG(const std::string &name,
+                                                  bool gamma,
+                                                  ImageMetadata *metadata) {
     auto contents = ReadFileContents(name);
     if (!contents)
-        return false;
+        return {};
 
     unsigned width, height;
     LodePNGState state;
@@ -825,9 +828,10 @@ static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                                          contents->size());
     if (error != 0) {
         Error("%s: %s", name.c_str(), lodepng_error_text(error));
-        return false;
+        return {};
     }
 
+    Image image;
     switch (state.info_png.color.colortype) {
     case LCT_GREY:
     case LCT_GREY_ALPHA: {
@@ -838,24 +842,24 @@ static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                                 contents->size(), LCT_GREY, bpp);
         if (error != 0) {
             Error("%s: %s", name.c_str(), lodepng_error_text(error));
-            return false;
+            return {};
         }
 
         if (state.info_png.color.bitdepth == 16) {
-            *image = Image(PixelFormat::Y16, Point2i(width, height));
+            image = Image(PixelFormat::Y16, Point2i(width, height));
             auto bufIter = buf.begin();
             for (unsigned int y = 0; y < height; ++y)
                 for (unsigned int x = 0; x < width; ++x, bufIter += 2) {
                     // Convert from little endian.
                     Float v = (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f;
                     if (gamma) v = SRGBToLinear(v);
-                    image->SetChannel(Point2i(x, y), 0, v);
+                    image.SetChannel(Point2i(x, y), 0, v);
                 }
             CHECK(bufIter == buf.end());
         } else {
-            *image = Image(gamma ? PixelFormat::SY8 : PixelFormat::Y8,
+            image = Image(gamma ? PixelFormat::SY8 : PixelFormat::Y8,
                            Point2i(width, height));
-            std::copy(buf.begin(), buf.end(), (uint8_t *)image->RawPointer({0, 0}));
+            std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
         }
         break;
     }
@@ -867,11 +871,11 @@ static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                                 contents->size(), LCT_RGB, bpp);
         if (error != 0) {
             Error("%s: %s", name.c_str(), lodepng_error_text(error));
-            return false;
+            return {};
         }
 
         if (state.info_png.color.bitdepth == 16) {
-            *image = Image(PixelFormat::RGB16, Point2i(width, height));
+            image = Image(PixelFormat::RGB16, Point2i(width, height));
             auto bufIter = buf.begin();
             for (unsigned int y = 0; y < height; ++y)
                 for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
@@ -885,18 +889,18 @@ static bool ReadPNG(const std::string &name, bool gamma, Image *image,
                         for (int c = 0; c < 3; ++c)
                             // TODO: this is slow; could replace with a LUT
                             rgb[c] = SRGBToLinear(rgb[c]);
-                    image->SetSpectrum(Point2i(x, y), Spectrum::FromRGB(rgb));
+                    image.SetSpectrum(Point2i(x, y), Spectrum::FromRGB(rgb));
                 }
             CHECK(bufIter == buf.end());
         } else {
-            *image = Image(gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8,
-                           Point2i(width, height));
-            std::copy(buf.begin(), buf.end(), (uint8_t *)image->RawPointer({0, 0}));
+            image = Image(gamma ? PixelFormat::SRGB8 : PixelFormat::RGB8,
+                          Point2i(width, height));
+            std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
         }
     }
     }
 
-    return true;
+    return image;
 }
 
 bool Image::WritePNG(const std::string &name, const ImageMetadata *metadata) const {
@@ -1011,7 +1015,8 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
     return -1;
 }
 
-static bool ReadPFM(const std::string &filename, Image *image, ImageMetadata *metadata) {
+static std::experimental::optional<Image> ReadPFM(const std::string &filename,
+                                                  ImageMetadata *metadata) {
     std::vector<float> rgb32;
     char buffer[BUFFER_SIZE];
     unsigned int nFloats;
@@ -1067,19 +1072,17 @@ static bool ReadPFM(const std::string &filename, Image *image, ImageMetadata *me
         for (unsigned int i = 0; i < nFloats; ++i) rgb32[i] *= std::abs(scale);
 
     // create RGBs...
-    *image = Image(std::move(rgb32),
-                   nChannels == 1 ? PixelFormat::Y32 : PixelFormat::RGB32,
-                   Point2i(width, height));
     fclose(fp);
-
     LOG(INFO) << StringPrintf("Read PFM image %s (%d x %d)",
                               filename.c_str(), width, height);
-    return true;
+    return Image(std::move(rgb32),
+                 nChannels == 1 ? PixelFormat::Y32 : PixelFormat::RGB32,
+                 Point2i(width, height));
 
 fail:
     Error("Error reading PFM file \"%s\"", filename.c_str());
     if (fp) fclose(fp);
-    return false;
+    return {};
 }
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata *metadata) const {

@@ -47,7 +47,10 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
     : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(),
             attributes),
       Lscale(L) {
-    if (!Image::Read(filename, &image)) {
+    auto im = Image::Read(filename);
+    if (im)
+        image = *im;
+    else {
         std::vector<Float> one = {(Float)1};
         image = Image(std::move(one), PixelFormat::Y32, {1, 1});
     }

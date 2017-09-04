@@ -21,13 +21,13 @@ static void TestRoundTrip(const char *fn, bool gamma) {
     ASSERT_TRUE(image.Write(fn));
 
     Point2i readRes;
-    Image readImage;
-    ASSERT_TRUE(Image::Read(fn, &readImage));
-    ASSERT_EQ(readImage.resolution, res);
+    auto readImage = Image::Read(fn);
+    ASSERT_TRUE((bool)readImage);
+    ASSERT_EQ(readImage->resolution, res);
 
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x) {
-            Spectrum s = readImage.GetSpectrum({x, y});
+            Spectrum s = readImage->GetSpectrum({x, y});
             Float rgb[3];
             s.ToRGB(rgb);
 

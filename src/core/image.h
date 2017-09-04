@@ -193,7 +193,6 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
 
 enum class WrapMode { Repeat, Black, Clamp };
 
-// TODO: use in imagemap
 inline bool ParseWrapMode(const char *w, WrapMode *wrapMode) {
     if (!strcmp(w, "clamp")) {
         *wrapMode = WrapMode::Clamp;
@@ -224,6 +223,9 @@ inline const char *WrapModeString(WrapMode mode) {
 
 bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
 
+///////////////////////////////////////////////////////////////////////////
+// ImageMetadata
+
 struct ImageMetadata {
     // These may come back from Read() with zero values; this signifies
     // that either the image format doesn't allow encoding this metadata or
@@ -234,24 +236,25 @@ struct ImageMetadata {
     Point2i fullResolution;
 };
 
-// Important: coordinate system for our images has (0,0) at the
-// upper left corner.
-// Write code does this.
+///////////////////////////////////////////////////////////////////////////
+// Image
+
+// Important: coordinate system for our images has (0,0) at the upper left
+// corner.
 
 class Image {
   public:
-    // TODO: array slice this up...
     Image() : format(PixelFormat::Y8), resolution(0, 0) {}
     Image(std::vector<uint8_t> p8, PixelFormat format, Point2i resolution);
     Image(std::vector<uint16_t> p16, PixelFormat format, Point2i resolution);
     Image(std::vector<float> p32, PixelFormat format, Point2i resolution);
     Image(PixelFormat format, Point2i resolution);
 
-    // TODO: make gamme option more flexible: sRGB vs provided gamma
+    // TODO: make gamma option more flexible: sRGB vs provided gamma
     // exponent...
-    static bool Read(const std::string &filename, Image *image,
-                     ImageMetadata *metadata = nullptr,
-                     bool gamma = true);
+    static std::experimental::optional<Image> Read(
+        const std::string &filename, ImageMetadata *metadata = nullptr,
+        bool gamma = true);
     bool Write(const std::string &name,
                const ImageMetadata *metadata = nullptr) const;
 

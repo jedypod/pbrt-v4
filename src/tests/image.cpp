@@ -248,17 +248,17 @@ TEST(Image, PfmIO) {
 
     Image image(rgbPixels, PixelFormat::RGB32, res);
     EXPECT_TRUE(image.Write("test.pfm"));
-    Image read;
-    EXPECT_TRUE(Image::Read("test.pfm", &read));
+    std::experimental::optional<Image> read = Image::Read("test.pfm");
+    EXPECT_TRUE((bool)read);
 
-    EXPECT_EQ(image.resolution, read.resolution);
-    EXPECT_EQ(read.format, PixelFormat::RGB32);
+    EXPECT_EQ(image.resolution, read->resolution);
+    EXPECT_EQ(read->format, PixelFormat::RGB32);
 
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c)
                 EXPECT_EQ(image.GetChannel({x, y}, c),
-                          read.GetChannel({x, y}, c));
+                          read->GetChannel({x, y}, c));
 
     EXPECT_EQ(0, remove("test.pfm"));
 }
@@ -273,24 +273,24 @@ TEST(Image, ExrIO) {
         Image image(format, res);
         image.CopyRectIn({{0, 0}, res}, rgbPixels);
         EXPECT_TRUE(image.Write("test.exr"));
-        Image read;
-        EXPECT_TRUE(Image::Read("test.exr", &read));
+        std::experimental::optional<Image> read = Image::Read("test.exr");
+        EXPECT_TRUE((bool)read);
 
-        EXPECT_EQ(image.resolution, read.resolution);
+        EXPECT_EQ(image.resolution, read->resolution);
         if (!Is8Bit(format))
-            EXPECT_EQ(read.format, format);
+            EXPECT_EQ(read->format, format);
 
         for (int y = 0; y < res[1]; ++y)
             for (int x = 0; x < res[0]; ++x)
                 for (int c = 0; c < image.nChannels(); ++c)
                     if (Is8Bit(format))
                         EXPECT_EQ(HalfToFloat(FloatToHalf(image.GetChannel({x, y}, c))),
-                                  read.GetChannel({x, y}, c));
+                                  read->GetChannel({x, y}, c));
                     else if (Is16Bit(format))
                         EXPECT_EQ(HalfToFloat(FloatToHalf(image.GetChannel({x, y}, c))),
-                                  read.GetChannel({x, y}, c));
+                                  read->GetChannel({x, y}, c));
                     else
-                        EXPECT_EQ(image.GetChannel({x, y}, c), read.GetChannel({x, y}, c));
+                        EXPECT_EQ(image.GetChannel({x, y}, c), read->GetChannel({x, y}, c));
 
         EXPECT_EQ(0, remove("test.exr"));
     }
@@ -302,17 +302,17 @@ TEST(Image, PngRgbIO) {
 
     Image image(rgbPixels, PixelFormat::RGB32, res);
     EXPECT_TRUE(image.Write("test.png"));
-    Image read;
-    EXPECT_TRUE(Image::Read("test.png", &read));
+    std::experimental::optional<Image> read = Image::Read("test.png");
+    EXPECT_TRUE((bool)read);
 
-    EXPECT_EQ(image.resolution, read.resolution);
-    EXPECT_EQ(read.format, PixelFormat::SRGB8);
+    EXPECT_EQ(image.resolution, read->resolution);
+    EXPECT_EQ(read->format, PixelFormat::SRGB8);
 
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c)
                 EXPECT_FLOAT_EQ(sRGBRoundTrip(image.GetChannel({x, y}, c)),
-                                read.GetChannel({x, y}, c))
+                                read->GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
 

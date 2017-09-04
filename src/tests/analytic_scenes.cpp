@@ -49,17 +49,17 @@ void PrintTo(const TestIntegrator &tr, ::std::ostream *os) {
 }
 
 void CheckSceneAverage(const char *filename, float expected) {
-    Image image;
-    ASSERT_TRUE(Image::Read(filename, &image));
-    ASSERT_EQ(image.nChannels(), 3);
+    std::experimental::optional<Image> image = Image::Read(filename);
+    ASSERT_TRUE((bool)image);
+    ASSERT_EQ(image->nChannels(), 3);
 
     float delta = .02;
     float sum = 0;
 
-    for (int t = 0; t < image.resolution[1]; ++t)
-      for (int s = 0; s < image.resolution[0]; ++s)
-        for (int c = 0; c < 3; ++c) sum += image.GetChannel(Point2i(s, t), c);
-    int nPixels = image.resolution.x * image.resolution.y * 3;
+    for (int t = 0; t < image->resolution[1]; ++t)
+      for (int s = 0; s < image->resolution[0]; ++s)
+        for (int c = 0; c < 3; ++c) sum += image->GetChannel(Point2i(s, t), c);
+    int nPixels = image->resolution.x * image->resolution.y * 3;
     EXPECT_NEAR(expected, sum / nPixels, delta);
 }
 

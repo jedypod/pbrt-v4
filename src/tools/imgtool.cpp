@@ -204,13 +204,13 @@ int assemble(int argc, char *argv[]) {
                 "only EXR images include the image bounding boxes that "
                 "\"assemble\" needs.");
 
-        Image img;
         ImageMetadata metadata;
-        if (!Image::Read(file, &img, &metadata, true)) continue;
+        std::experimental::optional<Image> img = Image::Read(file, &metadata, true);
+        if (!img) continue;
 
         if (fullImage.resolution == Point2i(0, 0)) {
             // First image read.
-            fullImage = Image(img.format, metadata.fullResolution);
+            fullImage = Image(img->format, metadata.fullResolution);
             seenPixel.resize(fullImage.resolution.x * fullImage.resolution.y);
             fullBounds = Bounds2i({0, 0}, fullImage.resolution);
         } else {
@@ -235,24 +235,24 @@ int assemble(int argc, char *argv[]) {
                         fullBounds.pMax.x, fullBounds.pMax.y);
                 continue;
             }
-            if (fullImage.nChannels() != img.nChannels()) {
+            if (fullImage.nChannels() != img->nChannels()) {
                 fprintf(stderr,
                         "%s: %d channel image; expecting %d channels.\n",
-                        file.c_str(), img.nChannels(), fullImage.nChannels());
+                        file.c_str(), img->nChannels(), fullImage.nChannels());
                 continue;
             }
         }
 
         // Copy pixels.
-        for (int y = 0; y < img.resolution.y; ++y)
-            for (int x = 0; x < img.resolution.x; ++x) {
+        for (int y = 0; y < img->resolution.y; ++y)
+            for (int x = 0; x < img->resolution.x; ++x) {
                 Point2i fullp{x + metadata.pixelBounds.pMin.x,
                               y + metadata.pixelBounds.pMin.y};
                 size_t fullOffset = fullImage.PixelOffset(fullp);
                 if (seenPixel[fullOffset]) ++seenMultiple;
                 seenPixel[fullOffset] = true;
                 for (int c = 0; c < fullImage.nChannels(); ++c)
-                    fullImage.SetChannel(fullp, c, img.GetChannel({x, y}, c));
+                    fullImage.SetChannel(fullp, c, img->GetChannel({x, y}, c));
             }
     }
 
@@ -283,18 +283,18 @@ int cat(int argc, char *argv[]) {
             continue;
         }
 
-        Image img;
-        if (!Image::Read(argv[i], &img)) {
-            fprintf(stderr, "imgtool: couldn't open \"%s\".\n", argv[i]);
+        std::experimental::optional<Image> img = Image::Read(argv[i]);
+        if (!img) {
+            fprintf(stderr, "%s: unable to read image.\n", argv[i]);
             continue;
         }
 
         if (sort) {
             std::vector<std::tuple<int, int, std::array<Float, 3>>> sorted;
-            sorted.reserve(img.resolution.x * img.resolution.y);
-            for (int y = 0; y < img.resolution.y; ++y)
-                for (int x = 0; x < img.resolution.x; ++x) {
-                    Spectrum s = img.GetSpectrum({x, y});
+            sorted.reserve(img->resolution.x * img->resolution.y);
+            for (int y = 0; y < img->resolution.y; ++y)
+                for (int x = 0; x < img->resolution.x; ++x) {
+                    Spectrum s = img->GetSpectrum({x, y});
                     std::array<Float, 3> rgb;
                     s.ToRGB(&rgb[0]);
                     sorted.push_back(std::make_tuple(x, y, rgb));
@@ -314,9 +314,9 @@ int cat(int argc, char *argv[]) {
                        std::get<1>(v), rgb[0], rgb[1], rgb[2]);
             }
         } else {
-            for (int y = 0; y < img.resolution.y; ++y) {
-                for (int x = 0; x < img.resolution.x; ++x) {
-                    Spectrum s = img.GetSpectrum({x, y});
+            for (int y = 0; y < img->resolution.y; ++y) {
+                for (int x = 0; x < img->resolution.x; ++x) {
+                    Spectrum s = img->GetSpectrum({x, y});
                     std::array<Float, 3> rgb;
                     s.ToRGB(&rgb[0]);
                     printf("(%d, %d): (%.9g %.9g %.9g)\n", x, y, rgb[0], rgb[1],
@@ -354,15 +354,19 @@ int diff(int argc, char *argv[]) {
               int(filenames.size()));
 
     Image img[2];
-    for (int i = 0; i < 2; ++i)
-        if (!Image::Read(filenames[i], &img[i])) {
-            fprintf(stderr, "%s: unable to read image\n", filenames[i].c_str());
+    for (int i = 0; i < 2; ++i) {
+        std::experimental::optional<Image> imRead = Image::Read(filenames[i]);
+        if (imRead)
+            img[i] = std::move(*imRead);
+        else {
+            fprintf(stderr, "%s: unable to read image.\n", filenames[i].c_str());
             return 1;
         }
+    }
 
     if (img[0].resolution != img[1].resolution) {
         fprintf(stderr,
-                "imgtool: image resolutions don't match \"%s\": (%d, %d) "
+                "%s: image resolutions don't match (%d, %d) versus "
                 "\"%s\": (%d, %d)\n",
                 filenames[0].c_str(), img[0].resolution.x, img[0].resolution.y,
                 filenames[1].c_str(), img[1].resolution.x, img[1].resolution.y);
@@ -415,7 +419,7 @@ int diff(int argc, char *argv[]) {
             100. * sqrt(mse / (3. * res.x * res.y)));
         if (!outfile.empty()) {
             if (!diffImage.Write(outfile))
-                fprintf(stderr, "imgtool: unable to write \"%s\": %s\n",
+                fprintf(stderr, "%s: unable to write image: %s\n",
                         outfile.c_str(), strerror(errno));
         }
         return 1;
@@ -521,16 +525,15 @@ int info(int argc, char *argv[]) {
                     StringPrintf("%s-level%d", argv[i], level).c_str(), image);
             }
         } else {
-            Point2i res;
-            Image image;
             ImageMetadata metadata;
-            if (!Image::Read(argv[i], &image, &metadata)) {
+            std::experimental::optional<Image> image = Image::Read(argv[i], &metadata);
+            if (!image) {
                 fprintf(stderr, "%s: unable to load image.\n", argv[i]);
                 err = 1;
                 continue;
             }
 
-            printImageStats(argv[i], image, &metadata);
+            printImageStats(argv[i], *image, &metadata);
         }
     }
     return err;
@@ -719,9 +722,13 @@ int convert(int argc, char *argv[]) {
                                          im.GetChannel({x, y}, c));
             xStart += im.resolution[0];
         }
-    } else if (!Image::Read(inFilename, &image)) {
-        fprintf(stderr, "%s: unable to read image\n", inFilename);
-        return 1;
+    } else {
+        auto imRead = Image::Read(inFilename);
+        if (!imRead) {
+            fprintf(stderr, "%s: unable to read image\n", inFilename);
+            return 1;
+        }
+        image = std::move(*imRead);  // drop the std::optional
     }
     Point2i res = image.resolution;
     int nc = image.nChannels();
@@ -823,7 +830,7 @@ int convert(int argc, char *argv[]) {
     if (flipy) image.FlipY();
 
     if (!image.Write(outFilename)) {
-        fprintf(stderr, "imgtool: couldn't write to \"%s\".\n", outFilename);
+        fprintf(stderr, "%s: couldn't write image.\n", outFilename);
         return 1;
     }
 
@@ -859,16 +866,16 @@ int maketiled(int argc, char *argv[]) {
 
     const char *infile = filenames[0].c_str(), *outfile = filenames[1].c_str();
 
-    Image image;
-    if (!Image::Read(infile, &image)) {
-        fprintf(stderr, "imgtool: unable to read image \"%s\"\n", infile);
+    std::experimental::optional<Image> image = Image::Read(infile);
+    if (!image) {
+        fprintf(stderr, "%s: unable to read image\n", infile);
         return 1;
     }
 
-    std::vector<Image> mips = Image::GenerateMIPMap(image, wrapMode);
-    int tileSize = TextureCache::TileSize(image.format);
+    std::vector<Image> mips = Image::GenerateMIPMap(*image, wrapMode);
+    int tileSize = TextureCache::TileSize(image->format);
     if (!TiledImagePyramid::Create(std::move(mips), outfile, wrapMode, tileSize)) {
-        fprintf(stderr, "imgtool: unable to create tiled image \"%s\"\n",
+        fprintf(stderr, "%s: unable to create tiled image\n",
                 outfile);
         return 1;
     }
