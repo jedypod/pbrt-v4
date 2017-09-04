@@ -41,12 +41,13 @@
 // core/tuple.h*
 #include "pbrt.h"
 
+#include "stringprint.h"
 #include <glog/logging.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
-//#include <type_traits>
+#include <iostream>
 
 namespace pbrt {
 
@@ -152,20 +153,17 @@ class Tuple2 {
         return y;
     }
 
+    std::string ToString() const {
+        return StringPrintf("[ %f, %f ]", x, y);
+    }
+
     // Tuple2 Public Data
     T x, y;
 };
 
 template <template<class> class C, typename T>
-inline std::ostream &operator<<(std::ostream &os, const Tuple2<C, T> &v) {
-    os << "[ " << v.x << ", " << v.y << " ]";
-    return os;
-}
-
-template <template<class> class C>
-inline std::ostream &operator<<(std::ostream &os, const Tuple2<C, Float> &v) {
-    os << StringPrintf("[ %f, %f ]", v.x, v.y);
-    return os;
+inline std::ostream &operator<<(std::ostream &os, const Tuple2<C, T> &t) {
+    return os << t.ToString();
 }
 
 template <template<class> class C, typename T>
@@ -307,20 +305,17 @@ class Tuple3 {
     }
     Child<T> operator-() const { return { -x, -y, -z }; }
 
+    std::string ToString() const {
+        return StringPrintf("[ %f, %f, %f ]", x, y, z);
+    }
+
     // Tuple3 Public Data
     T x, y, z;
 };
 
 template <template<class> class C, typename T>
-inline std::ostream &operator<<(std::ostream &os, const Tuple3<C, T> &v) {
-    os << "[ " << v.x << ", " << v.y << ", " << v.z << " ]";
-    return os;
-}
-
-template <template<class> class C>
-inline std::ostream &operator<<(std::ostream &os, const Tuple3<C, Float> &v) {
-    os << StringPrintf("[ %f, %f, %f ]", v.x, v.y, v.z);
-    return os;
+inline std::ostream &operator<<(std::ostream &os, const Tuple3<C, T> &t) {
+    return os << t.ToString();
 }
 
 template <template<class> class C, typename T>

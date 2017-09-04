@@ -45,7 +45,6 @@
 #include "geometry.h"
 #include "mathutil.h"
 #include "quaternion.h"
-#include "stringprint.h"
 
 #include <cmath>
 #include <memory>
@@ -126,7 +125,6 @@ class Transform {
     }
     Transform(const Matrix4x4 &m) : m(m), mInv(Inverse(m)) {}
     Transform(const Matrix4x4 &m, const Matrix4x4 &mInv) : m(m), mInv(mInv) {}
-    void Print(FILE *f) const;
     friend Transform Inverse(const Transform &t) {
         return Transform(t.mInv, t.m);
     }
@@ -195,10 +193,7 @@ class Transform {
                           const Vector3f &dErrorIn, Vector3f *oErrorOut,
                           Vector3f *dErrorOut) const;
 
-    friend std::ostream &operator<<(std::ostream &os, const Transform &t) {
-        os << "t=" << t.m << ", inv=" << t.mInv;
-        return os;
-    }
+    std::string ToString() const;
 
   private:
     // Transform Private Data
@@ -206,6 +201,8 @@ class Transform {
     friend class AnimatedTransform;
     friend struct Quaternion;
 };
+
+ std::ostream &operator<<(std::ostream &os, const Transform &t);
 
 Transform Translate(const Vector3f &delta);
 Transform Scale(Float x, Float y, Float z);

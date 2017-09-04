@@ -79,8 +79,7 @@ class MicrofacetDistribution {
 
 inline std::ostream &operator<<(std::ostream &os,
                                 const MicrofacetDistribution &md) {
-    os << md.ToString();
-    return os;
+    return os << md.ToString();
 }
 
 class BeckmannDistribution : public MicrofacetDistribution {

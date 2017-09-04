@@ -36,6 +36,7 @@
 
 #include "error.h"
 #include "interaction.h"
+#include "stringprint.h"
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -161,8 +162,6 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 }
 
 // Transform Method Definitions
-void Transform::Print(FILE *f) const { fputs(m.ToString().c_str(), f); }
-
 Transform Translate(const Vector3f &delta) {
     Matrix4x4 m(1, 0, 0, delta.x, 0, 1, 0, delta.y, 0, 0, 1, delta.z, 0, 0, 0,
                 1);
@@ -332,6 +331,15 @@ Transform Perspective(Float fov, Float n, Float f) {
     // Scale canonical perspective view to specified field of view
     Float invTanAng = 1 / std::tan(Radians(fov) / 2);
     return Scale(invTanAng, invTanAng, 1) * Transform(persp);
+}
+
+std::ostream &operator<<(std::ostream &os, const Transform &t) {
+    return os << t.ToString();
+}
+
+std::string Transform::ToString() const {
+    return StringPrintf("[ m: %s mInv: %s ]", m.ToString().c_str(),
+                       mInv.ToString().c_str());
 }
 
 // Interval Definitions

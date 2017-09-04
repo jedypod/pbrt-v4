@@ -111,16 +111,19 @@ struct TileId {
     size_t hash() const { return MixBits(bits); }
     bool operator==(const TileId &t) const { return t.bits == bits; }
     bool operator<(const TileId &t) const { return bits < t.bits; }
-    friend inline std::ostream &operator<<(std::ostream &os,
-                                           const TileId &tid) {
-        return os << StringPrintf("TileId { texId:%d level:%d p:%d, %d }",
-                                  tid.texId(), tid.level(), tid.p()[0],
-                                  tid.p()[1]);
+
+    std::string ToString() const {
+        return StringPrintf("TileId { texId:%d level:%d p: %s }",
+                            texId(), level(), p().ToString().c_str());
     }
 
   private:
     uint64_t bits;
 };
+
+inline std::ostream &operator<<(std::ostream &os, const TileId &tid) {
+    return os << tid.ToString();
+}
 
 // TextureTile Declarations
 struct TextureTile {

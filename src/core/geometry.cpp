@@ -34,6 +34,23 @@
 // core/geometry.cpp*
 #include "geometry.h"
 
+#include "stringprint.h"
+#include "medium.h"
+
 namespace pbrt {
+
+std::string Ray::ToString() const {
+    return StringPrintf("[ o: %s d: %s tMax: %f time: %f, medium:%s ]",
+                        o.ToString().c_str(), d.ToString().c_str(), tMax,
+                        time, medium ? medium->ToString().c_str() : "(none)");
+}
+
+std::string RayDifferential::ToString() const {
+    return StringPrintf("[ ray: %s differentials: %s xo: %s xd: %s yo: %s yd: %s ]",
+                        ((const Ray &)(*this)).ToString().c_str(),
+                        hasDifferentials ? "true" : "false", rxOrigin.ToString().c_str(),
+                        rxDirection.ToString().c_str(), ryOrigin.ToString().c_str(),
+                        ryDirection.ToString().c_str());
+}
 
 }  // namespace pbrt

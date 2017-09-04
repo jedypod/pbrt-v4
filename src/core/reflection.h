@@ -209,8 +209,7 @@ class BSDF {
 };
 
 inline std::ostream &operator<<(std::ostream &os, const BSDF &bsdf) {
-    os << bsdf.ToString();
-    return os;
+    return os << bsdf.ToString();
 }
 
 // BxDF Declarations
@@ -235,8 +234,7 @@ class BxDF {
 };
 
 inline std::ostream &operator<<(std::ostream &os, const BxDF &bxdf) {
-    os << bxdf.ToString();
-    return os;
+    return os << bxdf.ToString();
 }
 
 class ScaledBxDF : public BxDF {
@@ -271,8 +269,7 @@ class Fresnel {
 };
 
 inline std::ostream &operator<<(std::ostream &os, const Fresnel &f) {
-    os << f.ToString();
-    return os;
+    return os << f.ToString();
 }
 
 class FresnelConductor : public Fresnel {

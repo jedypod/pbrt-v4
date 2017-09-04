@@ -63,6 +63,7 @@ class HomogeneousMedium : public Medium {
     Spectrum Tr(const Ray &ray, Sampler &sampler) const;
     Spectrum Sample(const Ray &ray, Sampler &sampler, MemoryArena &arena,
                     MediumInteraction *mi) const;
+    std::string ToString() const;
 
   private:
     // HomogeneousMedium Private Data

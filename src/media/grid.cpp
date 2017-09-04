@@ -161,4 +161,11 @@ Spectrum GridDensityMedium::Tr(const Ray &rWorld, Sampler &sampler) const {
     return Spectrum(Tr);
 }
 
+std::string GridDensityMedium::ToString() const {
+    return StringPrintf("[ GridDensityMedium sigma_a: %s sigma_s: %s sigma_t: %f "
+                        " nx: %d ny: %d nz: %d WorldToMedium: %s invMaxDensity: %f ]",
+                        sigma_a.ToString().c_str(), sigma_s.ToString().c_str(), sigma_t,
+                        nx, ny, nz, WorldToMedium.ToString().c_str(), invMaxDensity);
+}
+
 }  // namespace pbrt

@@ -97,6 +97,7 @@ class GridDensityMedium : public Medium {
     Spectrum Sample(const Ray &ray, Sampler &sampler, MemoryArena &arena,
                     MediumInteraction *mi) const;
     Spectrum Tr(const Ray &ray, Sampler &sampler) const;
+    std::string ToString() const;
 
   private:
     // GridDensityMedium Private Data

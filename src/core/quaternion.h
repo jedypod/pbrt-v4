@@ -40,7 +40,6 @@
 
 // core/quaternion.h*
 #include "pbrt.h"
-#include "stringprint.h"
 #include "geometry.h"
 
 #include <iostream>
@@ -101,16 +100,14 @@ struct Quaternion {
     Transform ToTransform() const;
     Quaternion(const Transform &t);
 
-    friend std::ostream &operator<<(std::ostream &os, const Quaternion &q) {
-        os << StringPrintf("[ %f, %f, %f, %f ]", q.v.x, q.v.y, q.v.z,
-                           q.w);
-        return os;
-    }
+    std::string ToString() const;
 
     // Quaternion Public Data
     Vector3f v;
     Float w;
 };
+
+std::ostream &operator<<(std::ostream &os, const Quaternion &q);
 
 Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2);
 

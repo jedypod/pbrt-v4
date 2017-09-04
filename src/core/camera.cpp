@@ -37,6 +37,7 @@
 #include "error.h"
 #include "film.h"
 #include "image.h"
+#include "stringprint.h"
 
 namespace pbrt {
 
@@ -103,6 +104,12 @@ void Camera::WriteImage(ImageMetadata *metadata, Float splatScale) const {
     metadata->worldToCamera =
         CameraToWorld.Interpolate(shutterOpen).GetInverseMatrix();
     film->WriteImage(metadata, splatScale);
+}
+
+std::string CameraSample::ToString() const {
+    return StringPrintf("[ pFilm: %s pLens: %s time: %f ]",
+                        pFilm.ToString().c_str(), pLens.ToString().c_str(),
+                        time);
 }
 
 void ProjectiveCamera::WriteImage(ImageMetadata *metadata,

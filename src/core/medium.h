@@ -63,8 +63,7 @@ class PhaseFunction {
 };
 
 inline std::ostream &operator<<(std::ostream &os, const PhaseFunction &p) {
-    os << p.ToString();
-    return os;
+    return os << p.ToString();
 }
 
 bool GetMediumScatteringProperties(const std::string &name, Spectrum *sigma_a,
@@ -88,9 +87,14 @@ class Medium {
     virtual Spectrum Sample(const Ray &ray, Sampler &sampler,
                             MemoryArena &arena,
                             MediumInteraction *mi) const = 0;
+    virtual std::string ToString() const = 0;
 
     std::shared_ptr<const ParamSet> attributes;
 };
+
+inline std::ostream &operator<<(std::ostream &os, const Medium &m) {
+    return os << m.ToString();
+}
 
 // HenyeyGreenstein Declarations
 class HenyeyGreenstein : public PhaseFunction {

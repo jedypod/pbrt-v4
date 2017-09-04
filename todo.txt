@@ -1,13 +1,40 @@
 
+- ToString(), etc:
+  BSSRDF
+  Camera
+  EFloat
+  Film, FilmTile
+  Filter
+  fp16
+  Image
+  Integrator
+  Interaction
+  Light
+  LightDistribution
+  Material
+  MIPMap
+  ParamSetItem (refactor from ParamSet ToString())
+  Primitive
+  RNG
+  Sampler
+  Scene
+  Shape
+  TextureMapping*
+
+- separate util directory? stringprint, mathutil, ... ?
+
+- imageio.* nuke?
+
++ need to update emptychamber and villa in regress/ to use png not tga
+  textures
+
 - find interval test is broken
 
 - pbrtAttribute:
-   - auto add named material attribute for pbrtMakeNamedMaterial
-   - aov output of materialName, shapeName?
+   + auto add named material attribute for pbrtMakeNamedMaterial
+   + aov output of material/name, shape/name?
    - use attributes for parameter initialization backup...
      can we pass something to the Create functions that helps abstract this?
-  - id  Attribute "shape" "string name" "table"
-    -> then store the mapping in metadata. (Also for namedmaterials)
 
 - Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
 
@@ -101,8 +128,6 @@
 - IntersectTr? only used once?
 
 - move ray into its own header?
-
-- imageio.* nuke?
 
 - texcache branch is blurring bump map lookups; see e.g. bump-sphere.pbrt.
   do side-by-side runs?  this is due to bilerp default (only partly?)

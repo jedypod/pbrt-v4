@@ -36,6 +36,7 @@
 
 #include "error.h"
 #include "sampler.h"
+#include "stringprint.h"
 #include "interaction.h"
 #include "paramset.h"
 #include "stats.h"
@@ -95,6 +96,12 @@ Spectrum HomogeneousMedium::Sample(const Ray &ray, Sampler &sampler,
         pdf = 1;
     }
     return sampledMedium ? (Tr * sigma_s / pdf) : (Tr / pdf);
+}
+
+std::string HomogeneousMedium::ToString() const {
+    return StringPrintf("[ Homogeneous medium sigma_a: %s sigma_s: %s sigma_t: %s g: %f ]",
+                        sigma_a.ToString().c_str(), sigma_s.ToString().c_str(),
+                        sigma_t.ToString().c_str(), g);
 }
 
 }  // namespace pbrt

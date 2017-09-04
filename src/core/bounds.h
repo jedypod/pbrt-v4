@@ -42,6 +42,7 @@
 #include "pbrt.h"
 
 #include "geometry.h"
+#include "stringprint.h"
 
 #include <iostream>
 #include <iterator>
@@ -110,14 +111,19 @@ class Bounds2 {
         *c = (pMin + pMax) / 2;
         *rad = Inside(*c, *this) ? Distance(*c, pMax) : 0;
     }
-    friend std::ostream &operator<<(std::ostream &os, const Bounds2<T> &b) {
-        os << "[ " << b.pMin << " - " << b.pMax << " ]";
-        return os;
+    std::string ToString() const {
+        return StringPrintf("[ %s - %s ]", pMin.ToString().c_str(),
+                            pMax.ToString().c_str());
     }
 
     // Bounds2 Public Data
     Point2<T> pMin, pMax;
 };
+
+template<typename T>
+inline std::ostream &operator<<(std::ostream &os, const Bounds2<T> &b) {
+    return os << b.ToString();
+}
 
 template <typename T>
 class Bounds3 {
@@ -193,14 +199,19 @@ class Bounds3 {
                     Float *hitt1 = nullptr) const;
     inline bool IntersectP(const Ray &ray, const Vector3f &invDir,
                            const int dirIsNeg[3]) const;
-    friend std::ostream &operator<<(std::ostream &os, const Bounds3<T> &b) {
-        os << "[ " << b.pMin << " - " << b.pMax << " ]";
-        return os;
+    std::string ToString() const {
+        return StringPrintf("[ %s - %s ]", pMin.ToString().c_str(),
+                            pMax.ToString().c_str());
     }
 
     // Bounds3 Public Data
     Point3<T> pMin, pMax;
 };
+
+template<typename T>
+inline std::ostream &operator<<(std::ostream &os, const Bounds3<T> &b) {
+    return os << b.ToString();
+}
 
 using Bounds2f = Bounds2<Float>;
 using Bounds2i = Bounds2<int>;

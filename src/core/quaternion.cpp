@@ -35,6 +35,7 @@
 #include "quaternion.h"
 
 #include "transform.h"
+#include "stringprint.h"
 
 #include <cmath>
 
@@ -104,6 +105,14 @@ Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2) {
         Quaternion qperp = Normalize(q2 - q1 * cosTheta);
         return q1 * std::cos(thetap) + qperp * std::sin(thetap);
     }
+}
+
+std::string Quaternion::ToString() const {
+    return StringPrintf("[ %f, %f, %f, %f ]", v.x, v.y, v.z, w);
+}
+
+std::ostream &operator<<(std::ostream &os, const Quaternion &q) {
+    return os << q.ToString();
 }
 
 }  // namespace pbrt

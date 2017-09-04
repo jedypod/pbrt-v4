@@ -44,9 +44,7 @@
 #include "film.h"
 #include "geometry.h"
 #include "transform.h"
-#include "stringprint.h"
 
-#include <iostream>
 #include <memory>
 
 namespace pbrt {
@@ -80,12 +78,12 @@ struct CameraSample {
     Point2f pFilm;
     Point2f pLens;
     Float time;
+
+    std::string ToString() const;
 };
 
 inline std::ostream &operator<<(std::ostream &os, const CameraSample &cs) {
-    os << "[ pFilm: " << cs.pFilm << " , pLens: " << cs.pLens <<
-        StringPrintf(", time %f ]", cs.time);
-    return os;
+    return os << cs.ToString();
 }
 
 class ProjectiveCamera : public Camera {

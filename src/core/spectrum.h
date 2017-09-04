@@ -129,14 +129,6 @@ class CoefficientSpectrum {
         return static_cast<Child *>(*this);
     }
 #endif  // DEBUG
-    void Print(FILE *f) const {
-        fprintf(f, "[ ");
-        for (int i = 0; i < nSpectrumSamples; ++i) {
-            fprintf(f, "%f", c[i]);
-            if (i != nSpectrumSamples - 1) fprintf(f, ", ");
-        }
-        fprintf(f, "]");
-    }
     Child &operator+=(const Child &s2) {
         DCHECK(!s2.HasNaNs());
         for (int i = 0; i < nSpectrumSamples; ++i) c[i] += s2.c[i];
