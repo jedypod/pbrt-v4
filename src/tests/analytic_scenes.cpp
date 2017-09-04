@@ -9,7 +9,6 @@
 #include "film.h"
 #include "filters/box.h"
 #include "geometry.h"
-#include "imageio.h"
 #include "integrators/bdpt.h"
 #include "integrators/directlighting.h"
 #include "integrators/mlt.h"

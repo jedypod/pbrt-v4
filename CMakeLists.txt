@@ -332,7 +332,6 @@ SET ( PBRT_CORE_SOURCE
   src/core/floatfile.cpp
   src/core/geometry.cpp
   src/core/image.cpp
-  src/core/imageio.cpp
   src/core/integrator.cpp
   src/core/interaction.cpp
   src/core/interpolation.cpp
@@ -375,7 +374,6 @@ SET ( PBRT_CORE_HEADERS
   src/core/filter.h
   src/core/floatfile.h
   src/core/geometry.h
-  src/core/imageio.h
   src/core/integrator.h
   src/core/interaction.h
   src/core/interpolation.h

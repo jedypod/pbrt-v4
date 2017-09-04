@@ -12,7 +12,6 @@
 
 #include "args.h"
 #include "fileutil.h"
-#include "imageio.h"
 #include "mipmap.h"
 #include "parallel.h"
 #include "pbrt.h"

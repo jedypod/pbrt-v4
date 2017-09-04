@@ -34,7 +34,6 @@
 
 #include "error.h"
 #include "fileutil.h"
-#include "imageio.h"
 #include "mathutil.h"
 #include "spectrum.h"
 #include "stats.h"

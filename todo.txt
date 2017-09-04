@@ -23,8 +23,6 @@
 
 - separate util directory? stringprint, mathutil, ... ?
 
-- imageio.* nuke?
-
 + need to update emptychamber and villa in regress/ to use png not tga
   textures
 

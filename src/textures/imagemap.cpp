@@ -35,7 +35,6 @@
 
 #include "error.h"
 #include "fileutil.h"
-#include "imageio.h"
 #include "paramset.h"
 #include "stats.h"
 
