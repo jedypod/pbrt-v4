@@ -154,7 +154,10 @@ class Tuple2 {
     }
 
     std::string ToString() const {
-        return StringPrintf("[ %f, %f ]", x, y);
+        if (std::is_floating_point<T>::value)
+            return StringPrintf("[ %f, %f ]", x, y);
+        else
+            return StringPrintf("[ %d, %d ]", x, y);
     }
 
     // Tuple2 Public Data
@@ -306,7 +309,10 @@ class Tuple3 {
     Child<T> operator-() const { return { -x, -y, -z }; }
 
     std::string ToString() const {
-        return StringPrintf("[ %f, %f, %f ]", x, y, z);
+        if (std::is_floating_point<T>::value)
+            return StringPrintf("[ %f, %f, %f ]", x, y, z);
+        else
+            return StringPrintf("[ %d, %d, %d ]", x, y, z);
     }
 
     // Tuple3 Public Data
