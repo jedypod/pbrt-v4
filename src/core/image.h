@@ -52,6 +52,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <experimental/optional>
 #include <vector>
 
 namespace pbrt {
@@ -228,7 +229,7 @@ struct ImageMetadata {
     // that either the image format doesn't allow encoding this metadata or
     // that it isn't present in the image.
     Float renderTimeSeconds = 0;
-    Matrix4x4 worldToCamera, worldToNDC;
+    std::experimental::optional<Matrix4x4> worldToCamera, worldToNDC;
     Bounds2i pixelBounds;
     Point2i fullResolution;
 };

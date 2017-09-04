@@ -119,7 +119,7 @@ void ProjectiveCamera::WriteImage(ImageMetadata *metadata,
 
     // TODO: double check this
     Transform worldToNDC = Translate(Vector3f(0.5, 0.5, 0.5)) * Scale(0.5, 0.5, 0.5) *
-        CameraToScreen * metadata->worldToCamera;
+        CameraToScreen * *metadata->worldToCamera;
     metadata->worldToNDC = worldToNDC.GetMatrix();
 
     film->WriteImage(metadata, splatScale);

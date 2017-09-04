@@ -44,14 +44,6 @@
 
 - more std::optional: ReadImage, ... ?
 
-- report pixel format in imgtool info
-
-- use lodepng_inspect to figure out when we can return a 1-channel image
-  careful about palleted images -- blow them out to RGB...
-  landscape and san miguel have many greyscale alpha textures
-  png_info.color.
-  could use lodepng_add_text for image metadata (?)
-
 - std::string_view (in many places) (absl equivalent?)
 
 - harmonize Print(FILE) vs operator<< vs ToString()

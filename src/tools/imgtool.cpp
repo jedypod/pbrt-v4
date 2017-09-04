@@ -427,8 +427,10 @@ int diff(int argc, char *argv[]) {
 
 static void printImageStats(const char *name, const Image &image,
                             const ImageMetadata *metadata = nullptr) {
-    printf("%s\n\tresolution (%d, %d)\n", name, image.resolution.x,
+    printf("%s:\n\tresolution (%d, %d)\n", name, image.resolution.x,
            image.resolution.y);
+    printf("\tpixel format: %s\n", FormatName(image.format));
+
     if (metadata) {
         if (metadata->fullResolution != Point2i(0, 0))
             printf("\tfull resolution (%d, %d)\n", metadata->fullResolution.x,
@@ -447,12 +449,12 @@ static void printImageStats(const char *name, const Image &image,
             printf("\trender time: %dh %dm %d.%02ds\n", h, m,
                    int(s), int(100 * (s - int(s))));
         }
-        if (!metadata->worldToCamera.IsZero())
+        if (metadata->worldToCamera)
             printf("\tworld to camera: %s\n",
-                   metadata->worldToCamera.ToString().c_str());
-        if (!metadata->worldToNDC.IsZero())
+                   metadata->worldToCamera->ToString().c_str());
+        if (metadata->worldToNDC)
             printf("\tworld to NDC: %s\n",
-                   metadata->worldToNDC.ToString().c_str());
+                   metadata->worldToNDC->ToString().c_str());
     }
 
     Float min[3] = {Infinity, Infinity, Infinity};

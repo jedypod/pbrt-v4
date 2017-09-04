@@ -146,20 +146,24 @@ static bool ReadEXR(const std::string &name, Image *image,
 
             const Imf::M44fAttribute *worldToCameraAttrib =
                 file.header().findTypedAttribute<Imf::M44fAttribute>("worldToCamera");
-            if (worldToCameraAttrib)
+            if (worldToCameraAttrib) {
+                Matrix4x4 m;
                 for (int i = 0; i < 4; ++i)
                     for (int j = 0; j < 4; ++j)
                         // Can't memcpy since Float may be a double...
-                        metadata->worldToCamera.m[i][j] =
-                            worldToCameraAttrib->value().getValue()[4*i+j];
+                        m.m[i][j] = worldToCameraAttrib->value().getValue()[4*i+j];
+                metadata->worldToCamera = m;
+            }
 
             const Imf::M44fAttribute *worldToNDCAttrib =
                 file.header().findTypedAttribute<Imf::M44fAttribute>("worldToNDC");
-            if (worldToNDCAttrib)
+            if (worldToNDCAttrib) {
+                Matrix4x4 m;
                 for (int i = 0; i < 4; ++i)
                     for (int j = 0; j < 4; ++j)
-                        metadata->worldToNDC.m[i][j] =
-                            worldToNDCAttrib->value().getValue()[4*i+j];
+                        m.m[i][j] = worldToNDCAttrib->value().getValue()[4*i+j];
+                metadata->worldToNDC = m;
+            }
 
             // OpenEXR uses inclusive pixel bounds; adjust to non-inclusive
             // (the convention pbrt uses) in the values returned.
@@ -245,10 +249,10 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
             if (metadata->renderTimeSeconds > 0)
                 header.insert("renderTimeSeconds", Imf::FloatAttribute(metadata->renderTimeSeconds));
             // TODO: fix this for Float = double builds.
-            if (!metadata->worldToCamera.IsZero())
-                header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera.m));
-            if (!metadata->worldToNDC.IsZero())
-                header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC.m));
+            if (metadata->worldToCamera)
+                header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera->m));
+            if (metadata->worldToNDC)
+                header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC->m));
         }
 
         Imf::OutputFile file(name.c_str(), header);
