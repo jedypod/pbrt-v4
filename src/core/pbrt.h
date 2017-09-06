@@ -124,6 +124,8 @@ struct BSSRDFTable;
 class Light;
 class VisibilityTester;
 class AreaLight;
+class LightDistribution;
+class FixedLightDistribution;
 class Distribution1D;
 class Distribution2D;
 //#define PBRT_FLOAT_AS_DOUBLE

@@ -42,6 +42,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace pbrt {
 
@@ -54,26 +55,60 @@ class LightDistribution {
 
     // Given a point |p| in space, this method returns a (hopefully
     // effective) sampling distribution for light sources at that point.
-    virtual const Distribution1D *Lookup(const Point3f &p) const = 0;
+    virtual const Light *Sample(const Point3f &p, Float u, Float *pdf) const = 0;
+
+    // Returns the PDF for sampling the light |light| at the point |p|.
+    virtual Float Pdf(const Point3f &p, const Light *light) const = 0;
+
+ protected:
+    LightDistribution(const Scene &scene) : scene(scene) {}
+
+    const Scene &scene;
+};
+
+// FixedLightDistribution is a LightDistribution specialization for
+// implementations that use the sampling probabilities at all points in the
+// scene. Those just need to initialize a corresponding Distribution1D in
+// their constructor and the implementation here takes care of the rest.
+class FixedLightDistribution : public LightDistribution {
+ public:
+    virtual ~FixedLightDistribution();
+
+    // If the caller knows they have a FixedLightDistribution, they can
+    // sample and compute the PDF without providing a point.
+    const Light *Sample(Float u, Float *pdf) const;
+    Float Pdf(const Light *light) const;
+
+    const Light *Sample(const Point3f &p, Float u, Float *pdf) const final {
+        return Sample(u, pdf);
+    }
+    Float Pdf(const Point3f &p, const Light *light) const final {
+        return Pdf(light);
+    }
+
+ protected:
+    FixedLightDistribution(const Scene &scene);
+
+    std::unique_ptr<Distribution1D> distrib;
+
+ private:
+    // Inverse mapping from elements in scene.lights to entries
+    // in the |distrib| array.
+    std::unordered_map<const Light *, size_t> lightToIndex;
 };
 
 std::unique_ptr<LightDistribution> CreateLightSampleDistribution(
     const std::string &name, const Scene &scene);
 
-// The simplest possible implementation of LightDistribution: this returns
-// a uniform distribution over all light sources, ignoring the provided
-// point. This approach works well for very simple scenes, but is quite
-// ineffective for scenes with more than a handful of light sources. (This
-// was the sampling method originally used for the PathIntegrator and the
-// VolPathIntegrator in the printed book, though without the
-// UniformLightDistribution class.)
-class UniformLightDistribution : public LightDistribution {
+// The simplest possible implementation of LightDistribution: this uses a
+// uniform distribution over all light sources. This approach works well
+// for very simple scenes, but is quite ineffective for scenes with more
+// than a handful of light sources. (This was the sampling method
+// originally used for the PathIntegrator and the VolPathIntegrator in the
+// printed book, though without the UniformLightDistribution class.)
+class UniformLightDistribution : public FixedLightDistribution {
   public:
     UniformLightDistribution(const Scene &scene);
-    const Distribution1D *Lookup(const Point3f &p) const;
-
-  private:
-    std::unique_ptr<Distribution1D> distrib;
 };
 
 // PowerLightDistribution returns a distribution with sampling probability
@@ -85,13 +120,9 @@ class UniformLightDistribution : public LightDistribution {
 // scene and unimportant in others. (This was the default sampling method
 // used for the BDPT integrator and MLT integrator in the printed book,
 // though also without the PowerLightDistribution class.)
-class PowerLightDistribution : public LightDistribution {
+class PowerLightDistribution : public FixedLightDistribution {
   public:
     PowerLightDistribution(const Scene &scene);
-    const Distribution1D *Lookup(const Point3f &p) const;
-
-  private:
-    std::unique_ptr<Distribution1D> distrib;
 };
 
 // A spatially-varying light distribution that adjusts the probability of
@@ -102,15 +133,21 @@ class SpatialLightDistribution : public LightDistribution {
   public:
     SpatialLightDistribution(const Scene &scene, int maxVoxels = 64);
     ~SpatialLightDistribution();
-    const Distribution1D *Lookup(const Point3f &p) const;
+
+    const Light *Sample(const Point3f &p, Float u, Float *pdf) const;
+    Float Pdf(const Point3f &p, const Light *light) const;
 
   private:
+    // Returns a sampling distribution to use at the given point |p|.
+    const Distribution1D *GetDistribution(const Point3f &p) const;
+
     // Compute the sampling distribution for the voxel with integer
-    // coordiantes given by "pi".
+    // coordiantes given by |pi|.
     Distribution1D *ComputeDistribution(Point3i pi) const;
 
-    const Scene &scene;
     int nVoxels[3];
+
+    std::unordered_map<const Light *, size_t> lightToIndex;
 
     // The hash table is a fixed number of HashEntry structs (where we
     // allocate more than enough entries in the SpatialLightDistribution

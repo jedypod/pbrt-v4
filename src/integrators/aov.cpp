@@ -233,11 +233,9 @@ void AOVIntegrator::Render(const Scene &scene) {
                     ArraySlice<Float> ul = tileSampler->Get1DArray(eSamples);
                     ArraySlice<Point2f> u = tileSampler->Get2DArray(eSamples);
                     Spectrum E(0);
-                    const Distribution1D *ld = lightDistrib->Lookup(isect.p);
                     for (int i = 0; i < eSamples; ++i) {
                         Float lightPdf;
-                        int lightIndex = ld->SampleDiscrete(ul[i], &lightPdf);
-                        const Light *light = scene.lights[lightIndex].get();
+                        const Light *light = lightDistrib->Sample(isect.p, ul[i], &lightPdf);
 
                         Vector3f wi;
                         Float pdf;

@@ -47,19 +47,15 @@
 
 namespace pbrt {
 
-// LightStrategy Declarations
-enum class LightStrategy { UniformSampleAll, UniformSampleOne };
-
 // DirectLightingIntegrator Declarations
 class DirectLightingIntegrator : public SamplerIntegrator {
   public:
     // DirectLightingIntegrator Public Methods
-    DirectLightingIntegrator(LightStrategy strategy, int maxDepth,
+    DirectLightingIntegrator(int maxDepth,
                              std::shared_ptr<const Camera> camera,
                              std::unique_ptr<Sampler> sampler,
                              const Bounds2i &pixelBounds)
         : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
-          strategy(strategy),
           maxDepth(maxDepth) {}
     Spectrum Li(const RayDifferential &ray, const Scene &scene,
                 Sampler &sampler, MemoryArena &arena, int depth) const;
@@ -67,7 +63,6 @@ class DirectLightingIntegrator : public SamplerIntegrator {
 
   private:
     // DirectLightingIntegrator Private Data
-    const LightStrategy strategy;
     const int maxDepth;
     std::vector<int> nLightSamples;
 };

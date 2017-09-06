@@ -39,11 +39,11 @@
 #define PBRT_INTEGRATORS_BDPT_H
 
 // integrators/bdpt.h*
-#include <unordered_map>
 #include "camera.h"
 #include "integrator.h"
 #include "interaction.h"
 #include "light.h"
+#include "lightdistrib.h"
 #include "pbrt.h"
 #include "reflection.h"
 #include "sampling.h"
@@ -113,16 +113,12 @@ class ScopedAssignment {
 };
 
 inline Float InfiniteLightDensity(
-    const Scene &scene, const Distribution1D &lightDistr,
-    const std::unordered_map<const Light *, size_t> &lightToDistrIndex,
+    const Scene &scene, const FixedLightDistribution &lightDistr,
     const Vector3f &w) {
     Float pdf = 0;
-    for (const auto &light : scene.infiniteLights) {
-        CHECK(lightToDistrIndex.find(light.get()) != lightToDistrIndex.end());
-        size_t index = lightToDistrIndex.find(light.get())->second;
-        pdf += light->Pdf_Li(Interaction(), -w) * lightDistr.func[index];
-    }
-    return pdf / (lightDistr.funcInt * lightDistr.Count());
+    for (const auto &light : scene.infiniteLights)
+        pdf += light->Pdf_Li(Interaction(), -w) * lightDistr.Pdf(light.get());
+    return pdf;
 }
 
 // BDPT Declarations
@@ -389,19 +385,16 @@ struct Vertex {
         return pdf;
     }
     Float PdfLightOrigin(const Scene &scene, const Vertex &v,
-                         const Distribution1D &lightDistr,
-                         const std::unordered_map<const Light *, size_t>
-                             &lightToDistrIndex) const {
+                         const FixedLightDistribution &lightDistr) {
         Vector3f w = v.p() - p();
         if (LengthSquared(w) == 0) return 0.;
         w = Normalize(w);
         if (IsInfiniteLight()) {
             // Return solid angle density for infinite light sources
-            return InfiniteLightDensity(scene, lightDistr, lightToDistrIndex,
-                                        w);
+            return InfiniteLightDensity(scene, lightDistr, w);
         } else {
             // Return solid angle density for non-infinite light sources
-            Float pdfPos, pdfDir, pdfChoice = 0;
+            Float pdfPos, pdfDir;
 
             // Get pointer _light_ to the light source at the vertex
             CHECK(IsLight());
@@ -411,10 +404,7 @@ struct Vertex {
             CHECK_NOTNULL(light);
 
             // Compute the discrete probability of sampling _light_, _pdfChoice_
-            CHECK(lightToDistrIndex.find(light) != lightToDistrIndex.end());
-            size_t index = lightToDistrIndex.find(light)->second;
-            pdfChoice = lightDistr.DiscretePDF(index);
-
+            Float pdfChoice = lightDistr.Pdf(light);
             light->Pdf_Le(Ray(p(), w, Infinity, time()), ng(), &pdfPos, &pdfDir);
             return pdfPos * pdfChoice;
         }
@@ -428,13 +418,11 @@ extern int GenerateCameraSubpath(const Scene &scene, Sampler &sampler,
 
 extern int GenerateLightSubpath(
     const Scene &scene, Sampler &sampler, MemoryArena &arena, int maxDepth,
-    Float time, const Distribution1D &lightDistr,
-    const std::unordered_map<const Light *, size_t> &lightToIndex,
+    Float time, const FixedLightDistribution &lightDistr,
     Vertex *path);
 Spectrum ConnectBDPT(
     const Scene &scene, Vertex *lightVertices, Vertex *cameraVertices, int s,
-    int t, const Distribution1D &lightDistr,
-    const std::unordered_map<const Light *, size_t> &lightToIndex,
+    int t, const FixedLightDistribution &lightDistr,
     const Camera &camera, Sampler &sampler, Point2f *pRaster,
     Float *misWeight = nullptr);
 std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(

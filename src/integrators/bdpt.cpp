@@ -97,15 +97,14 @@ int GenerateCameraSubpath(const Scene &scene, Sampler &sampler,
 
 int GenerateLightSubpath(
     const Scene &scene, Sampler &sampler, MemoryArena &arena, int maxDepth,
-    Float time, const Distribution1D &lightDistr,
-    const std::unordered_map<const Light *, size_t> &lightToIndex,
+    Float time, const FixedLightDistribution &lightDistr,
     Vertex *path) {
     if (maxDepth == 0) return 0;
     ProfilePhase _(Prof::BDPTGenerateSubpath);
     // Sample initial ray for light subpath
     Float lightPdf;
-    int lightNum = lightDistr.SampleDiscrete(sampler.Get1D(), &lightPdf);
-    const std::shared_ptr<Light> &light = scene.lights[lightNum];
+    const Light *light = lightDistr.Sample(sampler.Get1D(), &lightPdf);
+    if (lightPdf == 0) return 0;
     RayDifferential ray;
     Normal3f nLight;
     Float pdfPos, pdfDir;
@@ -115,7 +114,7 @@ int GenerateLightSubpath(
 
     // Generate first vertex on light subpath and start random walk
     path[0] =
-        Vertex::CreateLight(light.get(), ray, nLight, Le, pdfPos * lightPdf);
+        Vertex::CreateLight(light, ray, nLight, Le, pdfPos * lightPdf);
     Spectrum beta = Le * AbsDot(nLight, ray.d) / (lightPdf * pdfPos * pdfDir);
     VLOG(2) << "Starting light subpath. Ray: " << ray << ", Le " << Le <<
         ", beta " << beta << ", pdfPos " << pdfPos << ", pdfDir " << pdfDir;
@@ -134,7 +133,7 @@ int GenerateLightSubpath(
 
         // Set spatial density of _path[0]_ for infinite area light
         path[0].pdfFwd =
-            InfiniteLightDensity(scene, lightDistr, lightToIndex, ray.d);
+            InfiniteLightDensity(scene, lightDistr, ray.d);
     }
     return nVertices + 1;
 }
@@ -230,8 +229,7 @@ Spectrum G(const Scene &scene, Sampler &sampler, const Vertex &v0,
 
 Float MISWeight(const Scene &scene, Vertex *lightVertices,
                 Vertex *cameraVertices, Vertex &sampled, int s, int t,
-                const Distribution1D &lightPdf,
-                const std::unordered_map<const Light *, size_t> &lightToIndex) {
+                const FixedLightDistribution &lightDistrib) {
     if (s + t == 2) return 1;
     Float sumRi = 0;
     // Define helper function _remap0_ that deals with Dirac delta functions
@@ -261,8 +259,7 @@ Float MISWeight(const Scene &scene, Vertex *lightVertices,
     ScopedAssignment<Float> a4;
     if (pt)
         a4 = {&pt->pdfRev, s > 0 ? qs->Pdf(scene, qsMinus, *pt)
-                                 : pt->PdfLightOrigin(scene, *ptMinus, lightPdf,
-                                                      lightToIndex)};
+                                 : pt->PdfLightOrigin(scene, *ptMinus, lightDistrib)};
 
     // Update reverse density of vertex $\pt{}_{t-2}$
     ScopedAssignment<Float> a5;
@@ -303,16 +300,7 @@ inline int BufferIndex(int s, int t) {
 }
 
 void BDPTIntegrator::Render(const Scene &scene) {
-    std::unique_ptr<LightDistribution> lightDistribution =
-        CreateLightSampleDistribution(lightSampleStrategy, scene);
-
-    // Compute a reverse mapping from light pointers to offsets into the
-    // scene lights vector (and, equivalently, offsets into
-    // lightDistr). Added after book text was finalized; this is critical
-    // to reasonable performance with 100s+ of light sources.
-    std::unordered_map<const Light *, size_t> lightToIndex;
-    for (size_t i = 0; i < scene.lights.size(); ++i)
-        lightToIndex[scene.lights[i].get()] = i;
+    PowerLightDistribution lightDistribution(scene);
 
     // Partition the image into tiles
     Film *film = camera->film.get();
@@ -369,20 +357,11 @@ void BDPTIntegrator::Render(const Scene &scene) {
                     int nCamera = GenerateCameraSubpath(
                         scene, *tileSampler, arena, maxDepth + 2, *camera,
                         pFilm, cameraVertices);
-                    // Get a distribution for sampling the light at the
-                    // start of the light subpath. Because the light path
-                    // follows multiple bounces, basing the sampling
-                    // distribution on any of the vertices of the camera
-                    // path is unlikely to be a good strategy. We use the
-                    // PowerLightDistribution by default here, which
-                    // doesn't use the point passed to it.
-                    const Distribution1D *lightDistr =
-                        lightDistribution->Lookup(cameraVertices[0].p());
+
                     // Now trace the light subpath
                     int nLight = GenerateLightSubpath(
                         scene, *tileSampler, arena, maxDepth + 1,
-                        cameraVertices[0].time(), *lightDistr, lightToIndex,
-                        lightVertices);
+                        cameraVertices[0].time(), lightDistribution, lightVertices);
 
                     // Execute all BDPT connection strategies
                     Spectrum L(0.f);
@@ -398,7 +377,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
                             Float misWeight = 0.f;
                             Spectrum Lpath = ConnectBDPT(
                                 scene, lightVertices, cameraVertices, s, t,
-                                *lightDistr, lightToIndex, *camera, *tileSampler,
+                                lightDistribution, *camera, *tileSampler,
                                 &pFilmNew, &misWeight);
                             VLOG(2) << "Connect bdpt s: " << s <<", t: " << t <<
                                 ", Lpath: " << Lpath << ", misWeight: " << misWeight;
@@ -445,8 +424,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
 
 Spectrum ConnectBDPT(
     const Scene &scene, Vertex *lightVertices, Vertex *cameraVertices, int s,
-    int t, const Distribution1D &lightDistr,
-    const std::unordered_map<const Light *, size_t> &lightToIndex,
+    int t, const FixedLightDistribution &lightDistr,
     const Camera &camera, Sampler &sampler, Point2f *pRaster,
     Float *misWeightPtr) {
     ProfilePhase _(Prof::BDPTConnectSubpaths);
@@ -487,20 +465,19 @@ Spectrum ConnectBDPT(
         const Vertex &pt = cameraVertices[t - 1];
         if (pt.IsConnectible()) {
             Float lightPdf;
+            const Light *light = lightDistr.Sample(sampler.Get1D(), &lightPdf);
+
             VisibilityTester vis;
             Vector3f wi;
             Float pdf;
-            int lightNum =
-                lightDistr.SampleDiscrete(sampler.Get1D(), &lightPdf);
-            const std::shared_ptr<Light> &light = scene.lights[lightNum];
             Spectrum lightWeight = light->Sample_Li(
                 pt.GetInteraction(), sampler.Get2D(), &wi, &pdf, &vis);
             if (pdf > 0 && !lightWeight.IsBlack()) {
-                EndpointInteraction ei(vis.P1(), light.get());
+                EndpointInteraction ei(vis.P1(), light);
                 sampled =
                     Vertex::CreateLight(ei, lightWeight / (pdf * lightPdf), 0);
                 sampled.pdfFwd =
-                    sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex);
+                    sampled.PdfLightOrigin(scene, pt, lightDistr);
                 L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta;
                 if (pt.IsOnSurface()) L *= AbsDot(wi, pt.ns());
                 // Only check visibility if the path would carry radiance.
@@ -527,7 +504,7 @@ Spectrum ConnectBDPT(
     // Compute MIS weight for connection strategy
     Float misWeight =
         L.IsBlack() ? 0.f : MISWeight(scene, lightVertices, cameraVertices,
-                                      sampled, s, t, lightDistr, lightToIndex);
+                                      sampled, s, t, lightDistr);
     VLOG(2) << "MIS weight for (s,t) = (" << s << ", " << t << ") connection: "
             << misWeight;
     DCHECK(!std::isnan(misWeight));

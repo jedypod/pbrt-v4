@@ -38,13 +38,14 @@
 #include "image.h"
 #include "integrator.h"
 #include "interaction.h"
-#include "util/memory.h"
-#include "util/parallel.h"
-#include "util/progressreporter.h"
+#include "lightdistrib.h"
 #include "reflection.h"
 #include "sampler.h"
 #include "sampling.h"
 #include "scene.h"
+#include "util/memory.h"
+#include "util/parallel.h"
+#include "util/progressreporter.h"
 #include "util/stats.h"
 
 namespace pbrt {
@@ -90,21 +91,13 @@ Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
 
 Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
                                MemoryArena &arena, Sampler &sampler,
-                               bool handleMedia, const Distribution1D *lightDistrib) {
+                               const LightDistribution &lightDistrib,
+                               bool handleMedia) {
     ProfilePhase p(Prof::DirectLighting);
     // Randomly choose a single light to sample, _light_
-    int nLights = int(scene.lights.size());
-    if (nLights == 0) return Spectrum(0.f);
-    int lightNum;
     Float lightPdf;
-    if (lightDistrib) {
-        lightNum = lightDistrib->SampleDiscrete(sampler.Get1D(), &lightPdf);
-        if (lightPdf == 0) return Spectrum(0.f);
-    } else {
-        lightNum = sampler.GetDiscrete1D(nLights);
-        lightPdf = Float(1) / nLights;
-    }
-    const std::shared_ptr<Light> &light = scene.lights[lightNum];
+    const Light *light = lightDistrib.Sample(it.p, sampler.Get1D(), &lightPdf);
+    if (lightPdf == 0) return Spectrum(0.f);
     Point2f uLight = sampler.Get2D();
     Point2f uScattering = sampler.Get2D();
     return EstimateDirect(it, uScattering, *light, uLight,
@@ -218,15 +211,6 @@ Spectrum EstimateDirect(const Interaction &it, const Point2f &uScattering,
         }
     }
     return Ld;
-}
-
-std::unique_ptr<Distribution1D> ComputeLightPowerDistribution(
-    const Scene &scene) {
-    if (scene.lights.empty()) return nullptr;
-    std::vector<Float> lightPower;
-    for (const auto &light : scene.lights)
-        lightPower.push_back(light->Power().y());
-    return std::make_unique<Distribution1D>(lightPower);
 }
 
 // SamplerIntegrator Method Definitions

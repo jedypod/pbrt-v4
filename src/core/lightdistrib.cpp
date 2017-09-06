@@ -72,20 +72,60 @@ std::unique_ptr<LightDistribution> CreateLightSampleDistribution(
     }
 }
 
-UniformLightDistribution::UniformLightDistribution(const Scene &scene) {
+///////////////////////////////////////////////////////////////////////////
+// FixedLightDistribution
+
+FixedLightDistribution::FixedLightDistribution(const Scene &scene)
+    : LightDistribution(scene) {
+    // Compute a reverse mapping from light pointers to offsets into the
+    // scene lights vector (and, equivalently, offsets into lightDistr).
+    for (size_t i = 0; i < scene.lights.size(); ++i)
+        lightToIndex[scene.lights[i].get()] = i;
+}
+
+FixedLightDistribution::~FixedLightDistribution() {}
+
+const Light *FixedLightDistribution::Sample(Float u, Float *pdf) const {
+    if (!distrib) {
+        *pdf = 0;
+        return nullptr;
+    }
+
+    int lightIndex = distrib->SampleDiscrete(u, pdf);
+    return scene.lights[lightIndex].get();
+}
+
+Float FixedLightDistribution::Pdf(const Light *light) const {
+    if (!distrib)
+        return 0;
+
+    auto iter = lightToIndex.find(light);
+    CHECK(iter != lightToIndex.end());
+    size_t index = iter->second;
+    return distrib->DiscretePDF(index);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// UniformLightDistribution
+
+UniformLightDistribution::UniformLightDistribution(const Scene &scene)
+    : FixedLightDistribution(scene) {
+    if (scene.lights.size() == 0) return;
     std::vector<Float> prob(scene.lights.size(), Float(1));
     distrib = std::make_unique<Distribution1D>(prob);
 }
 
-const Distribution1D *UniformLightDistribution::Lookup(const Point3f &p) const {
-    return distrib.get();
-}
+///////////////////////////////////////////////////////////////////////////
+// PowerLightDistribution
 
 PowerLightDistribution::PowerLightDistribution(const Scene &scene)
-    : distrib(ComputeLightPowerDistribution(scene)) {}
+    : FixedLightDistribution(scene) {
+    if (scene.lights.size() == 0) return;
 
-const Distribution1D *PowerLightDistribution::Lookup(const Point3f &p) const {
-    return distrib.get();
+    std::vector<Float> lightPower;
+    for (const auto &light : scene.lights)
+        lightPower.push_back(light->Power().y());
+    distrib = std::make_unique<Distribution1D>(lightPower);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -102,7 +142,7 @@ static const uint64_t invalidPackedPos = 0xffffffffffffffff;
 
 SpatialLightDistribution::SpatialLightDistribution(const Scene &scene,
                                                    int maxVoxels)
-    : scene(scene) {
+    : LightDistribution(scene) {
     // Compute the number of voxels so that the widest scene bounding box
     // dimension has maxVoxels voxels and the other dimensions have a number
     // of voxels so that voxels are roughly cube shaped.
@@ -124,6 +164,9 @@ SpatialLightDistribution::SpatialLightDistribution(const Scene &scene,
         hashTable[i].distribution.store(nullptr);
     }
 
+    for (size_t i = 0; i < scene.lights.size(); ++i)
+        lightToIndex[scene.lights[i].get()] = i;
+
     LOG(INFO) << "SpatialLightDistribution: scene bounds " << b <<
         ", voxel res (" << nVoxels[0] << ", " << nVoxels[1] << ", " <<
         nVoxels[2] << ")";
@@ -139,7 +182,29 @@ SpatialLightDistribution::~SpatialLightDistribution() {
     }
 }
 
-const Distribution1D *SpatialLightDistribution::Lookup(const Point3f &p) const {
+const Light *SpatialLightDistribution::Sample(const Point3f &p, Float u, Float *pdf) const {
+    if (scene.lights.size() == 0) {
+        *pdf = 0;
+        return nullptr;
+    }
+    const Distribution1D *distrib = GetDistribution(p);
+    int lightIndex = distrib->SampleDiscrete(u, pdf);
+    return scene.lights[lightIndex].get();
+}
+
+Float SpatialLightDistribution::Pdf(const Point3f &p, const Light *light) const {
+    if (scene.lights.size() == 0)
+        return 0;
+
+    const Distribution1D *distrib = GetDistribution(p);
+
+    auto iter = lightToIndex.find(light);
+    CHECK(iter != lightToIndex.end());
+    size_t index = iter->second;
+    return distrib->DiscretePDF(index);
+}
+
+const Distribution1D *SpatialLightDistribution::GetDistribution(const Point3f &p) const {
     ProfilePhase _(Prof::LightDistribLookup);
     ++nLookups;
 

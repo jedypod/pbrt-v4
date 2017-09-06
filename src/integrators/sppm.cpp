@@ -38,6 +38,7 @@
 #include "util/parallel.h"
 #include "scene.h"
 #include "image.h"
+#include "lightdistrib.h"
 #include "spectrum.h"
 #include "util/rng.h"
 #include "paramset.h"
@@ -121,8 +122,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
     const Float invSqrtSPP = 1.f / std::sqrt(nIterations);
     pixelMemoryBytes = nPixels * sizeof(SPPMPixel);
     // Compute _lightDistr_ for sampling lights proportional to power
-    std::unique_ptr<Distribution1D> lightDistr =
-        ComputeLightPowerDistribution(scene);
+    SpatialLightDistribution directLightDistribution(scene);
+    PowerLightDistribution shootLightDistribution(scene);
 
     // Perform _nIterations_ of SPPM integration
     HaltonSampler sampler(nIterations, pixelBounds);
@@ -191,7 +192,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
                             pixel.Ld += beta * isect.Le(wo);
                         pixel.Ld +=
                             beta * UniformSampleOneLight(isect, scene, arena,
-                                                         *tileSampler);
+                                                         *tileSampler, directLightDistribution,
+                                                         false);
 
                         // Possibly create visible point and end camera path
                         bool isDiffuse = bsdf.NumComponents(BxDFType(
@@ -310,9 +312,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 // Choose light to shoot photon from
                 Float lightPdf;
                 Float lightSample = RadicalInverse(haltonDim++, haltonIndex);
-                int lightNum =
-                    lightDistr->SampleDiscrete(lightSample, &lightPdf);
-                const std::shared_ptr<Light> &light = scene.lights[lightNum];
+                const Light *light = shootLightDistribution.Sample(lightSample, &lightPdf);
+                if (lightPdf == 0) continue;
 
                 // Compute sample values for photon ray leaving light source
                 Point2f uLight0(RadicalInverse(haltonDim, haltonIndex),

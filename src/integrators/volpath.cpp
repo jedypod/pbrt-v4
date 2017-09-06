@@ -89,10 +89,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 
             ++volumeInteractions;
             // Handle scattering at point in medium for volumetric path tracer
-            const Distribution1D *lightDistrib =
-                lightDistribution->Lookup(mi.p);
-            L += beta * UniformSampleOneLight(mi, scene, arena, sampler, true,
-                                              lightDistrib);
+            L += beta * UniformSampleOneLight(mi, scene, arena, sampler,
+                                              *lightDistribution, true);
 
             Vector3f wo = -ray.d, wi;
             mi.phase->Sample_p(wo, &wi, sampler.Get2D());
@@ -124,10 +122,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 
             // Sample illumination from lights to find attenuated path
             // contribution
-            const Distribution1D *lightDistrib =
-                lightDistribution->Lookup(isect.p);
             L += beta * UniformSampleOneLight(isect, scene, arena, sampler,
-                                              true, lightDistrib);
+                                              *lightDistribution, true);
 
             // Sample BSDF to get new path direction
             Vector3f wo = -ray.d, wi;
@@ -162,8 +158,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 // Account for the attenuated direct subsurface scattering
                 // component
                 L += beta *
-                     UniformSampleOneLight(pi, scene, arena, sampler, true,
-                                           lightDistribution->Lookup(pi.p));
+                     UniformSampleOneLight(pi, scene, arena, sampler,
+                                           *lightDistribution, true);
 
                 // Account for the indirect subsurface scattering component
                 Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(),

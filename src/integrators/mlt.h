@@ -45,7 +45,6 @@
 #include "spectrum.h"
 #include "film.h"
 #include "util/rng.h"
-#include <unordered_map>
 
 #include <memory>
 
@@ -125,8 +124,6 @@ class MLTIntegrator : public Integrator {
           largeStepProbability(largeStepProbability) {}
     void Render(const Scene &scene);
     Spectrum L(const Scene &scene, MemoryArena &arena,
-               const Distribution1D &lightDistr,
-               const std::unordered_map<const Light *, size_t> &lightToIndex,
                MLTSampler &sampler, int k, Point2f *pRaster);
 
   private:
@@ -137,6 +134,7 @@ class MLTIntegrator : public Integrator {
     const int nChains;
     const int mutationsPerPixel;
     const Float sigma, largeStepProbability;
+    std::unique_ptr<FixedLightDistribution> lightDistr;
 };
 
 std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(

@@ -115,15 +115,14 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             continue;
         }
 
-        const Distribution1D *distrib = lightDistribution->Lookup(isect.p);
-
         // Sample illumination from lights to find path contribution.
         // (But skip this for perfectly specular BSDFs.)
         if (isect.bsdf->NumComponents(BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) >
             0) {
             ++totalPaths;
             Spectrum Ld = beta * UniformSampleOneLight(isect, scene, arena,
-                                                       sampler, false, distrib);
+                                                       sampler, *lightDistribution,
+                                                       false);
             VLOG(2) << "Sampled direct lighting Ld = " << Ld;
             if (Ld.IsBlack()) ++zeroRadiancePaths;
             CHECK_GE(Ld.y(), 0.f);
@@ -163,8 +162,8 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             beta *= S / pdf;
 
             // Account for the direct subsurface scattering component
-            L += beta * UniformSampleOneLight(pi, scene, arena, sampler, false,
-                                              lightDistribution->Lookup(pi.p));
+            L += beta * UniformSampleOneLight(pi, scene, arena, sampler,
+                                              *lightDistribution, false);
 
             // Account for the indirect subsurface scattering component
             Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,

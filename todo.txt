@@ -56,9 +56,6 @@
 
 - more tests from v3-scenes in regress
 
-- should light distribution api take a sample and point and return a light *
-  and pdf (not a distribution1d?)
-
 - time reported by profiling system vs progress reporter (and reported in
   stats) doesn't match... (only for short renders? need more investigation)
 
