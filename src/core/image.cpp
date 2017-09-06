@@ -35,7 +35,6 @@
 
 #include "error.h"
 #include "util/fileutil.h"
-#include "util/fp16.h"
 #include "util/geometry.h"
 #include "util/parallel.h"
 #include "spectrum.h"
@@ -89,7 +88,7 @@ Image::Image(std::vector<uint8_t> p8c, PixelFormat format, Point2i resolution)
     CHECK(Is8Bit(format));
 }
 
-Image::Image(std::vector<uint16_t> p16c, PixelFormat format, Point2i resolution)
+Image::Image(std::vector<Half> p16c, PixelFormat format, Point2i resolution)
     : format(format), resolution(resolution), p16(std::move(p16c)) {
     CHECK_EQ(p16.size(), nChannels() * resolution[0] * resolution[1]);
     CHECK(Is16Bit(format));
@@ -127,7 +126,7 @@ Float Image::GetChannel(Point2i p, int c, WrapMode wrapMode) const {
         return Float(p8[PixelOffset(p, c)]) * (1.f / 255.f);
     case PixelFormat::Y16:
     case PixelFormat::RGB16:
-        return HalfToFloat(p16[PixelOffset(p, c)]);
+        return Float(p16[PixelOffset(p, c)]);
     case PixelFormat::Y32:
     case PixelFormat::RGB32:
         return Float(p32[PixelOffset(p, c)]);
@@ -162,7 +161,7 @@ std::array<Float, 3> Image::GetRGB(Point2i p, WrapMode wrapMode) const {
         break;
     case PixelFormat::RGB16:
         for (int c = 0; c < 3; ++c)
-            rgb[c] = HalfToFloat(p16[PixelOffset(p, c)]);
+            rgb[c] = Float(p16[PixelOffset(p, c)]);
         break;
     case PixelFormat::RGB32:
         for (int c = 0; c < 3; ++c) rgb[c] = p32[PixelOffset(p, c)];
@@ -210,12 +209,12 @@ void Image::CopyRectOut(const Bounds2i &extent,
         break;
     case PixelFormat::Y16:
         ForExtent1(extent, wrapMode, [&bufIter, this](int offset) {
-            *bufIter++ = HalfToFloat(p16[offset]);
+            *bufIter++ = Float(p16[offset]);
         });
         break;
     case PixelFormat::RGB16:
         ForExtent3(extent, wrapMode, [&bufIter, this](int offset) {
-            *bufIter++ = HalfToFloat(p16[offset]);
+            *bufIter++ = Float(p16[offset]);
         });
         break;
     case PixelFormat::Y32:
@@ -262,12 +261,12 @@ void Image::CopyRectIn(const Bounds2i &extent, gtl::ArraySlice<Float> buf) {
         break;
     case PixelFormat::Y16:
         ForExtent1(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
-            p16[offset] = FloatToHalf(*bufIter++);
+            p16[offset] = Half(*bufIter++);
         });
         break;
     case PixelFormat::RGB16:
         ForExtent3(extent, WrapMode::Clamp, [&bufIter, this](int offset) {
-            p16[offset] = FloatToHalf(*bufIter++);
+            p16[offset] = Half(*bufIter++);
         });
         break;
     case PixelFormat::Y32:
@@ -326,7 +325,7 @@ void Image::SetChannel(Point2i p, int c, Float value) {
         break;
     case PixelFormat::Y16:
     case PixelFormat::RGB16:
-        p16[PixelOffset(p, c)] = FloatToHalf(value);
+        p16[PixelOffset(p, c)] = Half(value);
         break;
     case PixelFormat::Y32:
     case PixelFormat::RGB32:
@@ -650,9 +649,9 @@ static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
         break;
     case PixelFormat::RGB16:
         fb.insert("R", Imf::Slice(Imf::HALF, originPtr, xStride, yStride));
-        fb.insert("G", Imf::Slice(Imf::HALF, originPtr + sizeof(uint16_t),
+        fb.insert("G", Imf::Slice(Imf::HALF, originPtr + sizeof(Half),
                                   xStride, yStride));
-        fb.insert("B", Imf::Slice(Imf::HALF, originPtr + 2 * sizeof(uint16_t),
+        fb.insert("B", Imf::Slice(Imf::HALF, originPtr + 2 * sizeof(Half),
                                   xStride, yStride));
         break;
     case PixelFormat::Y32:

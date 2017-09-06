@@ -41,10 +41,10 @@
 // core/image.h*
 #include "pbrt.h"
 
+#include "spectrum.h"
 #include "util/bounds.h"
 #include "util/geometry.h"
-#include "util/fp16.h"
-#include "spectrum.h"
+#include "util/half.h"
 #include "util/transform.h"
 #include <glog/logging.h>
 #include <ext/google/array_slice.h>
@@ -149,7 +149,7 @@ Float ConvertTexel(const void *ptr, PixelFormat format) {
     case PixelFormat::Y8:
         return Float(*((uint8_t *)ptr)) / 255.f;
     case PixelFormat::Y16:
-        return HalfToFloat(*((uint16_t *)ptr));
+        return float(*(Half *)ptr);
     case PixelFormat::Y32:
         return Float(*((float *)ptr));
     default:
@@ -174,7 +174,7 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
             rgb[c] = Float(((uint8_t *)ptr)[c]) / 255.f;
             break;
         case PixelFormat::RGB16:
-            rgb[c] = HalfToFloat(((uint16_t *)ptr)[c]);
+            rgb[c] = float(((Half *)ptr)[c]);
             break;
         case PixelFormat::RGB32:
             rgb[c] = Float(((float *)ptr)[c]);
@@ -246,7 +246,7 @@ class Image {
   public:
     Image() : format(PixelFormat::Y8), resolution(0, 0) {}
     Image(std::vector<uint8_t> p8, PixelFormat format, Point2i resolution);
-    Image(std::vector<uint16_t> p16, PixelFormat format, Point2i resolution);
+    Image(std::vector<Half> p16, PixelFormat format, Point2i resolution);
     Image(std::vector<float> p32, PixelFormat format, Point2i resolution);
     Image(PixelFormat format, Point2i resolution);
 
@@ -379,7 +379,7 @@ class Image {
     }
 
     std::vector<uint8_t> p8;
-    std::vector<uint16_t> p16;
+    std::vector<Half> p16;
     std::vector<float> p32;
 };
 

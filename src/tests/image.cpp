@@ -92,7 +92,7 @@ static Float modelQuantization(Float value, PixelFormat format) {
         return Clamp((value * 255.f) + 0.5f, 0, 255) * (1.f / 255.f);
     case PixelFormat::Y16:
     case PixelFormat::RGB16:
-        return HalfToFloat(FloatToHalf(value));
+        return Float(Half(value));
     case PixelFormat::Y32:
     case PixelFormat::RGB32:
         return value;
@@ -283,10 +283,10 @@ TEST(Image, ExrIO) {
             for (int x = 0; x < res[0]; ++x)
                 for (int c = 0; c < image.nChannels(); ++c)
                     if (Is8Bit(format))
-                        EXPECT_EQ(HalfToFloat(FloatToHalf(image.GetChannel({x, y}, c))),
+                        EXPECT_EQ(Float(Half(image.GetChannel({x, y}, c))),
                                   read->GetChannel({x, y}, c));
                     else if (Is16Bit(format))
-                        EXPECT_EQ(HalfToFloat(FloatToHalf(image.GetChannel({x, y}, c))),
+                        EXPECT_EQ(Float(Half(image.GetChannel({x, y}, c))),
                                   read->GetChannel({x, y}, c));
                     else
                         EXPECT_EQ(image.GetChannel({x, y}, c), read->GetChannel({x, y}, c));

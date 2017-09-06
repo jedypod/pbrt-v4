@@ -7,8 +7,7 @@
 
 - how come sampler test wasn't failing on gce?
 
-- Explicit class for Half, rather than typedef / uint16 overload
-  - avx 2 support, half to float, etc...  -march=native?
+- avx 2 support, half to float, etc...  -march=native?
 
 - ToString(), etc:
   BSSRDF
