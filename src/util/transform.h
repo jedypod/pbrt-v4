@@ -151,9 +151,8 @@ class Transform {
         Float la2 = LengthSquared((*this)(Vector3f(1, 0, 0)));
         Float lb2 = LengthSquared((*this)(Vector3f(0, 1, 0)));
         Float lc2 = LengthSquared((*this)(Vector3f(0, 0, 1)));
-#define NOT_ONE(x) ((x) < .999f || (x) > 1.001f)
-        return (NOT_ONE(la2) || NOT_ONE(lb2) || NOT_ONE(lc2));
-#undef NOT_ONE
+        return (std::abs(la2 - 1) > 1e-3f || std::abs(lb2 - 1) > 1e-3f ||
+                std::abs(lc2 - 1) > 1e-3f);
     }
     template <typename T>
     inline Point3<T> operator()(const Point3<T> &p) const;

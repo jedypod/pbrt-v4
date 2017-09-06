@@ -111,7 +111,7 @@
 
 - implement improved delta/ratio tracking stuff...
 
-- store Integrator and Camera in Scene
+- store Integrator and Camera in Scene (eliminate places where it's plumbed through)
 
 - how come e.g. a triangle isn't xformed twice when an area light source?
   light to world versus the baked in world space xform
@@ -126,8 +126,6 @@
   do side-by-side runs?  this is due to bilerp default (only partly?)
 
 - actually do robust bvh traversal--watertight...
-
-- Replace NOT_ONE in HasScale with a local lambda function...
 
 - manuka-style pre-dice?
 
