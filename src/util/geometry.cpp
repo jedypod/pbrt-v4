@@ -32,9 +32,9 @@
 
 
 // core/geometry.cpp*
-#include "geometry.h"
+#include "util/geometry.h"
 
-#include "stringprint.h"
+#include "util/stringprint.h"
 #include "medium.h"
 
 namespace pbrt {

@@ -10,10 +10,10 @@
 #include <stdlib.h>
 #include <algorithm>
 
-#include "args.h"
-#include "fileutil.h"
+#include "util/args.h"
+#include "util/fileutil.h"
 #include "mipmap.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include "pbrt.h"
 #include "spectrum.h"
 extern "C" {

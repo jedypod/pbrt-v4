@@ -41,9 +41,9 @@
 // core/sampling.h*
 #include "pbrt.h"
 
-#include "geometry.h"
-#include "mathutil.h"
-#include "rng.h"
+#include "util/geometry.h"
+#include "util/mathutil.h"
+#include "util/rng.h"
 #include "ext/google/array_slice.h"
 #include <glog/logging.h>
 

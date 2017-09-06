@@ -42,8 +42,8 @@
 #include "pbrt.h"
 
 #include "film.h"
-#include "geometry.h"
-#include "transform.h"
+#include "util/geometry.h"
+#include "util/transform.h"
 
 #include <memory>
 

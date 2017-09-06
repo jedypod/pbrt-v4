@@ -35,10 +35,10 @@
 #include "pbrt.h"
 
 #include "api.h"
-#include "args.h"
+#include "util/args.h"
 #include "error.h"
 #include "parser.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include <glog/logging.h>
 
 using namespace pbrt;

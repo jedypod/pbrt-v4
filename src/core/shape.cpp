@@ -36,7 +36,7 @@
 
 #include "interaction.h"
 #include "lowdiscrepancy.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

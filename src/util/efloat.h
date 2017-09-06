@@ -35,14 +35,14 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_EFLOAT_H
-#define PBRT_CORE_EFLOAT_H
+#ifndef PBRT_UTIL_EFLOAT_H
+#define PBRT_UTIL_EFLOAT_H
 
 // core/efloat.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
-#include "stringprint.h"
+#include "util/mathutil.h"
+#include "util/stringprint.h"
 
 namespace pbrt {
 
@@ -288,4 +288,4 @@ inline bool Quadratic(EFloat A, EFloat B, EFloat C, EFloat *t0, EFloat *t1) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_EFLOAT_H
+#endif  // PBRT_UTIL_EFLOAT_H

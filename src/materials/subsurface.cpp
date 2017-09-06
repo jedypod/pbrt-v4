@@ -36,11 +36,11 @@
 
 #include "textures/constant.h"
 #include "error.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "microfacet.h"
 #include "spectrum.h"
 #include "texture.h"
-#include "interpolation.h"
+#include "util/interpolation.h"
 #include "paramset.h"
 #include "interaction.h"
 

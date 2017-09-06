@@ -32,10 +32,10 @@
 
 
 // core/progressreporter.cpp*
-#include "progressreporter.h"
+#include "util/progressreporter.h"
 
-#include "parallel.h"
-#include "stats.h"
+#include "util/parallel.h"
+#include "util/stats.h"
 
 #include <memory>
 #include <stdio.h>

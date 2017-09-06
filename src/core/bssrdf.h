@@ -41,11 +41,11 @@
 // core/bssrdf.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "interaction.h"
 #include "reflection.h"
 #include "spectrum.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <string>
 #include <vector>

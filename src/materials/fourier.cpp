@@ -34,7 +34,7 @@
 #include "materials/fourier.h"
 
 #include "interaction.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "paramset.h"
 #include "error.h"
 

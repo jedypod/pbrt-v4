@@ -35,7 +35,7 @@
 #include "texture.h"
 
 #include "interaction.h"
-#include "mathutil.h"
+#include "util/mathutil.h"
 
 #include <algorithm>
 #include <cmath>

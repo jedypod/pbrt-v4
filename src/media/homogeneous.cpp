@@ -36,10 +36,10 @@
 
 #include "error.h"
 #include "sampler.h"
-#include "stringprint.h"
+#include "util/stringprint.h"
 #include "interaction.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <cmath>
 

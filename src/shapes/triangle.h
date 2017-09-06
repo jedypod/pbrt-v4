@@ -40,9 +40,9 @@
 
 // shapes/triangle.h*
 #include "shape.h"
-#include "geometry.h"
-#include "stats.h"
-#include "transform.h"
+#include "util/geometry.h"
+#include "util/stats.h"
+#include "util/transform.h"
 #include "ext/google/array_slice.h"
 
 #include <map>

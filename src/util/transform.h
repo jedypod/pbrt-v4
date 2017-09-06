@@ -35,16 +35,16 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_TRANSFORM_H
-#define PBRT_CORE_TRANSFORM_H
+#ifndef PBRT_UTIL_TRANSFORM_H
+#define PBRT_UTIL_TRANSFORM_H
 
 // core/transform.h*
 #include "pbrt.h"
 
-#include "bounds.h"
-#include "geometry.h"
-#include "mathutil.h"
-#include "quaternion.h"
+#include "util/bounds.h"
+#include "util/geometry.h"
+#include "util/mathutil.h"
+#include "util/quaternion.h"
 
 #include <cmath>
 #include <memory>
@@ -442,4 +442,4 @@ class AnimatedTransform {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_TRANSFORM_H
+#endif  // PBRT_UTIL_TRANSFORM_H

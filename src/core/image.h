@@ -41,11 +41,11 @@
 // core/image.h*
 #include "pbrt.h"
 
-#include "bounds.h"
-#include "geometry.h"
-#include "fp16.h"
+#include "util/bounds.h"
+#include "util/geometry.h"
+#include "util/fp16.h"
 #include "spectrum.h"
-#include "transform.h"
+#include "util/transform.h"
 #include <glog/logging.h>
 #include <ext/google/array_slice.h>
 

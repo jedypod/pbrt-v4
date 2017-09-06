@@ -1,7 +1,7 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include <atomic>
 
 using namespace pbrt;

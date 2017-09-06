@@ -35,8 +35,8 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_MATHUTIL_H
-#define PBRT_CORE_MATHUTIL_H
+#ifndef PBRT_UTIL_MATHUTIL_H
+#define PBRT_UTIL_MATHUTIL_H
 
 // core/mathutil.h*
 #include "pbrt.h"
@@ -418,4 +418,4 @@ inline Float SRGB8ToLinear(uint8_t value) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_MATHUTIL_H
+#endif  // PBRT_UTIL_MATHUTIL_H

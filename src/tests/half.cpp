@@ -2,8 +2,8 @@
 #include "tests/gtest/gtest.h"
 
 #include "pbrt.h"
-#include "core/fp16.h"
-#include "rng.h"
+#include "util/fp16.h"
+#include "util/rng.h"
 
 using namespace pbrt;
 

@@ -34,9 +34,9 @@
 #include "textures/imagemap.h"
 
 #include "error.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

@@ -37,9 +37,9 @@
 #include "half.h"
 #include "image.h"
 #include "mipmap.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include "pbrt.h"
-#include "rng.h"
+#include "util/rng.h"
 #include "texcache.h"
 
 using namespace pbrt;

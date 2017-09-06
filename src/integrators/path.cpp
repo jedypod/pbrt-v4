@@ -41,7 +41,7 @@
 #include "paramset.h"
 #include "sampler.h"
 #include "scene.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

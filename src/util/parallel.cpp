@@ -32,10 +32,10 @@
 
 
 // core/parallel.cpp*
-#include "parallel.h"
+#include "util/parallel.h"
 
-#include "memory.h"
-#include "stats.h"
+#include "util/memory.h"
+#include "util/stats.h"
 
 #include <list>
 #include <thread>

@@ -2,7 +2,7 @@
 #include "tests/gtest/gtest.h"
 #include "spectrum.h"
 #include "pbrt.h"
-#include "rng.h"
+#include "util/rng.h"
 
 using namespace pbrt;
 

@@ -44,7 +44,7 @@
 #include "sampler.h"
 #include "spectrum.h"
 #include "film.h"
-#include "rng.h"
+#include "util/rng.h"
 #include <unordered_map>
 
 #include <memory>

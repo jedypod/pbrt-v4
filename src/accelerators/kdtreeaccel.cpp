@@ -35,9 +35,9 @@
 #include "accelerators/kdtreeaccel.h"
 
 #include "interaction.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <algorithm>
 

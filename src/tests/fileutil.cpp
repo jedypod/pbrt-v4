@@ -1,6 +1,6 @@
 
 #include "tests/gtest/gtest.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 
 using namespace pbrt;
 

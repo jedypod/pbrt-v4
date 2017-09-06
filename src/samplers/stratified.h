@@ -39,7 +39,7 @@
 #define PBRT_SAMPLERS_STRATIFIED_H
 
 // samplers/stratified.h*
-#include "rng.h"
+#include "util/rng.h"
 #include "sampler.h"
 
 #include <memory>

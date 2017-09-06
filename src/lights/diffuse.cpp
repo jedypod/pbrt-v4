@@ -37,7 +37,7 @@
 #include "paramset.h"
 #include "sampling.h"
 #include "shapes/triangle.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

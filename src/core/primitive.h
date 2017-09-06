@@ -44,7 +44,7 @@
 #include "material.h"
 #include "medium.h"
 #include "texture.h"
-#include "transform.h"
+#include "util/transform.h"
 
 #include <memory>
 

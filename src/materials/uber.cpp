@@ -34,7 +34,7 @@
 // materials/uber.cpp*
 #include "materials/uber.h"
 
-#include "memory.h"
+#include "util/memory.h"
 #include "spectrum.h"
 #include "microfacet.h"
 #include "reflection.h"

@@ -41,10 +41,10 @@
 // core/medium.h*
 #include "pbrt.h"
 
-#include "geometry.h"
-#include "mathutil.h"
-#include "stats.h"
-#include "stringprint.h"
+#include "util/geometry.h"
+#include "util/mathutil.h"
+#include "util/stats.h"
+#include "util/stringprint.h"
 
 #include <cmath>
 #include <memory>

@@ -34,7 +34,7 @@
 #include "interaction.h"
 
 #include "light.h"
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "primitive.h"
 #include "reflection.h"
 #include "shape.h"

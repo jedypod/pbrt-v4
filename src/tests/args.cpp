@@ -1,7 +1,7 @@
 
 #include "tests/gtest/gtest.h"
 
-#include "args.h"
+#include "util/args.h"
 #include "pbrt.h"
 
 #include <algorithm>

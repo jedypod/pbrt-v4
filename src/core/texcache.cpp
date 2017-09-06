@@ -34,9 +34,9 @@
 #include "texcache.h"
 
 #include "error.h"
-#include "parallel.h"
-#include "stats.h"
-#include "stringprint.h"
+#include "util/parallel.h"
+#include "util/stats.h"
+#include "util/stringprint.h"
 
 #include <fcntl.h>
 #if defined(PBRT_IS_LINUX) || defined(PBRT_IS_OSX)

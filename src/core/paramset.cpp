@@ -34,9 +34,9 @@
 #include "paramset.h"
 
 #include "error.h"
-#include "fileutil.h"
-#include "floatfile.h"
-#include "stringprint.h"
+#include "util/fileutil.h"
+#include "util/floatfile.h"
+#include "util/stringprint.h"
 #include "textures/constant.h"
 
 #include <glog/logging.h>

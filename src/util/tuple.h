@@ -35,13 +35,13 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_TUPLE_H
-#define PBRT_CORE_TUPLE_H
+#ifndef PBRT_UTIL_TUPLE_H
+#define PBRT_UTIL_TUPLE_H
 
 // core/tuple.h*
 #include "pbrt.h"
 
-#include "stringprint.h"
+#include "util/stringprint.h"
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -381,4 +381,4 @@ inline C<T> Lerp(Float t, const Tuple3<C, T> &v0, const Tuple3<C, T> &v1) {
 
 } // namespace pbrt
 
-#endif // PBRT_CORE_TUPLE_H
+#endif // PBRT_UTIL_TUPLE_H

@@ -35,8 +35,8 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_STATS_H
-#define PBRT_CORE_STATS_H
+#ifndef PBRT_UTIL_STATS_H
+#define PBRT_UTIL_STATS_H
 
 // core/stats.h*
 #include "pbrt.h"
@@ -370,4 +370,4 @@ void CleanupProfiler();
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_STATS_H
+#endif  // PBRT_UTIL_STATS_H

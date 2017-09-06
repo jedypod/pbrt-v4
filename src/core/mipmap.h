@@ -41,7 +41,7 @@
 // core/mipmap.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "texcache.h"
 
 #include <memory>

@@ -35,7 +35,7 @@
 #include "light.h"
 #include "scene.h"
 #include "sampling.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "paramset.h"
 
 namespace pbrt {

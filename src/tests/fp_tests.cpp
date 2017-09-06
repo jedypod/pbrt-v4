@@ -3,9 +3,9 @@
 #include <cmath>
 
 #include "pbrt.h"
-#include "rng.h"
-#include "efloat.h"
-#include "parallel.h"
+#include "util/rng.h"
+#include "util/efloat.h"
+#include "util/parallel.h"
 
 using namespace pbrt;
 

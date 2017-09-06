@@ -37,7 +37,7 @@
 #include "error.h"
 #include "interaction.h"
 #include "sampling.h"
-#include "efloat.h"
+#include "util/efloat.h"
 #include "ext/rply.h"
 
 #include <array>

@@ -41,8 +41,8 @@
 // core/integrator.h*
 #include "pbrt.h"
 
-#include "bounds.h"
-#include "geometry.h"
+#include "util/bounds.h"
+#include "util/geometry.h"
 #include "sampling.h"
 #include "sampler.h"
 

@@ -39,7 +39,7 @@
 #include "api.h"
 #include "error.h"
 #include "parser.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 
 #include <string>
 #include <vector>

@@ -30,38 +30,34 @@
 
  */
 
-#if defined(_MSC_VER)
-#define NOMINMAX
-#pragma once
-#endif
 
-#ifndef PBRT_CORE_FILEUTIL_H
-#define PBRT_CORE_FILEUTIL_H
+// core/memory.cpp*
+#include "util/memory.h"
 
-// core/fileutil.h*
-#include "pbrt.h"
-
-#include <cctype>
-#include <experimental/optional>
-#include <string>
+#include <stdlib.h>
 
 namespace pbrt {
 
-// Platform independent filename-handling functions.
-bool IsAbsolutePath(const std::string &filename);
-std::string AbsolutePath(const std::string &filename);
-std::string ResolveFilename(const std::string &filename);
-std::string DirectoryContaining(const std::string &filename);
-void SetSearchDirectory(const std::string &dirname);
-std::experimental::optional<std::string> ReadFileContents(const std::string &filename);
+// Memory Allocation Functions
+void *AllocAligned(size_t size) {
+#if defined(PBRT_HAVE__ALIGNED_MALLOC)
+    return _aligned_malloc(size, PBRT_L1_CACHE_LINE_SIZE);
+#elif defined(PBRT_HAVE_POSIX_MEMALIGN)
+    void *ptr;
+    if (posix_memalign(&ptr, PBRT_L1_CACHE_LINE_SIZE, size) != 0) ptr = nullptr;
+    return ptr;
+#else
+    return memalign(PBRT_L1_CACHE_LINE_SIZE, size);
+#endif
+}
 
-inline bool HasExtension(const std::string &value, const std::string &ending) {
-    if (ending.size() > value.size()) return false;
-    return std::equal(
-        ending.rbegin(), ending.rend(), value.rbegin(),
-        [](char a, char b) { return std::tolower(a) == std::tolower(b); });
+void FreeAligned(void *ptr) {
+    if (!ptr) return;
+#if defined(PBRT_HAVE__ALIGNED_MALLOC)
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
 }
 
 }  // namespace pbrt
-
-#endif  // PBRT_CORE_FILEUTIL_H

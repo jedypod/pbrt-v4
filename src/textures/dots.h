@@ -41,7 +41,7 @@
 // textures/dots.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "texture.h"
 
 #include <memory>

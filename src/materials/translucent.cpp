@@ -36,7 +36,7 @@
 
 #include "spectrum.h"
 #include "microfacet.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "reflection.h"
 #include "paramset.h"
 #include "texture.h"

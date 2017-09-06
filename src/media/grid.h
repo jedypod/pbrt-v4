@@ -44,8 +44,8 @@
 #include "error.h"
 #include "medium.h"
 #include "spectrum.h"
-#include "stats.h"
-#include "transform.h"
+#include "util/stats.h"
+#include "util/transform.h"
 #include "ext/google/array_slice.h"
 
 #include <memory>

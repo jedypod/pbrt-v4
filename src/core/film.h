@@ -41,13 +41,13 @@
 // core/film.h*
 #include "pbrt.h"
 
-#include "bounds.h"
-#include "geometry.h"
+#include "util/bounds.h"
+#include "util/geometry.h"
 #include "spectrum.h"
 #include "filter.h"
-#include "memory.h"
-#include "parallel.h"
-#include "stats.h"
+#include "util/memory.h"
+#include "util/parallel.h"
+#include "util/stats.h"
 #include "ext/google/array_slice.h"
 #include <glog/logging.h>
 

@@ -35,16 +35,16 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_PARALLEL_H
-#define PBRT_CORE_PARALLEL_H
+#ifndef PBRT_UTIL_PARALLEL_H
+#define PBRT_UTIL_PARALLEL_H
 
 // core/parallel.h*
 #include "pbrt.h"
 
-#include "bounds.h"
-#include "mathutil.h"
-#include "geometry.h"
-#include "stats.h"
+#include "util/bounds.h"
+#include "util/mathutil.h"
+#include "util/geometry.h"
+#include "util/stats.h"
 #include <glog/logging.h>
 
 #include <atomic>
@@ -158,4 +158,4 @@ void MergeWorkerThreadStats();
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_PARALLEL_H
+#endif  // PBRT_UTIL_PARALLEL_H

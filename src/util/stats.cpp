@@ -31,7 +31,7 @@
  */
 
 // core/stats.cpp*
-#include "stats.h"
+#include "util/stats.h"
 #include <signal.h>
 #include <algorithm>
 #include <array>
@@ -40,8 +40,8 @@
 #include <functional>
 #include <mutex>
 #include <type_traits>
-#include "parallel.h"
-#include "stringprint.h"
+#include "util/parallel.h"
+#include "util/stringprint.h"
 #ifdef PBRT_HAVE_ITIMER
 #include <sys/time.h>
 #endif  // PBRT_HAVE_ITIMER

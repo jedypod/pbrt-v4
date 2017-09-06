@@ -35,15 +35,15 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_GEOMETRY_H
-#define PBRT_CORE_GEOMETRY_H
+#ifndef PBRT_UTIL_GEOMETRY_H
+#define PBRT_UTIL_GEOMETRY_H
 
 // core/geometry.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
-#include "stringprint.h"
-#include "tuple.h"
+#include "util/mathutil.h"
+#include "util/stringprint.h"
+#include "util/tuple.h"
 
 namespace pbrt {
 
@@ -504,4 +504,4 @@ inline Float SphericalPhi(const Vector3f &v) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_GEOMETRY_H
+#endif  // PBRT_UTIL_GEOMETRY_H

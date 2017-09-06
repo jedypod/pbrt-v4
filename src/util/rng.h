@@ -35,13 +35,13 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_RNG_H
-#define PBRT_CORE_RNG_H
+#ifndef PBRT_UTIL_RNG_H
+#define PBRT_UTIL_RNG_H
 
 // core/rng.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -151,4 +151,4 @@ inline uint32_t RNG::UniformUInt32() {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_RNG_H
+#endif  // PBRT_UTIL_RNG_H

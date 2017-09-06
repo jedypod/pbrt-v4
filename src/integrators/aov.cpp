@@ -34,18 +34,18 @@
 #include "integrators/aov.h"
 
 #include "error.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 #include "film.h"
 #include "image.h"
 #include "interaction.h"
 #include "lightdistrib.h"
 #include "lowdiscrepancy.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include "paramset.h"
-#include "progressreporter.h"
+#include "util/progressreporter.h"
 #include "reflection.h"
 #include "samplers/halton.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "scene.h"
 
 #include <mutex>

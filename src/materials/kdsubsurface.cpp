@@ -35,7 +35,7 @@
 #include "materials/kdsubsurface.h"
 
 #include "textures/constant.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "spectrum.h"
 #include "microfacet.h"
 #include "texture.h"

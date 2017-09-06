@@ -1,10 +1,10 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
-#include "stringprint.h"
-#include "geometry.h"
-#include "quaternion.h"
-#include "transform.h"
+#include "util/stringprint.h"
+#include "util/geometry.h"
+#include "util/quaternion.h"
+#include "util/transform.h"
 #include <sstream>
 
 using namespace pbrt;

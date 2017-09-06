@@ -3,7 +3,7 @@
 
 #include "pbrt.h"
 #include "image.h"
-#include "rng.h"
+#include "util/rng.h"
 #include "mipmap.h"
 #include "half.h"
 

@@ -36,10 +36,10 @@
 
 #include "error.h"
 #include "interaction.h"
-#include "memory.h"
-#include "parallel.h"
+#include "util/memory.h"
+#include "util/parallel.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <algorithm>
 

@@ -41,7 +41,7 @@
 // samplers/zerotwosequence.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "sampler.h"
 
 #include <memory>

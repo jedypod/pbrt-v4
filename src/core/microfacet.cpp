@@ -33,7 +33,7 @@
 // core/microfacet.cpp*
 #include "microfacet.h"
 
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "reflection.h" // Frame stuff only
 #include <glog/logging.h>
 

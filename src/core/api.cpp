@@ -34,13 +34,13 @@
 #include "api.h"
 
 #include "error.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include "paramset.h"
 #include "spectrum.h"
 #include "scene.h"
 #include "film.h"
 #include "medium.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "texcache.h"
 
 // API Additional Headers

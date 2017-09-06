@@ -34,8 +34,8 @@
 // core/primitive.cpp*
 #include "primitive.h"
 
-#include "stats.h"
-#include "geometry.h"
+#include "util/stats.h"
+#include "util/geometry.h"
 #include "interaction.h"
 #include "shape.h"
 #include <glog/logging.h>

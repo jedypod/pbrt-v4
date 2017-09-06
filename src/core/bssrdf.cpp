@@ -34,14 +34,14 @@
 // core/bssrdf.cpp*
 #include "bssrdf.h"
 
-#include "memory.h"
+#include "util/memory.h"
 #include "interaction.h"
-#include "interpolation.h"
-#include "mathutil.h"
-#include "parallel.h"
+#include "util/interpolation.h"
+#include "util/mathutil.h"
+#include "util/parallel.h"
 #include "reflection.h"
 #include "scene.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <cmath>
 

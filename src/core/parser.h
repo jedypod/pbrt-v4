@@ -41,7 +41,7 @@
 // core/parser.h*
 #include "pbrt.h"
 
-#include "memory.h"
+#include "util/memory.h"
 #include "paramset.h"
 
 #include <memory>

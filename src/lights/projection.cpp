@@ -35,7 +35,7 @@
 #include "sampling.h"
 #include "paramset.h"
 #include "reflection.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

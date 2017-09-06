@@ -41,8 +41,8 @@
 // core/spectrum.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
-#include "stringprint.h"
+#include "util/mathutil.h"
+#include "util/stringprint.h"
 #include "ext/google/array_slice.h"
 #include <glog/logging.h>
 

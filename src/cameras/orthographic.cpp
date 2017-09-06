@@ -38,7 +38,7 @@
 #include "paramset.h"
 #include "sampler.h"
 #include "sampling.h"
-#include "stats.h"
+#include "util/stats.h"
 
 using gtl::ArraySlice;
 

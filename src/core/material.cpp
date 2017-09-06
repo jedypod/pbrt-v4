@@ -34,7 +34,7 @@
 // core/material.cpp*
 #include "material.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "interaction.h"
 #include "spectrum.h"
 #include "texture.h"

@@ -33,9 +33,9 @@
 // core/reflection.cpp*
 #include "reflection.h"
 
-#include "interpolation.h"
+#include "util/interpolation.h"
 #include "microfacet.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "sampling.h"
 
 #include <glog/logging.h>

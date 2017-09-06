@@ -52,13 +52,13 @@ licensed under a slightly-modified Apache 2.0 license.
 
 #include "bssrdf.h"
 #include "interaction.h"
-#include "mathutil.h"
-#include "memory.h"
+#include "util/mathutil.h"
+#include "util/memory.h"
 #include "microfacet.h"
 #include "paramset.h"
 #include "reflection.h"
-#include "stats.h"
-#include "stringprint.h"
+#include "util/stats.h"
+#include "util/stringprint.h"
 #include "texture.h"
 
 namespace pbrt {

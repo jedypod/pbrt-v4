@@ -37,7 +37,7 @@
 #include "error.h"
 #include "interaction.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 using gtl::ArraySlice;
 

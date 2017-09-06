@@ -34,8 +34,8 @@
 #include "lights/infinite.h"
 #include "sampling.h"
 #include "paramset.h"
-#include "parallel.h"
-#include "stats.h"
+#include "util/parallel.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

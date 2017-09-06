@@ -40,9 +40,9 @@
 #include "integrator.h"
 #include "lightdistrib.h"
 #include "paramset.h"
-#include "progressreporter.h"
+#include "util/progressreporter.h"
 #include "sampler.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

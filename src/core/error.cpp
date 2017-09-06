@@ -34,8 +34,8 @@
 #include "error.h"
 
 #include "parser.h"
-#include "stringprint.h"
-#include "progressreporter.h"
+#include "util/stringprint.h"
+#include "util/progressreporter.h"
 
 #include <mutex>
 #include <stdarg.h>

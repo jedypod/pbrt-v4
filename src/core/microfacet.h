@@ -41,7 +41,7 @@
 // core/microfacet.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 
 #include <algorithm>
 #include <cmath>

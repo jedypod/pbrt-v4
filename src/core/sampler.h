@@ -42,9 +42,9 @@
 #include "pbrt.h"
 
 #include "camera.h"
-#include "geometry.h"
-#include "rng.h"
-#include "stringprint.h"
+#include "util/geometry.h"
+#include "util/rng.h"
+#include "util/stringprint.h"
 #include "ext/google/array_slice.h"
 
 #include <cstdint>

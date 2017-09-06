@@ -35,8 +35,8 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_STRINGPRINT_H
-#define PBRT_CORE_STRINGPRINT_H
+#ifndef PBRT_UTIL_STRINGPRINT_H
+#define PBRT_UTIL_STRINGPRINT_H
 
 #include "pbrt.h"
 #include <stdio.h>
@@ -175,4 +175,4 @@ inline std::string StringPrintf(const char *fmt, Args... args) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_STRINGPRINT_H
+#endif  // PBRT_UTIL_STRINGPRINT_H

@@ -31,8 +31,8 @@
  */
 
 
-#ifndef PBRT_CORE_HALF_H
-#define PBRT_CORE_HALF_H
+#ifndef PBRT_UTIL_HALF_H
+#define PBRT_UTIL_HALF_H
 
 #include "pbrt.h"
 
@@ -182,4 +182,4 @@ inline float HalfToFloat(uint16_t hh) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_HALF_H
+#endif  // PBRT_UTIL_HALF_H

@@ -34,9 +34,9 @@
 // core/medium.cpp*
 #include "medium.h"
 
-#include "memory.h"
+#include "util/memory.h"
 #include "sampler.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "interaction.h"
 
 namespace pbrt {

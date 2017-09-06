@@ -35,11 +35,11 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_ARGS_H
-#define PBRT_CORE_ARGS_H
+#ifndef PBRT_UTIL_ARGS_H
+#define PBRT_UTIL_ARGS_H
 
 #include "pbrt.h"
-#include "stringprint.h"
+#include "util/stringprint.h"
 
 #include <cctype>
 #include <cstring>
@@ -157,4 +157,4 @@ bool ParseArg(char ***argv, const std::string &name, T *ptr,
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_ARGS_H
+#endif  // PBRT_UTIL_ARGS_H

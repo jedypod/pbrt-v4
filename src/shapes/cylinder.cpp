@@ -36,8 +36,8 @@
 
 #include "interaction.h"
 #include "paramset.h"
-#include "efloat.h"
-#include "stats.h"
+#include "util/efloat.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

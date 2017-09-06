@@ -35,17 +35,17 @@
 #include "integrators/sppm.h"
 
 #include "reflection.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include "scene.h"
 #include "image.h"
 #include "spectrum.h"
-#include "rng.h"
+#include "util/rng.h"
 #include "paramset.h"
-#include "progressreporter.h"
+#include "util/progressreporter.h"
 #include "interaction.h"
 #include "sampling.h"
 #include "samplers/halton.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

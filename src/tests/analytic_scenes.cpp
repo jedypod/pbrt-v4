@@ -8,7 +8,7 @@
 #include "cameras/perspective.h"
 #include "film.h"
 #include "filters/box.h"
-#include "geometry.h"
+#include "util/geometry.h"
 #include "integrators/bdpt.h"
 #include "integrators/directlighting.h"
 #include "integrators/mlt.h"

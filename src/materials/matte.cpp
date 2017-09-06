@@ -36,8 +36,8 @@
 
 #include "interaction.h"
 #include "interaction.h"
-#include "mathutil.h"
-#include "memory.h"
+#include "util/mathutil.h"
+#include "util/memory.h"
 #include "paramset.h"
 #include "reflection.h"
 #include "texture.h"

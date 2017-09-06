@@ -324,32 +324,22 @@ SET ( PBRT_CORE_SOURCE
   src/core/api.cpp
   src/core/bssrdf.cpp
   src/core/camera.cpp
-  src/core/efloat.cpp
   src/core/error.cpp
-  src/core/fileutil.cpp
   src/core/film.cpp
   src/core/filter.cpp
-  src/core/floatfile.cpp
-  src/core/geometry.cpp
   src/core/image.cpp
   src/core/integrator.cpp
   src/core/interaction.cpp
-  src/core/interpolation.cpp
   src/core/light.cpp
   src/core/lightdistrib.cpp
   src/core/lowdiscrepancy.cpp
   src/core/material.cpp
-  src/core/mathutil.cpp
   src/core/medium.cpp
-  src/core/memory.cpp
   src/core/microfacet.cpp
   src/core/mipmap.cpp
-  src/core/parallel.cpp
   src/core/paramset.cpp
   src/core/parser.cpp
   src/core/primitive.cpp
-  src/core/progressreporter.cpp
-  src/core/quaternion.cpp
   src/core/reflection.cpp
   src/core/sampler.cpp
   src/core/sampling.cpp
@@ -357,68 +347,53 @@ SET ( PBRT_CORE_SOURCE
   src/core/shape.cpp
   src/core/sobolmatrices.cpp
   src/core/spectrum.cpp
-  src/core/stats.cpp
   src/core/texcache.cpp
   src/core/texture.cpp
-  src/core/transform.cpp
   )
 
 SET ( PBRT_CORE_HEADERS
   src/core/api.h
   src/core/bssrdf.h
   src/core/camera.h
-  src/core/efloat.h
   src/core/error.h
-  src/core/fileutil.h
   src/core/film.h
   src/core/filter.h
-  src/core/floatfile.h
-  src/core/geometry.h
   src/core/integrator.h
   src/core/interaction.h
-  src/core/interpolation.h
   src/core/light.h
   src/core/lowdiscrepancy.h
   src/core/material.h
   src/core/medium.h
-  src/core/memory.h
   src/core/microfacet.h
   src/core/mipmap.h
-  src/core/parallel.h
   src/core/paramset.h
   src/core/parser.h
   src/core/pbrt.h
   src/core/primitive.h
-  src/core/progressreporter.h
-  src/core/quaternion.h
   src/core/reflection.h
-  src/core/rng.h
   src/core/sampler.h
   src/core/sampling.h
   src/core/scene.h
   src/core/shape.h
   src/core/sobolmatrices.h
   src/core/spectrum.h
-  src/core/stats.h
-  src/core/stringprint.h
   src/core/texture.h
-  src/core/transform.h
-  src/core/tuple.h
   )
 
 FILE ( GLOB PBRT_SOURCE
-  src/ext/*.c
-  src/ext/*.cpp
   src/accelerators/*.cpp
   src/cameras/*.cpp
+  src/ext/*.c
+  src/ext/*.cpp
   src/filters/*.cpp
   src/integrators/*.cpp
   src/lights/*.cpp
   src/materials/*.cpp
+  src/media/*.cpp
   src/samplers/*.cpp
   src/shapes/*.cpp
   src/textures/*.cpp
-  src/media/*.cpp
+  src/util/*.cpp
   )
 
 INCLUDE_DIRECTORIES ( src )

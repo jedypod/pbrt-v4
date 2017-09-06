@@ -2,7 +2,7 @@
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
 #include "image.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 #include "spectrum.h"
 
 using namespace pbrt;

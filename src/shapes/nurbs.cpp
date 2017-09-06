@@ -35,7 +35,7 @@
 #include "shapes/nurbs.h"
 
 #include "error.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
 #include "ext/google/array_slice.h"

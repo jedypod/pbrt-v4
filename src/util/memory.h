@@ -35,13 +35,13 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_MEMORY_H
-#define PBRT_CORE_MEMORY_H
+#ifndef PBRT_UTIL_MEMORY_H
+#define PBRT_UTIL_MEMORY_H
 
 // core/memory.h*
 #include "pbrt.h"
 
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "ext/google/array_slice.h"
 
 #include <cstddef>
@@ -207,4 +207,4 @@ template <typename T> class MemoryPool {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_MEMORY_H
+#endif  // PBRT_UTIL_MEMORY_H

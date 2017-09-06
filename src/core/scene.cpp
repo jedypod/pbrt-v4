@@ -34,10 +34,10 @@
 // core/scene.cpp*
 #include "scene.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "medium.h"
 #include "spectrum.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <glog/logging.h>
 

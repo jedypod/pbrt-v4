@@ -35,14 +35,14 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_BOUNDS_H
-#define PBRT_CORE_BOUNDS_H
+#ifndef PBRT_UTIL_BOUNDS_H
+#define PBRT_UTIL_BOUNDS_H
 
 // core/geometry.h*
 #include "pbrt.h"
 
-#include "geometry.h"
-#include "stringprint.h"
+#include "util/geometry.h"
+#include "util/stringprint.h"
 
 #include <iostream>
 #include <iterator>
@@ -461,4 +461,4 @@ inline bool Bounds3<T>::IntersectP(const Ray &ray, const Vector3f &invDir,
 
 } // namespace pbrt
 
-#endif  // PBRT_CORE_BOUNDS_H
+#endif  // PBRT_UTIL_BOUNDS_H

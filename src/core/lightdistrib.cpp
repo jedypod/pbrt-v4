@@ -40,11 +40,11 @@
 #include "integrator.h" // FIXME only for ComputeLightPowerDistribution()
 #include "light.h"
 #include "lowdiscrepancy.h"
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "sampling.h"
 #include "scene.h"
 #include "spectrum.h"
-#include "stats.h"
+#include "util/stats.h"
 #include <glog/logging.h>
 
 #include <atomic>

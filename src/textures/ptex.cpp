@@ -36,7 +36,7 @@
 #include "error.h"
 #include "interaction.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <Ptexture.h>
 

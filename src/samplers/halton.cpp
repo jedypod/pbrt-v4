@@ -33,7 +33,7 @@
 // samplers/halton.cpp*
 #include "samplers/halton.h"
 #include "paramset.h"
-#include "rng.h"
+#include "util/rng.h"
 
 namespace pbrt {
 

@@ -35,12 +35,12 @@
 #pragma once
 #endif
 
-#ifndef PBRT_CORE_QUATERNION_H
-#define PBRT_CORE_QUATERNION_H
+#ifndef PBRT_UTIL_QUATERNION_H
+#define PBRT_UTIL_QUATERNION_H
 
 // core/quaternion.h*
 #include "pbrt.h"
-#include "geometry.h"
+#include "util/geometry.h"
 
 #include <iostream>
 #include <string>
@@ -124,4 +124,4 @@ inline Quaternion Normalize(const Quaternion &q) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_QUATERNION_H
+#endif  // PBRT_UTIL_QUATERNION_H

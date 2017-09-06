@@ -38,14 +38,14 @@
 #include "image.h"
 #include "integrator.h"
 #include "interaction.h"
-#include "memory.h"
-#include "parallel.h"
-#include "progressreporter.h"
+#include "util/memory.h"
+#include "util/parallel.h"
+#include "util/progressreporter.h"
 #include "reflection.h"
 #include "sampler.h"
 #include "sampling.h"
 #include "scene.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

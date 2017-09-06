@@ -40,11 +40,11 @@
 #include "sampler.h"
 #include "integrator.h"
 #include "camera.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "filters/box.h"
 #include "paramset.h"
 #include "sampling.h"
-#include "progressreporter.h"
+#include "util/progressreporter.h"
 
 namespace pbrt {
 

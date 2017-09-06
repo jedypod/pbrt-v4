@@ -37,10 +37,10 @@
 #include "paramset.h"
 #include "sampler.h"
 #include "sampling.h"
-#include "floatfile.h"
+#include "util/floatfile.h"
 #include "image.h"
 #include "reflection.h"
-#include "stats.h"
+#include "util/stats.h"
 #include "lowdiscrepancy.h"
 #include <array>
 

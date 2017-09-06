@@ -33,10 +33,10 @@
 #include "mipmap.h"
 
 #include "error.h"
-#include "fileutil.h"
-#include "mathutil.h"
+#include "util/fileutil.h"
+#include "util/mathutil.h"
 #include "spectrum.h"
-#include "stats.h"
+#include "util/stats.h"
 #include <glog/logging.h>
 
 #include <algorithm>

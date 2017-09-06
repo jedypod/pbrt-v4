@@ -34,7 +34,7 @@
 // materials/mixmat.cpp*
 #include "materials/mixmat.h"
 
-#include "memory.h"
+#include "util/memory.h"
 #include "spectrum.h"
 #include "reflection.h"
 #include "paramset.h"

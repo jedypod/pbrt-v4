@@ -41,9 +41,9 @@
 // core/reflection.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "interaction.h"
-#include "mathutil.h"
+#include "util/mathutil.h"
 #include "spectrum.h"
 #include "ext/google/array_slice.h"
 

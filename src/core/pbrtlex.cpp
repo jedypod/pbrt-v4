@@ -711,7 +711,7 @@ char *yytext;
 
 #include "pbrt.h"
 #include "api.h"
-#include "fileutil.h"
+#include "util/fileutil.h"
 
 #if defined(PBRT_IS_MSVC)
 #include <io.h>

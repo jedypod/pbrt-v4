@@ -34,7 +34,7 @@
 #include "lights/distant.h"
 #include "paramset.h"
 #include "sampling.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

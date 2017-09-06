@@ -38,7 +38,7 @@
 #ifndef PBRT_INTEGRATORS_AOV_H
 #define PBRT_INTEGRATORS_AOV_H
 
-#include "bounds.h"
+#include "util/bounds.h"
 #include "camera.h"
 #include "integrator.h"
 #include "pbrt.h"

@@ -34,10 +34,10 @@
 #include "image.h"
 
 #include "error.h"
-#include "fileutil.h"
-#include "fp16.h"
-#include "geometry.h"
-#include "parallel.h"
+#include "util/fileutil.h"
+#include "util/fp16.h"
+#include "util/geometry.h"
+#include "util/parallel.h"
 #include "spectrum.h"
 #include "texture.h"
 

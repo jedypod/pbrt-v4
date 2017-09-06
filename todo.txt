@@ -1,10 +1,14 @@
 
+- RGB class? (eventually records primaries, etc.)
+
 - Image::SetRGB method? Spectrum in general is sort of out of place, since
   we're explicit about "this is a 3 channel image", etc...
+  - but otoh we do want to someday support spectral Images...
 
 - how come sampler test wasn't failing on gce?
 
 - Explicit class for Half, rather than typedef / uint16 overload
+  - avx 2 support, half to float, etc...  -march=native?
 
 - ToString(), etc:
   BSSRDF
@@ -28,7 +32,8 @@
   Shape
   TextureMapping*
 
-- separate util directory? stringprint, mathutil, ... ?
+- pbrt/src/pbrt/core -> #include <pbrt/core/pbrt.h>, #include
+  <pbrt/util/half.h>, etc?
 
 + need to update emptychamber and villa in regress/ to use png not tga
   textures
@@ -65,8 +70,6 @@
 
 - could get rid of a lot of annoying plumbing
   (e.g. VIsibilityTester::Unoccluded) if scene was a global
-
-- avx 2 support, half to float, etc...
 
 - remove black filtering mode?
 

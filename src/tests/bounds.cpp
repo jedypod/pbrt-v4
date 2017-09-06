@@ -1,8 +1,8 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
-#include "bounds.h"
-#include "geometry.h"
+#include "util/bounds.h"
+#include "util/geometry.h"
 
 using namespace pbrt;
 

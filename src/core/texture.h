@@ -41,8 +41,8 @@
 // core/texture.h*
 #include "pbrt.h"
 
-#include "geometry.h"
-#include "transform.h"
+#include "util/geometry.h"
+#include "util/transform.h"
 
 namespace pbrt {
 

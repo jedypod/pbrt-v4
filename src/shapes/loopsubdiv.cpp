@@ -35,9 +35,9 @@
 #include "shapes/loopsubdiv.h"
 
 #include "shapes/triangle.h"
-#include "transform.h"
-#include "memory.h"
-#include "geometry.h"
+#include "util/transform.h"
+#include "util/memory.h"
+#include "util/geometry.h"
 #include "paramset.h"
 #include "error.h"
 #include "ext/google/array_slice.h"

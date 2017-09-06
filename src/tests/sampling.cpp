@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iterator>
 #include "pbrt.h"
-#include "rng.h"
+#include "util/rng.h"
 #include "sampling.h"
 #include "lowdiscrepancy.h"
 #include "samplers/halton.h"

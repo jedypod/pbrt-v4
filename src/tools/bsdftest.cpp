@@ -7,7 +7,7 @@
 #include "reflection.h"
 #include "microfacet.h"
 #include "sampling.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "api.h"
 #include "paramset.h"
 #include "shapes/disk.h"

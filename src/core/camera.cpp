@@ -37,7 +37,7 @@
 #include "error.h"
 #include "film.h"
 #include "image.h"
-#include "stringprint.h"
+#include "util/stringprint.h"
 
 namespace pbrt {
 

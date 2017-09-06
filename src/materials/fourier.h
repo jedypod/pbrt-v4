@@ -44,7 +44,7 @@
 #include "material.h"
 #include "reflection.h"
 #include "texture.h"
-#include "interpolation.h"
+#include "util/interpolation.h"
 
 #include <map>
 #include <memory>

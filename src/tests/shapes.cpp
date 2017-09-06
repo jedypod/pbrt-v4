@@ -5,7 +5,7 @@
 
 #include "pbrt.h"
 
-#include "rng.h"
+#include "util/rng.h"
 #include "interaction.h"
 #include "shape.h"
 #include "lowdiscrepancy.h"

@@ -34,10 +34,10 @@
 // shapes/hyperboloid.cpp*
 #include "shapes/hyperboloid.h"
 
-#include "efloat.h"
+#include "util/efloat.h"
 #include "interaction.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

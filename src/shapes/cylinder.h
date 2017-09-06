@@ -41,7 +41,7 @@
 // shapes/cylinder.h*
 #include "shape.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include <memory>
 
 namespace pbrt {

@@ -35,7 +35,7 @@
 #include "sampler.h"
 
 #include "sampling.h"
-#include "stats.h"
+#include "util/stats.h"
 
 #include <limits>
 

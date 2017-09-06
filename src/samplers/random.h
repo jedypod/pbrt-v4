@@ -39,7 +39,7 @@
 #define PBRT_SAMPLERS_RANDOM_H
 
 // samplers/random.h*
-#include "rng.h"
+#include "util/rng.h"
 #include "sampler.h"
 
 #include <memory>

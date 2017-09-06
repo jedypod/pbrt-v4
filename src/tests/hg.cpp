@@ -1,7 +1,7 @@
 
 #include "tests/gtest/gtest.h"
 #include "pbrt.h"
-#include "rng.h"
+#include "util/rng.h"
 #include "sampling.h"
 #include "medium.h"
 

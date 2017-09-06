@@ -43,8 +43,8 @@
 
 #include <glog/logging.h>
 #include "error.h"
-#include "geometry.h"
-#include "mathutil.h"
+#include "util/geometry.h"
+#include "util/mathutil.h"
 
 #include <memory>
 

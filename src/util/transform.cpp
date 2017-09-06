@@ -32,11 +32,11 @@
 
 
 // core/transform.cpp*
-#include "transform.h"
+#include "util/transform.h"
 
 #include "error.h"
 #include "interaction.h"
-#include "stringprint.h"
+#include "util/stringprint.h"
 #include <glog/logging.h>
 
 #include <algorithm>

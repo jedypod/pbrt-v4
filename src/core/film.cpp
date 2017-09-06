@@ -36,9 +36,9 @@
 
 #include "error.h"
 #include "image.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "paramset.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

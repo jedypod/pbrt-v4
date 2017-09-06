@@ -32,10 +32,10 @@
 
 
 // core/quaternion.cpp*
-#include "quaternion.h"
+#include "util/quaternion.h"
 
-#include "transform.h"
-#include "stringprint.h"
+#include "util/transform.h"
+#include "util/stringprint.h"
 
 #include <cmath>
 

@@ -42,7 +42,7 @@
 #include "pbrt.h"
 
 #include "light.h"
-#include "geometry.h"
+#include "util/geometry.h"
 #include "spectrum.h"
 #include "shape.h"
 #include "scene.h"

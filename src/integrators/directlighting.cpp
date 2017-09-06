@@ -40,7 +40,7 @@
 #include "interaction.h"
 #include "paramset.h"
 #include "sampler.h"
-#include "stats.h"
+#include "util/stats.h"
 
 namespace pbrt {
 

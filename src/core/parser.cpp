@@ -34,8 +34,8 @@
 #include "parser.h"
 
 #include "error.h"
-#include "fileutil.h"
-#include "floatfile.h"
+#include "util/fileutil.h"
+#include "util/floatfile.h"
 #include "paramset.h"
 
 #include <glog/logging.h>

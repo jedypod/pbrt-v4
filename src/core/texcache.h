@@ -41,9 +41,9 @@
 // core/texcache.h*
 #include "pbrt.h"
 
-#include "geometry.h"
+#include "util/geometry.h"
 #include "image.h"
-#include "parallel.h"
+#include "util/parallel.h"
 #include <glog/logging.h>
 
 #include <atomic>

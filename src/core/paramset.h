@@ -42,7 +42,7 @@
 #include "pbrt.h"
 
 #include "ext/google/array_slice.h"
-#include "geometry.h"
+#include "util/geometry.h"
 #include "spectrum.h"
 #include "texture.h"
 
