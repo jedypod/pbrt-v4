@@ -187,6 +187,9 @@ inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
     return (f * f) / (f * f + g * g);
 }
 
+void SampleDiscrete(gtl::ArraySlice<Float> weights, Float u, int *index,
+                    Float *pdf, Float *uRemapped = nullptr);
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H

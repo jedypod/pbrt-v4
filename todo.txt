@@ -1,11 +1,16 @@
 
+- use SampleDiscrete
+  - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
+  - light tree (eventually)
+  - other binary sampling decisions?
+
 - RGB class? (eventually records primaries, etc.)
 
 - Image::SetRGB method? Spectrum in general is sort of out of place, since
   we're explicit about "this is a 3 channel image", etc...
   - but otoh we do want to someday support spectral Images...
 
-- how come sampler test wasn't failing on gce?
++ how come sampler test wasn't failing on gce?
 
 - avx 2 support, half to float, etc...  -march=native?
 
@@ -25,7 +30,6 @@
   MIPMap
   ParamSetItem (refactor from ParamSet ToString())
   Primitive
-  RNG
   Sampler
   Scene
   Shape
@@ -33,9 +37,6 @@
 
 - pbrt/src/pbrt/core -> #include <pbrt/core/pbrt.h>, #include
   <pbrt/util/half.h>, etc?
-
-+ need to update emptychamber and villa in regress/ to use png not tga
-  textures
 
 - find interval test is broken
 
@@ -45,8 +46,6 @@
 - Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
 
 - more tests from v3-scenes in regress
-
-- aov integrator should include metadata
 
 - more std::optional usage ...
 
@@ -92,9 +91,6 @@
 - test alpha tex for non triangles. also review how it's passed through for
   non-triangles in --cat/--toply
 
-- Attribute ... std::shared_ptr<ParamSet>: Primitive/Shape, Light,
-  Material, ... ?
-
 - need tests based on more interesting scenes in v3-scenes
 
 - params faceindices face_indices faceIndices
@@ -138,13 +134,6 @@
 - support animated light sources (transformation at least)
 
 - light tree for many lights
-
-- sampling utility routine that takes an initializer list (or array slice)
-  of discrete probabilities (not necessarily normalized?) and a random
-  value in [0,1], then samples one of the probabilities, then returns both
-  the index of the even sampled and a renormalized to [0,1] random
-  variable. Use for sort of one-off things where it's not worth building
-  a full Distribution1D, or cases where it's just an a or b choice?
 
 - direct lighting code can use a general cleanup
 

@@ -34,6 +34,8 @@
 // core/sampling.cpp*
 #include "sampling.h"
 
+#include <numeric>
+
 using gtl::ArraySlice;
 using gtl::MutableArraySlice;
 
@@ -176,6 +178,26 @@ Distribution2D::Distribution2D(ArraySlice<Float> func, int nu, int nv) {
     for (int v = 0; v < nv; ++v)
         marginalFunc.push_back(pConditionalV[v]->funcInt);
     pMarginal = std::make_unique<Distribution1D>(marginalFunc);
+}
+
+void SampleDiscrete(gtl::ArraySlice<Float> weights, Float u, int *index,
+                    Float *pdf, Float *uRemapped) {
+    if (weights.empty()) {
+        *pdf = 0;
+        return;
+    }
+    Float sum = std::accumulate(weights.begin(), weights.end(), Float(0));
+    Float uScaled = u * sum;
+    int offset = 0;
+    // Need latter condition due to fp roundoff error in the u -= ... term.
+    while (uScaled > weights[offset] && offset < weights.size()) {
+        uScaled -= weights[offset];
+        ++offset;
+    }
+    *index = offset;
+    *pdf = weights[offset] / sum;
+    if (uRemapped) *uRemapped = std::min(uScaled / weights[offset],
+                                         OneMinusEpsilon);
 }
 
 }  // namespace pbrt
