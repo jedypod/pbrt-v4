@@ -46,6 +46,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <ostream>
+#include <string>
 
 namespace pbrt {
 
@@ -96,35 +98,36 @@ class RNG {
                            begin + UniformUInt32((uint32_t)(it - begin + 1)));
     }
     void Advance(int64_t idelta) {
-        uint64_t cur_mult = PCG32_MULT, cur_plus = inc, acc_mult = 1u,
-                 acc_plus = 0u, delta = (uint64_t)idelta;
+        uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
+        uint64_t accPlus = 0u, delta = (uint64_t)idelta;
         while (delta > 0) {
             if (delta & 1) {
-                acc_mult *= cur_mult;
-                acc_plus = acc_plus * cur_mult + cur_plus;
+                accMult *= curMult;
+                accPlus = accPlus * curMult + curPlus;
             }
-            cur_plus = (cur_mult + 1) * cur_plus;
-            cur_mult *= cur_mult;
+            curPlus = (curMult + 1) * curPlus;
+            curMult *= curMult;
             delta /= 2;
         }
-        state = acc_mult * state + acc_plus;
+        state = accMult * state + accPlus;
     }
     int64_t operator-(const RNG &other) const {
         CHECK_EQ(inc, other.inc);
-        uint64_t cur_mult = PCG32_MULT, cur_plus = inc, cur_state = other.state,
-                 the_bit = 1u, distance = 0u;
-        while (state != cur_state) {
-            if ((state & the_bit) != (cur_state & the_bit)) {
-                cur_state = cur_state * cur_mult + cur_plus;
-                distance |= the_bit;
+        uint64_t curMult = PCG32_MULT, curPlus = inc, curState = other.state;
+        uint64_t theBit = 1u, distance = 0u;
+        while (state != curState) {
+            if ((state & theBit) != (curState & theBit)) {
+                curState = curState * curMult + curPlus;
+                distance |= theBit;
             }
-            CHECK_EQ(state & the_bit, cur_state & the_bit);
-            the_bit <<= 1;
-            cur_plus = (cur_mult + 1ULL) * cur_plus;
-            cur_mult *= cur_mult;
+            CHECK_EQ(state & theBit, curState & theBit);
+            theBit <<= 1;
+            curPlus = (curMult + 1ULL) * curPlus;
+            curMult *= curMult;
         }
         return (int64_t)distance;
     }
+    std::string ToString() const;
 
   private:
     // RNG Private Data
@@ -132,6 +135,10 @@ class RNG {
 };
 
 // RNG Inline Method Definitions
+inline std::ostream &operator<<(std::ostream &os, const RNG &rng) {
+    return os << rng.ToString();
+}
+
 inline RNG::RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
 inline void RNG::SetSequence(uint64_t initseq) {
     state = 0u;

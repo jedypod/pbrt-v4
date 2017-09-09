@@ -155,35 +155,6 @@ TEST(PixelSampler, GeneratePixelSamples) {
     EXPECT_EQ(ts.calls, 3);
 }
 
-TEST(RNG, Advance) {
-    RNG rng;
-    rng.SetSequence(1234);
-    std::vector<Float> v;
-    for (int i = 0; i < 1000; ++i)
-        v.push_back(rng.UniformFloat());
-
-    rng.SetSequence(1234);
-    rng.Advance(16);
-    EXPECT_EQ(rng.UniformFloat(), v[16]);
-
-    for (int i = v.size() - 1; i >= 0; --i) {
-        rng.SetSequence(1234);
-        rng.Advance(i);
-        EXPECT_EQ(rng.UniformFloat(), v[i]);
-    }
-
-    // Switch to another sequence
-    rng.SetSequence(32);
-    rng.UniformFloat();
-
-    // Go back and check one last time
-    for (int i : { 5, 998, 552, 37, 16 }) {
-        rng.SetSequence(1234);
-        rng.Advance(i);
-        EXPECT_EQ(rng.UniformFloat(), v[i]);
-    }
-}
-
 // Make sure all samplers give the same sample values if we go back to the
 // same pixel / sample index.
 TEST(Sampler, ConsistentValues) {
