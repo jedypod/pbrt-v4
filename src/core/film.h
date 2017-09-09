@@ -119,13 +119,13 @@ class FilmTile {
   public:
     // FilmTile Public Methods
     FilmTile(const Bounds2i &pixelBounds, const Vector2f &filterRadius,
-             const Float *filterTable, int filterTableSize,
+             gtl::ArraySlice<Float> filterTable, int filterTableWidth,
              Float maxSampleLuminance)
         : pixelBounds(pixelBounds),
           filterRadius(filterRadius),
           invFilterRadius(1 / filterRadius.x, 1 / filterRadius.y),
           filterTable(filterTable),
-          filterTableSize(filterTableSize),
+          filterTableWidth(filterTableWidth),
           maxSampleLuminance(maxSampleLuminance) {
         pixels = std::vector<FilmTilePixel>(pixelBounds.Empty() ? 0 : pixelBounds.Area());
     }
@@ -148,19 +148,19 @@ class FilmTile {
         int *ifx = ALLOCA(int, p1.x - p0.x);
         for (int x = p0.x; x < p1.x; ++x) {
             Float fx = std::abs((x - pFilmDiscrete.x) * invFilterRadius.x *
-                                filterTableSize);
-            ifx[x - p0.x] = std::min((int)std::floor(fx), filterTableSize - 1);
+                                filterTableWidth);
+            ifx[x - p0.x] = std::min((int)std::floor(fx), filterTableWidth - 1);
         }
         int *ify = ALLOCA(int, p1.y - p0.y);
         for (int y = p0.y; y < p1.y; ++y) {
             Float fy = std::abs((y - pFilmDiscrete.y) * invFilterRadius.y *
-                                filterTableSize);
-            ify[y - p0.y] = std::min((int)std::floor(fy), filterTableSize - 1);
+                                filterTableWidth);
+            ify[y - p0.y] = std::min((int)std::floor(fy), filterTableWidth - 1);
         }
         for (int y = p0.y; y < p1.y; ++y) {
             for (int x = p0.x; x < p1.x; ++x) {
                 // Evaluate filter value at $(x,y)$ pixel
-                int offset = ify[y - p0.y] * filterTableSize + ifx[x - p0.x];
+                int offset = ify[y - p0.y] * filterTableWidth + ifx[x - p0.x];
                 Float filterWeight = filterTable[offset];
 
                 // Update pixel values with filtered sample contribution
@@ -190,8 +190,8 @@ class FilmTile {
     // FilmTile Private Data
     const Bounds2i pixelBounds;
     const Vector2f filterRadius, invFilterRadius;
-    const Float *filterTable;
-    const int filterTableSize;
+    gtl::ArraySlice<Float> filterTable;
+    const int filterTableWidth;
     std::vector<FilmTilePixel> pixels;
     const Float maxSampleLuminance;
     friend class Film;
