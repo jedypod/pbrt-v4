@@ -314,7 +314,8 @@ void SamplerIntegrator::Render(const Scene &scene) {
     // Save final image after rendering
     ImageMetadata metadata;
     metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.f;
-    camera->WriteImage(&metadata);
+    camera->InitMetadata(&metadata);
+    camera->film->WriteImage(&metadata);
 }
 
 Spectrum SamplerIntegrator::SpecularReflect(

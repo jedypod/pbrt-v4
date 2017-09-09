@@ -275,7 +275,8 @@ void MLTIntegrator::Render(const Scene &scene) {
     // Store final image computed with MLT
     ImageMetadata metadata;
     metadata.renderTimeSeconds = progress.ElapsedMS() / 1000.;
-    camera->WriteImage(&metadata, b / mutationsPerPixel);
+    camera->InitMetadata(&metadata);
+    camera->film->WriteImage(&metadata, b / mutationsPerPixel);
 }
 
 std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(

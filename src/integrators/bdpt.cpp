@@ -409,7 +409,8 @@ void BDPTIntegrator::Render(const Scene &scene) {
     }
     ImageMetadata metadata;
     metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
-    camera->WriteImage(&metadata, 1.0f / sampler->samplesPerPixel);
+    camera->InitMetadata(&metadata);
+    camera->film->WriteImage(&metadata, 1.0f / sampler->samplesPerPixel);
 
     // Write buffers for debug visualization
     if (visualizeStrategies || visualizeWeights) {

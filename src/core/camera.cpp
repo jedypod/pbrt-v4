@@ -100,10 +100,9 @@ Spectrum Camera::Sample_Wi(const Interaction &ref, const Point2f &u,
     return Spectrum(0.f);
 }
 
-void Camera::WriteImage(ImageMetadata *metadata, Float splatScale) const {
+void Camera::InitMetadata(ImageMetadata *metadata) const {
     metadata->worldToCamera =
         CameraToWorld.Interpolate(shutterOpen).GetInverseMatrix();
-    film->WriteImage(metadata, splatScale);
 }
 
 std::string CameraSample::ToString() const {
@@ -112,8 +111,7 @@ std::string CameraSample::ToString() const {
                         time);
 }
 
-void ProjectiveCamera::WriteImage(ImageMetadata *metadata,
-                                  Float splatScale) const {
+void ProjectiveCamera::InitMetadata(ImageMetadata *metadata) const {
     metadata->worldToCamera =
         CameraToWorld.Interpolate(shutterOpen).GetInverseMatrix();
 
@@ -122,7 +120,7 @@ void ProjectiveCamera::WriteImage(ImageMetadata *metadata,
         CameraToScreen * *metadata->worldToCamera;
     metadata->worldToNDC = worldToNDC.GetMatrix();
 
-    film->WriteImage(metadata, splatScale);
+    Camera::InitMetadata(metadata);
 }
 
 }  // namespace pbrt

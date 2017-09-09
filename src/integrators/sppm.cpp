@@ -462,7 +462,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
             camera->film->SetImage(image);
             ImageMetadata metadata;
             metadata.renderTimeSeconds = progress.ElapsedMS() / 1000.;
-            camera->WriteImage(&metadata);
+            camera->InitMetadata(&metadata);
+            camera->film->WriteImage(&metadata);
 
             // Write SPPM radius image, if requested
             if (getenv("SPPM_RADIUS")) {

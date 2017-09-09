@@ -270,8 +270,8 @@ void AOVIntegrator::Render(const Scene &scene) {
 
     ImageMetadata metadata;
     metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
-    metadata.pixelBounds = camera->film->croppedPixelBounds;
-    metadata.fullResolution = camera->film->fullResolution;
+    camera->InitMetadata(&metadata);
+
     pImage.Write(mungeFilename(camera->film->filename, "_p"), &metadata);
     nImage.Write(mungeFilename(camera->film->filename, "_n"), &metadata);
     nsImage.Write(mungeFilename(camera->film->filename, "_ns"), &metadata);
@@ -290,8 +290,8 @@ void AOVIntegrator::Render(const Scene &scene) {
 
     if (aoSamples > 0)
         aoImage.Write(mungeFilename(camera->film->filename, "_ao"), &metadata);
-    if (eSamples > 0) eImage.Write(mungeFilename(camera->film->filename, "_E"),
-                                   &metadata);
+    if (eSamples > 0)
+        eImage.Write(mungeFilename(camera->film->filename, "_E"), &metadata);
 }
 
 std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(
