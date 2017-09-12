@@ -36,10 +36,6 @@ GFX!
 
 - rename EstimateDirect to Ld (general naming improvements there)
 
-- nuke UniformSampleAllLights?
-
-- nuke DirectLightingIntegrator? (whitted only?)
-
 - RGB class? (eventually records primaries, etc.)
 
 - Image::SetRGB method? Spectrum in general is sort of out of place, since

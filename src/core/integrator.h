@@ -59,10 +59,6 @@ class Integrator {
     virtual void Render(const Scene &scene) = 0;
 };
 
-Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
-                                Sampler &sampler,
-                                const std::vector<int> &nLightSamples,
-                                bool handleMedia = false);
 Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
                                Sampler &sampler,
                                const LightDistribution &lightDistrib,

@@ -10,7 +10,6 @@
 #include "filters/box.h"
 #include "util/geometry.h"
 #include "integrators/bdpt.h"
-#include "integrators/directlighting.h"
 #include "integrators/mlt.h"
 #include "integrators/path.h"
 #include "integrators/volpath.h"

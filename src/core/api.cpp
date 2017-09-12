@@ -57,7 +57,6 @@
 #include "filters/triangle.h"
 #include "integrators/aov.h"
 #include "integrators/bdpt.h"
-#include "integrators/directlighting.h"
 #include "integrators/mlt.h"
 #include "integrators/ao.h"
 #include "integrators/path.h"
@@ -1502,9 +1501,6 @@ std::unique_ptr<Integrator> RenderOptions::MakeIntegrator() const {
     std::unique_ptr<Integrator> integrator;
     if (IntegratorName == "whitted")
         integrator = CreateWhittedIntegrator(IntegratorParams, std::move(sampler), camera);
-    else if (IntegratorName == "directlighting")
-        integrator =
-            CreateDirectLightingIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "path")
         integrator = CreatePathIntegrator(IntegratorParams, std::move(sampler), camera);
     else if (IntegratorName == "volpath")
