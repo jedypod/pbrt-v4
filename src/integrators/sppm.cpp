@@ -190,9 +190,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         Vector3f wo = -ray.d;
                         if (depth == 0 || specularBounce)
                             pixel.Ld += beta * isect.Le(wo);
-                        pixel.Ld +=
-                            beta * UniformSampleOneLight(isect, scene, *tileSampler,
-                                                         directLightDistribution, false);
+                        pixel.Ld += beta * EstimateLd(isect, scene, *tileSampler,
+                                                      directLightDistribution, false);
 
                         // Possibly create visible point and end camera path
                         bool isDiffuse = bsdf.NumComponents(BxDFType(

@@ -59,14 +59,9 @@ class Integrator {
     virtual void Render(const Scene &scene) = 0;
 };
 
-Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
-                               Sampler &sampler,
-                               const LightDistribution &lightDistrib,
-                               bool handleMedia);
-Spectrum EstimateDirect(const Interaction &it, const Point2f &uShading,
-                        const Light &light, const Point2f &uLight,
-                        const Scene &scene, Sampler &sampler,
-                        bool handleMedia = false, bool specular = false);
+Spectrum EstimateLd(const Interaction &it, const Scene &scene,
+                    Sampler &sampler, const LightDistribution &lightDistrib,
+                    bool handleMedia);
 
 // SamplerIntegrator Declarations
 class SamplerIntegrator : public Integrator {

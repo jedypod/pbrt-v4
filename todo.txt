@@ -34,7 +34,7 @@ GFX!
 
 - avx2 check https://gist.github.com/UnaNancyOwen/263c243ae1e05a2f9d0e
 
-- rename EstimateDirect to Ld (general naming improvements there)
+- direct lighting code can use a general cleanup
 
 - RGB class? (eventually records primaries, etc.)
 
@@ -144,8 +144,6 @@ GFX!
 
 - pass relative IOR rather than both IORs everywhere that's possible. be
   consistent: to/from, right? 
-
-- direct lighting code can use a general cleanup
 
 - FindOneFilename: support search path. also, pass it in (absl-based?)
 
