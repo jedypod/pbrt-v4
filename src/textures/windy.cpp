@@ -39,14 +39,14 @@ namespace pbrt {
 std::shared_ptr<WindyTexture<Float>> CreateWindyFloatTexture(
     const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
-    auto map = std::make_unique<IdentityMapping3D>(tex2world);
+    auto map = std::make_unique<TransformMapping3D>(tex2world);
     return std::make_shared<WindyTexture<Float>>(std::move(map));
 }
 
 std::shared_ptr<WindyTexture<Spectrum>> CreateWindySpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
-    auto map = std::make_unique<IdentityMapping3D>(tex2world);
+    auto map = std::make_unique<TransformMapping3D>(tex2world);
     return std::make_shared<WindyTexture<Spectrum>>(std::move(map));
 }
 

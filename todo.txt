@@ -129,8 +129,6 @@ GFX!
 - how come e.g. a triangle isn't xformed twice when an area light source?
   light to world versus the baked in world space xform
   
-- itentity mapping3d should be called transformampping3d
-
 - IntersectTr? only used once?
 
 - move ray into its own header?

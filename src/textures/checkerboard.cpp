@@ -89,7 +89,7 @@ std::shared_ptr<Texture<Float>> CreateCheckerboardFloatTexture(
             std::move(map), tex1, tex2, aaMethod);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
-        std::unique_ptr<TextureMapping3D> map(new IdentityMapping3D(tex2world));
+        std::unique_ptr<TextureMapping3D> map(new TransformMapping3D(tex2world));
         return std::make_shared<Checkerboard3DTexture<Float>>(std::move(map),
                                                               tex1, tex2);
     }
@@ -148,9 +148,9 @@ std::shared_ptr<Texture<Spectrum>> CreateCheckerboardSpectrumTexture(
             std::move(map), tex1, tex2, aaMethod);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
-        std::unique_ptr<TextureMapping3D> map(new IdentityMapping3D(tex2world));
+        std::unique_ptr<TextureMapping3D> map(new TransformMapping3D(tex2world));
         return std::make_shared<Checkerboard3DTexture<Spectrum>>(
-            std::make_unique<IdentityMapping3D>(tex2world), tex1, tex2);
+            std::make_unique<TransformMapping3D>(tex2world), tex1, tex2);
     }
 }
 

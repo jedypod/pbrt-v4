@@ -159,8 +159,8 @@ Point2f PlanarMapping2D::Map(const SurfaceInteraction &si, Vector2f *dstdx,
     return Point2f(ds + Dot(vec, vs), dt + Dot(vec, vt));
 }
 
-Point3f IdentityMapping3D::Map(const SurfaceInteraction &si, Vector3f *dpdx,
-                               Vector3f *dpdy) const {
+Point3f TransformMapping3D::Map(const SurfaceInteraction &si, Vector3f *dpdx,
+                                Vector3f *dpdy) const {
     *dpdx = WorldToTexture(si.dpdx);
     *dpdy = WorldToTexture(si.dpdy);
     return WorldToTexture(si.p);

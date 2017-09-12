@@ -44,7 +44,7 @@ std::shared_ptr<Texture<Float>> CreateMarbleFloatTexture(
 std::shared_ptr<MarbleTexture> CreateMarbleSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
     // Initialize 3D texture mapping _map_ from _tp_
-    auto map = std::make_unique<IdentityMapping3D>(tex2world);
+    auto map = std::make_unique<TransformMapping3D>(tex2world);
     return std::make_shared<MarbleTexture>(
         std::move(map), tp.GetOneInt("octaves", 8),
         tp.GetOneFloat("roughness", .5f), tp.GetOneFloat("scale", 1.f),

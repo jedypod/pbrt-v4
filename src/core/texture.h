@@ -118,10 +118,10 @@ class TextureMapping3D {
                         Vector3f *dpdy) const = 0;
 };
 
-class IdentityMapping3D : public TextureMapping3D {
+class TransformMapping3D : public TextureMapping3D {
   public:
-    // IdentityMapping3D Public Methods
-    IdentityMapping3D(const Transform &WorldToTexture)
+    // TransformMapping3D Public Methods
+    TransformMapping3D(const Transform &WorldToTexture)
         : WorldToTexture(WorldToTexture) {}
     Point3f Map(const SurfaceInteraction &si, Vector3f *dpdx,
                 Vector3f *dpdy) const;
