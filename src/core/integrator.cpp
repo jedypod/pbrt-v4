@@ -59,7 +59,7 @@ Integrator::~Integrator() {}
 
 // Integrator Utility Functions
 Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
-                                MemoryArena &arena, Sampler &sampler,
+                                Sampler &sampler,
                                 const std::vector<int> &nLightSamples,
                                 bool handleMedia) {
     ProfilePhase p(Prof::DirectLighting);
@@ -75,14 +75,13 @@ Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
             Point2f uLight = sampler.Get2D();
             Point2f uScattering = sampler.Get2D();
             L += EstimateDirect(it, uScattering, *light, uLight, scene, sampler,
-                                arena, handleMedia);
+                                handleMedia);
         } else {
             // Estimate direct lighting using sample arrays
             Spectrum Ld(0.f);
             for (int k = 0; k < nSamples; ++k)
                 Ld += EstimateDirect(it, uScatteringArray[k], *light,
-                                     uLightArray[k], scene, sampler, arena,
-                                     handleMedia);
+                                     uLightArray[k], scene, sampler, handleMedia);
             L += Ld / nSamples;
         }
     }
@@ -90,7 +89,7 @@ Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
 }
 
 Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
-                               MemoryArena &arena, Sampler &sampler,
+                               Sampler &sampler,
                                const LightDistribution &lightDistrib,
                                bool handleMedia) {
     ProfilePhase p(Prof::DirectLighting);
@@ -101,13 +100,13 @@ Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
     Point2f uLight = sampler.Get2D();
     Point2f uScattering = sampler.Get2D();
     return EstimateDirect(it, uScattering, *light, uLight,
-                          scene, sampler, arena, handleMedia) / lightPdf;
+                          scene, sampler, handleMedia) / lightPdf;
 }
 
 Spectrum EstimateDirect(const Interaction &it, const Point2f &uScattering,
                         const Light &light, const Point2f &uLight,
                         const Scene &scene, Sampler &sampler,
-                        MemoryArena &arena, bool handleMedia, bool specular) {
+                        bool handleMedia, bool specular) {
     BxDFType bsdfFlags =
         specular ? BSDF_ALL : BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
     Spectrum Ld(0.f);

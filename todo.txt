@@ -32,9 +32,9 @@ GFX!
 
 -----------------
 
-- rename EstimateDirect to Ld (general naming improvements there)
+- avx2 check https://gist.github.com/UnaNancyOwen/263c243ae1e05a2f9d0e
 
-- wtf why are we pipling memory arena into direct lighting code?
+- rename EstimateDirect to Ld (general naming improvements there)
 
 - nuke UniformSampleAllLights?
 

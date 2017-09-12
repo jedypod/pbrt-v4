@@ -81,8 +81,7 @@ Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
     L += isect.Le(wo);
     if (scene.lights.size() > 0)
         // Compute direct lighting for _DirectLightingIntegrator_ integrator
-        L += UniformSampleAllLights(isect, scene, arena, sampler,
-                                    nLightSamples);
+        L += UniformSampleAllLights(isect, scene, sampler, nLightSamples);
 
     if (depth + 1 < maxDepth) {
         Vector3f wi;
