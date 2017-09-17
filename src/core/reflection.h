@@ -162,22 +162,20 @@ class BSDF {
     // BSDF Public Methods
     BSDF(const SurfaceInteraction &si, Float eta = 1)
         : eta(eta),
-          ns(si.shading.n),
           ng(si.n),
-          ss(Normalize(si.shading.dpdu)),
-          ts(Cross(ns, ss)) {}
+          shadingFrame(Frame::FromXZ(Normalize(si.shading.dpdu),
+                                     Vector3f(si.shading.n)))
+                     {}
     void Add(BxDF *b) {
         CHECK_LT(nBxDFs, MaxBxDFs);
         bxdfs[nBxDFs++] = b;
     }
     int NumComponents(BxDFType flags = BSDF_ALL) const;
     Vector3f WorldToLocal(const Vector3f &v) const {
-        return Vector3f(Dot(v, ss), Dot(v, ts), Dot(v, ns));
+        return shadingFrame.ToLocal(v);
     }
     Vector3f LocalToWorld(const Vector3f &v) const {
-        return Vector3f(ss.x * v.x + ts.x * v.y + ns.x * v.z,
-                        ss.y * v.x + ts.y * v.y + ns.y * v.z,
-                        ss.z * v.x + ts.z * v.y + ns.z * v.z);
+        return shadingFrame.FromLocal(v);
     }
     Spectrum f(const Vector3f &woW, const Vector3f &wiW,
                BxDFType flags = BSDF_ALL) const;
@@ -200,8 +198,8 @@ class BSDF {
     ~BSDF() {}
 
     // BSDF Private Data
-    const Normal3f ns, ng;
-    const Vector3f ss, ts;
+    Frame shadingFrame;
+    const Normal3f ng;
     int nBxDFs = 0;
     static constexpr int MaxBxDFs = 8;
     BxDF *bxdfs[MaxBxDFs];

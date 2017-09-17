@@ -270,6 +270,22 @@ inline std::ostream &operator<<(std::ostream &os, const RayDifferential &r) {
     return os << r.ToString();
 }
 
+class Frame {
+ public:
+    Frame()
+        : x(1, 0, 0), y(0, 1, 0), z(0, 0, 1) {}
+    Frame(const Vector3f &x, const Vector3f &y, const Vector3f &z);
+
+    static Frame FromXZ(const Vector3f &x, const Vector3f &z);
+    Vector3f ToLocal(const Vector3f &v) const;
+    Vector3f FromLocal(const Vector3f &v) const {
+        return v.x * x + v.y * y + v.z * z;
+    }
+
+ private:
+    Vector3f x, y, z;
+};
+
 // Geometry Inline Functions
 template <typename T>
 inline Vector3<T>::Vector3(const Point3<T> &p)
@@ -500,6 +516,24 @@ inline Float SphericalTheta(const Vector3f &v) {
 inline Float SphericalPhi(const Vector3f &v) {
     Float p = std::atan2(v.y, v.x);
     return (p < 0) ? (p + 2 * Pi) : p;
+}
+
+inline Frame::Frame(const Vector3f &x, const Vector3f &y, const Vector3f &z)
+     : x(x), y(y), z(z) {
+     DCHECK_LT(std::abs(LengthSquared(x) - 1), 1e-4);
+     DCHECK_LT(std::abs(LengthSquared(y) - 1), 1e-4);
+     DCHECK_LT(std::abs(LengthSquared(z) - 1), 1e-4);
+     DCHECK_LT(std::abs(Dot(x, y)), 1e-4);
+     DCHECK_LT(std::abs(Dot(y, z)), 1e-4);
+     DCHECK_LT(std::abs(Dot(z, x)), 1e-4);
+}
+
+inline Frame Frame::FromXZ(const Vector3f &x, const Vector3f &z) {
+    return Frame(x, Cross(z, x), z);
+}
+
+inline Vector3f Frame::ToLocal(const Vector3f &v) const {
+    return Vector3f(Dot(v, x), Dot(v, y), Dot(v, z));
 }
 
 }  // namespace pbrt
