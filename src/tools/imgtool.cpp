@@ -651,7 +651,8 @@ Image bloom(Image image, Float level, int width, Float scale, int iters) {
                 // blurred ones.
                 for (size_t j = 1; j < blurred.size(); ++j)
                     blurredSum += blurred[j].GetChannel({x, y}, c);
-                image.SetChannel({x, y}, c, (scale / iters) * blurredSum);
+                image.SetChannel({x, y}, c,
+                                 image.GetChannel({x, y}, c) + (scale / iters) * blurredSum);
             }
         }
     }
