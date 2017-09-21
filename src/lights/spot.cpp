@@ -35,6 +35,7 @@
 #include "paramset.h"
 #include "sampling.h"
 #include "reflection.h"
+#include "util/mathutil.h"
 #include "util/stats.h"
 
 namespace pbrt {
@@ -70,7 +71,7 @@ Float SpotLight::Falloff(const Vector3f &w) const {
     // Compute falloff inside spotlight cone
     Float delta =
         (cosTheta - cosTotalWidth) / (cosFalloffStart - cosTotalWidth);
-    return (delta * delta) * (delta * delta);
+    return Pow<4>(delta);
 }
 
 Spectrum SpotLight::Power() const {

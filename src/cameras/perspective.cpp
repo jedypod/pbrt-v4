@@ -39,6 +39,7 @@
 #include "sampler.h"
 #include "sampling.h"
 #include "light.h"
+#include "util/mathutil.h"
 #include "util/stats.h"
 
 namespace pbrt {
@@ -168,8 +169,7 @@ Spectrum PerspectiveCamera::We(const Ray &ray, Point2f *pRaster2) const {
     Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
 
     // Return importance for point on image plane
-    Float cos2Theta = cosTheta * cosTheta;
-    return Spectrum(1 / (A * lensArea * cos2Theta * cos2Theta));
+    return Spectrum(1 / (A * lensArea * Pow<4>(cosTheta)));
 }
 
 void PerspectiveCamera::Pdf_We(const Ray &ray, Float *pdfPos,
@@ -197,7 +197,7 @@ void PerspectiveCamera::Pdf_We(const Ray &ray, Float *pdfPos,
     // Compute lens area of perspective camera
     Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
     *pdfPos = 1 / lensArea;
-    *pdfDir = 1 / (A * cosTheta * cosTheta * cosTheta);
+    *pdfDir = 1 / (A * Pow<3>(cosTheta));
 }
 
 Spectrum PerspectiveCamera::Sample_Wi(const Interaction &ref, const Point2f &u,
