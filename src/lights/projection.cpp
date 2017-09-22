@@ -42,21 +42,13 @@ namespace pbrt {
 // ProjectionLight Method Definitions
 ProjectionLight::ProjectionLight(const Transform &LightToWorld,
                                  const MediumInterface &mediumInterface,
-                                 const Spectrum &I, const std::string &texname,
+                                 const Spectrum &I, Image image,
                                  Float fov, const std::shared_ptr<const ParamSet> &attributes)
     : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
             attributes),
+      image(std::move(image)),
       pLight(LightToWorld(Point3f(0, 0, 0))),
       I(I) {
-    // Create _ProjectionLight_ MIP map
-    auto im = Image::Read(texname);
-    if (im)
-        image = *im;
-    else {
-        std::vector<Float> one = {(Float)1};
-        image = Image(std::move(one), PixelFormat::Y32, {1, 1});
-    }
-
     // Initialize _ProjectionLight_ projection matrix
     Float aspect = Float(image.resolution.x) / Float(image.resolution.y);
     if (aspect > 1)
@@ -66,10 +58,12 @@ ProjectionLight::ProjectionLight(const Transform &LightToWorld,
             Bounds2f(Point2f(-1, -1 / aspect), Point2f(1, 1 / aspect));
     hither = 1e-3f;
     yon = 1e30f;
-    lightProjection = Perspective(fov, hither, yon);
+    lightToScreen = Perspective(fov, hither, yon);
 
     // Compute cosine of cone surrounding projection directions
     Float opposite = std::tan(Radians(fov) / 2.f);
+    // Area of the image on projection plane.
+    A = 4 * opposite * opposite * (aspect > 1 ? aspect : 1 / aspect);
     Float tanDiag = opposite * std::sqrt(1 + 1 / (aspect * aspect));
     cosTotalWidth = std::cos(std::atan(tanDiag));
 }
@@ -91,7 +85,7 @@ Spectrum ProjectionLight::Projection(const Vector3f &w) const {
     if (wl.z < hither) return 0;
 
     // Project point onto projection plane and compute light
-    Point3f p = lightProjection(Point3f(wl.x, wl.y, wl.z));
+    Point3f p = lightToScreen(Point3f(wl.x, wl.y, wl.z));
     if (!Inside(Point2f(p.x, p.y), screenBounds)) return 0.f;
     Point2f st = Point2f(screenBounds.Offset(Point2f(p.x, p.y)));
     return I * image.BilerpSpectrum(st, SpectrumType::Illuminant);
@@ -99,11 +93,20 @@ Spectrum ProjectionLight::Projection(const Vector3f &w) const {
 
 Spectrum ProjectionLight::Power() const {
     Spectrum sum(0.f);
+    Transform screenToLight = Inverse(lightToScreen);
+    Float minRes = std::min(image.resolution.x, image.resolution.y);
     for (int v = 0; v < image.resolution.y; ++v)
-        for (int u = 0; u < image.resolution.x; ++u)
-            sum += image.GetSpectrum({u, v}, SpectrumType::Illuminant);
-    return I * 2 * Pi * (1.f - cosTotalWidth) * sum /
-           (image.resolution.x * image.resolution.y);
+        for (int u = 0; u < image.resolution.x; ++u) {
+            Point3f ps(2 * (u - image.resolution.x / 2) / minRes,
+                       2 * (v - image.resolution.y / 2) / minRes,
+                       0);
+            Vector3f w = Vector3f(screenToLight(ps));
+            w = Normalize(w);
+            Float dwdA = Pow<3>(w.z);
+            sum += image.GetSpectrum({u, v}, SpectrumType::Illuminant) * dwdA;
+        }
+
+    return I * A * sum / (image.resolution.x * image.resolution.y);
 }
 
 Float ProjectionLight::Pdf_Li(const Interaction &, const Vector3f &) const {
@@ -137,9 +140,18 @@ std::shared_ptr<ProjectionLight> CreateProjectionLight(
     Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     Float fov = paramSet.GetOneFloat("fov", 45.);
+
     std::string texname = paramSet.GetOneFilename("mapname", "");
+    std::experimental::optional<Image> image;
+    if (texname != "")
+        image = Image::Read(texname);
+    if (!image) {
+        std::vector<Float> one = {(Float)1};
+        image = Image(std::move(one), PixelFormat::Y32, {1, 1});
+    }
+
     return std::make_shared<ProjectionLight>(light2world, medium, I * sc,
-                                             texname, fov, attributes);
+                                             std::move(*image), fov, attributes);
 }
 
 }  // namespace pbrt

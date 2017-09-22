@@ -42,19 +42,12 @@ namespace pbrt {
 // InfiniteAreaLight Method Definitions
 InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
                                      const Spectrum &L,
-                                     const std::string &filename,
+                                     Image image,
                                      const std::shared_ptr<const ParamSet> &attributes)
     : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(),
             attributes),
+      image(std::move(image)),
       Lscale(L) {
-    auto im = Image::Read(filename);
-    if (im)
-        image = *im;
-    else {
-        std::vector<Float> one = {(Float)1};
-        image = Image(std::move(one), PixelFormat::Y32, {1, 1});
-    }
-
     // Initialize sampling PDFs for infinite area light
 
     // Compute scalar-valued image _img_ from environment map
@@ -80,6 +73,8 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
 }
 
 Spectrum InfiniteAreaLight::Power() const {
+    // We're really computing fluence, then converting to power, for what
+    // that's worth..
     Spectrum sumL(0.);
 
     int width = image.resolution.x, height = image.resolution.y;
@@ -90,7 +85,11 @@ Spectrum InfiniteAreaLight::Power() const {
                 image.GetSpectrum({u, v}, SpectrumType::Illuminant) * sinTheta;
         }
     }
-    return Pi * worldRadius * worldRadius * Lscale * sumL / (width * height);
+    // Integrating over spherical coordinates, so have a scale of Pi for
+    // theta and 2 Pi for phi.  Then one more for Pi r^2 for the area of
+    // the disk receiving illumination...
+    return 2 * Pi * Pi * Pi * worldRadius * worldRadius * Lscale * sumL /
+        (width * height);
 }
 
 Spectrum InfiniteAreaLight::Le(const RayDifferential &ray) const {
@@ -183,8 +182,17 @@ std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
     Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     std::string texmap = paramSet.GetOneFilename("mapname", "");
-    return std::make_shared<InfiniteAreaLight>(light2world, L * sc, texmap,
-                                               attributes);
+
+    std::experimental::optional<Image> image;
+    if (texmap != "")
+        image = Image::Read(texmap);
+    if (!image) {
+        std::vector<Float> one = {(Float)1};
+        image = Image(std::move(one), PixelFormat::Y32, {1, 1});
+    }
+
+    return std::make_shared<InfiniteAreaLight>(light2world, L * sc,
+                                               std::move(*image), attributes);
 }
 
 }  // namespace pbrt

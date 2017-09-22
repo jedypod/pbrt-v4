@@ -8,7 +8,7 @@
 
 GFX!
 
-- spherical traiangle sampling (https://www.shadertoy.com/view/4tGGzd)
+- tests for spherical traiangle sampling
 
 - implement improved delta/ratio tracking stuff...
 
@@ -20,7 +20,6 @@ GFX!
 - support animated light sources (transformation at least)
 
 - light tree for many lights
-  see also https://github.com/cessen/psychopath_cpp/blob/54334c7e6d5a7bfc12db26d08a239e5c82a88926/accel/light_tree.hpp
 
 - revisit materials, mitsuba style
 
@@ -30,11 +29,17 @@ GFX!
 
 - BDPT RR
 
+- http://aras-p.info/texts/CompactNormalStorage.html ?
+
+- do a better job of sampling projection lights, gonio lights, and spot
+  lights. is there some reusable infrastructure for sampling images that that
+  and infinite light can be built on?
+
 -----------------
 
-- avx2 check https://gist.github.com/UnaNancyOwen/263c243ae1e05a2f9d0e
+- rename Light::Power() methods to Phi()?
 
-- direct lighting code can use a general cleanup
+- avx2 check https://gist.github.com/UnaNancyOwen/263c243ae1e05a2f9d0e
 
 - RGB class? (eventually records primaries, etc.)
 
@@ -109,6 +114,12 @@ GFX!
 - test alpha tex for non triangles. also review how it's passed through for
   non-triangles in --cat/--toply
 
+- what does an alpha'ed out area light mean, anyway? not visible to eye,
+  visible to e.g. diffuse reflection, what about specular? glossy? for
+  specular, does it make a difference if there's a transparent plane
+  between the viewer and the light? why should it? consistency here is
+  tricky...
+
 - need tests based on more interesting scenes in v3-scenes
 
 - params faceindices face_indices faceIndices
@@ -135,9 +146,6 @@ GFX!
 - actually do robust bvh traversal--watertight...
 
 - manuka-style pre-dice?
-
-- Keep a pool of FilmTiles, don't do dynamic allocation in the usual case
-  (remember to zero out spectrum sums and weights when returning them)
 
 - BxDFType is really only used for "was it specular" at this point;
   simplify?  (BSSRDFs also though...)

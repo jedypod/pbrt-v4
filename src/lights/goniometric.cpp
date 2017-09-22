@@ -52,16 +52,17 @@ Spectrum GonioPhotometricLight::Sample_Li(const Interaction &ref,
 }
 
 Spectrum GonioPhotometricLight::Power() const {
+    // integrate over speherical coordinates [0,Pi], [0,2pi]
     Spectrum sumL(0.);
     int width = image.resolution.x, height = image.resolution.y;
     for (int v = 0; v < height; ++v) {
         Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
         for (int u = 0; u < width; ++u) {
             sumL +=
-                image.GetSpectrum({u, v}, SpectrumType::Illuminant) * sinTheta;
+                I * image.GetSpectrum({u, v}, SpectrumType::Illuminant) * sinTheta;
         }
     }
-    return 4 * Pi * sumL / (width * height);
+    return 2 * Pi * Pi * sumL / (width * height);
 }
 
 Float GonioPhotometricLight::Pdf_Li(const Interaction &,
@@ -94,9 +95,18 @@ std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
     const ParamSet &paramSet, const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
+
     std::string texname = paramSet.GetOneFilename("mapname", "");
+    std::experimental::optional<Image> image;
+    if (texname != "")
+        image = Image::Read(texname);
+    if (!image) {
+        std::vector<Float> one = {(Float)1};
+        image = Image(std::move(one), PixelFormat::Y32, {1, 1});
+    }
+
     return std::make_shared<GonioPhotometricLight>(light2world, medium, I * sc,
-                                                   texname, attributes);
+                                                   std::move(*image), attributes);
 }
 
 }  // namespace pbrt

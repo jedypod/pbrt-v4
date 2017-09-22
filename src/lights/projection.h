@@ -52,7 +52,7 @@ class ProjectionLight : public Light {
     // ProjectionLight Public Methods
     ProjectionLight(const Transform &LightToWorld,
                     const MediumInterface &medium, const Spectrum &I,
-                    const std::string &texname, Float fov,
+                    Image image, Float fov,
                     const std::shared_ptr<const ParamSet> &attributes);
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
                        Float *pdf, VisibilityTester *vis) const;
@@ -70,10 +70,11 @@ class ProjectionLight : public Light {
     Image image;
     const Point3f pLight;
     const Spectrum I;
-    Transform lightProjection;
+    Transform lightToScreen;
     Float hither, yon;
     Bounds2f screenBounds;
     Float cosTotalWidth;
+    Float A;
 };
 
 std::shared_ptr<ProjectionLight> CreateProjectionLight(

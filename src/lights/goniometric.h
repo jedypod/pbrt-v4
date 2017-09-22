@@ -54,20 +54,13 @@ class GonioPhotometricLight : public Light {
                        Float *pdf, VisibilityTester *vis) const;
     GonioPhotometricLight(const Transform &LightToWorld,
                           const MediumInterface &mediumInterface,
-                          const Spectrum &I, const std::string &texname,
+                          const Spectrum &I, Image image,
                           const std::shared_ptr<const ParamSet> &attributes)
         : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
                 attributes),
           pLight(LightToWorld(Point3f(0, 0, 0))),
-          I(I) {
-        auto im = Image::Read(texname);
-        if (im)
-            image = *im;
-        else {
-            std::vector<Float> one = {(Float)1};
-            image = Image(std::move(one), PixelFormat::Y32, {1, 1});
-        }
-    }
+          I(I),
+          image(std::move(image)) { }
     Spectrum Scale(const Vector3f &w) const {
         Vector3f wp = Normalize(WorldToLight(w));
         std::swap(wp.y, wp.z);
