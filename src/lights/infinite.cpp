@@ -42,11 +42,11 @@ namespace pbrt {
 // InfiniteAreaLight Method Definitions
 InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
                                      const Spectrum &L,
-                                     Image image,
+                                     Image im,
                                      const std::shared_ptr<const ParamSet> &attributes)
     : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(),
             attributes),
-      image(std::move(image)),
+      image(std::move(im)),
       Lscale(L) {
     // Initialize sampling PDFs for infinite area light
 
