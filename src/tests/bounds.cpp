@@ -4,6 +4,8 @@
 #include "util/bounds.h"
 #include "util/geometry.h"
 
+#include <absl/base/macros.h>
+
 using namespace pbrt;
 
 TEST(Bounds2, IteratorBasic) {
@@ -11,7 +13,7 @@ TEST(Bounds2, IteratorBasic) {
     Point2i e[] = {{0, 1}, {1, 1}, {0, 2}, {1, 2}};
     int offset = 0;
     for (auto p : b) {
-        EXPECT_LT(offset, sizeof(e) / sizeof(e[0]));
+        EXPECT_LT(offset, ABSL_ARRAYSIZE(e));
         EXPECT_EQ(e[offset], p) << "offset = " << offset;
         ++offset;
     }

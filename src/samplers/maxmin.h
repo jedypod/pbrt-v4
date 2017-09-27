@@ -42,6 +42,8 @@
 #include "sampler.h"
 #include "error.h"
 #include "lowdiscrepancy.h"
+
+#include <absl/base/macros.h>
 #include <absl/types/span.h>
 #include <glog/logging.h>
 
@@ -60,17 +62,12 @@ class MaxMinDistSampler : public PixelSampler {
         : PixelSampler(
               [](int spp) {
                   int Cindex = Log2Int(spp);
-                  if (Cindex >= sizeof(CMaxMinDist) / sizeof(CMaxMinDist[0])) {
+                  if (Cindex >= ABSL_ARRAYSIZE(CMaxMinDist)) {
                       Warning(
                           "No more than %d samples per pixel are supported "
-                          "with "
-                          "MaxMinDistSampler. Rounding down.",
-                          (1 << int(sizeof(CMaxMinDist) /
-                                    sizeof(CMaxMinDist[0]))) -
-                              1);
-                      spp = (1 << (sizeof(CMaxMinDist) /
-                                   sizeof(CMaxMinDist[0]))) -
-                            1;
+                          "with MaxMinDistSampler. Rounding down.",
+                          1 << (ABSL_ARRAYSIZE(CMaxMinDist) - 1));
+                      spp = 1 << (ABSL_ARRAYSIZE(CMaxMinDist) - 1);
                   }
                   if (!IsPowerOf2(spp)) {
                       spp = RoundUpPow2(spp);
@@ -83,8 +80,7 @@ class MaxMinDistSampler : public PixelSampler {
               }(samplesPerPixel),
               nSampledDimensions) {
         int Cindex = Log2Int(samplesPerPixel);
-        CHECK(Cindex >= 0 &&
-              Cindex < (sizeof(CMaxMinDist) / sizeof(CMaxMinDist[0])));
+        CHECK(Cindex >= 0 && Cindex < ABSL_ARRAYSIZE(CMaxMinDist));
         CPixel = CMaxMinDist[Cindex];
     }
 

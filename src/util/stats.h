@@ -41,6 +41,7 @@
 // core/stats.h*
 #include "pbrt.h"
 
+#include <absl/base/macros.h>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -257,8 +258,7 @@ static const char *ProfNames[] = {
     "Ptex lookup",
 };
 
-static_assert((int)Prof::NumProfCategories ==
-                  sizeof(ProfNames) / sizeof(ProfNames[0]),
+static_assert((int)Prof::NumProfCategories == ABSL_ARRAYSIZE(ProfNames),
               "ProfNames[] array and Prof enumerant have different "
               "numbers of entries!");
 

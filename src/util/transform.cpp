@@ -37,8 +37,10 @@
 #include "error.h"
 #include "interaction.h"
 #include "util/stringprint.h"
+
 #include <glog/logging.h>
 
+#include <absl/base/macros.h>
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -1258,7 +1260,7 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
         IntervalFindZeros(c1[c].Eval(p), c2[c].Eval(p), c3[c].Eval(p),
                           c4[c].Eval(p), c5[c].Eval(p), theta, Interval(0., 1.),
                           zeros, &nZeros);
-        CHECK_LE(nZeros, sizeof(zeros) / sizeof(zeros[0]));
+        CHECK_LE(nZeros, ABSL_ARRAYSIZE(zeros));
 
         // Expand bounding box for any motion derivative zeros found
         for (int i = 0; i < nZeros; ++i) {

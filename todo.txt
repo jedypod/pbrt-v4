@@ -60,8 +60,6 @@ GFX!
 
 - absl:
   base/casts.h: bit_cast for float to bits sort of stuff
-  base/macros.h: ABSL_ARRAYSIZE
-  base/optimization.h: ABSL_CACHELINE_SIZE
   container/inlined_vector.h: InlinedVector, in particular for
     Distribution1D stuff
   strings/match.h: useful for param parsing stuff?

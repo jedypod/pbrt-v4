@@ -4,6 +4,8 @@
 #include "pbrt.h"
 #include "util/rng.h"
 
+#include <absl/base/macros.h>
+
 using namespace pbrt;
 
 TEST(Spectrum, Blackbody) {
@@ -20,7 +22,7 @@ TEST(Spectrum, Blackbody) {
         {500, 3700, 1.59845e12},
         {600, 4500, 7.46497e12},
     };
-    int n = sizeof(v) / sizeof(v[0]);
+    int n = ABSL_ARRAYSIZE(v);
     for (int i = 0; i < n; ++i) {
         Float Le;
         Blackbody(absl::Span<const Float>(&v[i][0], 1), v[i][1],
@@ -141,7 +143,7 @@ TEST(Spectrum, LinearIrregularResample) {
     // Irregularly-sampled SPD, where f(lambda) = lambda^2.
     Float lambdaIrreg[] = {-1.5, -.5, .01, .6, 1,   2,     2.1, 3.4, 4.6,
                            5.7,  7,   8.2, 9,  9.8, 11.11, 12,  13,  14.7};
-    const int nIn = sizeof(lambdaIrreg) / sizeof(lambdaIrreg[0]);
+    const int nIn = ABSL_ARRAYSIZE(lambdaIrreg);
     Float valIrreg[nIn];
     for (int i = 0; i < nIn; ++i) valIrreg[i] = lambdaIrreg[i] * lambdaIrreg[i];
 
@@ -167,7 +169,7 @@ TEST(Spectrum, LinearDownsampleBasic) {
     // Another linear SPD.
     Float lambda[5] = {0, 1, 2, 3, 4};
     Float val[5] = {1, 3, 5, 7, 9};
-    const int nIn = sizeof(lambda) / sizeof(lambda[0]);
+    const int nIn = ABSL_ARRAYSIZE(lambda);
 
     // Resample it with the same endpoints but at a lower sampling rate.
     const int nOut = 3;
@@ -188,7 +190,7 @@ TEST(Spectrum, LinearDownsampleOffset) {
     // Another linear SPD.
     Float lambda[5] = {0, 1, 2, 3, 4};
     Float val[5] = {1, 3, 5, 7, 9};
-    const int nIn = sizeof(lambda) / sizeof(lambda[0]);
+    const int nIn = ABSL_ARRAYSIZE(lambda);
 
     const int nOut = 4;
     Float newVal[nOut];
