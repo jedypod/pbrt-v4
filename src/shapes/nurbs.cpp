@@ -38,7 +38,9 @@
 #include "util/memory.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
-#include "absl/types/span.h"
+
+#include <absl/container/fixed_array.h>
+#include <absl/types/span.h>
 
 namespace pbrt {
 
@@ -79,7 +81,7 @@ static Homogeneous3 NURBSEvaluate(int order, const Float *knot,
     int cpOffset = knotOffset - order + 1;
     CHECK(cpOffset >= 0 && cpOffset < np);
 
-    Homogeneous3 *cpWork = ALLOCA(Homogeneous3, order);
+    absl::FixedArray<Homogeneous3> cpWork(order);
     for (int i = 0; i < order; ++i) cpWork[i] = cp[(cpOffset + i) * cpStride];
 
     for (int i = 0; i < order - 2; ++i)
@@ -120,7 +122,7 @@ static Point3f NURBSEvaluateSurface(int uOrder, const Float *uKnot, int ucp,
                                     Float u, int vOrder, const Float *vKnot,
                                     int vcp, Float v, const Homogeneous3 *cp,
                                     Vector3f *dpdu, Vector3f *dpdv) {
-    Homogeneous3 *iso = ALLOCA(Homogeneous3, std::max(uOrder, vOrder));
+    absl::FixedArray<Homogeneous3> iso(std::max(uOrder, vOrder));
 
     int uOffset = KnotOffset(uKnot, uOrder, ucp, u);
     int uFirstCp = uOffset - uOrder + 1;
@@ -134,13 +136,13 @@ static Point3f NURBSEvaluateSurface(int uOrder, const Float *uKnot, int ucp,
     CHECK(vFirstCp >= 0 && vFirstCp + vOrder - 1 < vcp);
 
     Homogeneous3 P =
-        NURBSEvaluate(uOrder, uKnot, iso - uFirstCp, ucp, 1, u, dpdu);
+        NURBSEvaluate(uOrder, uKnot, iso.data() - uFirstCp, ucp, 1, u, dpdu);
 
     if (dpdv) {
         for (int i = 0; i < vOrder; ++i)
             iso[i] = NURBSEvaluate(uOrder, uKnot, &cp[(vFirstCp + i) * ucp],
                                    ucp, 1, u);
-        (void)NURBSEvaluate(vOrder, vKnot, iso - vFirstCp, vcp, 1, v, dpdv);
+        (void)NURBSEvaluate(vOrder, vKnot, iso.data() - vFirstCp, vcp, 1, v, dpdv);
     }
     return Point3f(P.x / P.w, P.y / P.w, P.z / P.w);
 }

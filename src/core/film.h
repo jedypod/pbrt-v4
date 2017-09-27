@@ -48,6 +48,8 @@
 #include "util/memory.h"
 #include "util/parallel.h"
 #include "util/stats.h"
+
+#include <absl/container/fixed_array.h>
 #include <absl/types/span.h>
 #include <glog/logging.h>
 
@@ -145,13 +147,13 @@ class FilmTile {
         // Loop over filter support and add sample to pixel arrays
 
         // Precompute $x$ and $y$ filter table offsets
-        int *ifx = ALLOCA(int, p1.x - p0.x);
+        absl::FixedArray<int> ifx(p1.x - p0.x);
         for (int x = p0.x; x < p1.x; ++x) {
             Float fx = std::abs((x - pFilmDiscrete.x) * invFilterRadius.x *
                                 filterTableWidth);
             ifx[x - p0.x] = std::min((int)std::floor(fx), filterTableWidth - 1);
         }
-        int *ify = ALLOCA(int, p1.y - p0.y);
+        absl::FixedArray<int> ify(p1.y - p0.y);
         for (int y = p0.y; y < p1.y; ++y) {
             Float fy = std::abs((y - pFilmDiscrete.y) * invFilterRadius.y *
                                 filterTableWidth);

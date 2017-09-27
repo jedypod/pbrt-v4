@@ -52,17 +52,8 @@
 #include <utility>
 
 #ifdef PBRT_HAVE_MALLOC_H
-#include <malloc.h>  // for _alloca, memalign
+#include <malloc.h>  // for memalign
 #endif
-#ifdef PBRT_HAVE_ALLOCA_H
-#include <alloca.h>
-#endif
-
-#if defined(PBRT_IS_MSVC)
-#define alloca _alloca
-#endif
-
-#define ALLOCA(TYPE, COUNT) (TYPE *) alloca((COUNT) * sizeof(TYPE))
 
 namespace pbrt {
 

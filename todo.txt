@@ -8,6 +8,11 @@
 
 GFX!
 
+- big rework of direct lighting: after bsdf sample, intersect scene to find
+  light
+
+- tests for light * -> pdf computaiton
+
 - tests for spherical traiangle sampling
 
 - implement improved delta/ratio tracking stuff...
@@ -20,12 +25,20 @@ GFX!
 - support animated light sources (transformation at least)
 
 - light tree for many lights
-
+  - split two sided lights into two light sources, for better light tree
+    culling?
+  
 - revisit materials, mitsuba style
 
 - Direct lighting: does it make sense to run this for specular bsdf
   components as well (and not sample the light, obviously), and then just
   always ignore emission after the very first intersection?
+  - actually, the opposite---never sample the bsdf in direct lighting code,
+    then always incorportate (and MIS) at intersections
+
+- move Light::Le() into infinitearealight only?
+
+- implement filter importance sampling
 
 - BDPT RR
 
@@ -34,8 +47,30 @@ GFX!
 - do a better job of sampling projection lights, gonio lights, and spot
   lights. is there some reusable infrastructure for sampling images that that
   and infinite light can be built on?
+  - this should be extra straightforward now that the Power stuff is
+    principled.  In turn, can implement Power() via the sampling routines
+    (potentially)
+
+- accurate importance sampling
+  - spot light
+  - gonio
+  - projection
 
 -----------------
+
+- absl:
+  base/casts.h: bit_cast for float to bits sort of stuff
+  base/macros.h: ABSL_ARRAYSIZE
+  base/optimization.h: ABSL_CACHELINE_SIZE
+  container/inlined_vector.h: InlinedVector, in particular for
+    Distribution1D stuff
+  strings/match.h: useful for param parsing stuff?
+  strings/string_view.h: many
+  strings/str_cat.h: StrCat/StrAppend (parsing?)
+  strings/strip.h: image filename extension handling?
+  synchronization/barrier.h
+
+- rename GonioPhotometricLight -> GoniometricLight?
 
 - rename Light::Power() methods to Phi()?
 

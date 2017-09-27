@@ -38,6 +38,7 @@
 #include "util/memory.h"
 #include "sampling.h"
 
+#include <absl/container/fixed_array.h>
 #include <glog/logging.h>
 
 namespace pbrt {
@@ -318,8 +319,7 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
         return Spectrum(0.f);
 
     // Allocate storage to accumulate _ak_ coefficients
-    Float *ak = ALLOCA(Float, bsdfTable.mMax * bsdfTable.nChannels);
-    memset(ak, 0, bsdfTable.mMax * bsdfTable.nChannels * sizeof(Float));
+    absl::FixedArray<Float> ak(bsdfTable.mMax * bsdfTable.nChannels, Float(0));
 
     // Accumulate weighted sums of nearby $a_k$ coefficients
     int mMax = 0;
@@ -339,7 +339,8 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
     }
 
     // Evaluate Fourier expansion for angle $\phi$
-    Float Y = std::max((Float)0, Fourier({ak, size_t(mMax)}, cosPhi));
+    absl::Span<const Float> akSpan(ak);
+    Float Y = std::max((Float)0, Fourier(akSpan.subspan(0, mMax), cosPhi));
     Float scale = muI != 0 ? (1 / std::abs(muI)) : (Float)0;
 
     // Update _scale_ to account for adjoint light transport
@@ -351,8 +352,8 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
         return Spectrum(Y * scale);
     else {
         // Compute and return RGB colors for tabulated BSDF
-        Float R = Fourier({ak + 1 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
-        Float B = Fourier({ak + 2 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
+        Float R = Fourier(akSpan.subspan(bsdfTable.mMax, mMax), cosPhi);
+        Float B = Fourier(akSpan.subspan(2 * bsdfTable.mMax, mMax), cosPhi);
         Float G = 1.39829f * Y - 0.100913f * B - 0.297375f * R;
         Float rgb[3] = {R * scale, G * scale, B * scale};
         return Spectrum::FromRGB(rgb).Clamp();
@@ -538,8 +539,7 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
         return Spectrum(0.f);
 
     // Allocate storage to accumulate _ak_ coefficients
-    Float *ak = ALLOCA(Float, bsdfTable.mMax * bsdfTable.nChannels);
-    memset(ak, 0, bsdfTable.mMax * bsdfTable.nChannels * sizeof(Float));
+    absl::FixedArray<Float> ak(bsdfTable.mMax * bsdfTable.nChannels, Float(0));
 
     // Accumulate weighted sums of nearby $a_k$ coefficients
     int mMax = 0;
@@ -560,7 +560,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     // Importance sample the luminance Fourier expansion
     Float phi, pdfPhi;
-    Float Y = SampleFourier(absl::Span<const Float>(ak, size_t(mMax)),
+    absl::Span<const Float> akSpan(ak);
+    Float Y = SampleFourier(akSpan.subspan(0, size_t(mMax)),
                             absl::Span<const Float>(bsdfTable.recip).subspan(0, size_t(mMax)),
                             u[0], &pdfPhi, &phi);
     *pdf = std::max((Float)0, pdfPhi * pdfMu);
@@ -592,8 +593,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
     }
 
     if (bsdfTable.nChannels == 1) return Spectrum(Y * scale);
-    Float R = Fourier({ak + 1 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
-    Float B = Fourier({ak + 2 * bsdfTable.mMax, size_t(mMax)}, cosPhi);
+    Float R = Fourier(akSpan.subspan(bsdfTable.mMax, mMax), cosPhi);
+    Float B = Fourier(akSpan.subspan(2 * bsdfTable.mMax, mMax), cosPhi);
     Float G = 1.39829f * Y - 0.100913f * B - 0.297375f * R;
     Float rgb[3] = {R * scale, G * scale, B * scale};
     return Spectrum::FromRGB(rgb).Clamp();
@@ -610,8 +611,7 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
     if (!bsdfTable.GetWeightsAndOffset(muI, &offsetI, weightsI) ||
         !bsdfTable.GetWeightsAndOffset(muO, &offsetO, weightsO))
         return 0;
-    Float *ak = ALLOCA(Float, bsdfTable.mMax);
-    memset(ak, 0, bsdfTable.mMax * sizeof(Float));
+    absl::FixedArray<Float> ak(bsdfTable.mMax, Float(0));
     int mMax = 0;
     for (int o = 0; o < 4; ++o) {
         for (int i = 0; i < 4; ++i) {
@@ -636,7 +636,7 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
             bsdfTable.cdf[(offsetO + o) * bsdfTable.nMu + bsdfTable.nMu - 1] *
             (2 * Pi);
     }
-    Float Y = Fourier({ak, size_t(mMax)}, cosPhi);
+    Float Y = Fourier(absl::Span<const Float>(ak).subspan(0, mMax), cosPhi);
     return (rho > 0 && Y > 0) ? (Y / rho) : 0;
 }
 

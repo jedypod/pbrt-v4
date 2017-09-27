@@ -40,7 +40,9 @@
 #include "util/geometry.h"
 #include "paramset.h"
 #include "error.h"
-#include "absl/types/span.h"
+
+#include <absl/container/fixed_array.h>
+#include <absl/types/span.h>
 
 #include <set>
 #include <map>
@@ -431,8 +433,8 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
 static Point3f weightOneRing(SDVertex *vert, Float beta) {
     // Put _vert_ one-ring in _pRing_
     int valence = vert->valence();
-    Point3f *pRing = ALLOCA(Point3f, valence);
-    vert->oneRing(pRing);
+    absl::FixedArray<Point3f> pRing(valence);
+    vert->oneRing(pRing.data());
     Point3f p = (1 - valence * beta) * vert->p;
     for (int i = 0; i < valence; ++i) p += beta * pRing[i];
     return p;
@@ -461,8 +463,8 @@ void SDVertex::oneRing(Point3f *p) {
 static Point3f weightBoundary(SDVertex *vert, Float beta) {
     // Put _vert_ one-ring in _pRing_
     int valence = vert->valence();
-    Point3f *pRing = ALLOCA(Point3f, valence);
-    vert->oneRing(pRing);
+    absl::FixedArray<Point3f> pRing(valence);
+    vert->oneRing(pRing.data());
     Point3f p = (1 - 2 * beta) * vert->p;
     p += beta * pRing[0];
     p += beta * pRing[valence - 1];
