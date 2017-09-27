@@ -62,10 +62,6 @@ GFX!
   base/casts.h: bit_cast for float to bits sort of stuff
   container/inlined_vector.h: InlinedVector, in particular for
     Distribution1D stuff
-  strings/match.h: useful for param parsing stuff?
-  strings/string_view.h: many
-  strings/str_cat.h: StrCat/StrAppend (parsing?)
-  strings/strip.h: image filename extension handling?
 
 - rename GonioPhotometricLight -> GoniometricLight?
 
