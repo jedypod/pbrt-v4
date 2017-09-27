@@ -37,26 +37,12 @@
 #include "util/memory.h"
 #include "util/stats.h"
 
+#include <absl/synchronization/barrier.h>
 #include <list>
 #include <thread>
 #include <vector>
 
 namespace pbrt {
-
-void Barrier::Wait() {
-    std::unique_lock<std::mutex> lock(mutex);
-    CHECK_GT(count, 0);
-    if (--count == 0)
-        // This is the last thread to reach the barrier; wake up all of the
-        // other ones before exiting.
-        cv.notify_all();
-    else
-        // Otherwise there are still threads that haven't reached it. Give
-        // up the lock and wait to be notified.
-        cv.wait(lock, [this] { return count == 0; });
-}
-
-///////////////////////////////////////////////////////////////////////////
 
 class ParallelJob {
   public:
@@ -78,7 +64,7 @@ protected:
     void RemoveFromJobList();
 
 private:
-    static void workerFunc(int tIndex, std::shared_ptr<Barrier> barrier);
+    static void workerFunc(int tIndex, absl::Barrier *barrier);
 
     static ParallelJob *jobList;
     // Protects jobList
@@ -247,7 +233,7 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     ProfilerState = oldState;
 }
 
-void ParallelJob::workerFunc(int tIndex, std::shared_ptr<Barrier> barrier) {
+void ParallelJob::workerFunc(int tIndex, absl::Barrier *barrier) {
     LOG(INFO) << "Started execution in worker thread " << tIndex;
     ThreadIndex = tIndex;
 
@@ -258,11 +244,7 @@ void ParallelJob::workerFunc(int tIndex, std::shared_ptr<Barrier> barrier) {
     // The main thread sets up a barrier so that it can be sure that all
     // workers have called ProfilerWorkerThreadInit() before it continues
     // (and actually starts the profiling system).
-    barrier->Wait();
-
-    // Release our reference to the Barrier so that it's freed once all of
-    // the threads have cleared it.
-    barrier.reset();
+    if (barrier->Block()) delete barrier;
 
     std::unique_lock<std::mutex> lock(jobListMutex);
     while (!shutdownThreads)
@@ -331,14 +313,14 @@ void ParallelJob::StartThreads() {
     // their call to ProfilerWorkerThreadInit() before we return from this
     // function.  In turn, we can be sure that the profiling system isn't
     // started until after all worker threads have done that.
-    std::shared_ptr<Barrier> barrier = Barrier::Create(nThreads);
+    absl::Barrier *barrier = new absl::Barrier(nThreads);
 
     // Launch one fewer worker thread than the total number we want doing
     // work, since the main thread helps out, too.
     for (int i = 0; i < nThreads - 1; ++i)
         threads.push_back(std::thread(workerFunc, i + 1, barrier));
 
-    barrier->Wait();
+    if (barrier->Block()) delete barrier;
 }
 
 void ParallelCleanup() {
@@ -361,12 +343,12 @@ void ParallelJob::TerminateThreads() {
 
 void MergeWorkerThreadStats() {
     int nThreads = MaxThreadIndex();
-    std::shared_ptr<Barrier> barrier = Barrier::Create(nThreads);
+    absl::Barrier *barrier = new absl::Barrier(nThreads);
 
     ParallelFor(0, nThreads,
                 [barrier](int64_t index) {
                     ReportThreadStats();
-                    barrier->Wait();
+                    if (barrier->Block()) delete barrier;
                 });
 }
 

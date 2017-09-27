@@ -68,7 +68,6 @@ GFX!
   strings/string_view.h: many
   strings/str_cat.h: StrCat/StrAppend (parsing?)
   strings/strip.h: image filename extension handling?
-  synchronization/barrier.h
 
 - rename GonioPhotometricLight -> GoniometricLight?
 

@@ -85,32 +85,6 @@ class AtomicFloat {
 #endif
 };
 
-// Simple one-use barrier; ensures that multiple threads all reach a
-// particular point of execution before allowing any of them to proceed
-// past it.
-//
-// Note: this should be heap allocated and managed with a shared_ptr, where
-// all threads that use it are passed the shared_ptr. This ensures that
-// memory for the Barrier won't be freed until all threads have
-// successfully cleared it.
-class Barrier {
-  public:
-    static std::shared_ptr<Barrier> Create(int count) {
-        // It would be nice to use make_shared, but it's complicated...
-        // https://stackoverflow.com/questions/8147027/how-do-i-call-stdmake-shared-on-a-class-with-only-protected-or-private-const
-        return std::shared_ptr<Barrier>(new Barrier(count));
-    }
-    ~Barrier() { CHECK_EQ(count, 0); }
-    void Wait();
-
-  private:
-    Barrier(int count) : count(count) { CHECK_GT(count, 0); }
-
-    std::mutex mutex;
-    std::condition_variable cv;
-    int count;
-};
-
 void ParallelFor(int64_t start, int64_t end, int chunkSize,
                  std::function<void(int64_t, int64_t)> func);
 

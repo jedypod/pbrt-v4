@@ -37,6 +37,7 @@
 #include "util/parallel.h"
 #include "util/stats.h"
 
+#include <absl/synchronization/barrier.h>
 #include <memory>
 #include <stdio.h>
 
@@ -70,16 +71,16 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
         // time. (Which in turn calls malloc, which isn't allowed in a
         // signal handler.)
         SuspendProfiler();
-        std::shared_ptr<Barrier> barrier = Barrier::Create(2);
+        absl::Barrier *barrier = new absl::Barrier(2);
         updateThread = std::thread([this, barrier]() {
             ProfilerWorkerThreadInit();
             ProfilerState = 0;
-            barrier->Wait();
+            if (barrier->Block()) delete barrier;
             PrintBar();
         });
         // Wait for the thread to get past the ProfilerWorkerThreadInit()
         // call.
-        barrier->Wait();
+        if (barrier->Block()) delete barrier;
         ResumeProfiler();
     }
 }
