@@ -48,7 +48,7 @@ void PrintTo(const TestIntegrator &tr, ::std::ostream *os) {
 }
 
 void CheckSceneAverage(const char *filename, float expected) {
-    std::experimental::optional<Image> image = Image::Read(filename);
+    absl::optional<Image> image = Image::Read(filename);
     ASSERT_TRUE((bool)image);
     ASSERT_EQ(image->nChannels(), 3);
 

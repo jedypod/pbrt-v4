@@ -247,7 +247,7 @@ TEST(Image, PfmIO) {
 
     Image image(rgbPixels, PixelFormat::RGB32, res);
     EXPECT_TRUE(image.Write("test.pfm"));
-    std::experimental::optional<Image> read = Image::Read("test.pfm");
+    absl::optional<Image> read = Image::Read("test.pfm");
     EXPECT_TRUE((bool)read);
 
     EXPECT_EQ(image.resolution, read->resolution);
@@ -272,7 +272,7 @@ TEST(Image, ExrIO) {
         Image image(format, res);
         image.CopyRectIn({{0, 0}, res}, rgbPixels);
         EXPECT_TRUE(image.Write("test.exr"));
-        std::experimental::optional<Image> read = Image::Read("test.exr");
+        absl::optional<Image> read = Image::Read("test.exr");
         EXPECT_TRUE((bool)read);
 
         EXPECT_EQ(image.resolution, read->resolution);
@@ -301,7 +301,7 @@ TEST(Image, PngRgbIO) {
 
     Image image(rgbPixels, PixelFormat::RGB32, res);
     EXPECT_TRUE(image.Write("test.png"));
-    std::experimental::optional<Image> read = Image::Read("test.png");
+    absl::optional<Image> read = Image::Read("test.png");
     EXPECT_TRUE((bool)read);
 
     EXPECT_EQ(image.resolution, read->resolution);

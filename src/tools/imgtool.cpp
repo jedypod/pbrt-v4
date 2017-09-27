@@ -205,7 +205,7 @@ int assemble(int argc, char *argv[]) {
                 "\"assemble\" needs.");
 
         ImageMetadata metadata;
-        std::experimental::optional<Image> img = Image::Read(file, &metadata, true);
+        absl::optional<Image> img = Image::Read(file, &metadata, true);
         if (!img) continue;
 
         if (!metadata.fullResolution) {
@@ -294,7 +294,7 @@ int cat(int argc, char *argv[]) {
             continue;
         }
 
-        std::experimental::optional<Image> img = Image::Read(argv[i]);
+        absl::optional<Image> img = Image::Read(argv[i]);
         if (!img) {
             fprintf(stderr, "%s: unable to read image.\n", argv[i]);
             continue;
@@ -364,7 +364,7 @@ int diff(int argc, char *argv[]) {
 
     Image img[2];
     for (int i = 0; i < 2; ++i) {
-        std::experimental::optional<Image> imRead = Image::Read(filenames[i]);
+        absl::optional<Image> imRead = Image::Read(filenames[i]);
         if (imRead)
             img[i] = std::move(*imRead);
         else {
@@ -541,7 +541,7 @@ int info(int argc, char *argv[]) {
             }
         } else {
             ImageMetadata metadata;
-            std::experimental::optional<Image> image = Image::Read(argv[i], &metadata);
+            absl::optional<Image> image = Image::Read(argv[i], &metadata);
             if (!image) {
                 fprintf(stderr, "%s: unable to load image.\n", argv[i]);
                 err = 1;
@@ -882,7 +882,7 @@ int maketiled(int argc, char *argv[]) {
 
     const char *infile = filenames[0].c_str(), *outfile = filenames[1].c_str();
 
-    std::experimental::optional<Image> image = Image::Read(infile);
+    absl::optional<Image> image = Image::Read(infile);
     if (!image) {
         fprintf(stderr, "%s: unable to read image\n", infile);
         return 1;

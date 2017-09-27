@@ -183,7 +183,7 @@ std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     std::string texmap = paramSet.GetOneFilename("mapname", "");
 
-    std::experimental::optional<Image> image;
+    absl::optional<Image> image;
     if (texmap != "")
         image = Image::Read(texmap);
     if (!image) {

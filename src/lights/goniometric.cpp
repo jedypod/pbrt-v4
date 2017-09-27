@@ -97,7 +97,7 @@ std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
 
     std::string texname = paramSet.GetOneFilename("mapname", "");
-    std::experimental::optional<Image> image;
+    absl::optional<Image> image;
     if (texname != "")
         image = Image::Read(texname);
     if (!image) {

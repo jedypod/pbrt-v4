@@ -132,7 +132,7 @@ void SetSearchDirectory(const std::string &dirname) {
     searchDirectory = dirname;
 }
 
-std::experimental::optional<std::string> ReadFileContents(const std::string &filename) {
+absl::optional<std::string> ReadFileContents(const std::string &filename) {
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
         Error("%s: %s", filename.c_str(), strerror(errno));

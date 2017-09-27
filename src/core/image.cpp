@@ -587,18 +587,16 @@ std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
 }
 
 // ImageIO Local Declarations
-static std::experimental::optional<Image> ReadEXR(const std::string &name,
-                                                  ImageMetadata *metadata);
-static std::experimental::optional<Image> ReadPNG(const std::string &name,
-                                                  bool gamma,
-                                                  ImageMetadata *metadata);
-static std::experimental::optional<Image> ReadPFM(const std::string &filename,
-                                                  ImageMetadata *metadata);
+static absl::optional<Image> ReadEXR(const std::string &name,
+                                     ImageMetadata *metadata);
+static absl::optional<Image> ReadPNG(const std::string &name, bool gamma,
+                                     ImageMetadata *metadata);
+static absl::optional<Image> ReadPFM(const std::string &filename,
+                                     ImageMetadata *metadata);
 
 // ImageIO Function Definitions
-std::experimental::optional<Image> Image::Read(const std::string &name,
-                                               ImageMetadata *metadata,
-                                               bool gamma) {
+absl::optional<Image> Image::Read(const std::string &name,
+                                  ImageMetadata *metadata, bool gamma) {
     if (HasExtension(name, ".exr"))
         return ReadEXR(name, metadata);
     else if (HasExtension(name, ".png"))
@@ -670,8 +668,8 @@ static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
     return fb;
 }
 
-static std::experimental::optional<Image> ReadEXR(const std::string &name,
-                                                  ImageMetadata *metadata) {
+static absl::optional<Image> ReadEXR(const std::string &name,
+                                     ImageMetadata *metadata) {
     try {
         Imf::InputFile file(name.c_str());
         Imath::Box2i dw = file.header().dataWindow();
@@ -828,9 +826,8 @@ static inline uint8_t FloatToSRGB(Float v) {
     return uint8_t(Clamp(255.f * LinearToSRGB(v) + 0.5f, 0.f, 255.f));
 }
 
-static std::experimental::optional<Image> ReadPNG(const std::string &name,
-                                                  bool gamma,
-                                                  ImageMetadata *metadata) {
+static absl::optional<Image> ReadPNG(const std::string &name,
+                                     bool gamma, ImageMetadata *metadata) {
     auto contents = ReadFileContents(name);
     if (!contents)
         return {};
@@ -1030,8 +1027,8 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
     return -1;
 }
 
-static std::experimental::optional<Image> ReadPFM(const std::string &filename,
-                                                  ImageMetadata *metadata) {
+static absl::optional<Image> ReadPFM(const std::string &filename,
+                                     ImageMetadata *metadata) {
     std::vector<float> rgb32;
     char buffer[BUFFER_SIZE];
     unsigned int nFloats;

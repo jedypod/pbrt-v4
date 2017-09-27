@@ -142,7 +142,7 @@ std::shared_ptr<ProjectionLight> CreateProjectionLight(
     Float fov = paramSet.GetOneFloat("fov", 45.);
 
     std::string texname = paramSet.GetOneFilename("mapname", "");
-    std::experimental::optional<Image> image;
+    absl::optional<Image> image;
     if (texname != "")
         image = Image::Read(texname);
     if (!image) {

@@ -48,11 +48,11 @@
 #include "util/transform.h"
 #include <glog/logging.h>
 #include <absl/types/span.h>
+#include <absl/types/optional.h>
 
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <experimental/optional>
 #include <map>
 #include <vector>
 
@@ -229,10 +229,10 @@ bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
 
 struct ImageMetadata {
     // These may or may not be present in the metadata of an Image.
-    std::experimental::optional<Float> renderTimeSeconds;
-    std::experimental::optional<Matrix4x4> worldToCamera, worldToNDC;
-    std::experimental::optional<Bounds2i> pixelBounds;
-    std::experimental::optional<Point2i> fullResolution;
+    absl::optional<Float> renderTimeSeconds;
+    absl::optional<Matrix4x4> worldToCamera, worldToNDC;
+    absl::optional<Bounds2i> pixelBounds;
+    absl::optional<Point2i> fullResolution;
     std::map<std::string, std::vector<std::string>> stringVectors;
 };
 
@@ -252,7 +252,7 @@ class Image {
 
     // TODO: make gamma option more flexible: sRGB vs provided gamma
     // exponent...
-    static std::experimental::optional<Image> Read(
+    static absl::optional<Image> Read(
         const std::string &filename, ImageMetadata *metadata = nullptr,
         bool gamma = true);
     bool Write(const std::string &name,
