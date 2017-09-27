@@ -34,21 +34,19 @@
 // core/spectrum.cpp*
 #include "spectrum.h"
 
-using gtl::ArraySlice;
-using gtl::MutableArraySlice;
 
 namespace pbrt {
 
 // Spectrum Method Definitions
-bool SpectrumSamplesSorted(ArraySlice<Float> lambda, ArraySlice<Float> vals) {
+bool SpectrumSamplesSorted(absl::Span<const Float> lambda, absl::Span<const Float> vals) {
     CHECK_EQ(lambda.size(), vals.size());
     for (size_t i = 0; i < lambda.size() - 1; ++i)
         if (lambda[i] > lambda[i + 1]) return false;
     return true;
 }
 
-void SortSpectrumSamples(MutableArraySlice<Float> lambda,
-                         MutableArraySlice<Float> vals) {
+void SortSpectrumSamples(absl::Span<Float> lambda,
+                         absl::Span<Float> vals) {
     CHECK_EQ(lambda.size(), vals.size());
     std::vector<std::pair<Float, Float>> sortVec;
     sortVec.reserve(lambda.size());
@@ -61,7 +59,7 @@ void SortSpectrumSamples(MutableArraySlice<Float> lambda,
     }
 }
 
-Float AverageSpectrumSamples(ArraySlice<Float> lambda, ArraySlice<Float> vals,
+Float AverageSpectrumSamples(absl::Span<const Float> lambda, absl::Span<const Float> vals,
                              Float lambdaStart, Float lambdaEnd) {
     CHECK_EQ(lambda.size(), vals.size());
     for (int i = 0; i < lambda.size() - 1; ++i) CHECK_GT(lambda[i + 1], lambda[i]);
@@ -96,7 +94,7 @@ Float AverageSpectrumSamples(ArraySlice<Float> lambda, ArraySlice<Float> vals,
     return sum / (lambdaEnd - lambdaStart);
 }
 
-SampledSpectrum SampledSpectrum::FromRGB(gtl::ArraySlice<Float> rgb,
+SampledSpectrum SampledSpectrum::FromRGB(absl::Span<const Float> rgb,
                                          SpectrumType type) {
     DCHECK_EQ(3, rgb.size());
     SampledSpectrum r;
@@ -176,8 +174,8 @@ SampledSpectrum::SampledSpectrum(const RGBSpectrum &r, SpectrumType t) {
     *this = SampledSpectrum::FromRGB(r.ToRGB(), t);
 }
 
-Float InterpolateSpectrumSamples(ArraySlice<Float> lambda,
-                                 ArraySlice<Float> vals, Float l) {
+Float InterpolateSpectrumSamples(absl::Span<const Float> lambda,
+                                 absl::Span<const Float> vals, Float l) {
     CHECK_EQ(lambda.size(), vals.size());
     for (int i = 0; i < lambda.size() - 1; ++i)
         CHECK_GT(lambda[i + 1], lambda[i]);
@@ -939,7 +937,7 @@ const Float CIE_lambda[nCIESamples] = {
     795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805, 806, 807, 808, 809,
     810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 820, 821, 822, 823, 824,
     825, 826, 827, 828, 829, 830};
-void Blackbody(ArraySlice<Float> lambda, Float T, MutableArraySlice<Float> Le) {
+void Blackbody(absl::Span<const Float> lambda, Float T, absl::Span<Float> Le) {
     CHECK_GE(Le.size(), lambda.size());
     if (T <= 0) {
         for (size_t i = 0; i < lambda.size(); ++i) Le[i] = 0.f;
@@ -958,8 +956,8 @@ void Blackbody(ArraySlice<Float> lambda, Float T, MutableArraySlice<Float> Le) {
     }
 }
 
-void BlackbodyNormalized(gtl::ArraySlice<Float> lambda, Float T,
-                         gtl::MutableArraySlice<Float> Le) {
+void BlackbodyNormalized(absl::Span<const Float> lambda, Float T,
+                         absl::Span<Float> Le) {
     CHECK_LE(lambda.size(), Le.size());
     Blackbody(lambda, T, Le);
     // Normalize _Le_ values based on maximum blackbody radiance
@@ -1294,8 +1292,8 @@ void ResampleLinearSpectrum(const Float *lambdaIn, const Float *vIn, int nIn,
         } else {
             // Upsampling: use a box filter and average all values in the
             // input spectrum from lambda +/- delta / 2.
-            return AverageSpectrumSamples(ArraySlice<Float>(lambdaIn, nIn),
-                                          ArraySlice<Float>(vIn, nIn),
+            return AverageSpectrumSamples(absl::Span<const Float>(lambdaIn, nIn),
+                                          absl::Span<const Float>(vIn, nIn),
                                           lambda - delta / 2, lambda + delta / 2);
         }
     };

@@ -40,7 +40,7 @@
 
 // shapes/curve.h*
 #include "shape.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 namespace pbrt {
 
@@ -49,8 +49,8 @@ enum class CurveType { Flat, Cylinder, Ribbon };
 
 // CurveCommon Declarations
 struct CurveCommon {
-    CurveCommon(gtl::ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
-                gtl::ArraySlice<Normal3f> norm,
+    CurveCommon(absl::Span<const Point3f> c, Float w0, Float w1, CurveType type,
+                absl::Span<const Normal3f> norm,
                 std::shared_ptr<const Transform> ObjectToWorld,
                 std::shared_ptr<const Transform> WorldToObject,
                 bool reverseOrientation,

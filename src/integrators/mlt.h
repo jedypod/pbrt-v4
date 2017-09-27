@@ -65,8 +65,8 @@ class MLTSampler : public Sampler {
     Point2f Get2D();
     void Request1DArray(int n) final;
     void Request2DArray(int n) final;
-    gtl::ArraySlice<Float> Get1DArray(int n) final;
-    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
+    absl::Span<const Float> Get1DArray(int n) final;
+    absl::Span<const Point2f> Get2DArray(int n) final;
     std::unique_ptr<Sampler> Clone();
     void StartIteration();
     void Accept();

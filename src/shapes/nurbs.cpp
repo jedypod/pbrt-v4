@@ -38,9 +38,7 @@
 #include "util/memory.h"
 #include "shapes/triangle.h"
 #include "paramset.h"
-#include "ext/google/array_slice.h"
-
-using gtl::ArraySlice;
+#include "absl/types/span.h"
 
 namespace pbrt {
 
@@ -163,7 +161,7 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    ArraySlice<Float> uknots = params.GetFloatArray("uknots");
+    absl::Span<const Float> uknots = params.GetFloatArray("uknots");
     if (uknots.empty()) {
         Error("Must provide u knot vector \"uknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
@@ -192,7 +190,7 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
         return std::vector<std::shared_ptr<Shape>>();
     }
 
-    ArraySlice<Float> vknots = params.GetFloatArray("vknots");
+    absl::Span<const Float> vknots = params.GetFloatArray("vknots");
     if (vknots.empty()) {
         Error("Must provide v knot vector \"vknots\" with NURBS shape.");
         return std::vector<std::shared_ptr<Shape>>();
@@ -209,8 +207,8 @@ std::vector<std::shared_ptr<Shape>> CreateNURBS(
     Float v0 = params.GetOneFloat("v0", vknots[vorder - 1]);
     Float v1 = params.GetOneFloat("v1", vknots[nv]);
 
-    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
-    ArraySlice<Float> Pw;
+    absl::Span<const Point3f> P = params.GetPoint3fArray("P");
+    absl::Span<const Float> Pw;
     if (P.empty()) {
         Pw = params.GetFloatArray("Pw");
         if (Pw.empty()) {

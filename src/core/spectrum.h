@@ -43,7 +43,7 @@
 
 #include "util/mathutil.h"
 #include "util/stringprint.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -59,21 +59,21 @@ namespace pbrt {
 static const int sampledLambdaStart = 400;
 static const int sampledLambdaEnd = 700;
 static const int nSpectralSamples = 60;
-extern bool SpectrumSamplesSorted(gtl::ArraySlice<Float> lambda,
-                                  gtl::ArraySlice<Float> vals);
-extern void SortSpectrumSamples(gtl::MutableArraySlice<Float> lambda,
-                                gtl::MutableArraySlice<Float> vals);
-extern Float AverageSpectrumSamples(gtl::ArraySlice<Float> lambda,
-                                    gtl::ArraySlice<Float> vals,
+extern bool SpectrumSamplesSorted(absl::Span<const Float> lambda,
+                                  absl::Span<const Float> vals);
+extern void SortSpectrumSamples(absl::Span<Float> lambda,
+                                absl::Span<Float> vals);
+extern Float AverageSpectrumSamples(absl::Span<const Float> lambda,
+                                    absl::Span<const Float> vals,
                                     Float lambdaStart, Float lambdaEnd);
-inline std::array<Float, 3> XYZToRGB(gtl::ArraySlice<Float> xyz) {
+inline std::array<Float, 3> XYZToRGB(absl::Span<const Float> xyz) {
     DCHECK_EQ(3, xyz.size());
     return { 3.240479f * xyz[0] - 1.537150f * xyz[1] - 0.498535f * xyz[2],
             -0.969256f * xyz[0] + 1.875991f * xyz[1] + 0.041556f * xyz[2],
             0.055648f * xyz[0] - 0.204043f * xyz[1] + 1.057311f * xyz[2] };
 }
 
-inline std::array<Float, 3> RGBToXYZ(gtl::ArraySlice<Float> rgb) {
+inline std::array<Float, 3> RGBToXYZ(absl::Span<const Float> rgb) {
     DCHECK_EQ(3, rgb.size());
     return { 0.412453f * rgb[0] + 0.357580f * rgb[1] + 0.180423f * rgb[2],
             0.212671f * rgb[0] + 0.715160f * rgb[1] + 0.072169f * rgb[2],
@@ -81,12 +81,12 @@ inline std::array<Float, 3> RGBToXYZ(gtl::ArraySlice<Float> rgb) {
 }
 
 enum class SpectrumType { Reflectance, Illuminant };
-extern Float InterpolateSpectrumSamples(gtl::ArraySlice<Float> lambda,
-                                        gtl::ArraySlice<Float> vals, Float l);
-extern void Blackbody(gtl::ArraySlice<Float> lambda, Float T,
-                      gtl::MutableArraySlice<Float> Le);
-extern void BlackbodyNormalized(gtl::ArraySlice<Float> lambda, Float T,
-                                gtl::MutableArraySlice<Float> vals);
+extern Float InterpolateSpectrumSamples(absl::Span<const Float> lambda,
+                                        absl::Span<const Float> vals, Float l);
+extern void Blackbody(absl::Span<const Float> lambda, Float T,
+                      absl::Span<Float> Le);
+extern void BlackbodyNormalized(absl::Span<const Float> lambda, Float T,
+                                absl::Span<Float> vals);
 
 // Spectral Data Declarations
 static const int nCIESamples = 471;
@@ -307,14 +307,14 @@ class SampledSpectrum :
     SampledSpectrum(Float v = 0.f) : CoefficientSpectrum(v) {}
 /*CO    SampledSpectrum(const CoefficientSpectrum<nSpectralSamples> &v)*/
 /*CO        : CoefficientSpectrum<nSpectralSamples>(v) {}*/
-    static SampledSpectrum FromSampled(gtl::ArraySlice<Float> lambda,
-                                       gtl::ArraySlice<Float> v) {
+    static SampledSpectrum FromSampled(absl::Span<const Float> lambda,
+                                       absl::Span<const Float> v) {
         // Sort samples if unordered, use sorted for returned spectrum
         CHECK_EQ(lambda.size(), v.size());
         if (!SpectrumSamplesSorted(lambda, v)) {
             std::vector<Float> slambda(lambda.begin(), lambda.end());
             std::vector<Float> sv(v.begin(), v.end());
-            SortSpectrumSamples(&slambda, &sv);
+            SortSpectrumSamples(absl::MakeSpan(slambda), absl::MakeSpan(sv));
             return FromSampled(slambda, sv);
         }
         SampledSpectrum r;
@@ -401,9 +401,9 @@ class SampledSpectrum :
         return XYZToRGB(ToXYZ());
     }
     static SampledSpectrum FromRGB(
-        gtl::ArraySlice<Float> rgb, SpectrumType type = SpectrumType::Illuminant);
+        absl::Span<const Float> rgb, SpectrumType type = SpectrumType::Illuminant);
     static SampledSpectrum FromXYZ(
-        gtl::ArraySlice<Float> xyz, SpectrumType type = SpectrumType::Reflectance) {
+        absl::Span<const Float> xyz, SpectrumType type = SpectrumType::Reflectance) {
         DCHECK_EQ(3, xyz.size());
         std::array<Float, 3> rgb = XYZToRGB(xyz);
         return FromRGB(rgb, type);
@@ -435,7 +435,7 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
                 SpectrumType type = SpectrumType::Reflectance) {
         *this = s;
     }
-    static RGBSpectrum FromRGB(gtl::ArraySlice<Float> rgb,
+    static RGBSpectrum FromRGB(absl::Span<const Float> rgb,
                                SpectrumType type = SpectrumType::Reflectance) {
         DCHECK_EQ(3, rgb.size());
         RGBSpectrum s;
@@ -449,7 +449,7 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
         return { c[0], c[1], c[2] };
     }
     std::array<Float, 3> ToXYZ() const { return RGBToXYZ(c); }
-    static RGBSpectrum FromXYZ(gtl::ArraySlice<Float> xyz,
+    static RGBSpectrum FromXYZ(absl::Span<const Float> xyz,
                                SpectrumType type = SpectrumType::Reflectance) {
         DCHECK_EQ(3, xyz.size());
         std::array<Float, 3> rgb = XYZToRGB(xyz);
@@ -459,13 +459,13 @@ RGBSpectrum(Float v = 0.f) : CoefficientSpectrum<RGBSpectrum, 3>(v) {}
         const Float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};
         return YWeight[0] * c[0] + YWeight[1] * c[1] + YWeight[2] * c[2];
     }
-    static RGBSpectrum FromSampled(gtl::ArraySlice<Float> lambda,
-                                   gtl::ArraySlice<Float> v) {
+    static RGBSpectrum FromSampled(absl::Span<const Float> lambda,
+                                   absl::Span<const Float> v) {
         // Sort samples if unordered, use sorted for returned spectrum
         if (!SpectrumSamplesSorted(lambda, v)) {
             std::vector<Float> slambda(lambda.begin(), lambda.end());
             std::vector<Float> sv(v.begin(), v.end());
-            SortSpectrumSamples(&slambda, &sv);
+            SortSpectrumSamples(absl::MakeSpan(slambda), absl::MakeSpan(sv));
             return FromSampled(slambda, sv);
         }
         Float xyz[3] = {0, 0, 0};

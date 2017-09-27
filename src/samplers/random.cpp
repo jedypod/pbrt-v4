@@ -76,7 +76,7 @@ void RandomSampler::Request2DArray(int n) {
     sampleArray2D.push_back(std::vector<Point2f>(n));
 }
 
-gtl::ArraySlice<Float> RandomSampler::Get1DArray(int n) {
+absl::Span<const Float> RandomSampler::Get1DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(array1DOffset, sampleArray1D.size());
     for (int i = 0; i < n; ++i)
@@ -84,7 +84,7 @@ gtl::ArraySlice<Float> RandomSampler::Get1DArray(int n) {
     return sampleArray1D[array1DOffset++];
 }
 
-gtl::ArraySlice<Point2f> RandomSampler::Get2DArray(int n) {
+absl::Span<const Point2f> RandomSampler::Get2DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(array2DOffset, sampleArray2D.size());
     for (int i = 0; i < n; ++i) {

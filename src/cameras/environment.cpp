@@ -39,7 +39,6 @@
 #include "sampler.h"
 #include "util/stats.h"
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -87,7 +86,7 @@ std::shared_ptr<EnvironmentCamera> CreateEnvironmentCamera(
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    ArraySlice<Float> sw = params.GetFloatArray("screenwindow");
+    absl::Span<const Float> sw = params.GetFloatArray("screenwindow");
     if (sw.size() > 0) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];

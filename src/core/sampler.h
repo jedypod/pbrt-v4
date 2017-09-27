@@ -45,7 +45,7 @@
 #include "util/geometry.h"
 #include "util/rng.h"
 #include "util/stringprint.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <cstdint>
 #include <memory>
@@ -67,8 +67,8 @@ class Sampler {
     virtual int RoundCount(int n) const { return n; }
     virtual void Request1DArray(int n) = 0;
     virtual void Request2DArray(int n) = 0;
-    virtual gtl::ArraySlice<Float> Get1DArray(int n) = 0;
-    virtual gtl::ArraySlice<Point2f> Get2DArray(int n) = 0;
+    virtual absl::Span<const Float> Get1DArray(int n) = 0;
+    virtual absl::Span<const Point2f> Get2DArray(int n) = 0;
     virtual std::unique_ptr<Sampler> Clone() = 0;
 
     int GetDiscrete1D(int n) {
@@ -92,8 +92,8 @@ class PixelSampler : public Sampler {
     Point2f Get2D() final;
     void Request1DArray(int n) final;
     void Request2DArray(int n) final;
-    gtl::ArraySlice<Float> Get1DArray(int n) final;
-    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
+    absl::Span<const Float> Get1DArray(int n) final;
+    absl::Span<const Point2f> Get2DArray(int n) final;
 
     virtual void GeneratePixelSamples(RNG &rng) = 0;
 
@@ -121,8 +121,8 @@ class GlobalSampler : public Sampler {
     GlobalSampler(int samplesPerPixel) : Sampler(samplesPerPixel) {}
     void Request1DArray(int n) final;
     void Request2DArray(int n) final;
-    gtl::ArraySlice<Float> Get1DArray(int n) final;
-    gtl::ArraySlice<Point2f> Get2DArray(int n) final;
+    absl::Span<const Float> Get1DArray(int n) final;
+    absl::Span<const Point2f> Get2DArray(int n) final;
 
     virtual int64_t GetIndexForSample(int64_t sampleNum) const = 0;
     virtual Float SampleDimension(int64_t index, int dimension) const = 0;

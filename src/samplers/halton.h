@@ -39,7 +39,7 @@
 #define PBRT_SAMPLERS_HALTON_H
 
 // samplers/halton.h*
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include "lowdiscrepancy.h"
 #include "sampler.h"
 
@@ -71,7 +71,7 @@ class HaltonSampler : public GlobalSampler {
     bool sampleAtPixelCenter;
 
     // HaltonSampler Private Methods
-    gtl::ArraySlice<uint16_t> PermutationForDimension(int dim) const {
+    absl::Span<const uint16_t> PermutationForDimension(int dim) const {
         if (dim >= PrimeTableSize)
             LOG(FATAL) << StringPrintf("HaltonSampler can only sample %d "
                                        "dimensions.", PrimeTableSize);

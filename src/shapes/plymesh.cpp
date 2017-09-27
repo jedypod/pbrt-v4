@@ -40,7 +40,6 @@
 
 #include <iostream>
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 using namespace std;
@@ -239,9 +238,9 @@ std::vector<std::shared_ptr<Shape>> CreatePLYMesh(
 
     if (context.error) return std::vector<std::shared_ptr<Shape>>();
 
-    ArraySlice<Normal3f> N;
+    absl::Span<const Normal3f> N;
     if (context.n) N = {context.n, vertexCount};
-    ArraySlice<Point2f> uv;
+    absl::Span<const Point2f> uv;
     if (context.uv) uv = {context.uv, vertexCount};
 
     return CreateTriangleMesh(

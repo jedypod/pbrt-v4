@@ -61,7 +61,7 @@ std::shared_ptr<GridDensityMedium> GridDensityMedium::Create(
     sig_a = ps.GetOneSpectrum("sigma_a", sig_a) * scale;
     sig_s = ps.GetOneSpectrum("sigma_s", sig_s) * scale;
 
-    gtl::ArraySlice<Float> data = ps.GetFloatArray("density");
+    absl::Span<const Float> data = ps.GetFloatArray("density");
     if (data.empty()) {
         Error("No \"density\" values provided for heterogeneous medium?");
         return nullptr;

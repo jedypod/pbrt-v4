@@ -560,7 +560,8 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
 
     // Importance sample the luminance Fourier expansion
     Float phi, pdfPhi;
-    Float Y = SampleFourier({ak, size_t(mMax)}, {bsdfTable.recip, 0, size_t(mMax)},
+    Float Y = SampleFourier(absl::Span<const Float>(ak, size_t(mMax)),
+                            absl::Span<const Float>(bsdfTable.recip).subspan(0, size_t(mMax)),
                             u[0], &pdfPhi, &phi);
     *pdf = std::max((Float)0, pdfPhi * pdfMu);
 
@@ -639,7 +640,7 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
     return (rho > 0 && Y > 0) ? (Y / rho) : 0;
 }
 
-Spectrum BxDF::rho(const Vector3f &w, gtl::ArraySlice<Point2f> samples) const {
+Spectrum BxDF::rho(const Vector3f &w, absl::Span<const Point2f> samples) const {
     Spectrum r(0.);
     for (Point2f u : samples) {
         // Estimate one term of $\rho_\roman{hd}$
@@ -651,8 +652,8 @@ Spectrum BxDF::rho(const Vector3f &w, gtl::ArraySlice<Point2f> samples) const {
     return r / samples.size();
 }
 
-Spectrum BxDF::rho(gtl::ArraySlice<Point2f> u1,
-                   gtl::ArraySlice<Point2f> u2) const {
+Spectrum BxDF::rho(absl::Span<const Point2f> u1,
+                   absl::Span<const Point2f> u2) const {
     DCHECK_EQ(u1.size(), u2.size());
     Spectrum r(0.f);
     for (int i = 0; i < u1.size(); ++i) {
@@ -683,8 +684,8 @@ Spectrum BSDF::f(const Vector3f &woW, const Vector3f &wiW,
     return f;
 }
 
-Spectrum BSDF::rho(gtl::ArraySlice<Point2f> samples1,
-                   gtl::ArraySlice<Point2f> samples2, BxDFType flags) const {
+Spectrum BSDF::rho(absl::Span<const Point2f> samples1,
+                   absl::Span<const Point2f> samples2, BxDFType flags) const {
     Spectrum ret(0.f);
     for (int i = 0; i < nBxDFs; ++i)
         if (bxdfs[i]->MatchesFlags(flags))
@@ -692,7 +693,7 @@ Spectrum BSDF::rho(gtl::ArraySlice<Point2f> samples1,
     return ret;
 }
 
-Spectrum BSDF::rho(const Vector3f &wo, gtl::ArraySlice<Point2f> samples,
+Spectrum BSDF::rho(const Vector3f &wo, absl::Span<const Point2f> samples,
                    BxDFType flags) const {
     Spectrum ret(0.f);
     for (int i = 0; i < nBxDFs; ++i)

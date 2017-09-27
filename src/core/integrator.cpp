@@ -52,7 +52,6 @@ namespace pbrt {
 
 STAT_COUNTER("Integrator/Camera rays traced", nCameraRays);
 
-using gtl::ArraySlice;
 
 // Integrator Method Definitions
 Integrator::~Integrator() {}

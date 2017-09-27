@@ -47,7 +47,7 @@
 #include "util/half.h"
 #include "util/transform.h"
 #include <glog/logging.h>
-#include <ext/google/array_slice.h>
+#include <absl/types/span.h>
 
 #include <array>
 #include <cstdint>
@@ -271,10 +271,10 @@ class Image {
 
     // FIXME: could be / should be const...
     void CopyRectOut(const Bounds2i &extent,
-                     gtl::MutableArraySlice<Float> buf,
+                     absl::Span<Float> buf,
                      WrapMode wrapMode = WrapMode::Clamp);
     void CopyRectIn(const Bounds2i &extent,
-                    gtl::ArraySlice<Float> buf);
+                    absl::Span<const Float> buf);
 
     Float BilerpChannel(Point2f p, int c,
                         WrapMode wrapMode = WrapMode::Clamp) const;

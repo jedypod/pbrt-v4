@@ -40,32 +40,32 @@
 
 // core/interpolation.h*
 #include "pbrt.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 namespace pbrt {
 
 // Spline Interpolation Declarations
-Float CatmullRom(gtl::ArraySlice<Float> nodes, gtl::ArraySlice<Float> values,
+Float CatmullRom(absl::Span<const Float> nodes, absl::Span<const Float> values,
                  Float x);
-bool CatmullRomWeights(gtl::ArraySlice<Float> nodes, Float x, int *offset,
-                       gtl::MutableArraySlice<Float> weights);
-Float SampleCatmullRom(gtl::ArraySlice<Float> nodes, gtl::ArraySlice<Float> f,
-                       gtl::ArraySlice<Float> cdf, Float sample, Float *fval = nullptr,
+bool CatmullRomWeights(absl::Span<const Float> nodes, Float x, int *offset,
+                       absl::Span<Float> weights);
+Float SampleCatmullRom(absl::Span<const Float> nodes, absl::Span<const Float> f,
+                       absl::Span<const Float> cdf, Float sample, Float *fval = nullptr,
                        Float *pdf = nullptr);
-Float SampleCatmullRom2D(gtl::ArraySlice<Float> nodes1,
-                         gtl::ArraySlice<Float> nodes2,
-                         gtl::ArraySlice<Float> values,
-                         gtl::ArraySlice<Float> cdf, Float alpha, Float sample,
+Float SampleCatmullRom2D(absl::Span<const Float> nodes1,
+                         absl::Span<const Float> nodes2,
+                         absl::Span<const Float> values,
+                         absl::Span<const Float> cdf, Float alpha, Float sample,
                          Float *fval = nullptr, Float *pdf = nullptr);
-Float IntegrateCatmullRom(gtl::ArraySlice<Float> nodes,
-                          gtl::ArraySlice<Float> values,
-                          gtl::MutableArraySlice<Float> cdf);
-Float InvertCatmullRom(gtl::ArraySlice<Float> x, gtl::ArraySlice<Float> values,
+Float IntegrateCatmullRom(absl::Span<const Float> nodes,
+                          absl::Span<const Float> values,
+                          absl::Span<Float> cdf);
+Float InvertCatmullRom(absl::Span<const Float> x, absl::Span<const Float> values,
                        Float u);
 
 // Fourier Interpolation Declarations
-Float Fourier(gtl::ArraySlice<Float> a, double cosPhi);
-Float SampleFourier(gtl::ArraySlice<Float> ak, gtl::ArraySlice<Float> recip,
+Float Fourier(absl::Span<const Float> a, double cosPhi);
+Float SampleFourier(absl::Span<const Float> ak, absl::Span<const Float> recip,
                     Float u, Float *pdf, Float *phiPtr);
 
 }  // namespace pbrt

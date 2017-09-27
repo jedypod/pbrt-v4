@@ -528,7 +528,7 @@ std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
         maxDepth = 5;
     }
 
-    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
+    absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)

@@ -23,8 +23,8 @@ TEST(Spectrum, Blackbody) {
     int n = sizeof(v) / sizeof(v[0]);
     for (int i = 0; i < n; ++i) {
         Float Le;
-        Blackbody(gtl::ArraySlice<Float>(&v[i][0], 1), v[i][1],
-                  gtl::MutableArraySlice<Float>(&Le, 1));
+        Blackbody(absl::Span<const Float>(&v[i][0], 1), v[i][1],
+                  absl::Span<Float>(&Le, 1));
         EXPECT_LT(err(Le, v[i][2]), .001);
     }
 
@@ -36,8 +36,8 @@ TEST(Spectrum, Blackbody) {
         Float lambda[3] = {Float(.999 * lambdaMax), lambdaMax,
                            Float(1.001 * lambdaMax)};
         Float Le[3];
-        Blackbody(gtl::ArraySlice<Float>(lambda), T,
-                  gtl::MutableArraySlice<Float>(Le));
+        Blackbody(absl::Span<const Float>(lambda), T,
+                  absl::Span<Float>(Le));
         EXPECT_LT(Le[0], Le[1]);
         EXPECT_GT(Le[1], Le[2]);
     }

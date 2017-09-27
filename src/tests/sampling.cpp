@@ -31,7 +31,7 @@ TEST(LowDiscrepancy, ScrambledRadicalInverse) {
 
         std::vector<uint16_t> perm;
         for (int i = 0; i < base; ++i) perm.push_back(base - 1 - i);
-        Shuffle(gtl::MutableArraySlice<uint16_t>(&perm), 1, rng);
+        Shuffle(absl::MakeSpan(perm), 1, rng);
 
         for (const uint32_t index : {0, 1, 2, 1151, 32351, 4363211, 681122}) {
             // First, compare to the pbrt-v2 implementation.
@@ -112,7 +112,7 @@ TEST(LowDiscrepancy, GrayCodeSample) {
     for (int i = 0; i < 32; ++i) C[i] = 1 << i;
 
     std::vector<Float> v(64, (Float)0);
-    GrayCodeSample(C, 0, &v);
+    GrayCodeSample(C, 0, absl::MakeSpan(v));
 
     for (int a = 0; a < (int)v.size(); ++a) {
         Float u = MultiplyGenerator(C, a) * 2.3283064365386963e-10f;

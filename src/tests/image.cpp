@@ -181,7 +181,7 @@ TEST(Image, CopyRectOut) {
         Bounds2i extent(Point2i(2, 3), Point2i(5, 10));
         std::vector<Float> buf(extent.Area() * nc);
 
-        image.CopyRectOut(extent, &buf);
+        image.CopyRectOut(extent, absl::MakeSpan(buf));
 
         // Iterate through the points in the extent and the buffer
         // together.

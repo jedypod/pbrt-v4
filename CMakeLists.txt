@@ -38,6 +38,13 @@ if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/ptex")
     "\"git submodule update --init --recursive\"")
 endif()
 
+if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/abseil-cpp")
+  message(FATAL_ERROR "The abseil-cpp submodule directory is missing! "
+    "You probably did not clone the project with --recursive, or first checked out "
+    "pbrt before it was added. It is possible to recover by running "
+    "\"git submodule update --init --recursive\"")
+endif()
+
 FIND_PACKAGE ( Sanitizers )
 FIND_PACKAGE ( Threads )
 
@@ -245,6 +252,13 @@ ELSE()
 ENDIF()
 
 ###########################################################################
+# abseil
+
+ADD_SUBDIRECTORY(src/ext/abseil-cpp)
+
+INCLUDE_DIRECTORIES(src/ext/abseil-cpp)
+
+###########################################################################
 # zlib
 
 FIND_PACKAGE ( ZLIB )
@@ -443,6 +457,7 @@ SET(ALL_PBRT_LIBS
   glog
   Ptex_static
   ${ZLIB_LIBRARY}
+  absl
 )
 
 # Main renderer

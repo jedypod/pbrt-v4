@@ -75,6 +75,12 @@ Float SpotLight::Falloff(const Vector3f &w) const {
 }
 
 Spectrum SpotLight::Power() const {
+    return I * 2 * Pi * (1 - .5f * (cosFalloffStart + cosTotalWidth));
+
+    LOG(WARNING) << "Spotlight.  Was: " <<
+        I * 2 * Pi * (1 - .5f * (cosFalloffStart + cosTotalWidth)) << ", is: "<<
+        I * 2 * Pi * ((1 - cosFalloffStart) +
+                      (cosFalloffStart - cosTotalWidth) / 5);
     // int_0^start sin theta dtheta = 1 - cosFalloffStart
     // int_start^end [(cos theta - cos end) / (cos start - cos end)]^4
     //      sin theta dtheta = (cos start - cos end) / 5 (!!!!!)

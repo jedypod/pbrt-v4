@@ -36,13 +36,11 @@
 #include "util/mathutil.h"
 #include <glog/logging.h>
 
-using gtl::ArraySlice;
-using gtl::MutableArraySlice;
 
 namespace pbrt {
 
 // Spline Interpolation Definitions
-Float CatmullRom(ArraySlice<Float> nodes, ArraySlice<Float> values, Float x) {
+Float CatmullRom(absl::Span<const Float> nodes, absl::Span<const Float> values, Float x) {
     CHECK_EQ(nodes.size(), values.size());
     if (!(x >= nodes.front() && x <= nodes.back())) return 0;
     int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
@@ -65,8 +63,8 @@ Float CatmullRom(ArraySlice<Float> nodes, ArraySlice<Float> values, Float x) {
            (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
 }
 
-bool CatmullRomWeights(ArraySlice<Float> nodes, Float x, int *offset,
-                       MutableArraySlice<Float> weights) {
+bool CatmullRomWeights(absl::Span<const Float> nodes, Float x, int *offset,
+                       absl::Span<Float> weights) {
     CHECK_GE(weights.size(), 4);
     // Return _false_ if _x_ is out of bounds
     if (!(x >= nodes.front() && x <= nodes.back())) return false;
@@ -109,8 +107,8 @@ bool CatmullRomWeights(ArraySlice<Float> nodes, Float x, int *offset,
     return true;
 }
 
-Float SampleCatmullRom(ArraySlice<Float> x, ArraySlice<Float> f,
-                       ArraySlice<Float> F, Float u, Float *fval, Float *pdf) {
+Float SampleCatmullRom(absl::Span<const Float> x, absl::Span<const Float> f,
+                       absl::Span<const Float> F, Float u, Float *fval, Float *pdf) {
     CHECK_EQ(x.size(), f.size());
     CHECK_EQ(f.size(), F.size());
 
@@ -180,8 +178,8 @@ Float SampleCatmullRom(ArraySlice<Float> x, ArraySlice<Float> f,
     return x0 + width * t;
 }
 
-Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
-                         ArraySlice<Float> values, ArraySlice<Float> cdf,
+Float SampleCatmullRom2D(absl::Span<const Float> nodes1, absl::Span<const Float> nodes2,
+                         absl::Span<const Float> values, absl::Span<const Float> cdf,
                          Float alpha, Float u, Float *fval, Float *pdf) {
     // Determine offset and coefficients for the _alpha_ parameter
     int offset;
@@ -189,7 +187,7 @@ Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
     if (!CatmullRomWeights(nodes1, alpha, &offset, weights)) return 0;
 
     // Define a lambda function to interpolate table entries
-    auto interpolate = [&](ArraySlice<Float> array, int idx) {
+    auto interpolate = [&](absl::Span<const Float> array, int idx) {
         Float value = 0;
         for (int i = 0; i < 4; ++i)
             if (weights[i] != 0)
@@ -267,8 +265,8 @@ Float SampleCatmullRom2D(ArraySlice<Float> nodes1, ArraySlice<Float> nodes2,
     return x0 + width * t;
 }
 
-Float IntegrateCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values,
-                          MutableArraySlice<Float> cdf) {
+Float IntegrateCatmullRom(absl::Span<const Float> x, absl::Span<const Float> values,
+                          absl::Span<Float> cdf) {
     CHECK_EQ(x.size(), values.size());
     Float sum = 0;
     cdf[0] = 0;
@@ -296,7 +294,7 @@ Float IntegrateCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values,
     return sum;
 }
 
-Float InvertCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values, Float u) {
+Float InvertCatmullRom(absl::Span<const Float> x, absl::Span<const Float> values, Float u) {
     // Stop when _u_ is out of bounds
     if (!(u > values.front()))
         return x.front();
@@ -356,7 +354,7 @@ Float InvertCatmullRom(ArraySlice<Float> x, ArraySlice<Float> values, Float u) {
 }
 
 // Fourier Interpolation Definitions
-Float Fourier(ArraySlice<Float> a, double cosPhi) {
+Float Fourier(absl::Span<const Float> a, double cosPhi) {
     double value = 0.0;
     // Initialize cosine iterates
     double cosKMinusOnePhi = cosPhi;
@@ -371,7 +369,7 @@ Float Fourier(ArraySlice<Float> a, double cosPhi) {
     return value;
 }
 
-Float SampleFourier(ArraySlice<Float> ak, ArraySlice<Float> recip, Float u,
+Float SampleFourier(absl::Span<const Float> ak, absl::Span<const Float> recip, Float u,
                     Float *pdf, Float *phiPtr) {
     // Pick a side and declare bisection variables
     bool flip = (u >= 0.5);

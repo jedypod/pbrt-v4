@@ -45,7 +45,7 @@
 #include "interaction.h"
 #include "util/mathutil.h"
 #include "spectrum.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <algorithm>
 #include <cmath>
@@ -179,9 +179,9 @@ class BSDF {
     }
     Spectrum f(const Vector3f &woW, const Vector3f &wiW,
                BxDFType flags = BSDF_ALL) const;
-    Spectrum rho(gtl::ArraySlice<Point2f> samples1, gtl::ArraySlice<Point2f> samples2,
+    Spectrum rho(absl::Span<const Point2f> samples1, absl::Span<const Point2f> samples2,
                  BxDFType flags = BSDF_ALL) const;
-    Spectrum rho(const Vector3f &wo, gtl::ArraySlice<Point2f> samples,
+    Spectrum rho(const Vector3f &wo, absl::Span<const Point2f> samples,
                  BxDFType flags = BSDF_ALL) const;
     Spectrum Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u,
                       Float *pdf, BxDFType type = BSDF_ALL,
@@ -221,9 +221,9 @@ class BxDF {
     virtual Spectrum Sample_f(const Vector3f &wo, Vector3f *wi,
                               const Point2f &sample, Float *pdf,
                               BxDFType *sampledType = nullptr) const;
-    virtual Spectrum rho(const Vector3f &wo, gtl::ArraySlice<Point2f> samples) const;
-    virtual Spectrum rho(gtl::ArraySlice<Point2f> samples1,
-                         gtl::ArraySlice<Point2f> samples2) const;
+    virtual Spectrum rho(const Vector3f &wo, absl::Span<const Point2f> samples) const;
+    virtual Spectrum rho(absl::Span<const Point2f> samples1,
+                         absl::Span<const Point2f> samples2) const;
     virtual Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     virtual std::string ToString() const = 0;
 
@@ -240,11 +240,11 @@ class ScaledBxDF : public BxDF {
     // ScaledBxDF Public Methods
     ScaledBxDF(BxDF *bxdf, const Spectrum &scale)
         : BxDF(BxDFType(bxdf->type)), bxdf(bxdf), scale(scale) {}
-    Spectrum rho(const Vector3f &w, gtl::ArraySlice<Point2f> samples) const {
+    Spectrum rho(const Vector3f &w, absl::Span<const Point2f> samples) const {
         return scale * bxdf->rho(w, samples);
     }
-    Spectrum rho(gtl::ArraySlice<Point2f> samples1,
-                 gtl::ArraySlice<Point2f> samples2) const {
+    Spectrum rho(absl::Span<const Point2f> samples1,
+                 absl::Span<const Point2f> samples2) const {
         return scale * bxdf->rho(samples1, samples2);
     }
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
@@ -380,9 +380,9 @@ class LambertianReflection : public BxDF {
     LambertianReflection(const Spectrum &R)
         : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return R; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>,
-                 gtl::ArraySlice<Point2f>) const { return R; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return R; }
+    Spectrum rho(int, absl::Span<const Point2f>,
+                 absl::Span<const Point2f>) const { return R; }
     std::string ToString() const;
 
   private:
@@ -396,9 +396,9 @@ class LambertianTransmission : public BxDF {
     LambertianTransmission(const Spectrum &T)
         : BxDF(BxDFType(BSDF_TRANSMISSION | BSDF_DIFFUSE)), T(T) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return T; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>,
-                 gtl::ArraySlice<Point2f>) const { return T; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return T; }
+    Spectrum rho(int, absl::Span<const Point2f>,
+                 absl::Span<const Point2f>) const { return T; }
     Spectrum Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u,
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;

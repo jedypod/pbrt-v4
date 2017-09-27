@@ -252,7 +252,7 @@ std::shared_ptr<PerspectiveCamera> CreatePerspectiveCamera(
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    gtl::ArraySlice<Float> sw = params.GetFloatArray("screenwindow");
+    absl::Span<const Float> sw = params.GetFloatArray("screenwindow");
     if (sw.size() > 0) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];

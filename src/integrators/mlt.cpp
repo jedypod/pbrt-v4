@@ -80,12 +80,12 @@ void MLTSampler::Request2DArray(int n) {
     LOG(FATAL) << "Unimplemented";
 }
 
-gtl::ArraySlice<Float> MLTSampler::Get1DArray(int n) {
+absl::Span<const Float> MLTSampler::Get1DArray(int n) {
     LOG(FATAL) << "Unimplemented";
     return {};
 }
 
-gtl::ArraySlice<Point2f> MLTSampler::Get2DArray(int n) {
+absl::Span<const Point2f> MLTSampler::Get2DArray(int n) {
     LOG(FATAL) << "Unimplemented";
     return {};
 }

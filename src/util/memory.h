@@ -42,7 +42,7 @@
 #include "pbrt.h"
 
 #include "util/mathutil.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <cstddef>
 #include <functional>

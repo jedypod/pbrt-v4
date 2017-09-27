@@ -119,7 +119,6 @@
 #include <map>
 #include <stdio.h>
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -348,13 +347,13 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 getenv("PLY_PREFIX") ? getenv("PLY_PREFIX") : "mesh";
             std::string fn = StringPrintf("%s_%05d.ply", plyPrefix, count++);
 
-            ArraySlice<int> vi = paramSet.GetIntArray("indices");
-            ArraySlice<Point3f> P = paramSet.GetPoint3fArray("P");
-            ArraySlice<Point2f> uvs = paramSet.GetPoint2fArray("uv");
+            absl::Span<const int> vi = paramSet.GetIntArray("indices");
+            absl::Span<const Point3f> P = paramSet.GetPoint3fArray("P");
+            absl::Span<const Point2f> uvs = paramSet.GetPoint2fArray("uv");
             if (uvs.empty()) uvs = paramSet.GetPoint2fArray("st");
             std::vector<Point2f> tempUVs;
             if (uvs.empty()) {
-                ArraySlice<Float> fuv = paramSet.GetFloatArray("uv");
+                absl::Span<const Float> fuv = paramSet.GetFloatArray("uv");
                 if (fuv.empty()) fuv = paramSet.GetFloatArray("st");
                 if (!fuv.empty()) {
                     tempUVs.reserve(fuv.size() / 2);
@@ -363,8 +362,8 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                     uvs = tempUVs;
                 }
             }
-            ArraySlice<Normal3f> N = paramSet.GetNormal3fArray("N");
-            ArraySlice<Vector3f> S = paramSet.GetVector3fArray("S");
+            absl::Span<const Normal3f> N = paramSet.GetNormal3fArray("N");
+            absl::Span<const Vector3f> S = paramSet.GetVector3fArray("S");
             // TODO: check that if non-empty, N and S are at least as big
             // as P.
 
@@ -379,7 +378,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture alpha\" \"%s\" ", catIndentCount + 8, "",
                        alphaTex.c_str());
             else {
-                ArraySlice<Float> alpha = paramSet.GetFloatArray("alpha");
+                absl::Span<const Float> alpha = paramSet.GetFloatArray("alpha");
                 if (!alpha.empty())
                     printf("\n%*s\"float alpha\" %f ", catIndentCount + 8, "",
                            alpha[0]);
@@ -390,7 +389,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
                 printf("\n%*s\"texture shadowalpha\" \"%s\" ",
                        catIndentCount + 8, "", shadowAlphaTex.c_str());
             else {
-                ArraySlice<Float> alpha = paramSet.GetFloatArray("shadowalpha");
+                absl::Span<const Float> alpha = paramSet.GetFloatArray("shadowalpha");
                 if (!alpha.empty())
                     printf("\n%*s\"float shadowalpha\" %f ", catIndentCount + 8,
                            "", alpha[0]);

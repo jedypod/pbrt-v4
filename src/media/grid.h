@@ -46,7 +46,7 @@
 #include "spectrum.h"
 #include "util/stats.h"
 #include "util/transform.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <memory>
 
@@ -60,7 +60,7 @@ class GridDensityMedium : public Medium {
     // GridDensityMedium Public Methods
     GridDensityMedium(const Spectrum &sigma_a, const Spectrum &sigma_s, Float g,
                       int nx, int ny, int nz, const Transform &mediumToWorld,
-                      gtl::ArraySlice<Float> d,
+                      absl::Span<const Float> d,
                       const std::shared_ptr<const ParamSet> &attributes)
         : Medium(attributes),
           sigma_a(sigma_a),

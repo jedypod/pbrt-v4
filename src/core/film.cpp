@@ -136,7 +136,7 @@ void Film::MergeFilmTile(std::unique_ptr<FilmTile> tile) {
     }
 }
 
-void Film::SetImage(gtl::ArraySlice<Spectrum> img) const {
+void Film::SetImage(absl::Span<const Spectrum> img) const {
     int nPixels = croppedPixelBounds.Area();
     CHECK_EQ(img.size(), nPixels);
     for (int i = 0; i < nPixels; ++i) {
@@ -233,7 +233,7 @@ std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter>
     if (PbrtOptions.quickRender) xres = std::max(1, xres / 4);
     if (PbrtOptions.quickRender) yres = std::max(1, yres / 4);
     Bounds2f crop(Point2f(0, 0), Point2f(1, 1));
-    gtl::ArraySlice<Float> cr = params.GetFloatArray("cropwindow");
+    absl::Span<const Float> cr = params.GetFloatArray("cropwindow");
     if (!cr.empty() && cr.size() == 4) {
         crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
         crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);

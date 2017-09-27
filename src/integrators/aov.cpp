@@ -50,7 +50,6 @@
 
 #include <mutex>
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -206,7 +205,7 @@ void AOVIntegrator::Render(const Scene &scene) {
                     Vector3f s = Normalize(isect.dpdu);
                     Vector3f t = Cross(isect.n, s);
 
-                    ArraySlice<Point2f> u = tileSampler->Get2DArray(aoSamples);
+                    absl::Span<const Point2f> u = tileSampler->Get2DArray(aoSamples);
                     for (int i = 0; i < aoSamples; ++i) {
                         Vector3f wi = CosineSampleHemisphere(u[i]);
                         Float pdf = CosineHemispherePdf(std::abs(wi.z));
@@ -230,8 +229,8 @@ void AOVIntegrator::Render(const Scene &scene) {
                 if (eSamples > 0) {
                     Normal3f n = Faceforward(isect.n, -ray.d);
 
-                    ArraySlice<Float> ul = tileSampler->Get1DArray(eSamples);
-                    ArraySlice<Point2f> u = tileSampler->Get2DArray(eSamples);
+                    absl::Span<const Float> ul = tileSampler->Get1DArray(eSamples);
+                    absl::Span<const Point2f> u = tileSampler->Get2DArray(eSamples);
                     Spectrum E(0);
                     for (int i = 0; i < eSamples; ++i) {
                         Float lightPdf;
@@ -310,7 +309,7 @@ std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(
         return nullptr;
     }
 
-    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
+    absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)

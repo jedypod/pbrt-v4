@@ -181,7 +181,7 @@ Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
 }
 
 void Image::CopyRectOut(const Bounds2i &extent,
-                        gtl::MutableArraySlice<Float> buf, WrapMode wrapMode) {
+                        absl::Span<Float> buf, WrapMode wrapMode) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
 
     auto bufIter = buf.begin();
@@ -232,7 +232,7 @@ void Image::CopyRectOut(const Bounds2i &extent,
     }
 }
 
-void Image::CopyRectIn(const Bounds2i &extent, gtl::ArraySlice<Float> buf) {
+void Image::CopyRectIn(const Bounds2i &extent, absl::Span<const Float> buf) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
 
     int nu = extent.pMax[0] - extent.pMin[0];
@@ -408,7 +408,7 @@ Image Image::FloatResize(Point2i newResolution, WrapMode wrapMode) const {
         // and pixel-by-pixel during the first resampling
         // step.)
         // FIXME CAST
-        ((Image *)this)->CopyRectOut(inExtent, &inBuf, wrapMode);
+        ((Image *)this)->CopyRectOut(inExtent, absl::MakeSpan(inBuf), wrapMode);
 
         // Zoom in s. We need to do this across all scanlines
         // in inExtent's t dimension so we have the border

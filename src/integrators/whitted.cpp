@@ -94,7 +94,7 @@ std::unique_ptr<WhittedIntegrator> CreateWhittedIntegrator(
     const ParamSet &params, std::unique_ptr<Sampler> sampler,
     std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
-    gtl::ArraySlice<int> pb = params.GetIntArray("pixelbounds");
+    absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
     if (!pb.empty()) {
         if (pb.size() != 4)

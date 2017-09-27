@@ -39,7 +39,6 @@
 #include "paramset.h"
 #include "util/stats.h"
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -77,8 +76,8 @@ static Point3f EvalBezier(const Point3f cp[4], Float u,
 }
 
 // Curve Method Definitions
-CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
-                         CurveType type, ArraySlice<Normal3f> norm,
+CurveCommon::CurveCommon(absl::Span<const Point3f> c, Float width0, Float width1,
+                         CurveType type, absl::Span<const Normal3f> norm,
                          std::shared_ptr<const Transform> ObjectToWorld,
                          std::shared_ptr<const Transform> WorldToObject,
                          bool reverseOrientation,
@@ -105,8 +104,8 @@ CurveCommon::CurveCommon(ArraySlice<Point3f> c, Float width0, Float width1,
 std::vector<std::shared_ptr<Shape>> CreateCurve(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
-    ArraySlice<Point3f> c, Float w0, Float w1, CurveType type,
-    ArraySlice<Normal3f> norm, int splitDepth,
+    absl::Span<const Point3f> c, Float w0, Float w1, CurveType type,
+    absl::Span<const Normal3f> norm, int splitDepth,
     const std::shared_ptr<const ParamSet> &attributes) {
     std::vector<std::shared_ptr<Shape>> segments;
     std::shared_ptr<CurveCommon> common =
@@ -405,7 +404,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
     Float width0 = params.GetOneFloat("width0", width);
     Float width1 = params.GetOneFloat("width1", width);
 
-    ArraySlice<Point3f> cp = params.GetPoint3fArray("P");
+    absl::Span<const Point3f> cp = params.GetPoint3fArray("P");
     if (cp.size() != 4) {
         Error(
             "Must provide 4 control points for \"curve\" primitive. "
@@ -427,7 +426,7 @@ std::vector<std::shared_ptr<Shape>> CreateCurveShape(
         type = CurveType::Cylinder;
     }
 
-    ArraySlice<Normal3f> n = params.GetNormal3fArray("N");
+    absl::Span<const Normal3f> n = params.GetNormal3fArray("N");
     if (n.size() > 0) {
         if (type != CurveType::Ribbon) {
             Warning("Curve normals are only used with \"ribbon\" type curves.");

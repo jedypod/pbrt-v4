@@ -41,7 +41,7 @@
 // core/paramset.h*
 #include "pbrt.h"
 
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include "util/geometry.h"
 #include "spectrum.h"
 #include "texture.h"
@@ -122,16 +122,16 @@ class ParamSet {
                                const std::string &def) const;
     std::string FindTexture(const std::string &) const;
 
-    gtl::ArraySlice<Float> GetFloatArray(const std::string &name) const;
-    gtl::ArraySlice<int> GetIntArray(const std::string &name) const;
-    gtl::ArraySlice<uint8_t> GetBoolArray(const std::string &name) const;
-    gtl::ArraySlice<Point2f> GetPoint2fArray(const std::string &name) const;
-    gtl::ArraySlice<Vector2f> GetVector2fArray(const std::string &name) const;
-    gtl::ArraySlice<Point3f> GetPoint3fArray(const std::string &name) const;
-    gtl::ArraySlice<Vector3f> GetVector3fArray(const std::string &name) const;
-    gtl::ArraySlice<Normal3f> GetNormal3fArray(const std::string &name) const;
-    gtl::ArraySlice<Spectrum> GetSpectrumArray(const std::string &name) const;
-    gtl::ArraySlice<std::string> GetStringArray(const std::string &name) const;
+    absl::Span<const Float> GetFloatArray(const std::string &name) const;
+    absl::Span<const int> GetIntArray(const std::string &name) const;
+    absl::Span<const uint8_t> GetBoolArray(const std::string &name) const;
+    absl::Span<const Point2f> GetPoint2fArray(const std::string &name) const;
+    absl::Span<const Vector2f> GetVector2fArray(const std::string &name) const;
+    absl::Span<const Point3f> GetPoint3fArray(const std::string &name) const;
+    absl::Span<const Vector3f> GetVector3fArray(const std::string &name) const;
+    absl::Span<const Normal3f> GetNormal3fArray(const std::string &name) const;
+    absl::Span<const Spectrum> GetSpectrumArray(const std::string &name) const;
+    absl::Span<const std::string> GetStringArray(const std::string &name) const;
 
     void ReportUnused() const;
 

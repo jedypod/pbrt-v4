@@ -40,7 +40,7 @@
 #include "util/geometry.h"
 #include "paramset.h"
 #include "error.h"
-#include "ext/google/array_slice.h"
+#include "absl/types/span.h"
 
 #include <set>
 #include <map>
@@ -49,7 +49,6 @@ namespace pbrt {
 
 struct SDFace;
 struct SDVertex;
-using gtl::ArraySlice;
 
 // LoopSubdiv Macros
 #define NEXT(i) (((i) + 1) % 3)
@@ -156,8 +155,8 @@ inline Float loopGamma(int valence) {
 // LoopSubdiv Function Definitions
 static std::vector<std::shared_ptr<Shape>> LoopSubdivide(
     const Transform *ObjectToWorld, const Transform *WorldToObject,
-    bool reverseOrientation, int nLevels, ArraySlice<int> vertexIndices,
-    ArraySlice<Point3f> p, const std::shared_ptr<const ParamSet> &attributes) {
+    bool reverseOrientation, int nLevels, absl::Span<const int> vertexIndices,
+    absl::Span<const Point3f> p, const std::shared_ptr<const ParamSet> &attributes) {
     std::vector<SDVertex *> vertices;
     std::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
@@ -411,8 +410,8 @@ std::vector<std::shared_ptr<Shape>> CreateLoopSubdiv(
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
     int nLevels = params.GetOneInt("levels", params.GetOneInt("nlevels", 3));
-    ArraySlice<int> vertexIndices = params.GetIntArray("indices");
-    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
+    absl::Span<const int> vertexIndices = params.GetIntArray("indices");
+    absl::Span<const Point3f> P = params.GetPoint3fArray("P");
     if (vertexIndices.empty()) {
         Error("Vertex indices \"indices\" not provided for LoopSubdiv shape.");
         return std::vector<std::shared_ptr<Shape>>();

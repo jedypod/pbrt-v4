@@ -120,7 +120,7 @@ void PixelSampler::Request2DArray(int n) {
     sampleArray2D.push_back(std::vector<Point2f>(n * samplesPerPixel));
 }
 
-gtl::ArraySlice<Float> PixelSampler::Get1DArray(int n) {
+absl::Span<const Float> PixelSampler::Get1DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     if (array1DOffset == sampleArray1D.size()) return {};
     CHECK_EQ(samples1DArraySizes[array1DOffset], n);
@@ -130,7 +130,7 @@ gtl::ArraySlice<Float> PixelSampler::Get1DArray(int n) {
             (size_t)samples1DArraySizes[offset]};
 }
 
-gtl::ArraySlice<Point2f> PixelSampler::Get2DArray(int n) {
+absl::Span<const Point2f> PixelSampler::Get2DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     if (array2DOffset == sampleArray2D.size()) return {};
     CHECK_EQ(samples2DArraySizes[array2DOffset], n);
@@ -163,7 +163,7 @@ void GlobalSampler::Request2DArray(int n) {
     arrayEndDim += 2;
 }
 
-gtl::ArraySlice<Float> GlobalSampler::Get1DArray(int n) {
+absl::Span<const Float> GlobalSampler::Get1DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     if (array1DOffset == sampleArray1D.size()) return {};
 
@@ -179,7 +179,7 @@ gtl::ArraySlice<Float> GlobalSampler::Get1DArray(int n) {
     return sampleArray1D[array1DOffset++];
 }
 
-gtl::ArraySlice<Point2f> GlobalSampler::Get2DArray(int n) {
+absl::Span<const Point2f> GlobalSampler::Get2DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     if (array2DOffset == sampleArray2D.size()) return {};
 

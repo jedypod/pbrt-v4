@@ -42,7 +42,7 @@
 #include "sampler.h"
 #include "error.h"
 #include "lowdiscrepancy.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include <glog/logging.h>
 
 #include <memory>
@@ -90,7 +90,7 @@ class MaxMinDistSampler : public PixelSampler {
 
   private:
     // MaxMinDistSampler Private Data
-    gtl::ArraySlice<uint32_t> CPixel;
+    absl::Span<const uint32_t> CPixel;
 };
 
 std::unique_ptr<MaxMinDistSampler> CreateMaxMinDistSampler(

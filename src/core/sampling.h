@@ -44,7 +44,7 @@
 #include "util/geometry.h"
 #include "util/mathutil.h"
 #include "util/rng.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -54,16 +54,16 @@
 namespace pbrt {
 
 // Sampling Declarations
-void StratifiedSample1D(gtl::MutableArraySlice<Float> samples, RNG &rng,
+void StratifiedSample1D(absl::Span<Float> samples, RNG &rng,
                         bool jitter = true);
-void StratifiedSample2D(gtl::MutableArraySlice<Point2f> samples, int nx, int ny,
+void StratifiedSample2D(absl::Span<Point2f> samples, int nx, int ny,
                         RNG &rng, bool jitter = true);
-void LatinHypercube(gtl::MutableArraySlice<Float> samples, int nDim, RNG &rng);
+void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng);
 
 class Distribution1D {
  public:
     // Distribution1D Public Methods
-    Distribution1D(gtl::ArraySlice<Float> f)
+    Distribution1D(absl::Span<const Float> f)
         : func(f.begin(), f.end()), cdf(f.size() + 1) {
         // Compute integral of step function at $x_i$
         cdf[0] = 0;
@@ -135,7 +135,7 @@ Point2f UniformSampleTriangle(const Point2f &u);
 class Distribution2D {
   public:
     // Distribution2D Public Methods
-    Distribution2D(gtl::ArraySlice<Float> data, int nu, int nv);
+    Distribution2D(absl::Span<const Float> data, int nu, int nv);
     Point2f SampleContinuous(const Point2f &u, Float *pdf) const {
         Float pdfs[2];
         int v;
@@ -160,7 +160,7 @@ class Distribution2D {
 
 // Sampling Inline Functions
 template <typename T>
-void Shuffle(gtl::MutableArraySlice<T> samples, int nDimensions, RNG &rng) {
+void Shuffle(absl::Span<T> samples, int nDimensions, RNG &rng) {
     CHECK_EQ(0, (samples.size() % nDimensions));
     size_t nSamples = samples.size() / nDimensions;
     for (size_t i = 0; i < nSamples; ++i) {
@@ -187,7 +187,7 @@ inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
     return (f * f) / (f * f + g * g);
 }
 
-void SampleDiscrete(gtl::ArraySlice<Float> weights, Float u, int *index,
+void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
                     Float *pdf, Float *uRemapped = nullptr);
 
 }  // namespace pbrt

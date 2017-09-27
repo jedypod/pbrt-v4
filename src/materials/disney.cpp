@@ -97,9 +97,9 @@ class DisneyDiffuse : public BxDF {
     DisneyDiffuse(const Spectrum &R)
         : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return R; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>,
-                 gtl::ArraySlice<Point2f>) const { return R; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return R; }
+    Spectrum rho(int, absl::Span<const Point2f>,
+                 absl::Span<const Point2f>) const { return R; }
     std::string ToString() const;
 
   private:
@@ -131,8 +131,8 @@ class DisneyFakeSS : public BxDF {
           R(R),
           roughness(roughness) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return R; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>, gtl::ArraySlice<Point2f>) const { return R; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return R; }
+    Spectrum rho(int, absl::Span<const Point2f>, absl::Span<const Point2f>) const { return R; }
     std::string ToString() const;
 
   private:
@@ -173,9 +173,9 @@ class DisneyRetro : public BxDF {
           R(R),
           roughness(roughness) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return R; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>,
-                 gtl::ArraySlice<Point2f>) const { return R; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return R; }
+    Spectrum rho(int, absl::Span<const Point2f>,
+                 absl::Span<const Point2f>) const { return R; }
     std::string ToString() const;
 
   private:
@@ -212,9 +212,9 @@ class DisneySheen : public BxDF {
     DisneySheen(const Spectrum &R, SheenMode mode)
         : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R), mode(mode) {}
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const;
-    Spectrum rho(const Vector3f &, gtl::ArraySlice<Point2f>) const { return R; }
-    Spectrum rho(int, gtl::ArraySlice<Point2f>,
-                 gtl::ArraySlice<Point2f>) const { return R; }
+    Spectrum rho(const Vector3f &, absl::Span<const Point2f>) const { return R; }
+    Spectrum rho(int, absl::Span<const Point2f>,
+                 absl::Span<const Point2f>) const { return R; }
     std::string ToString() const;
 
   private:

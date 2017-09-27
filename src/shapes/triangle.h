@@ -43,7 +43,7 @@
 #include "util/geometry.h"
 #include "util/stats.h"
 #include "util/transform.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <map>
 #include <memory>
@@ -57,9 +57,9 @@ STAT_MEMORY_COUNTER("Memory/Triangle meshes", triMeshBytes);
 struct TriangleMesh {
     // TriangleMesh Public Methods
     TriangleMesh(const Transform &ObjectToWorld, bool reverseOrientation,
-                 gtl::ArraySlice<int> vertexIndices, gtl::ArraySlice<Point3f> p,
-                 gtl::ArraySlice<Vector3f> S, gtl::ArraySlice<Normal3f> N,
-                 gtl::ArraySlice<Point2f> uv, gtl::ArraySlice<int> faceIndices,
+                 absl::Span<const int> vertexIndices, absl::Span<const Point3f> p,
+                 absl::Span<const Vector3f> S, absl::Span<const Normal3f> N,
+                 absl::Span<const Point2f> uv, absl::Span<const int> faceIndices,
                  const std::shared_ptr<const ParamSet> &attributes);
 
     // TriangleMesh Data
@@ -116,10 +116,10 @@ class Triangle : public Shape {
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
-    bool reverseOrientation, gtl::ArraySlice<int> vertexIndices,
-    gtl::ArraySlice<Point3f> p, gtl::ArraySlice<Vector3f> s,
-    gtl::ArraySlice<Normal3f> n, gtl::ArraySlice<Point2f> uv,
-    gtl::ArraySlice<int> faceIndices,
+    bool reverseOrientation, absl::Span<const int> vertexIndices,
+    absl::Span<const Point3f> p, absl::Span<const Vector3f> s,
+    absl::Span<const Normal3f> n, absl::Span<const Point2f> uv,
+    absl::Span<const int> faceIndices,
     const std::shared_ptr<const ParamSet> &attributes);
 
 
@@ -129,9 +129,9 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes);
 
 bool WritePlyFile(const std::string &filename,
-                  gtl::ArraySlice<int> vertexIndices,
-                  gtl::ArraySlice<Point3f> P, gtl::ArraySlice<Vector3f> S,
-                  gtl::ArraySlice<Normal3f> N, gtl::ArraySlice<Point2f> UV);
+                  absl::Span<const int> vertexIndices,
+                  absl::Span<const Point3f> P, absl::Span<const Vector3f> S,
+                  absl::Span<const Normal3f> N, absl::Span<const Point2f> UV);
 
 }  // namespace pbrt
 

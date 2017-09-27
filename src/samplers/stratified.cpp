@@ -41,29 +41,27 @@ namespace pbrt {
 void StratifiedSampler::GeneratePixelSamples(RNG &rng) {
     // Generate single stratified samples for the pixel
     for (size_t i = 0; i < samples1D.size(); ++i) {
-        StratifiedSample1D(&samples1D[i], rng, jitterSamples);
-        Shuffle<Float>(&samples1D[i], 1, rng);
+        StratifiedSample1D(absl::Span<Float>(samples1D[i]), rng, jitterSamples);
+        Shuffle<Float>(absl::Span<Float>(samples1D[i]), 1, rng);
     }
     for (size_t i = 0; i < samples2D.size(); ++i) {
-        StratifiedSample2D(&samples2D[i], xPixelSamples, yPixelSamples, rng,
-                           jitterSamples);
-        Shuffle<Point2f>(&samples2D[i], 1, rng);
+        StratifiedSample2D(absl::Span<Point2f>(samples2D[i]), xPixelSamples,
+                           yPixelSamples, rng, jitterSamples);
+        Shuffle<Point2f>(absl::Span<Point2f>(samples2D[i]), 1, rng);
     }
 
     // Generate arrays of stratified samples for the pixel
     for (size_t i = 0; i < samples1DArraySizes.size(); ++i)
         for (int64_t j = 0; j < samplesPerPixel; ++j) {
             int count = samples1DArraySizes[i];
-            gtl::MutableArraySlice<Float> samples(&sampleArray1D[i][j * count],
-                                                  count);
+            absl::Span<Float> samples(&sampleArray1D[i][j * count], count);
             StratifiedSample1D(samples, rng, jitterSamples);
             Shuffle(samples, 1, rng);
         }
     for (size_t i = 0; i < samples2DArraySizes.size(); ++i)
         for (int64_t j = 0; j < samplesPerPixel; ++j) {
             int count = samples2DArraySizes[i];
-            gtl::MutableArraySlice<Float> samples(
-                &sampleArray2D[i][j * count].x, 2 * count);
+            absl::Span<Float> samples(&sampleArray2D[i][j * count].x, 2 * count);
             LatinHypercube(samples, 2, rng);
         }
 }

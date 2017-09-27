@@ -41,7 +41,6 @@
 
 #include <glog/logging.h>
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -107,12 +106,12 @@ static void addParam(const std::string &name, std::vector<T> values,
 }
 
 template <typename T>
-static ArraySlice<T> lookupPtr(const std::string &name,
+static absl::Span<const T> lookupPtr(const std::string &name,
                                const std::vector<ParamSetItem<T>> &vec) {
     for (const auto &v : vec)
         if (v.name == name) {
             v.lookedUp = true;
-            return ArraySlice<T>(v.values);
+            return absl::Span<const T>(v.values);
         }
     return {};
 }
@@ -188,15 +187,15 @@ Float ParamSet::GetOneFloat(const std::string &name, Float def) const {
     return lookupOne(name, def, floats);
 }
 
-ArraySlice<Float> ParamSet::GetFloatArray(const std::string &name) const {
+absl::Span<const Float> ParamSet::GetFloatArray(const std::string &name) const {
     return lookupPtr(name, floats);
 }
 
-ArraySlice<int> ParamSet::GetIntArray(const std::string &name) const {
+absl::Span<const int> ParamSet::GetIntArray(const std::string &name) const {
     return lookupPtr(name, ints);
 }
 
-ArraySlice<uint8_t> ParamSet::GetBoolArray(const std::string &name) const {
+absl::Span<const uint8_t> ParamSet::GetBoolArray(const std::string &name) const {
     return lookupPtr(name, bools);
 }
 
@@ -208,7 +207,7 @@ bool ParamSet::GetOneBool(const std::string &name, bool def) const {
     return lookupOne(name, uint8_t(def), bools);
 }
 
-ArraySlice<Point2f> ParamSet::GetPoint2fArray(const std::string &name) const {
+absl::Span<const Point2f> ParamSet::GetPoint2fArray(const std::string &name) const {
     return lookupPtr(name, point2fs);
 }
 
@@ -217,7 +216,7 @@ Point2f ParamSet::GetOnePoint2f(const std::string &name,
     return lookupOne(name, def, point2fs);
 }
 
-ArraySlice<Vector2f> ParamSet::GetVector2fArray(const std::string &name) const {
+absl::Span<const Vector2f> ParamSet::GetVector2fArray(const std::string &name) const {
     return lookupPtr(name, vector2fs);
 }
 
@@ -226,7 +225,7 @@ Vector2f ParamSet::GetOneVector2f(const std::string &name,
     return lookupOne(name, def, vector2fs);
 }
 
-ArraySlice<Point3f> ParamSet::GetPoint3fArray(const std::string &name) const {
+absl::Span<const Point3f> ParamSet::GetPoint3fArray(const std::string &name) const {
     return lookupPtr(name, point3fs);
 }
 
@@ -235,7 +234,7 @@ Point3f ParamSet::GetOnePoint3f(const std::string &name,
     return lookupOne(name, def, point3fs);
 }
 
-ArraySlice<Vector3f> ParamSet::GetVector3fArray(const std::string &name) const {
+absl::Span<const Vector3f> ParamSet::GetVector3fArray(const std::string &name) const {
     return lookupPtr(name, vector3fs);
 }
 
@@ -244,7 +243,7 @@ Vector3f ParamSet::GetOneVector3f(const std::string &name,
     return lookupOne(name, def, vector3fs);
 }
 
-ArraySlice<Normal3f> ParamSet::GetNormal3fArray(const std::string &name) const {
+absl::Span<const Normal3f> ParamSet::GetNormal3fArray(const std::string &name) const {
     return lookupPtr(name, normals);
 }
 
@@ -253,7 +252,7 @@ Normal3f ParamSet::GetOneNormal3f(const std::string &name,
     return lookupOne(name, def, normals);
 }
 
-ArraySlice<Spectrum> ParamSet::GetSpectrumArray(const std::string &name) const {
+absl::Span<const Spectrum> ParamSet::GetSpectrumArray(const std::string &name) const {
     return lookupPtr(name, spectra);
 }
 
@@ -262,7 +261,7 @@ Spectrum ParamSet::GetOneSpectrum(const std::string &name,
     return lookupOne(name, def, spectra);
 }
 
-ArraySlice<std::string> ParamSet::GetStringArray(
+absl::Span<const std::string> ParamSet::GetStringArray(
     const std::string &name) const {
     return lookupPtr(name, strings);
 }
@@ -491,7 +490,7 @@ void ParamSet::Parse(const NamedValues *namedValues,
                 2, nv->numbers, *nv->name,
                 [&values](const double *v) -> Spectrum {
                     Float T = v[0], scale = v[1];
-                    BlackbodyNormalized(CIE_lambda, T, &values);
+                    BlackbodyNormalized(CIE_lambda, T, absl::MakeSpan(values));
                     return scale * Spectrum::FromSampled(CIE_lambda, values);
                 },
                 [this, &name](std::vector<Spectrum> v) {
@@ -640,7 +639,7 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
             return nullptr;
         }
     }
-    ArraySlice<Spectrum> val = GetSpectrumArray(n);
+    absl::Span<const Spectrum> val = GetSpectrumArray(n);
     if (!val.empty())
         return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
@@ -668,7 +667,7 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
         }
     }
 
-    ArraySlice<Float> val = GetFloatArray(n);
+    absl::Span<const Float> val = GetFloatArray(n);
     if (!val.empty()) return std::make_shared<ConstantTexture<Float>>(val[0]);
     return nullptr;
 }

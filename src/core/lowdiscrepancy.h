@@ -46,7 +46,7 @@
 #include "sampling.h"
 #include "sobolmatrices.h"
 #include "util/rng.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -59,10 +59,10 @@ std::vector<uint16_t> ComputeRadicalInversePermutations(RNG &rng);
 static constexpr int PrimeTableSize = 1000;
 extern const int Primes[PrimeTableSize];
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
-                              gtl::ArraySlice<uint16_t> perm);
+                              absl::Span<const uint16_t> perm);
 extern const int PrimeSums[PrimeTableSize];
 inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
-                    gtl::MutableArraySlice<Point2f> samples, RNG &rng);
+                    absl::Span<Point2f> samples, RNG &rng);
 extern uint32_t CMaxMinDist[17][32];
 inline uint64_t SobolIntervalToIndex(const uint32_t log2Resolution,
                                      uint64_t sampleNum, const Point2i &p);
@@ -98,14 +98,14 @@ inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
     return index;
 }
 
-inline uint32_t MultiplyGenerator(gtl::ArraySlice<uint32_t> C, uint32_t a) {
+inline uint32_t MultiplyGenerator(absl::Span<const uint32_t> C, uint32_t a) {
     uint32_t v = 0;
     for (int i = 0; a != 0; ++i, a >>= 1)
         if (a & 1) v ^= C[i];
     return v;
 }
 
-inline Float SampleGeneratorMatrix(gtl::ArraySlice<uint32_t> C, uint32_t a,
+inline Float SampleGeneratorMatrix(absl::Span<const uint32_t> C, uint32_t a,
                                    uint32_t scramble = 0) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
     return std::min((MultiplyGenerator(C, a) ^ scramble) * Float(2.3283064365386963e-10),
@@ -118,8 +118,8 @@ inline Float SampleGeneratorMatrix(gtl::ArraySlice<uint32_t> C, uint32_t a,
 
 inline uint32_t GrayCode(uint32_t v) { return (v >> 1) ^ v; }
 
-inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C, uint32_t scramble,
-                           gtl::MutableArraySlice<Float> p) {
+inline void GrayCodeSample(absl::Span<const uint32_t> C, uint32_t scramble,
+                           absl::Span<Float> p) {
     uint32_t v = scramble;
     for (uint32_t i = 0; i < p.size(); ++i) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
@@ -133,10 +133,10 @@ inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C, uint32_t scramble,
     }
 }
 
-inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C0,
-                           gtl::ArraySlice<uint32_t> C1,
+inline void GrayCodeSample(absl::Span<const uint32_t> C0,
+                           absl::Span<const uint32_t> C1,
                            const Point2i &scramble,
-                           gtl::MutableArraySlice<Point2f> p) {
+                           absl::Span<Point2f> p) {
     uint32_t v[2] = {(uint32_t)scramble.x, (uint32_t)scramble.y};
     for (uint32_t i = 0; i < p.size(); ++i) {
 #ifndef PBRT_HAVE_HEX_FP_CONSTANTS
@@ -152,7 +152,7 @@ inline void GrayCodeSample(gtl::ArraySlice<uint32_t> C0,
 }
 
 inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
-                         gtl::MutableArraySlice<Float> samples, RNG &rng) {
+                         absl::Span<Float> samples, RNG &rng) {
     uint32_t scramble = rng.UniformUInt32();
     // Define _CVanDerCorput_ Generator Matrix
     const uint32_t CVanDerCorput[32] = {
@@ -196,15 +196,16 @@ inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
     GrayCodeSample(CVanDerCorput, scramble, samples);
     // Randomly shuffle 1D sample points
     for (int i = 0; i < nPixelSamples; ++i) {
-        gtl::MutableArraySlice<Float> pixelSamples(
-            samples, i * nSamplesPerPixelSample, nSamplesPerPixelSample);
+        absl::Span<Float> pixelSamples =
+            samples.subspan(i * nSamplesPerPixelSample,
+                            nSamplesPerPixelSample);
         Shuffle(pixelSamples, 1, rng);
     }
     Shuffle(samples, nSamplesPerPixelSample, rng);
 }
 
 inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
-                    gtl::MutableArraySlice<Point2f> samples, RNG &rng) {
+                    absl::Span<Point2f> samples, RNG &rng) {
     Point2i scramble;
     scramble[0] = rng.UniformUInt32();
     scramble[1] = rng.UniformUInt32();
@@ -224,8 +225,9 @@ inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
     CHECK_EQ(samples.size(), nSamplesPerPixelSample * nPixelSamples);
     GrayCodeSample(CSobol[0], CSobol[1], scramble, samples);
     for (int i = 0; i < nPixelSamples; ++i) {
-        gtl::MutableArraySlice<Point2f> slice(
-            samples, i * nSamplesPerPixelSample, nSamplesPerPixelSample);
+        absl::Span<Point2f> slice =
+            samples.subspan(i * nSamplesPerPixelSample,
+                            nSamplesPerPixelSample);
         Shuffle(slice, 1, rng);
     }
     Shuffle(samples, nSamplesPerPixelSample, rng);

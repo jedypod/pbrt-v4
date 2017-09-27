@@ -42,7 +42,6 @@
 
 #include <array>
 
-using gtl::ArraySlice;
 
 namespace pbrt {
 
@@ -57,9 +56,9 @@ static void PlyErrorCallback(p_ply, const char *message) {
 STAT_RATIO("Scene/Triangles per triangle mesh", nTris, nMeshes);
 TriangleMesh::TriangleMesh(
     const Transform &ObjectToWorld, bool reverseOrientation,
-    ArraySlice<int> vertexIndices, ArraySlice<Point3f> P,
-    ArraySlice<Vector3f> S, ArraySlice<Normal3f> N, ArraySlice<Point2f> UV,
-    ArraySlice<int> faceIndices, const std::shared_ptr<const ParamSet> &attributes)
+    absl::Span<const int> vertexIndices, absl::Span<const Point3f> P,
+    absl::Span<const Vector3f> S, absl::Span<const Normal3f> N, absl::Span<const Point2f> UV,
+    absl::Span<const int> faceIndices, const std::shared_ptr<const ParamSet> &attributes)
     : reverseOrientation(reverseOrientation),
       transformSwapsHandedness(ObjectToWorld.SwapsHandedness()),
       nTriangles(vertexIndices.size() / 3),
@@ -98,9 +97,9 @@ TriangleMesh::TriangleMesh(
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     const Transform &ObjectToWorld, const Transform &WorldToObject,
-    bool reverseOrientation, ArraySlice<int> vertexIndices,
-    ArraySlice<Point3f> p, ArraySlice<Vector3f> s, ArraySlice<Normal3f> n,
-    ArraySlice<Point2f> uv, ArraySlice<int> faceIndices,
+    bool reverseOrientation, absl::Span<const int> vertexIndices,
+    absl::Span<const Point3f> p, absl::Span<const Vector3f> s, absl::Span<const Normal3f> n,
+    absl::Span<const Point2f> uv, absl::Span<const int> faceIndices,
     const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>(
         ObjectToWorld, reverseOrientation, vertexIndices, p, s, n, uv,
@@ -113,9 +112,9 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
     return tris;
 }
 
-bool WritePlyFile(const std::string &filename, ArraySlice<int> vertexIndices,
-                  ArraySlice<Point3f> P, ArraySlice<Vector3f> S,
-                  ArraySlice<Normal3f> N, ArraySlice<Point2f> UV) {
+bool WritePlyFile(const std::string &filename, absl::Span<const int> vertexIndices,
+                  absl::Span<const Point3f> P, absl::Span<const Vector3f> S,
+                  absl::Span<const Normal3f> N, absl::Span<const Point2f> UV) {
     size_t nVertices = P.size();
     size_t nTriangles = vertexIndices.size() / 3;
     CHECK_EQ(vertexIndices.size() % 3, 0);
@@ -575,13 +574,13 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
     std::shared_ptr<const Transform> ObjectToWorld,
     std::shared_ptr<const Transform> WorldToObject, bool reverseOrientation,
     const ParamSet &params, const std::shared_ptr<const ParamSet> &attributes) {
-    ArraySlice<int> vi = params.GetIntArray("indices");
-    ArraySlice<Point3f> P = params.GetPoint3fArray("P");
-    ArraySlice<Point2f> uvs = params.GetPoint2fArray("uv");
+    absl::Span<const int> vi = params.GetIntArray("indices");
+    absl::Span<const Point3f> P = params.GetPoint3fArray("P");
+    absl::Span<const Point2f> uvs = params.GetPoint2fArray("uv");
     if (uvs.empty()) uvs = params.GetPoint2fArray("st");
     std::vector<Point2f> tempUVs;
     if (uvs.empty()) {
-        ArraySlice<Float> fuv = params.GetFloatArray("uv");
+        absl::Span<const Float> fuv = params.GetFloatArray("uv");
         if (fuv.empty()) fuv = params.GetFloatArray("st");
         if (!fuv.empty()) {
             tempUVs.reserve(fuv.size() / 2);
@@ -619,12 +618,12 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
         Error("Vertex positions \"P\" not provided with triangle mesh shape");
         return std::vector<std::shared_ptr<Shape>>();
     }
-    ArraySlice<Vector3f> S = params.GetVector3fArray("S");
+    absl::Span<const Vector3f> S = params.GetVector3fArray("S");
     if (!S.empty() && S.size() != P.size()) {
         Error("Number of \"S\"s for triangle mesh must match \"P\"s");
         S = {};
     }
-    ArraySlice<Normal3f> N = params.GetNormal3fArray("N");
+    absl::Span<const Normal3f> N = params.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error("Number of \"N\"s for triangle mesh must match \"P\"s");
         N = {};
@@ -639,7 +638,7 @@ std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
             return std::vector<std::shared_ptr<Shape>>();
         }
 
-    ArraySlice<int> faceIndices = params.GetIntArray("faceIndices");
+    absl::Span<const int> faceIndices = params.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
         Error("Number of face indices %d != number of triangles %d",
               int(faceIndices.size()), int(vi.size() / 3));

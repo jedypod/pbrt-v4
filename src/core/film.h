@@ -48,7 +48,7 @@
 #include "util/memory.h"
 #include "util/parallel.h"
 #include "util/stats.h"
-#include "ext/google/array_slice.h"
+#include <absl/types/span.h>
 #include <glog/logging.h>
 
 #include <memory>
@@ -76,7 +76,7 @@ class Film {
     Bounds2f GetPhysicalExtent() const;
     std::unique_ptr<FilmTile> GetFilmTile(const Bounds2i &sampleBounds);
     void MergeFilmTile(std::unique_ptr<FilmTile> tile);
-    void SetImage(gtl::ArraySlice<Spectrum> img) const;
+    void SetImage(absl::Span<const Spectrum> img) const;
     void AddSplat(const Point2f &p, Spectrum v);
     void WriteImage(ImageMetadata *metadata, Float splatScale = 1);
     void Clear();
@@ -119,7 +119,7 @@ class FilmTile {
   public:
     // FilmTile Public Methods
     FilmTile(const Bounds2i &pixelBounds, const Vector2f &filterRadius,
-             gtl::ArraySlice<Float> filterTable, int filterTableWidth,
+             absl::Span<const Float> filterTable, int filterTableWidth,
              Float maxSampleLuminance)
         : pixelBounds(pixelBounds),
           filterRadius(filterRadius),
@@ -190,7 +190,7 @@ class FilmTile {
     // FilmTile Private Data
     const Bounds2i pixelBounds;
     const Vector2f filterRadius, invFilterRadius;
-    gtl::ArraySlice<Float> filterTable;
+    absl::Span<const Float> filterTable;
     const int filterTableWidth;
     std::vector<FilmTilePixel> pixels;
     const Float maxSampleLuminance;

@@ -36,13 +36,11 @@
 
 #include <numeric>
 
-using gtl::ArraySlice;
-using gtl::MutableArraySlice;
 
 namespace pbrt {
 
 // Sampling Function Definitions
-void StratifiedSample1D(MutableArraySlice<Float> samples, RNG &rng,
+void StratifiedSample1D(absl::Span<Float> samples, RNG &rng,
                         bool jitter) {
     Float invNSamples = (Float)1 / samples.size();
     for (size_t i = 0; i < samples.size(); ++i) {
@@ -51,7 +49,7 @@ void StratifiedSample1D(MutableArraySlice<Float> samples, RNG &rng,
     }
 }
 
-void StratifiedSample2D(MutableArraySlice<Point2f> samp, int nx, int ny,
+void StratifiedSample2D(absl::Span<Point2f> samp, int nx, int ny,
                         RNG &rng, bool jitter) {
     CHECK_EQ(samp.size(), (size_t)nx * (size_t)ny);
     Float dx = (Float)1 / nx, dy = (Float)1 / ny;
@@ -65,7 +63,7 @@ void StratifiedSample2D(MutableArraySlice<Point2f> samp, int nx, int ny,
         }
 }
 
-void LatinHypercube(MutableArraySlice<Float> samples, int nDim, RNG &rng) {
+void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng) {
     // Generate LHS samples along diagonal
     DCHECK_EQ(0, samples.size() % nDim);
     int nSamples = samples.size() / nDim;
@@ -164,13 +162,13 @@ Point2f UniformSampleTriangle(const Point2f &u) {
     return Point2f(1 - su0, u[1] * su0);
 }
 
-Distribution2D::Distribution2D(ArraySlice<Float> func, int nu, int nv) {
+Distribution2D::Distribution2D(absl::Span<const Float> func, int nu, int nv) {
     CHECK_EQ(func.size(), (size_t)nu * (size_t)nv);
     pConditionalV.reserve(nv);
     for (int v = 0; v < nv; ++v) {
         // Compute conditional sampling distribution for $\tilde{v}$
         pConditionalV.push_back(std::make_unique<Distribution1D>(
-            ArraySlice<Float>(func, v * nu, nu)));
+            func.subspan(v * nu, nu)));
     }
     // Compute marginal sampling distribution $p[\tilde{v}]$
     std::vector<Float> marginalFunc;
@@ -180,7 +178,7 @@ Distribution2D::Distribution2D(ArraySlice<Float> func, int nu, int nv) {
     pMarginal = std::make_unique<Distribution1D>(marginalFunc);
 }
 
-void SampleDiscrete(gtl::ArraySlice<Float> weights, Float u, int *index,
+void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
                     Float *pdf, Float *uRemapped) {
     if (weights.empty()) {
         *pdf = 0;
