@@ -251,7 +251,10 @@ ENDIF()
 
 ADD_SUBDIRECTORY(src/ext/abseil-cpp)
 
-INCLUDE_DIRECTORIES(src/ext/abseil-cpp)
+INCLUDE_DIRECTORIES(
+    src/ext/abseil-cpp
+    src/ext/abseil-cpp/cctz/include
+)
 
 ###########################################################################
 # zlib
@@ -453,6 +456,7 @@ SET(ALL_PBRT_LIBS
   Ptex_static
   ${ZLIB_LIBRARY}
   absl
+  cctz
 )
 
 # Main renderer
