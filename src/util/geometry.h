@@ -343,6 +343,16 @@ inline Vector3<T> Normalize(const Vector3<T> &v) {
     return v / Length(v);
 }
 
+// Equivalent to std::acos(Dot(a, b)), but more numerically stable.
+// http://www.plunk.org/~hatch/rightway.php
+template <typename T>
+inline Float AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
+    if (Dot(a, b) < 0)
+        return Pi - 2 * SafeASin(Length(a + b) / 2);
+    else
+        return 2 * SafeASin(Length(b - a) / 2);
+}
+
 template <typename T>
 inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
                              Vector3<T> *v3) {

@@ -63,6 +63,8 @@ GFX!
   container/inlined_vector.h: InlinedVector, in particular for
     Distribution1D stuff
 
+- Improved CoordinateSystem from jcgt papers?
+
 - rename GonioPhotometricLight -> GoniometricLight?
 
 - rename Light::Power() methods to Phi()?

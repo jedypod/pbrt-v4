@@ -21,7 +21,7 @@ static char **makeArgs(std::string args) {
         strcpy(argv[i], arg.c_str());
 
         if (pos == std::string::npos) {
-            CHECK_EQ(i + 1, n);
+            EXPECT_EQ(i + 1, n);
             break;
         }
         args = args.substr(pos + 1);
