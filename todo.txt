@@ -13,8 +13,6 @@ GFX!
 
 - tests for light * -> pdf computaiton
 
-- tests for spherical traiangle sampling
-
 - implement improved delta/ratio tracking stuff...
 
 - try jacopo/heitz stuff for inf env map sampling e.g.
@@ -57,6 +55,8 @@ GFX!
   - projection
 
 -----------------
+
+- Use AngleBetween() in Triangle::SolidAngle() implementation
 
 - absl:
   base/casts.h: bit_cast for float to bits sort of stuff

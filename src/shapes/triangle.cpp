@@ -506,14 +506,14 @@ Float Triangle::Area() const {
 }
 
 Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
-    Point2f b = UniformSampleTriangle(u);
+    std::array<Float, 3> b = UniformSampleTriangle(u);
     // Get triangle vertices in _p0_, _p1_, and _p2_
     const int *v = &mesh->vertexIndices[3 * triIndex];
     const Point3f &p0 = mesh->p[v[0]];
     const Point3f &p1 = mesh->p[v[1]];
     const Point3f &p2 = mesh->p[v[2]];
     Interaction it;
-    it.p = b[0] * p0 + b[1] * p1 + (1 - b[0] - b[1]) * p2;
+    it.p = b[0] * p0 + b[1] * p1 + b[2] * p2;
     // Compute surface normal for sampled point on triangle
     it.n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
     // Ensure correct orientation of the geometric normal; follow the same
@@ -531,6 +531,67 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
     it.pError = gamma(6) * Vector3f(pAbsSum.x, pAbsSum.y, pAbsSum.z);
     *pdf = 1 / Area();
     return it;
+}
+
+// The spherical sampling code has trouble with both very small and very
+// large triangles (on the hemisphere); fall back to uniform area sampling
+// in these cases. In the first case, there is presumably not a lot of
+// contribution from the emitter due to its subtending a small solid angle.
+// In the second, BSDF sampling should be the much better sampling strategy
+// anyway.
+static constexpr Float MinSphericalSampleArea = 1e-3;
+static constexpr Float MaxSphericalSampleArea = 6.28;
+
+// Note: much of this method---other than the call to the sampling function
+// and the check about how to sample---is shared with the other
+// Triangle::Sample() routine.
+Interaction Triangle::Sample(const Interaction &ref, const Point2f &u,
+                             Float *pdf) const {
+    // Get triangle vertices in _p0_, _p1_, and _p2_
+    const int *v = &mesh->vertexIndices[3 * triIndex];
+    const Point3f &p0 = mesh->p[v[0]];
+    const Point3f &p1 = mesh->p[v[1]];
+    const Point3f &p2 = mesh->p[v[2]];
+
+    Float sa = SolidAngle(ref.p);
+    if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
+        *pdf = 0; return {};
+        return Shape::Sample(ref, u, pdf);
+    }
+
+    std::array<Float, 3> b = SphericalSampleTriangle({p0, p1, p2}, ref.p, u, pdf);
+    if (*pdf == 0)
+        return {};
+
+    // Initialize Interaction for sampled point on triangle.
+    Interaction it;
+    it.p = b[0] * p0 + b[1] * p1 + b[2] * p2;
+
+    // Compute surface normal for sampled point on triangle
+    it.n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
+    // Ensure correct orientation of the geometric normal; follow the same
+    // approach as was used in Triangle::Intersect().
+    if (!mesh->n.empty()) {
+        Normal3f ns(b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] +
+                    b[2] * mesh->n[v[2]]);
+        it.n = Faceforward(it.n, ns);
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        it.n *= -1;
+
+    // Compute error bounds for sampled point on triangle
+    Point3f pAbsSum =
+        Abs(b[0] * p0) + Abs(b[1] * p1) + Abs(b[2] * p2);
+    it.pError = gamma(6) * Vector3f(pAbsSum.x, pAbsSum.y, pAbsSum.z);
+
+    return it;
+}
+
+Float Triangle::Pdf(const Interaction &ref, const Vector3f &wi) const {
+    Float sa = SolidAngle(ref.p);
+    if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea)
+        return Shape::Pdf(ref, wi);
+
+    return IntersectP(ref.SpawnRay(wi)) ? (1 / sa) : 0;
 }
 
 Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {

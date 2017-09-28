@@ -48,6 +48,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -131,7 +132,11 @@ Vector3f UniformSampleCone(const Point2f &u, Float thetamax, const Vector3f &x,
 Float UniformConePdf(Float thetamax);
 Point2f UniformSampleDisk(const Point2f &u);
 Point2f ConcentricSampleDisk(const Point2f &u);
-Point2f UniformSampleTriangle(const Point2f &u);
+std::array<Float, 3> UniformSampleTriangle(const Point2f &u);
+std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
+                                             const Point3f &p, const Point2f &u,
+                                             Float *pdf);
+
 class Distribution2D {
   public:
     // Distribution2D Public Methods

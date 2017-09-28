@@ -433,3 +433,35 @@ TEST(Sampling, SampleDiscrete) {
     EXPECT_EQ(0, offset);
     EXPECT_EQ(1./8., pdf);
 }
+
+TEST(Sampling, SphericalTriangle) {
+    int count = 1024*1024;
+    std::array<Point3f, 3> v = { Point3f(4, 1, 1), Point3f(-10, 3, 3), Point3f(-2, -8, 10) };
+    Float A = 0.5 * Length(Cross(v[1] - v[0], v[2] - v[0]));
+    Vector3f N = Normalize(Cross(v[1] - v[0], v[2] - v[0]));
+    Point3f p(.5, -.4, .7);
+
+    // Integrate this function over the projection of the triangle given by
+    // |v| at the unit sphere surrounding |p|.
+    auto f = [](Point3f p) { return p.x * p.y * p.z; };
+
+    Float sphSum = 0, areaSum = 0;
+    for (int i = 0; i < count; ++i) {
+        Point2f u(RadicalInverse(0, i), RadicalInverse(1, i));
+
+        Float pdf;
+        std::array<Float, 3> bs = SphericalSampleTriangle(v, p, u, &pdf);
+        Point3f pTri = bs[0] * v[0] + bs[1] * v[1] + bs[2] * v[2];
+        sphSum += f(pTri) / pdf;
+
+        std::array<Float, 3> ba = UniformSampleTriangle(u);
+        pdf = 1 / A;
+        pTri = ba[0] * v[0] + ba[1] * v[1] + (1 - ba[0] - ba[1]) * v[2];
+        areaSum += f(pTri) * AbsDot(N, Normalize(pTri - p)) /
+            (pdf * DistanceSquared(p, pTri));
+    }
+    Float sphInt = sphSum / count;
+    Float areaInt = areaSum / count;
+
+    EXPECT_LT(std::abs(areaInt - sphInt), 1e-3);
+}
