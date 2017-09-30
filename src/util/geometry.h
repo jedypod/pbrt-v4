@@ -61,6 +61,11 @@ class Vector2 : public Tuple2<Vector2, T> {
     template <typename U> explicit Vector2(const Point2<U> &p);
     template <typename U> explicit Vector2(const Vector2<U> &v)
         : Tuple2<pbrt::Vector2, T>(T(v.x), T(v.y)) { }
+
+    template <typename U> explicit operator Point2<U>() const;
+    template <typename U> explicit operator Vector2<U>() const {
+        return Vector2<U>(x, y);
+    }
 };
 
 template <typename T>
@@ -74,6 +79,13 @@ class Vector3 : public Tuple3<Vector3, T> {
     Vector3(T x, T y, T z) : Tuple3<pbrt::Vector3, T>(x, y, z) { }
     explicit Vector3(const Point3<T> &p);
     explicit Vector3(const Normal3<T> &n);
+    template <typename U> explicit Vector3(const Vector3<U> &v)
+        : Tuple3<pbrt::Vector3, T>(T(v.x), T(v.y), T(v.z)) { }
+
+    template <typename U> explicit operator Point3<U>() const;
+    template <typename U> explicit operator Vector3<U>() const {
+        return Vector3<U>(x, y, z);
+    }
 };
 
 using Vector2f = Vector2<Float>;
@@ -93,18 +105,18 @@ class Point2 : public Tuple2<Point2, T> {
     // Point2 Public Methods
     Point2() { x = y = 0; }
     Point2(T xx, T yy) : Tuple2<pbrt::Point2, T>(xx, yy) { }
-    template <typename U>
-    explicit Point2(const Point2<U> &p) {
-        x = (T)p.x;
-        y = (T)p.y;
-        DCHECK(!HasNaNs());
-    }
+    template <typename U> explicit Point2(const Point2<U> &v)
+        : Tuple2<pbrt::Point2, T>(T(v.x), T(v.y)) { }
+    template <typename U> explicit Point2(const Vector2<U> &v)
+        : Tuple2<pbrt::Point2, T>(v.x, v.y) { }
 
     template <typename U>
-    explicit Point2(const Vector2<U> &p) {
-        x = (T)p.x;
-        y = (T)p.y;
-        DCHECK(!HasNaNs());
+    explicit operator Point2<U>() const {
+        return Point2<U>(x, y);
+    }
+    template <typename U>
+    explicit operator Vector2<U>() const {
+        return Vector2<U>(x, y);
     }
 
     template <typename U>
@@ -152,13 +164,20 @@ class Point3 : public Tuple3<Point3, T> {
     // Point3 Public Methods
     Point3() { x = y = z = 0; }
     Point3(T x, T y, T z) : Tuple3<pbrt::Point3, T>(x, y, z) { }
+    template <typename U> explicit Point3(const Vector3<U> &v)
+        : Tuple3<pbrt::Point3, T>(T(v.x), T(v.y), T(v.z)) { }
+    template <typename U> explicit Point3(const Point3<U> &p)
+        : Tuple3<pbrt::Point3, T>(T(p.x), T(p.y), T(p.z)) { }
+
     template <typename U>
-    explicit Point3(const Point3<U> &p)
-        : Tuple3<pbrt::Point3, T>((T)p.x, (T)p.y, (T)p.z) { }
+    explicit operator Point3<U>() const {
+        return Point3<U>(x, y, z);
+    }
     template <typename U>
     explicit operator Vector3<U>() const {
         return Vector3<U>(x, y, z);
     }
+
     Point3<T> operator+(const Vector3<T> &v) const {
         DCHECK(!v.HasNaNs());
         return Point3<T>(x + v.x, y + v.y, z + v.z);
@@ -287,6 +306,16 @@ class Frame {
 };
 
 // Geometry Inline Functions
+template <typename T> template <typename U>
+Vector2<T>::operator Point2<U>() const {
+    return Point2<U>(x, y);
+}
+
+template <typename T> template <typename U>
+Vector3<T>::operator Point3<U>() const {
+    return Point3<U>(x, y, z);
+}
+
 template <typename T>
 inline Vector3<T>::Vector3(const Point3<T> &p)
     : Tuple3<pbrt::Vector3, T>(p.x, p.y, p.z) { }
@@ -346,7 +375,7 @@ inline Vector3<T> Normalize(const Vector3<T> &v) {
 // Equivalent to std::acos(Dot(a, b)), but more numerically stable.
 // http://www.plunk.org/~hatch/rightway.php
 template <typename T>
-inline Float AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
+inline T AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
     if (Dot(a, b) < 0)
         return Pi - 2 * SafeASin(Length(a + b) / 2);
     else
