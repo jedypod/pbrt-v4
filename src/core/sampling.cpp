@@ -34,6 +34,7 @@
 // core/sampling.cpp*
 #include "sampling.h"
 
+#include "util/stats.h"
 #include "util/transform.h"
 
 #include <numeric>
@@ -214,7 +215,8 @@ void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
 std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
                                              const Point3f &p, const Point2f &u,
                                              Float *pdf) {
-    Vector3f a = v[0] - p, b = v[1] - p, c = v[2] - p;
+    using Vector3d = Vector3<double>;
+    Vector3d a(v[0] - p), b(v[1] - p), c(v[2] - p);
     CHECK_GT(LengthSquared(a), 0);
     CHECK_GT(LengthSquared(b), 0);
     CHECK_GT(LengthSquared(c), 0);
@@ -224,7 +226,7 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
 
     // TODO: have a shared snippet that goes from here to computing
     // alpha/beta/gamma, use it also in Triangle::SolidAngle().
-    Vector3f axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
+    Vector3d axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
     if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0) {
         *pdf = 0;
         return {};
@@ -234,12 +236,12 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
     cxa = Normalize(cxa);
 
     // See comment in Triangle::SolidAngle() for ordering...
-    Float alpha = AngleBetween(cxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxa);
+    double alpha = AngleBetween(cxa, -axb);
+    double beta = AngleBetween(axb, -bxc);
+    double gamma = AngleBetween(bxc, -cxa);
 
     // Spherical area of the triangle.
-    Float A = alpha + beta + gamma - Pi;
+    double A = alpha + beta + gamma - Pi;
     if (A <= 0) {
         *pdf = 0;
         return {};
@@ -247,75 +249,73 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
     *pdf = 1 / A;
 
     // Uniformly sample triangle area
-    Float Ap = u[0] * A;
+    double Ap = u[0] * A;
 
     // Compute sin beta' and cos beta' for the point along the edge b
     // corresponding to the area sampled, A'.
 
     // TODO? Permute vertices so we always sample along the longest edge?
-    Float sinPhi = std::sin(Ap - alpha);
+    double sinPhi = std::sin(Ap - alpha);
     // This doesn't always work... Can we compute cos and then do
     // sine this way?
-//CO    Float cosPhi = std::sqrt(std::max(Float(0), 1 - sinPhi * sinPhi));
-    Float cosPhi = std::cos(Ap - alpha);
+//CO    double cosPhi = std::sqrt(std::max(double(0), 1 - sinPhi * sinPhi));
+    double cosPhi = std::cos(Ap - alpha);
 
-    Float cosAlpha = std::cos(alpha);
-    Float uu = cosPhi - cosAlpha;
-//CO    Float sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
-    Float sinAlpha = std::sin(alpha);
-    Float vv = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
+    double cosAlpha = std::cos(alpha);
+    double uu = cosPhi - cosAlpha;
+//CO    double sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
+    double sinAlpha = std::sin(alpha);
 
-    Float cosBetap = (((vv * cosPhi - uu * sinPhi) * cosAlpha - vv) /
+    double vv = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
+    double cosBetap = (((vv * cosPhi - uu * sinPhi) * cosAlpha - vv) /
                       ((vv * sinPhi + uu * cosPhi) * sinAlpha));
-    CHECK(cosBetap >= -1.0001 && cosBetap <= 1.0001) << cosBetap;
+    CHECK_RARE(1e-6, cosBetap < -1.00001 || cosBetap > 1.00001);
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
     // is sort of ugly/unfortunate.
     CHECK(!isNaN(cosBetap));
     cosBetap = Clamp(cosBetap, -1, 1);
-    Float sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
+    double sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
 
     // Gram-Schmidt
-    auto GS = [](const Vector3f &a, const Vector3f &b) {
+    auto GS = [](const Vector3d &a, const Vector3d &b) {
         return Normalize(a - Dot(a, b) * b);
     };
 
     // Compute c', the point along the arc between b' and a.
-    Vector3f cp = cosBetap * a + sinBetap * GS(c, a);
+    Vector3d cp = cosBetap * a + sinBetap * GS(c, a);
 
-    Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
-    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+    double cosTheta = 1 - u[1] * (1 - Dot(cp, b));
+    double sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
 
     // Compute direction on the sphere.
-    Vector3f w = cosTheta * b + sinTheta * GS(cp, b);
+    Vector3d w = cosTheta * b + sinTheta * GS(cp, b);
 
     // Compute barycentrics. Subset of Moller-Trumbore intersection test.
-    Vector3f e1 = v[1] - v[0], e2 = v[2] - v[0];
-    Vector3f s1 = Cross(w, e2);
-    Float divisor = Dot(s1, e1);
+    Vector3d e1(v[1] - v[0]), e2(v[2] - v[0]);
+    Vector3d s1 = Cross(w, e2);
+    double divisor = Dot(s1, e1);
 
+    CHECK_RARE(1e-6, divisor == 0);
     if (divisor == 0) {
         // This happens with triangles that cover (nearly) the whole
         // hemisphere.
         LOG(ERROR) << "Divisor 0. A = " << A;
         return {1.f/3.f, 1.f/3.f, 1.f/3.f};
     }
-    Float invDivisor = 1 / divisor;
+    double invDivisor = 1 / divisor;
 
     // Compute first barycentric coordinate
-    Vector3f s = Vector3f(p - v[0]);
-    Float b1 = Dot(s, s1) * invDivisor;
+    Vector3d s(p - v[0]);
+    double b1 = Dot(s, s1) * invDivisor;
 
     // Compute second barycentric coordinate
-    Vector3f s2 = Cross(s, e1);
-    Float b2 = Dot(w, s2) * invDivisor;
+    Vector3d s2 = Cross(s, e1);
+    double b2 = Dot(w, s2) * invDivisor;
 
     // We get goofy barycentrics for very small and very large (w.r.t. the sphere) triangles. Again,
-    // we expect the caller to not use this
-    if (b1 < -1e-3 || b1 > 1.001 || b2 < -1e-3 || b2 > 1.001 ||
-        b1 + b2 < -1e-3 || b1 + b2 > 1.001)
-        LOG(ERROR) << "b1: " << b1 << ", b2: "<< b2 << ", A: " << A;
-
+    // we expect the caller to not use this in that case.
+    CHECK_RARE(1e-6, b1 < -1e-4 || b1 > 1.0001 || b2 < -1e-4 || b2 > 1.0001);
     b1 = Clamp(b1, 0, 1);
     b2 = Clamp(b2, 0, 1);
     if (b1 + b2 > 1) {
@@ -323,7 +323,7 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
         b2 /= b1 + b2;
     }
 
-    return {1 - b1 - b2, b1, b2};
+    return {Float(1 - b1 - b2), Float(b1), Float(b2)};
 }
 
 }  // namespace pbrt
