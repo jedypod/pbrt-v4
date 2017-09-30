@@ -1473,6 +1473,8 @@ void pbrtWorldEnd() {
             ClearStats();
             ClearProfiler();
         }
+        if (PrintCheckRare(stdout))
+            exit(1);
     }
 
     for (int i = 0; i < MaxTransforms; ++i) curTransform[i] = Transform();

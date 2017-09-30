@@ -71,7 +71,7 @@ class StatRegisterer {
 };
 
 void PrintStats(FILE *dest);
-void PrintCheckRare(FILE *dest);
+bool PrintCheckRare(FILE *dest);
 void ClearStats();
 void ReportThreadStats();
 
@@ -132,7 +132,7 @@ class StatsAccumulator {
         rc.total += total;
     }
     void Print(FILE *file);
-    void PrintCheckRare(FILE *dest);
+    bool PrintCheckRare(FILE *dest);
     void Clear();
 
   private:
@@ -396,5 +396,11 @@ void CleanupProfiler();
     } while(0)
 
 }  // namespace pbrt
+
+#ifdef NDEBUG
+#define DCHECK_RARE(freq, condition) (void *)0
+#else
+#define DCHECK_RARE(freq, condition) CHECK_RARE(freq, condition)
+#endif  // NDEBUG
 
 #endif  // PBRT_UTIL_STATS_H

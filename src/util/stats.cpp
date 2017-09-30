@@ -88,7 +88,7 @@ void StatRegisterer::CallCallbacks(StatsAccumulator &accum) {
 
 void PrintStats(FILE *dest) { statsAccumulator.Print(dest); }
 
-void PrintCheckRare(FILE *dest) { statsAccumulator.PrintCheckRare(dest); }
+bool PrintCheckRare(FILE *dest) { return statsAccumulator.PrintCheckRare(dest); }
 
 void ClearStats() { statsAccumulator.Clear(); }
 
@@ -188,15 +188,19 @@ void StatsAccumulator::Print(FILE *dest) {
     }
 }
 
-void StatsAccumulator::PrintCheckRare(FILE *dest) {
+bool StatsAccumulator::PrintCheckRare(FILE *dest) {
+    bool anyFailed = false;
     for (const auto iter : rareChecks) {
         const RareCheck &rc = iter.second;
-        Float freq = double(rc.numTrue) / double(rc.total);
-        if (freq >= rc.maxFrequency)
-            fprintf(dest, "%s %.9g was %fx over limit %.9g (%" PRId64 " samples)\n",
-                    iter.first.c_str(), freq, freq/rc.maxFrequency,
+        Float trueFreq = double(rc.numTrue) / double(rc.total);
+        if (trueFreq >= rc.maxFrequency) {
+            fprintf(dest, "%s @ %.9g failures was %fx over limit %.9g (%" PRId64 " samples)\n",
+                    iter.first.c_str(), trueFreq, trueFreq / rc.maxFrequency,
                     rc.maxFrequency, rc.total);
+            anyFailed = true;
+        }
     }
+    return anyFailed;
 }
 
 void StatsAccumulator::Clear() {
