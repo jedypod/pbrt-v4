@@ -45,6 +45,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <glog/logging.h>
 #include <map>
 #include <stdio.h>
 #include <string>
@@ -70,6 +71,7 @@ class StatRegisterer {
 };
 
 void PrintStats(FILE *dest);
+void PrintCheckRare(FILE *dest);
 void ClearStats();
 void ReportThreadStats();
 
@@ -120,8 +122,17 @@ class StatsAccumulator {
         ratios[name].first += num;
         ratios[name].second += denom;
     }
-
+    void ReportRareCheck(const std::string &condition, Float maxFrequency,
+                         int64_t numTrue, int64_t total) {
+        if (rareChecks.find(condition) == rareChecks.end())
+            rareChecks[condition] = RareCheck(maxFrequency);
+        RareCheck &rc = rareChecks[condition];
+        CHECK_EQ(maxFrequency, rc.maxFrequency);
+        rc.numTrue += numTrue;
+        rc.total += total;
+    }
     void Print(FILE *file);
+    void PrintCheckRare(FILE *dest);
     void Clear();
 
   private:
@@ -138,6 +149,12 @@ class StatsAccumulator {
     std::map<std::string, double> floatDistributionMaxs;
     std::map<std::string, std::pair<int64_t, int64_t>> percentages;
     std::map<std::string, std::pair<int64_t, int64_t>> ratios;
+    struct RareCheck {
+        RareCheck(Float f = 0) : maxFrequency(f) {}
+        Float maxFrequency;
+        int64_t numTrue = 0, total = 0;
+    };
+    std::map<std::string, RareCheck> rareChecks;
 };
 
 enum class Prof {
@@ -296,18 +313,17 @@ void CleanupProfiler();
 // Statistics Macros
 #define STAT_COUNTER(title, var)                           \
     static PBRT_THREAD_LOCAL int64_t var;                  \
-    static void STATS_FUNC##var(StatsAccumulator &accum) { \
+    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) { \
         accum.ReportCounter(title, var);                   \
         var = 0;                                           \
-    }                                                      \
-    static StatRegisterer STATS_REG##var(STATS_FUNC##var)
+    });
+
 #define STAT_MEMORY_COUNTER(title, var)                    \
     static PBRT_THREAD_LOCAL int64_t var;                  \
-    static void STATS_FUNC##var(StatsAccumulator &accum) { \
+    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) { \
         accum.ReportMemoryCounter(title, var);             \
         var = 0;                                           \
-    }                                                      \
-    static StatRegisterer STATS_REG##var(STATS_FUNC##var)
+    });
 
 #define STATS_INT64_T_MIN std::numeric_limits<int64_t>::max()
 #define STATS_INT64_T_MAX std::numeric_limits<int64_t>::lowest()
@@ -319,30 +335,28 @@ void CleanupProfiler();
     static PBRT_THREAD_LOCAL int64_t var##count;                           \
     static PBRT_THREAD_LOCAL int64_t var##min = (STATS_INT64_T_MIN);       \
     static PBRT_THREAD_LOCAL int64_t var##max = (STATS_INT64_T_MAX);       \
-    static void STATS_FUNC##var(StatsAccumulator &accum) {                 \
+    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {  \
         accum.ReportIntDistribution(title, var##sum, var##count, var##min, \
                                     var##max);                             \
         var##sum = 0;                                                      \
         var##count = 0;                                                    \
         var##min = std::numeric_limits<int64_t>::max();                    \
         var##max = std::numeric_limits<int64_t>::lowest();                 \
-    }                                                                      \
-    static StatRegisterer STATS_REG##var(STATS_FUNC##var)
+    });
 
 #define STAT_FLOAT_DISTRIBUTION(title, var)                                  \
     static PBRT_THREAD_LOCAL double var##sum;                                \
     static PBRT_THREAD_LOCAL int64_t var##count;                             \
     static PBRT_THREAD_LOCAL double var##min = (STATS_DBL_T_MIN);            \
     static PBRT_THREAD_LOCAL double var##max = (STATS_DBL_T_MAX);            \
-    static void STATS_FUNC##var(StatsAccumulator &accum) {                   \
+    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {       \
         accum.ReportFloatDistribution(title, var##sum, var##count, var##min, \
                                       var##max);                             \
         var##sum = 0;                                                        \
         var##count = 0;                                                      \
         var##min = std::numeric_limits<double>::max();                       \
         var##max = std::numeric_limits<double>::lowest();                    \
-    }                                                                        \
-    static StatRegisterer STATS_REG##var(STATS_FUNC##var)
+    });
 
 #define ReportValue(var, value)                                   \
     do {                                                          \
@@ -354,19 +368,32 @@ void CleanupProfiler();
 
 #define STAT_PERCENT(title, numVar, denomVar)                 \
     static PBRT_THREAD_LOCAL int64_t numVar, denomVar;        \
-    static void STATS_FUNC##numVar(StatsAccumulator &accum) { \
+    static StatRegisterer STATS_REG##numVar([](StatsAccumulator &accum) { \
         accum.ReportPercentage(title, numVar, denomVar);      \
         numVar = denomVar = 0;                                \
-    }                                                         \
-    static StatRegisterer STATS_REG##numVar(STATS_FUNC##numVar)
+    });
 
 #define STAT_RATIO(title, numVar, denomVar)                   \
     static PBRT_THREAD_LOCAL int64_t numVar, denomVar;        \
-    static void STATS_FUNC##numVar(StatsAccumulator &accum) { \
+    static StatRegisterer STATS_REG##numVar([](StatsAccumulator &accum) { \
         accum.ReportRatio(title, numVar, denomVar);           \
         numVar = denomVar = 0;                                \
-    }                                                         \
-    static StatRegisterer STATS_REG##numVar(STATS_FUNC##numVar)
+    });
+
+#define TO_STRING(x) #x
+#define EXPAND_AND_TO_STRING(x) TO_STRING(x)
+
+#define CHECK_RARE(freq, condition)                                  \
+    do {                                                             \
+        static thread_local int64_t numTrue, total;                  \
+        static StatRegisterer reg([](StatsAccumulator &accum) {     \
+                accum.ReportRareCheck(__FILE__ " " EXPAND_AND_TO_STRING(__LINE__) ": CHECK_RARE failed: " #condition, \
+                                  freq, numTrue, total);               \
+            numTrue = total = 0;                                     \
+            });                                                      \
+        ++total;                                                     \
+        if (condition) ++numTrue;                                    \
+    } while(0)
 
 }  // namespace pbrt
 

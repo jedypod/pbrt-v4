@@ -56,6 +56,10 @@ GFX!
 
 -----------------
 
++ SpotLight::Power() test is failing
+
+- find places to use CHECK_RARE
+
 - Use AngleBetween() in Triangle::SolidAngle() implementation
 
 - absl:

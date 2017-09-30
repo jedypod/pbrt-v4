@@ -88,6 +88,8 @@ void StatRegisterer::CallCallbacks(StatsAccumulator &accum) {
 
 void PrintStats(FILE *dest) { statsAccumulator.Print(dest); }
 
+void PrintCheckRare(FILE *dest) { statsAccumulator.PrintCheckRare(dest); }
+
 void ClearStats() { statsAccumulator.Clear(); }
 
 static void getCategoryAndTitle(const std::string &str, std::string *category,
@@ -183,6 +185,17 @@ void StatsAccumulator::Print(FILE *dest) {
         fprintf(dest, "  %s\n", categories.first.c_str());
         for (auto &item : categories.second)
             fprintf(dest, "    %s\n", item.c_str());
+    }
+}
+
+void StatsAccumulator::PrintCheckRare(FILE *dest) {
+    for (const auto iter : rareChecks) {
+        const RareCheck &rc = iter.second;
+        Float freq = double(rc.numTrue) / double(rc.total);
+        if (freq >= rc.maxFrequency)
+            fprintf(dest, "%s %.9g was %fx over limit %.9g (%" PRId64 " samples)\n",
+                    iter.first.c_str(), freq, freq/rc.maxFrequency,
+                    rc.maxFrequency, rc.total);
     }
 }
 
