@@ -54,28 +54,28 @@ void TranslucentMaterial::ComputeScatteringFunctions(
 
     Spectrum r = reflect->Evaluate(*si).Clamp();
     Spectrum t = transmit->Evaluate(*si).Clamp();
-    if (r.IsBlack() && t.IsBlack()) return;
+    if (!r && !t) return;
 
     Spectrum kd = Kd->Evaluate(*si).Clamp();
-    if (!kd.IsBlack()) {
-        if (!r.IsBlack())
+    if (kd) {
+        if (r)
             si->bsdf->Add(arena.Alloc<LambertianReflection>(r * kd));
-        if (!t.IsBlack())
+        if (t)
             si->bsdf->Add(arena.Alloc<LambertianTransmission>(t * kd));
     }
     Spectrum ks = Ks->Evaluate(*si).Clamp();
-    if (!ks.IsBlack() && (!r.IsBlack() || !t.IsBlack())) {
+    if (ks) {
         Float rough = roughness->Evaluate(*si);
         if (remapRoughness)
             rough = TrowbridgeReitzDistribution::RoughnessToAlpha(rough);
         MicrofacetDistribution *distrib =
             arena.Alloc<TrowbridgeReitzDistribution>(rough, rough);
-        if (!r.IsBlack()) {
+        if (r) {
             Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, eta);
             si->bsdf->Add(arena.Alloc<MicrofacetReflection>(
                 r * ks, distrib, fresnel));
         }
-        if (!t.IsBlack())
+        if (t)
             si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(
                 t * ks, distrib, 1.f, eta, mode));
     }

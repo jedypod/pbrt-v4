@@ -50,7 +50,7 @@ void MirrorMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     if (bumpMap) Bump(*bumpMap, si);
     si->bsdf = arena.Alloc<BSDF>(*si);
     Spectrum R = Kr->Evaluate(*si).Clamp();
-    if (!R.IsBlack())
+    if (R)
         si->bsdf->Add(arena.Alloc<SpecularReflection>(R, arena.Alloc<FresnelNoOp>()));
 }
 

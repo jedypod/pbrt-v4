@@ -55,7 +55,7 @@ void MatteMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     si->bsdf = arena.Alloc<BSDF>(*si);
     Spectrum r = Kd->Evaluate(*si).Clamp();
     Float sig = Clamp(sigma->Evaluate(*si), 0, 90);
-    if (!r.IsBlack()) {
+    if (r) {
         if (sig == 0)
             si->bsdf->Add(arena.Alloc<LambertianReflection>(r));
         else

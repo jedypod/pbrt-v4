@@ -61,7 +61,7 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
     // Initialize _bsdf_ for smooth or rough dielectric
     si->bsdf = arena.Alloc<BSDF>(*si, eta);
 
-    if (R.IsBlack() && T.IsBlack()) return;
+    if (!R && !T) return;
 
     bool isSpecular = urough == 0 && vrough == 0;
     if (isSpecular) {
@@ -74,11 +74,11 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
         MicrofacetDistribution *distrib =
             isSpecular ? nullptr
             : arena.Alloc<TrowbridgeReitzDistribution>(urough, vrough);
-        if (!R.IsBlack()) {
+        if (R) {
             Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, eta);
             si->bsdf->Add(arena.Alloc<MicrofacetReflection>(R, distrib, fresnel));
         }
-        if (!T.IsBlack()) {
+        if (T) {
             si->bsdf->Add(arena.Alloc<MicrofacetTransmission>(T, distrib, 1.f, eta, mode));
         }
     }

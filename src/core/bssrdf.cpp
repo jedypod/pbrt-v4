@@ -241,7 +241,7 @@ Spectrum SeparableBSSRDF::Sample_S(const Scene &scene, Float u1,
                                    SurfaceInteraction *si, Float *pdf) const {
     ProfilePhase pp(Prof::BSSRDFSampling);
     Spectrum Sp = Sample_Sp(scene, u1, u2, arena, si, pdf);
-    if (!Sp.IsBlack()) {
+    if (Sp) {
         // Initialize material model at sampled surface interaction
         si->bsdf = arena.Alloc<BSDF>(*si);
         si->bsdf->Add(arena.Alloc<SeparableBSSRDFAdapter>(this));

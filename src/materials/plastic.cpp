@@ -52,12 +52,12 @@ void PlasticMaterial::ComputeScatteringFunctions(
     si->bsdf = arena.Alloc<BSDF>(*si);
     // Initialize diffuse component of plastic material
     Spectrum kd = Kd->Evaluate(*si).Clamp();
-    if (!kd.IsBlack())
+    if (kd)
         si->bsdf->Add(arena.Alloc<LambertianReflection>(kd));
 
     // Initialize specular component of plastic material
     Spectrum ks = Ks->Evaluate(*si).Clamp();
-    if (!ks.IsBlack()) {
+    if (ks) {
         Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.5f, 1.f);
         // Create microfacet distribution _distrib_ for plastic material
         Float rough = roughness->Evaluate(*si);

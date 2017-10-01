@@ -77,9 +77,9 @@ Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
         VisibilityTester visibility;
         Spectrum Li =
             light->Sample_Li(isect, sampler.Get2D(), &wi, &pdf, &visibility);
-        if (Li.IsBlack() || pdf == 0) continue;
+        if (!Li || pdf == 0) continue;
         Spectrum f = isect.bsdf->f(wo, wi);
-        if (!f.IsBlack() && visibility.Unoccluded(scene))
+        if (f && visibility.Unoccluded(scene))
             L += f * Li * AbsDot(wi, n) / pdf;
     }
     if (depth + 1 < maxDepth) {

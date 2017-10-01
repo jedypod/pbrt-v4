@@ -241,8 +241,7 @@ void AOVIntegrator::Render(const Scene &scene) {
                         VisibilityTester vis;
                         Spectrum Li =
                             light->Sample_Li(isect, u[i], &wi, &pdf, &vis);
-                        if (Dot(n, wi) > 0 && !Li.IsBlack() &&
-                            vis.Unoccluded(scene))
+                        if (Dot(n, wi) > 0 && Li && vis.Unoccluded(scene))
                             E += Li * Dot(n, wi) / (lightPdf * pdf * eSamples);
                     }
                     eImage.SetSpectrum(p, E);

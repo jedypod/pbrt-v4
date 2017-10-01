@@ -213,7 +213,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                             Spectrum f =
                                 bsdf.Sample_f(wo, &wi, tileSampler->Get2D(),
                                               &pdf, BSDF_ALL, &type);
-                            if (pdf == 0. || f.IsBlack()) break;
+                            if (pdf == 0 || !f) break;
                             specularBounce = (type & BSDF_SPECULAR) != 0;
                             beta *= f * AbsDot(wi, isect.shading.n) / pdf;
                             if (beta.y() < 0.25) {
@@ -243,7 +243,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
             Float maxRadius = 0.;
             for (int i = 0; i < nPixels; ++i) {
                 const SPPMPixel &pixel = pixels[i];
-                if (pixel.vp.beta.IsBlack()) continue;
+                if (!pixel.vp.beta) continue;
                 Bounds3f vpBound = Expand(Bounds3f(pixel.vp.p), pixel.radius);
                 gridBounds = Union(gridBounds, vpBound);
                 maxRadius = std::max(maxRadius, pixel.radius);
@@ -262,7 +262,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 MemoryArena &arena = perThreadArenas[ThreadIndex];
                 for (int64_t pixelIndex = start; pixelIndex < end; ++pixelIndex) {
                     SPPMPixel &pixel = pixels[pixelIndex];
-                    if (!pixel.vp.beta.IsBlack()) {
+                    if (pixel.vp.beta) {
                         // Add pixel's visible point to applicable grid cells
                         Float radius = pixel.radius;
                         Point3i pMin, pMax;
@@ -330,10 +330,10 @@ void SPPMIntegrator::Render(const Scene &scene) {
                 Spectrum Le =
                     light->Sample_Le(uLight0, uLight1, uLightTime, &photonRay,
                                      &nLight, &pdfPos, &pdfDir);
-                if (pdfPos == 0 || pdfDir == 0 || Le.IsBlack()) continue;
+                if (pdfPos == 0 || pdfDir == 0 || !Le) continue;
                 Spectrum beta = (AbsDot(nLight, photonRay.d) * Le) /
                                 (lightPdf * pdfPos * pdfDir);
-                if (beta.IsBlack()) continue;
+                if (!beta) continue;
 
                 // Follow photon path through scene and record intersections
                 SurfaceInteraction isect;
@@ -392,7 +392,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                     haltonDim += 2;
                     Spectrum fr = photonBSDF.Sample_f(wo, &wi, bsdfSample, &pdf,
                                                       BSDF_ALL, &flags);
-                    if (fr.IsBlack() || pdf == 0.f) break;
+                    if (!fr || pdf == 0) break;
                     Spectrum bnew =
                         beta * fr * AbsDot(wi, isect.shading.n) / pdf;
 

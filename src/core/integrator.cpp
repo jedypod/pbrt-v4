@@ -77,7 +77,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
     Float lightPdf = 0, scatteringPdf = 0;
     VisibilityTester visibility;
     Spectrum Li = light->Sample_Li(it, uLight, &wi, &lightPdf, &visibility);
-    if (lightPdf > 0 && !Li.IsBlack()) {
+    if (lightPdf > 0 && Li) {
         // Compute BSDF or phase function's value for light sample
         Spectrum f;
         if (it.IsSurfaceInteraction()) {
@@ -94,7 +94,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
             scatteringPdf = p;
         }
 
-        if (!f.IsBlack()) {
+        if (f) {
             // Compute effect of visibility for light source sample
             if (handleMedia)
                 Li *= visibility.Tr(scene, sampler);
@@ -102,7 +102,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
                 Li = Spectrum(0.f);
 
             // Add light's contribution to reflected radiance
-            if (!Li.IsBlack()) {
+            if (Li) {
                 if (IsDeltaLight(light->flags))
                     Ld += f * Li / (lightPdf * lightIndexPdf);
                 else {
@@ -134,7 +134,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
             scatteringPdf = p;
         }
 
-        if (!f.IsBlack() && scatteringPdf > 0) {
+        if (f && scatteringPdf > 0) {
             // Account for light contributions along sampled direction _wi_
             Float weight = 1;
             if (!sampledSpecular) {
@@ -158,7 +158,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
                     Li = lightIsect.Le(-wi);
             } else
                 Li = light->Le(ray);
-            if (!Li.IsBlack())
+            if (Li)
                 Ld += f * Li * Tr * weight / (scatteringPdf * lightIndexPdf);
         }
     }
@@ -281,7 +281,7 @@ Spectrum SamplerIntegrator::SpecularReflect(
 
     // Return contribution of specular reflection
     const Normal3f &ns = isect.shading.n;
-    if (pdf > 0.f && !f.IsBlack() && AbsDot(wi, ns) != 0.f) {
+    if (pdf > 0 && f && AbsDot(wi, ns) != 0) {
         // Compute ray differential _rd_ for specular reflection
         RayDifferential rd = isect.SpawnRay(wi);
         if (ray.hasDifferentials) {
@@ -298,9 +298,9 @@ Spectrum SamplerIntegrator::SpecularReflect(
             Float dDNdx = Dot(dwodx, ns) + Dot(wo, dndx);
             Float dDNdy = Dot(dwody, ns) + Dot(wo, dndy);
             rd.rxDirection =
-                wi - dwodx + 2.f * Vector3f(Dot(wo, ns) * dndx + dDNdx * ns);
+                wi - dwodx + 2 * Vector3f(Dot(wo, ns) * dndx + dDNdx * ns);
             rd.ryDirection =
-                wi - dwody + 2.f * Vector3f(Dot(wo, ns) * dndy + dDNdy * ns);
+                wi - dwody + 2 * Vector3f(Dot(wo, ns) * dndy + dDNdy * ns);
         }
         return f * Li(rd, scene, sampler, arena, depth + 1) * AbsDot(wi, ns) /
                pdf;
@@ -319,7 +319,7 @@ Spectrum SamplerIntegrator::SpecularTransmit(
     Spectrum f = bsdf.Sample_f(wo, &wi, sampler.Get2D(), &pdf,
                                BxDFType(BSDF_TRANSMISSION | BSDF_SPECULAR));
     Spectrum L = Spectrum(0.f);
-    if (pdf > 0.f && !f.IsBlack() && AbsDot(wi, ns) != 0.f) {
+    if (pdf > 0 && f && AbsDot(wi, ns) != 0) {
         // Compute ray differential _rd_ for specular transmission
         RayDifferential rd = isect.SpawnRay(wi);
         if (ray.hasDifferentials) {

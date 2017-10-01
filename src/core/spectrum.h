@@ -203,10 +203,13 @@ class CoefficientSpectrum {
     bool operator!=(const Child &sp) const {
         return !(*this == sp);
     }
-    bool IsBlack() const {
+    // We don't need an explicit in e.g. if tests or boolean expressions,
+    // which is nice.
+    // https://stackoverflow.com/questions/6242768/is-the-safe-bool-idiom-obsolete-in-c11
+    explicit operator bool() const {
         for (int i = 0; i < nSpectrumSamples; ++i)
-            if (c[i] != 0.) return false;
-        return true;
+            if (c[i] != 0.) return true;
+        return false;
     }
     friend Child Sqrt(const Child &s) {
         Child ret;

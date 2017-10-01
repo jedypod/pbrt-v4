@@ -60,7 +60,6 @@ GFX!
 
 - sync / harmoize tests from gce to local
 
-- replace IsBlack() with operator bool?
 
 - return std::chrono:duration from progress reporter for elapsed time?
 

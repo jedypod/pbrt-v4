@@ -54,7 +54,7 @@ void UberMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
 
     Spectrum op = opacity->Evaluate(*si).Clamp();
     Spectrum t = (-op + Spectrum(1.f)).Clamp();
-    if (!t.IsBlack()) {
+    if (t) {
         si->bsdf = arena.Alloc<BSDF>(*si, 1.f);
         BxDF *tr = arena.Alloc<SpecularTransmission>(t, 1.f, 1.f, mode);
         si->bsdf->Add(tr);
@@ -62,13 +62,13 @@ void UberMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
         si->bsdf = arena.Alloc<BSDF>(*si, e);
 
     Spectrum kd = op * Kd->Evaluate(*si).Clamp();
-    if (!kd.IsBlack()) {
+    if (kd) {
         BxDF *diff = arena.Alloc<LambertianReflection>(kd);
         si->bsdf->Add(diff);
     }
 
     Spectrum ks = op * Ks->Evaluate(*si).Clamp();
-    if (!ks.IsBlack()) {
+    if (ks) {
         Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, e);
         Float roughu, roughv;
         if (roughnessu)
@@ -91,13 +91,13 @@ void UberMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
     }
 
     Spectrum kr = op * Kr->Evaluate(*si).Clamp();
-    if (!kr.IsBlack()) {
+    if (kr) {
         Fresnel *fresnel = arena.Alloc<FresnelDielectric>(1.f, e);
         si->bsdf->Add(arena.Alloc<SpecularReflection>(kr, fresnel));
     }
 
     Spectrum kt = op * Kt->Evaluate(*si).Clamp();
-    if (!kt.IsBlack())
+    if (kt)
         si->bsdf->Add(arena.Alloc<SpecularTransmission>(kt, 1.f, e, mode));
 }
 

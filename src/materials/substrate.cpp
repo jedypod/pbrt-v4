@@ -55,7 +55,7 @@ void SubstrateMaterial::ComputeScatteringFunctions(
     Float roughu = nu->Evaluate(*si);
     Float roughv = nv->Evaluate(*si);
 
-    if (!d.IsBlack() || !s.IsBlack()) {
+    if (d || s) {
         if (remapRoughness) {
             roughu = TrowbridgeReitzDistribution::RoughnessToAlpha(roughu);
             roughv = TrowbridgeReitzDistribution::RoughnessToAlpha(roughv);

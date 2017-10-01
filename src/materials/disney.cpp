@@ -516,7 +516,7 @@ void DisneyMaterial::ComputeScatteringFunctions(SurfaceInteraction *si,
             si->bsdf->Add(arena.Alloc<DisneyFakeSS>(diffuseWeight * flat * (1 - dt) * c, rough));
         } else {
             Spectrum sd = scatterDistance->Evaluate(*si);
-            if (sd.IsBlack())
+            if (!sd)
                 // No subsurface scattering; use regular (Fresnel modified) diffuse.
                 si->bsdf->Add(arena.Alloc<DisneyDiffuse>(diffuseWeight * c));
             else {

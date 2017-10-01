@@ -110,7 +110,7 @@ int GenerateLightSubpath(
     Float pdfPos, pdfDir;
     Spectrum Le = light->Sample_Le(sampler.Get2D(), sampler.Get2D(), time, &ray,
                                    &nLight, &pdfPos, &pdfDir);
-    if (pdfPos == 0 || pdfDir == 0 || Le.IsBlack()) return 0;
+    if (pdfPos == 0 || pdfDir == 0 || !Le) return 0;
 
     // Generate first vertex on light subpath and start random walk
     path[0] =
@@ -155,7 +155,7 @@ int RandomWalk(const Scene &scene, RayDifferential ray, Sampler &sampler,
         SurfaceInteraction isect;
         bool foundIntersection = scene.Intersect(ray, &isect);
         if (ray.medium) beta *= ray.medium->Sample(ray, sampler, arena, &mi);
-        if (beta.IsBlack()) break;
+        if (!beta) break;
         Vertex &vertex = path[bounces], &prev = path[bounces - 1];
         if (mi.IsValid()) {
             // Record medium interaction in _path_ and compute forward density
@@ -197,7 +197,7 @@ int RandomWalk(const Scene &scene, RayDifferential ray, Sampler &sampler,
                                               BSDF_ALL, &type);
             VLOG(2) << "Random walk sampled dir " << wi << " f: " << f <<
                 ", pdfFwd: " << pdfFwd;
-            if (f.IsBlack() || pdfFwd == 0.f) break;
+            if (!f || pdfFwd == 0) break;
             beta *= f * AbsDot(wi, isect.shading.n) / pdfFwd;
             VLOG(2) << "Random walk beta now " << beta;
             pdfRev = isect.bsdf->Pdf(wi, wo, BSDF_ALL);
@@ -450,7 +450,7 @@ Spectrum ConnectBDPT(
             Float pdf;
             Spectrum Wi = camera.Sample_Wi(qs.GetInteraction(), sampler.Get2D(),
                                            &wi, &pdf, pRaster, &vis);
-            if (pdf > 0 && !Wi.IsBlack()) {
+            if (pdf > 0 && Wi) {
                 // Initialize dynamically sampled vertex and _L_ for $t=1$ case
                 sampled = Vertex::CreateCamera(&camera, vis.P1(), Wi / pdf);
                 L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
@@ -458,7 +458,7 @@ Spectrum ConnectBDPT(
                 DCHECK(!L.HasNaNs());
                 // Only check visibility after we know that the path would
                 // make a non-zero contribution.
-                if (!L.IsBlack()) L *= vis.Tr(scene, sampler);
+                if (L) L *= vis.Tr(scene, sampler);
             }
         }
     } else if (s == 1) {
@@ -473,7 +473,7 @@ Spectrum ConnectBDPT(
             Float pdf;
             Spectrum lightWeight = light->Sample_Li(
                 pt.GetInteraction(), sampler.Get2D(), &wi, &pdf, &vis);
-            if (pdf > 0 && !lightWeight.IsBlack()) {
+            if (pdf > 0 && lightWeight) {
                 EndpointInteraction ei(vis.P1(), light);
                 sampled =
                     Vertex::CreateLight(ei, lightWeight / (pdf * lightPdf), 0);
@@ -482,7 +482,7 @@ Spectrum ConnectBDPT(
                 L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta;
                 if (pt.IsOnSurface()) L *= AbsDot(wi, pt.ns());
                 // Only check visibility if the path would carry radiance.
-                if (!L.IsBlack()) L *= vis.Tr(scene, sampler);
+                if (L) L *= vis.Tr(scene, sampler);
             }
         }
     } else {
@@ -494,18 +494,17 @@ Spectrum ConnectBDPT(
                 " qs: " << qs << ", pt: " << pt << ", qs.f(pt): " << qs.f(pt, TransportMode::Importance) <<
                 ", pt.f(qs): " << pt.f(qs, TransportMode::Radiance) << ", G: " << G(scene, sampler, qs, pt) <<
                 ", dist^2: " << DistanceSquared(qs.p(), pt.p());
-            if (!L.IsBlack()) L *= G(scene, sampler, qs, pt);
+            if (L) L *= G(scene, sampler, qs, pt);
         }
     }
 
     ++totalPaths;
-    if (L.IsBlack()) ++zeroRadiancePaths;
+    if (!L) ++zeroRadiancePaths;
     ReportValue(pathLength, s + t - 2);
 
     // Compute MIS weight for connection strategy
     Float misWeight =
-        L.IsBlack() ? 0.f : MISWeight(scene, lightVertices, cameraVertices,
-                                      sampled, s, t, lightDistr);
+        L ? MISWeight(scene, lightVertices, cameraVertices, sampled, s, t, lightDistr) : 0.f;
     VLOG(2) << "MIS weight for (s,t) = (" << s << ", " << t << ") connection: "
             << misWeight;
     DCHECK(!std::isnan(misWeight));

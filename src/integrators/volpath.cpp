@@ -80,7 +80,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         // Sample the participating medium, if present
         MediumInteraction mi;
         if (ray.medium) beta *= ray.medium->Sample(ray, sampler, arena, &mi);
-        if (beta.IsBlack()) break;
+        if (!beta) break;
 
         // Handle an interaction with a medium or a surface
         if (mi.IsValid()) {
@@ -129,7 +129,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             BxDFType flags;
             Spectrum f = isect.bsdf->Sample_f(wo, &wi, sampler.Get2D(), &pdf,
                                               BSDF_ALL, &flags);
-            if (f.IsBlack() || pdf == 0.f) break;
+            if (!f || pdf == 0) break;
             beta *= f * AbsDot(wi, isect.shading.n) / pdf;
             DCHECK(std::isinf(beta.y()) == false);
             specularBounce = (flags & BSDF_SPECULAR) != 0;
@@ -150,7 +150,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 Spectrum S = isect.bssrdf->Sample_S(
                     scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
                 DCHECK(std::isinf(beta.y()) == false);
-                if (S.IsBlack() || pdf == 0) break;
+                if (!S || pdf == 0) break;
                 beta *= S / pdf;
 
                 // Account for the attenuated direct subsurface scattering
@@ -161,7 +161,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 // Account for the indirect subsurface scattering component
                 Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(),
                                                &pdf, BSDF_ALL, &flags);
-                if (f.IsBlack() || pdf == 0) break;
+                if (!f || pdf == 0) break;
                 beta *= f * AbsDot(wi, pi.shading.n) / pdf;
                 DCHECK(std::isinf(beta.y()) == false);
                 specularBounce = (flags & BSDF_SPECULAR) != 0;

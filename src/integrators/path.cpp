@@ -123,7 +123,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             Spectrum Ld = beta * EstimateLd(isect, scene, sampler, *lightDistribution,
                                             false);
             VLOG(2) << "Sampled direct lighting Ld = " << Ld;
-            if (Ld.IsBlack()) ++zeroRadiancePaths;
+            if (!Ld) ++zeroRadiancePaths;
             CHECK_GE(Ld.y(), 0.f);
             L += Ld;
         }
@@ -135,7 +135,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         Spectrum f = isect.bsdf->Sample_f(wo, &wi, sampler.Get2D(), &pdf,
                                           BSDF_ALL, &flags);
         VLOG(2) << "Sampled BSDF, f = " << f << ", pdf = " << pdf;
-        if (f.IsBlack() || pdf == 0.f) break;
+        if (!f || pdf == 0) break;
         beta *= f * AbsDot(wi, isect.shading.n) / pdf;
         VLOG(2) << "Updated beta = " << beta;
         CHECK_GE(beta.y(), 0.f);
@@ -157,7 +157,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             Spectrum S = isect.bssrdf->Sample_S(
                 scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
             DCHECK(!std::isinf(beta.y()));
-            if (S.IsBlack() || pdf == 0) break;
+            if (!S || pdf == 0) break;
             beta *= S / pdf;
 
             // Account for the direct subsurface scattering component
@@ -167,7 +167,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             // Account for the indirect subsurface scattering component
             Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,
                                            BSDF_ALL, &flags);
-            if (f.IsBlack() || pdf == 0) break;
+            if (!f || pdf == 0) break;
             beta *= f * AbsDot(wi, pi.shading.n) / pdf;
             DCHECK(!std::isinf(beta.y()));
             specularBounce = (flags & BSDF_SPECULAR) != 0;
