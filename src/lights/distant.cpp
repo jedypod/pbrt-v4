@@ -59,7 +59,7 @@ Spectrum DistantLight::Sample_Li(const Interaction &ref, const Point2f &u,
     return L;
 }
 
-Spectrum DistantLight::Power() const {
+Spectrum DistantLight::Phi() const {
     return L * Pi * worldRadius * worldRadius;
 }
 

@@ -48,7 +48,7 @@ GFX!
   lights. is there some reusable infrastructure for sampling images that that
   and infinite light can be built on?
   - this should be extra straightforward now that the Power stuff is
-    principled.  In turn, can implement Power() via the sampling routines
+    principled.  In turn, can implement Phi() via the sampling routines
     (potentially)
 
 - accurate importance sampling
@@ -80,8 +80,6 @@ GFX!
 - Improved CoordinateSystem from jcgt papers?
 
 - rename GonioPhotometricLight -> GoniometricLight?
-
-- rename Light::Power() methods to Phi()?
 
 - avx2 check https://gist.github.com/UnaNancyOwen/263c243ae1e05a2f9d0e
 

@@ -23,7 +23,7 @@ TEST(SpotLight, Power) {
                     40 /* falloff start */,
                     nullptr);
 
-    Spectrum phi = light.Power();
+    Spectrum phi = light.Phi();
 
     int nSamples = 1024*1024;
     double phiSampled = 0;
@@ -59,7 +59,7 @@ TEST(GoniometricLight, Power) {
     GonioPhotometricLight light(Transform(), MediumInterface(), I, std::move(image),
                                 nullptr);
 
-    Spectrum phi = light.Power();
+    Spectrum phi = light.Phi();
 
     int nSamples = 1024*1024;
     double phiSampled = 0;
@@ -81,7 +81,7 @@ TEST(ProjectionLight, Power) {
         ProjectionLight light(Transform(), MediumInterface(), I, std::move(image),
                               30 /* fov */, nullptr);
 
-        Spectrum phi = light.Power();
+        Spectrum phi = light.Phi();
 
         int nSamples = 1024*1024;
         double phiSampled = 0;

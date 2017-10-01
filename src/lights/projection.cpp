@@ -91,7 +91,7 @@ Spectrum ProjectionLight::Projection(const Vector3f &w) const {
     return I * image.BilerpSpectrum(st, SpectrumType::Illuminant);
 }
 
-Spectrum ProjectionLight::Power() const {
+Spectrum ProjectionLight::Phi() const {
     Spectrum sum(0.f);
     Transform screenToLight = Inverse(lightToScreen);
     Float minRes = std::min(image.resolution.x, image.resolution.y);

@@ -64,7 +64,7 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &LightToWorld,
             "Proceed at your own risk; your image may have errors.");
 }
 
-Spectrum DiffuseAreaLight::Power() const {
+Spectrum DiffuseAreaLight::Phi() const {
     return (twoSided ? 2 : 1) * Lemit * area * Pi;
 }
 

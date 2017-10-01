@@ -58,7 +58,7 @@ class InfiniteAreaLight : public Light {
     void Preprocess(const Scene &scene) {
         scene.WorldBound().BoundingSphere(&worldCenter, &worldRadius);
     }
-    Spectrum Power() const;
+    Spectrum Phi() const;
     Spectrum Le(const RayDifferential &ray) const;
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
                        Float *pdf, VisibilityTester *vis) const;

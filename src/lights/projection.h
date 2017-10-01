@@ -57,7 +57,7 @@ class ProjectionLight : public Light {
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
                        Float *pdf, VisibilityTester *vis) const;
     Spectrum Projection(const Vector3f &w) const;
-    Spectrum Power() const;
+    Spectrum Phi() const;
     Float Pdf_Li(const Interaction &, const Vector3f &) const;
     Spectrum Sample_Le(const Point2f &u1, const Point2f &u2, Float time,
                        Ray *ray, Normal3f *nLight, Float *pdfPos,

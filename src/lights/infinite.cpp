@@ -72,7 +72,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
     distribution = std::make_unique<Distribution2D>(img, width, height);
 }
 
-Spectrum InfiniteAreaLight::Power() const {
+Spectrum InfiniteAreaLight::Phi() const {
     // We're really computing fluence, then converting to power, for what
     // that's worth..
     Spectrum sumL(0.);

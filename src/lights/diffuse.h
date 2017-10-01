@@ -62,7 +62,7 @@ class DiffuseAreaLight : public AreaLight {
     Spectrum L(const Interaction &intr, const Vector3f &w) const {
         return (twoSided || Dot(intr.n, w) > 0) ? Lemit : Spectrum(0.f);
     }
-    Spectrum Power() const;
+    Spectrum Phi() const;
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wo,
                        Float *pdf, VisibilityTester *vis) const;
     Float Pdf_Li(const Interaction &, const Vector3f &) const;

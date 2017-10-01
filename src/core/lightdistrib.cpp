@@ -124,7 +124,7 @@ PowerLightDistribution::PowerLightDistribution(const Scene &scene)
 
     std::vector<Float> lightPower;
     for (const auto &light : scene.lights)
-        lightPower.push_back(light->Power().y());
+        lightPower.push_back(light->Phi().y());
     distrib = std::make_unique<Distribution1D>(lightPower);
 }
 

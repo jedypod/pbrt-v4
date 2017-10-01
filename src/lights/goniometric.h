@@ -69,7 +69,7 @@ class GonioPhotometricLight : public Light {
         Point2f st(phi * Inv2Pi, theta * InvPi);
         return I * image.BilerpSpectrum(st, SpectrumType::Illuminant);
     }
-    Spectrum Power() const;
+    Spectrum Phi() const;
     Float Pdf_Li(const Interaction &, const Vector3f &) const;
     Spectrum Sample_Le(const Point2f &u1, const Point2f &u2, Float time,
                        Ray *ray, Normal3f *nLight, Float *pdfPos,

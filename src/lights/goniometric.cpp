@@ -51,7 +51,7 @@ Spectrum GonioPhotometricLight::Sample_Li(const Interaction &ref,
     return Scale(-*wi) / DistanceSquared(pLight, ref.p);
 }
 
-Spectrum GonioPhotometricLight::Power() const {
+Spectrum GonioPhotometricLight::Phi() const {
     // integrate over speherical coordinates [0,Pi], [0,2pi]
     Spectrum sumL(0.);
     int width = image.resolution.x, height = image.resolution.y;
