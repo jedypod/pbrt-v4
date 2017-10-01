@@ -263,14 +263,25 @@ inline constexpr Float Lerp(Float t, Float v1, Float v2) {
     return (1 - t) * v1 + t * v2;
 }
 
-inline constexpr Float Sqr(Float v) { return v * v; }
+template <typename T>
+inline constexpr Float Sqr(T v) { return v * v; }
 
-inline Float SafeASin(Float x) {
+inline float SafeASin(float x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
     return std::asin(Clamp(x, -1, 1));
 }
 
-inline Float SafeACos(Float x) {
+inline double SafeASin(double x) {
+    DCHECK(x >= -1.0001 && x <= 1.0001);
+    return std::asin(Clamp(x, -1, 1));
+}
+
+inline float SafeACos(float x) {
+    DCHECK(x >= -1.0001 && x <= 1.0001);
+    return std::acos(Clamp(x, -1, 1));
+}
+
+inline double SafeACos(double x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
     return std::acos(Clamp(x, -1, 1));
 }
@@ -285,6 +296,8 @@ inline double SafeSqrt(double x) {
     return std::sqrt(std::max(0., x));
 }
 
+// Would be nice to allow Float to be a template type here, but it's tricky:
+// https://stackoverflow.com/questions/5101516/why-function-template-cannot-be-partially-specialized
 template <int n>
 inline constexpr Float Pow(Float v) {
     static_assert(n > 0, "Power can't be negative");
