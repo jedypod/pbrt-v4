@@ -10,7 +10,9 @@ GFX!
 
 - big rework of direct lighting: after bsdf sample, intersect scene to find
   light
-
+  + scattering-heterogeneous-medium has big diffs.
+    add simpler volume scattering tests
+    
 - tests for light * -> pdf computaiton
 
 - implement improved delta/ratio tracking stuff...
@@ -18,7 +20,7 @@ GFX!
 - try jacopo/heitz stuff for inf env map sampling e.g.
 
 - explicit path representation (review mitsuba libbidir stuff). Also, just
-  build on top of bdpt Vertex stuff?
+  build on top of bdpt Vertex stuff (or generalize, and build both on top?)
 
 - support animated light sources (transformation at least)
 
@@ -56,9 +58,19 @@ GFX!
 
 -----------------
 
-+ SpotLight::Power() test is failing
+- sync / harmoize tests from gce to local
+
+- replace IsBlack() with operator bool?
+
+- return std::chrono:duration from progress reporter for elapsed time?
+
+- std::align for memory arena aligment calculations?
 
 - find places to use CHECK_RARE
+
+- feel like we want a separate Sampler instance for volume stuff. on very first
+  shadow ray, Scene::IntersectTr() may use dimensions, which messes up
+  all subsequent dimensions...
 
 - absl:
   base/casts.h: bit_cast for float to bits sort of stuff
@@ -132,9 +144,6 @@ GFX!
 - figure out consistent merging of film tiles so have fully deterministic
   final pixel outputs
   
-- absorbing-sphere-null.pbrt gives inconsistent resutls (even with one
-  thread??) (others as well...)  (Film tile merge??)
-
 - api.cpp: Create* vs Make*, etc.
 
 - CreateConeShape -> Cone::Create (etc..)
