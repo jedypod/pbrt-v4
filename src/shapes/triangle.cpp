@@ -597,9 +597,7 @@ Float Triangle::Pdf(const Interaction &ref, const Vector3f &wi) const {
 Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // Project the vertices into the unit sphere around p.
     const int *v = &mesh->vertexIndices[3 * triIndex];
-    std::array<Vector3f, 3> pSphere = {Normalize(mesh->p[v[0]] - p),
-                                       Normalize(mesh->p[v[1]] - p),
-                                       Normalize(mesh->p[v[2]] - p)};
+    Vector3f a = mesh->p[v[0]] - p, b = mesh->p[v[1]] - p, c = mesh->p[v[2]] - p;
 
     // http://math.stackexchange.com/questions/9819/area-of-a-spherical-triangle
     // Girard's theorem: surface area of a spherical triangle on a unit
@@ -612,23 +610,21 @@ Float Triangle::SolidAngle(const Point3f &p, int nSamples) const {
     // cos theta =  Dot(Cross(c, a), Cross(b, a)) /
     //              (Length(Cross(c, a)) * Length(Cross(b, a))).
     //
-    Vector3f cross01 = (Cross(pSphere[0], pSphere[1]));
-    Vector3f cross12 = (Cross(pSphere[1], pSphere[2]));
-    Vector3f cross20 = (Cross(pSphere[2], pSphere[0]));
-
-    // Some of these vectors may be degenerate. In this case, we don't want
-    // to normalize them so that we don't hit an assert. This is fine,
-    // since the corresponding dot products below will be zero.
-    if (LengthSquared(cross01) > 0) cross01 = Normalize(cross01);
-    if (LengthSquared(cross12) > 0) cross12 = Normalize(cross12);
-    if (LengthSquared(cross20) > 0) cross20 = Normalize(cross20);
-
     // We only need to do three cross products to evaluate the angles at
     // all three vertices, though, since we can take advantage of the fact
     // that Cross(a, b) = -Cross(b, a).
-    return std::abs(SafeACos(Dot(cross01, -cross12)) +
-                    SafeACos(Dot(cross12, -cross20)) +
-                    SafeACos(Dot(cross20, -cross01)) - Pi);
+    Vector3f axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
+    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0)
+        return 0;
+    axb = Normalize(axb);
+    bxc = Normalize(bxc);
+    cxa = Normalize(cxa);
+
+    Float alpha = AngleBetween(cxa, -axb);
+    Float beta = AngleBetween(axb, -bxc);
+    Float gamma = AngleBetween(bxc, -cxa);
+
+    return std::abs(alpha + beta + gamma - Pi);
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
