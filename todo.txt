@@ -56,14 +56,18 @@ GFX!
   - gonio
   - projection
 
+- BDPT: do standard MIS direct lighting at end (and then can use fancy
+  light sampling stuff)
+
 -----------------
 
+- frame 380 bdpt bug
+
+- can reduce sph triangle min area to 1e-5 I think... 
+
+- more mathutil tests..
+
 - sync / harmoize tests from gce to local
-
-
-- return std::chrono:duration from progress reporter for elapsed time?
-
-- std::align for memory arena aligment calculations?
 
 - find places to use CHECK_RARE
 
@@ -87,8 +91,6 @@ GFX!
 - Image::SetRGB method? Spectrum in general is sort of out of place, since
   we're explicit about "this is a 3 channel image", etc...
   - but otoh we do want to someday support spectral Images...
-
-+ how come sampler test wasn't failing on gce?
 
 - avx 2 support, half to float, etc...  -march=native?
 

@@ -71,17 +71,19 @@ MemoryArena {
   public:
     // MemoryArena Public Methods
     MemoryArena(size_t blockSize = 262144) : blockSize(blockSize) {}
-    void *Alloc(size_t nBytes) {
-        // Round up _nBytes_ to minimum machine alignment
+    void *Alloc(size_t nRequested, size_t align = 0) {
+        if (align == 0) {
 #if __GNUC__ == 4 && __GNUC_MINOR__ < 9
         // gcc bug: max_align_t wasn't in std:: until 4.9.0
-        const int align = alignof(::max_align_t);
+            align = alignof(::max_align_t);
 #else
-        const int align = alignof(std::max_align_t);
+            align = alignof(std::max_align_t);
 #endif
-        static_assert(IsPowerOf2(align), "Minimum alignment not a power of two");
-        nBytes = (nBytes + align - 1) & ~(align - 1);
-        if (currentBlockPos + nBytes > currentAllocSize) {
+        }
+        DCHECK(IsPowerOf2(align));
+
+        size_t nAlloc = nRequested + align - 1;
+        if (currentBlockPos + nAlloc > currentAllocSize) {
             // Add current block to _usedBlocks_ list
             if (currentBlock) {
                 usedBlocks.push_back(
@@ -95,7 +97,7 @@ MemoryArena {
             // Try to get memory block from _availableBlocks_
             for (auto iter = availableBlocks.begin();
                  iter != availableBlocks.end(); ++iter) {
-                if (iter->first >= nBytes) {
+                if (nAlloc <= iter->first) {
                     currentAllocSize = iter->first;
                     currentBlock = std::move(iter->second);
                     availableBlocks.erase(iter);
@@ -103,24 +105,26 @@ MemoryArena {
                 }
             }
             if (!currentBlock) {
-                currentAllocSize = std::max(nBytes, blockSize);
+                currentAllocSize = std::max(nAlloc, blockSize);
                 currentBlock = std::make_unique<char[]>(currentAllocSize);
             }
             currentBlockPos = 0;
         }
-        void *ret = currentBlock.get() + currentBlockPos;
-        currentBlockPos += nBytes;
-        return ret;
+        void *start = currentBlock.get() + currentBlockPos;
+        currentBlockPos += nAlloc;
+        void *ptr = std::align(align, nRequested, start, nAlloc);
+        CHECK_NOTNULL(ptr);
+        return ptr;
     }
     template <typename T>
     T *AllocArray(size_t n = 1, bool runConstructor = true) {
-        T *ret = (T *)Alloc(n * sizeof(T));
+        T *ret = (T *)Alloc(n * sizeof(T), alignof(T));
         if (runConstructor)
             for (size_t i = 0; i < n; ++i) new (&ret[i]) T();
         return ret;
     }
     template<typename T, typename ...Args> T *Alloc(Args&&... args)  {
-        T *ptr = (T *)Alloc(sizeof(T));
+        T *ptr = (T *)Alloc(sizeof(T), alignof(T));
         return new (ptr) T(std::forward<Args>(args)...);
     }
     void Reset() {
