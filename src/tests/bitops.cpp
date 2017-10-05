@@ -1,8 +1,11 @@
 
 #include "tests/gtest/gtest.h"
-#include <stdint.h>
+
 #include "pbrt.h"
+#include "util/bits.h"
 #include "util/mathutil.h"
+
+#include <stdint.h>
 
 using namespace pbrt;
 

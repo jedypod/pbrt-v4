@@ -36,9 +36,10 @@
 
 #include "error.h"
 #include "interaction.h"
+#include "paramset.h"
+#include "util/bits.h"
 #include "util/memory.h"
 #include "util/parallel.h"
-#include "paramset.h"
 #include "util/stats.h"
 
 #include <algorithm>
@@ -108,27 +109,6 @@ struct LinearBVHNode {
 };
 
 // BVHAccel Utility Functions
-inline uint32_t LeftShift3(uint32_t x) {
-    CHECK_LE(x, (1 << 10));
-    if (x == (1 << 10)) --x;
-    x = (x | (x << 16)) & 0b00000011000000000000000011111111;
-    // x = ---- --98 ---- ---- ---- ---- 7654 3210
-    x = (x | (x << 8)) & 0b00000011000000001111000000001111;
-    // x = ---- --98 ---- ---- 7654 ---- ---- 3210
-    x = (x | (x << 4)) & 0b00000011000011000011000011000011;
-    // x = ---- --98 ---- 76-- --54 ---- 32-- --10
-    x = (x | (x << 2)) & 0b00001001001001001001001001001001;
-    // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-    return x;
-}
-
-inline uint32_t EncodeMorton3(const Vector3f &v) {
-    CHECK_GE(v.x, 0);
-    CHECK_GE(v.y, 0);
-    CHECK_GE(v.z, 0);
-    return (LeftShift3(v.z) << 2) | (LeftShift3(v.y) << 1) | LeftShift3(v.x);
-}
-
 static void RadixSort(std::vector<MortonPrimitive> *v) {
     std::vector<MortonPrimitive> tempVector(v->size());
     constexpr int bitsPerPass = 6;

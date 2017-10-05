@@ -41,11 +41,13 @@
 // core/lowdiscrepancy.h*
 #include "pbrt.h"
 
-#include "util/mathutil.h"
-#include "util/geometry.h"
 #include "sampling.h"
 #include "sobolmatrices.h"
+#include "util/bits.h"
+#include "util/geometry.h"
+#include "util/mathutil.h"
 #include "util/rng.h"
+
 #include <absl/types/span.h>
 
 #include <algorithm>

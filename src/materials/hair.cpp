@@ -35,14 +35,15 @@
 
 #include "error.h"
 #include "interaction.h"
-#include "util/mathutil.h"
-#include "util/memory.h"
 #include "paramset.h"
 #include "reflection.h"
 #include "sampling.h"
 #include "spectrum.h"
 #include "texture.h"
 #include "textures/constant.h"
+#include "util/bits.h"
+#include "util/mathutil.h"
+#include "util/memory.h"
 
 #include <array>
 #include <cmath>
@@ -364,7 +365,7 @@ Spectrum HairBSDF::Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u2,
     Float phiO = std::atan2(wo.z, wo.y);
 
     // Derive four random samples from _u2_
-    Point2f u[2] = {DemuxFloat(u2[0]), DemuxFloat(u2[1])};
+    std::array<Float, 2> u[2] = {DemuxFloat(u2[0]), DemuxFloat(u2[1])};
 
     // Determine which term $p$ to sample for hair scattering
     std::array<Float, pMax + 1> apPdf = ComputeApPdf(cosThetaO);

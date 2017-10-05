@@ -34,6 +34,7 @@
 #include "texcache.h"
 
 #include "error.h"
+#include "util/bits.h"
 #include "util/parallel.h"
 #include "util/stats.h"
 #include "util/stringprint.h"
@@ -77,16 +78,6 @@ inline Point2i nTiles(Point2i resolution, int logTileSize) {
     int tileSize = 1 << logTileSize;
     return {(resolution[0] + tileSize - 1) >> logTileSize,
             (resolution[1] + tileSize - 1) >> logTileSize};
-}
-
-// http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
-inline uint64_t MixBits(uint64_t v) {
-    v ^= (v >> 31);
-    v *= 0x7fb5d329728ea185;
-    v ^= (v >> 27);
-    v *= 0x81dadef4bc2dd44d;
-    v ^= (v >> 33);
-    return v;
 }
 
 // TileId Declarations
