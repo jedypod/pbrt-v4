@@ -335,6 +335,7 @@ void BDPTIntegrator::Render(const Scene &scene) {
     // Render and write the output image to disk
     if (scene.lights.size() > 0) {
         ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
+            LOG(INFO) << "Starting tile " << tileBounds;
             // Render a single tile using BDPT
             MemoryArena arena;
             std::unique_ptr<Sampler> tileSampler = sampler->Clone();

@@ -264,7 +264,7 @@ inline constexpr Float Lerp(Float t, Float v1, Float v2) {
 }
 
 template <typename T>
-inline constexpr Float Sqr(T v) { return v * v; }
+inline constexpr T Sqr(T v) { return v * v; }
 
 inline float SafeASin(float x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
