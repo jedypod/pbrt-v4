@@ -297,9 +297,16 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect)
         dpdu = (duv12[1] * dp02 - duv02[1] * dp12) * invdet;
         dpdv = (-duv12[0] * dp02 + duv02[0] * dp12) * invdet;
     }
-    if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0)
+    if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0) {
+        Vector3f n = Cross(p2 - p0, p1 - p0);
+        if (LengthSquared(n) == 0) {
+            // TODO: should these be eliminated from the start?
+            LOG(WARNING) << "Intersected degenerate triangle; ignoring";
+            return false;
+        }
         // Handle zero determinant for triangle partial derivative matrix
-        CoordinateSystem(Normalize(Cross(p2 - p0, p1 - p0)), &dpdu, &dpdv);
+        CoordinateSystem(Normalize(n), &dpdu, &dpdv);
+    }
 
     // Compute error bounds for triangle intersection
     Float xAbsSum =
