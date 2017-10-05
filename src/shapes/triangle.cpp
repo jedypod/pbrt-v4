@@ -554,10 +554,8 @@ Interaction Triangle::Sample(const Interaction &ref, const Point2f &u,
     const Point3f &p2 = mesh->p[v[2]];
 
     Float sa = SolidAngle(ref.p);
-    if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
-        *pdf = 0; return {};
+    if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea)
         return Shape::Sample(ref, u, pdf);
-    }
 
     std::array<Float, 3> b = SphericalSampleTriangle({p0, p1, p2}, ref.p, u, pdf);
     if (*pdf == 0)
