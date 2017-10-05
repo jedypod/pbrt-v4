@@ -12,7 +12,7 @@ TEST(Vector, AngleBetween) {
 
     EXPECT_EQ(Pi, AngleBetween(Vector3f(0, 0, 1), Vector3f(0, 0, -1)));
 
-    EXPECT_EQ(Pi / 2, AngleBetween(Vector3f(1, 0, 0), Vector3f(0, 1, 0)));
+    EXPECT_FLOAT_EQ(Pi / 2, AngleBetween(Vector3f(1, 0, 0), Vector3f(0, 1, 0)));
 
     Vector3f x = Normalize(Vector3f(1, -3, 10));
     EXPECT_EQ(0, AngleBetween(x, x));
