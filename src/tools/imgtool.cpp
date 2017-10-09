@@ -19,6 +19,7 @@
 extern "C" {
 #include "ext/ArHosekSkyModel.h"
 }
+
 #include <glog/logging.h>
 
 using namespace pbrt;
@@ -673,6 +674,7 @@ int convert(int argc, char *argv[]) {
     Float despikeLimit = Infinity;
     bool preserveColors = false;
     std::vector<std::string> filenames;
+    std::array<Float, 3> rgbScale = { Float(1), Float(1), Float(1) };
 
     while (*argv) {
         auto onError = [](const std::string &err) {
@@ -686,6 +688,7 @@ int convert(int argc, char *argv[]) {
             ParseArg(&argv, "maxluminance", &maxY, onError) ||
             ParseArg(&argv, "repeatpix", &repeat, onError) ||
             ParseArg(&argv, "scale", &scale, onError) ||
+            ParseArg(&argv, "rgbScale", absl::MakeSpan(rgbScale), onError) ||
             ParseArg(&argv, "bloomlevel", &bloomLevel, onError) ||
             ParseArg(&argv, "bloomwidth", &bloomWidth, onError) ||
             ParseArg(&argv, "bloomscale", &bloomScale, onError) ||
@@ -761,7 +764,7 @@ int convert(int argc, char *argv[]) {
         for (int x = 0; x < res.x; ++x)
             for (int c = 0; c < nc; ++c)
                 image.SetChannel({x, y}, c,
-                                 scale * image.GetChannel({x, y}, c));
+                                 scale * rgbScale[c] * image.GetChannel({x, y}, c));
 
     if (despikeLimit < Infinity) {
         Image filteredImg = image;

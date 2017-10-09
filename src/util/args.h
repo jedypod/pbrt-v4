@@ -41,6 +41,8 @@
 #include "pbrt.h"
 #include "util/stringprint.h"
 
+#include <absl/strings/str_split.h>
+#include <absl/types/span.h>
 #include <cctype>
 #include <cstring>
 #include <functional>
@@ -70,6 +72,15 @@ bool initArg(const std::string &str, Float *ptr) {
         (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
         return false;
     *ptr = std::stof(str);
+    return true;
+}
+
+bool initArg(const std::string &str, absl::Span<Float> out) {
+    std::vector<std::string> v = absl::StrSplit(str, ',');
+    if (v.size() != out.size())
+        return false;
+    std::transform(v.begin(), v.end(), out.begin(),
+                   [](const std::string &s) { return std::stof(s); });
     return true;
 }
 
@@ -105,7 +116,7 @@ bool matchPrefix(const std::string &str, const std::string &prefix) {
 }
 
 template <typename T>
-bool enable(T *ptr) {
+bool enable(T ptr) {
     return false;
 }
 
@@ -116,8 +127,9 @@ bool enable(bool *ptr) {
 
 }  // namespace
 
+// T basically needs to be a pointer type or a Span.
 template <typename T>
-bool ParseArg(char ***argv, const std::string &name, T *ptr,
+bool ParseArg(char ***argv, const std::string &name, T out,
               std::function<void(std::string)> onError) {
     std::string arg = **argv;
 
@@ -131,7 +143,7 @@ bool ParseArg(char ***argv, const std::string &name, T *ptr,
         // --arg=value
         *argv += 1;
         std::string value = arg.substr(name.size() + 1);
-        if (!initArg(value, ptr)) {
+        if (!initArg(value, out)) {
             onError(StringPrintf("invalid value \"%s\" for %s argument",
                                  value.c_str(), name.c_str()));
             return false;
@@ -141,14 +153,14 @@ bool ParseArg(char ***argv, const std::string &name, T *ptr,
         // --arg <value>, except for bool arguments, which are set to true
         // without expecting another argument.
         *argv += 1;
-        if (enable(ptr))
+        if (enable(out))
             return true;
 
         if (**argv == nullptr) {
             onError(StringPrintf("missing value after %s argument", **argv));
             return false;
         }
-        initArg(**argv, ptr);
+        initArg(**argv, out);
         *argv += 1;
         return true;
     } else
