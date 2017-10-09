@@ -33,13 +33,15 @@
 
 // filters/sinc.cpp*
 #include "filters/sinc.h"
+
+#include "util/mathutil.h"
 #include "paramset.h"
 
 namespace pbrt {
 
 // Sinc Filter Method Definitions
 Float LanczosSincFilter::Evaluate(const Point2f &p) const {
-    return WindowedSinc(p.x, radius.x) * WindowedSinc(p.y, radius.y);
+    return WindowedSinc(p.x, radius.x, tau) * WindowedSinc(p.y, radius.y, tau);
 }
 
 std::unique_ptr<LanczosSincFilter> CreateSincFilter(const ParamSet &ps) {

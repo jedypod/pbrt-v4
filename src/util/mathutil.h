@@ -417,6 +417,23 @@ inline Float SRGB8ToLinear(uint8_t value) {
     return SRGBToLinearLUT[value];
 }
 
+inline Float Sinc(Float x) {
+    // http://www.plunk.org/~hatch/rightway.php
+    // The power series expansion of sin(x)/x is 1 - x^2/3! + x^4/5! - ...
+    // So if x is small and 1 - x^2/3! rounds to 1, then sin(x)/x will
+    // also round to one. Making the test a bit more conservative, as below,
+    // works as well.
+    if (1 + Pow<2>(Pi * x) == 1)
+        return 1;
+    return std::sin(Pi * x) / (Pi * x);
+}
+
+inline Float WindowedSinc(Float x, Float radius, Float tau) {
+    if (std::abs(x) > radius) return 0;
+    Float lanczos = Sinc(x / tau);
+    return Sinc(x) * lanczos;
+}
+
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_MATHUTIL_H
