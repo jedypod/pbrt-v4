@@ -546,7 +546,7 @@ Interaction Triangle::Sample(const Point2f &u, Float *pdf) const {
 // contribution from the emitter due to its subtending a small solid angle.
 // In the second, BSDF sampling should be the much better sampling strategy
 // anyway.
-static constexpr Float MinSphericalSampleArea = 1e-3;
+static constexpr Float MinSphericalSampleArea = 1e-5;
 static constexpr Float MaxSphericalSampleArea = 6.28;
 
 // Note: much of this method---other than the call to the sampling function

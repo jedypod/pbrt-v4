@@ -61,8 +61,6 @@ GFX!
 
 - REGISTER_CAMERA("perspective", PerspectiveCamera::Create) etc
 
-- can reduce sph triangle min area to 1e-5 I think... 
-
 - more mathutil tests..
 
 - sync / harmoize tests from gce to local
