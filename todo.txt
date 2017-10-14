@@ -1,4 +1,7 @@
 
+- get 3ed tests cleaned up / normal again
+  - verify clean with tot
+
 - use SampleDiscrete
   - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
   - light tree (eventually)
@@ -44,24 +47,19 @@ GFX!
 
 - http://aras-p.info/texts/CompactNormalStorage.html ?
 
-- do a better job of sampling projection lights, gonio lights, and spot
-  lights. is there some reusable infrastructure for sampling images that that
+- do a better job of sampling projection lights, and gonio lights.
+  is there some reusable infrastructure for sampling images that that
   and infinite light can be built on?
   - this should be extra straightforward now that the Power stuff is
     principled.  In turn, can implement Phi() via the sampling routines
     (potentially)
-
-- accurate importance sampling
-  - spot light
-  - gonio
-  - projection
 
 - BDPT: do standard MIS direct lighting at end (and then can use fancy
   light sampling stuff)
 
 -----------------
 
-- frame 380 bdpt bug
+- REGISTER_CAMERA("perspective", PerspectiveCamera::Create) etc
 
 - can reduce sph triangle min area to 1e-5 I think... 
 

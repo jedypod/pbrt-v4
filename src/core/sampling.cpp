@@ -185,11 +185,11 @@ Distribution2D::Distribution2D(absl::Span<const Float> func, int nu, int nv) {
     pMarginal = std::make_unique<Distribution1D>(marginalFunc);
 }
 
-void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
-                    Float *pdf, Float *uRemapped) {
+int SampleDiscrete(absl::Span<const Float> weights, Float u, Float *pdf,
+                   Float *uRemapped) {
     if (weights.empty()) {
         *pdf = 0;
-        return;
+        return -1;
     }
     Float sum = std::accumulate(weights.begin(), weights.end(), Float(0));
     Float uScaled = u * sum;
@@ -199,10 +199,10 @@ void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
         uScaled -= weights[offset];
         ++offset;
     }
-    *index = offset;
     *pdf = weights[offset] / sum;
     if (uRemapped) *uRemapped = std::min(uScaled / weights[offset],
                                          OneMinusEpsilon);
+    return offset;
 }
 
 // TODO: work on fp robustness.

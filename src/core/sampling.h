@@ -166,7 +166,7 @@ class Distribution2D {
 // Sampling Inline Functions
 template <typename T>
 void Shuffle(absl::Span<T> samples, int nDimensions, RNG &rng) {
-    CHECK_EQ(0, (samples.size() % nDimensions));
+    CHECK_EQ(0, samples.size() % nDimensions);
     size_t nSamples = samples.size() / nDimensions;
     for (size_t i = 0; i < nSamples; ++i) {
         size_t other = i + rng.UniformUInt32(nSamples - i);
@@ -192,8 +192,8 @@ inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
     return (f * f) / (f * f + g * g);
 }
 
-void SampleDiscrete(absl::Span<const Float> weights, Float u, int *index,
-                    Float *pdf, Float *uRemapped = nullptr);
+int SampleDiscrete(absl::Span<const Float> weights, Float u,
+                   Float *pdf = nullptr, Float *uRemapped = nullptr);
 
 }  // namespace pbrt
 

@@ -388,49 +388,39 @@ TEST(Distribution1D, Continuous) {
 }
 
 TEST(Sampling, SampleDiscrete) {
-    int offset;
     Float pdf, uRemapped;
 
-    SampleDiscrete({1, 1}, .61, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(1, offset);
+    EXPECT_EQ(1, SampleDiscrete({1, 1}, .61, &pdf, &uRemapped));
     EXPECT_EQ(0.5, pdf);
     EXPECT_FLOAT_EQ(.22, uRemapped);
 
-    SampleDiscrete({10, 10}, .4999, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(0, offset);
+    EXPECT_EQ(0, SampleDiscrete({10, 10}, .4999, &pdf, &uRemapped));
     EXPECT_EQ(0.5, pdf);
     EXPECT_FLOAT_EQ(.9998, uRemapped);
 
-    SampleDiscrete({67, 33}, .66669, &offset, &pdf);
-    EXPECT_EQ(0, offset);
+    EXPECT_EQ(0, SampleDiscrete({67, 33}, .66669, &pdf));
     EXPECT_FLOAT_EQ(0.67, pdf);
 
-    SampleDiscrete({67, 33}, .672, &offset, &pdf);
-    EXPECT_EQ(1, offset);
+    EXPECT_EQ(1, SampleDiscrete({67, 33}, .672, &pdf));
     EXPECT_FLOAT_EQ(.33, pdf);
 
-    SampleDiscrete({1, 1, 1, 1}, .24, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(0, offset);
+    EXPECT_EQ(0, SampleDiscrete({1, 1, 1, 1}, .24, &pdf, &uRemapped));
     EXPECT_EQ(0.25, pdf);
     EXPECT_FLOAT_EQ(.96, uRemapped);
 
-    SampleDiscrete({1, 1, 1, 1}, .251, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(1, offset);
+    EXPECT_EQ(1, SampleDiscrete({1, 1, 1, 1}, .251, &pdf, &uRemapped));
     EXPECT_EQ(0.25, pdf);
     EXPECT_NEAR(.004, uRemapped, 1e-5);
 
-    SampleDiscrete({.125, .125, .625, .125}, .251, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(2, offset);
+    EXPECT_EQ(2, SampleDiscrete({.125, .125, .625, .125}, .251, &pdf, &uRemapped));
     EXPECT_EQ(5./8., pdf);
     EXPECT_NEAR(.001 / .625, uRemapped, 1e-5);
 
-    SampleDiscrete({1, 1, 5, 1}, .251, &offset, &pdf, &uRemapped);
-    EXPECT_EQ(2, offset);
+    EXPECT_EQ(2, SampleDiscrete({1, 1, 5, 1}, .251, &pdf, &uRemapped));
     EXPECT_EQ(5./8., pdf);
     EXPECT_NEAR(.001 * 8. / 5., uRemapped, 1e-5);
 
-    SampleDiscrete({1, 1, 5, 1}, .124, &offset, &pdf);
-    EXPECT_EQ(0, offset);
+    EXPECT_EQ(0, SampleDiscrete({1, 1, 5, 1}, .124, &pdf));
     EXPECT_EQ(1./8., pdf);
 }
 

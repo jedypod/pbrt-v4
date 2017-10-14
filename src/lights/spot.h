@@ -70,7 +70,8 @@ class SpotLight : public Light {
     // SpotLight Private Data
     const Point3f pLight;
     const Spectrum I;
-    const Float cosTotalWidth, cosFalloffStart;
+    const Float cosFalloffStart, cosFalloffEnd;
+    Float c[6];
 };
 
 std::shared_ptr<SpotLight> CreateSpotLight(

@@ -37,6 +37,34 @@ TEST(SpotLight, Power) {
         " qmc: " << phiSampled << ", closed-form: " << phi[0];
 }
 
+TEST(SpotLight, Sampling) {
+    Spectrum I(10.);
+
+    int widthStart[][2] = { { 50, 0 }, { 40, 10 }, { 60, 5 }, {70 , 70 } };
+    for (auto ws : widthStart) {
+        SpotLight light(Transform(), MediumInterface(), I,
+                        ws[0] /* total width */,
+                        ws[1] /* falloff start */,
+                        nullptr);
+
+        RNG rng;
+        for (int i = 0; i < 100; ++i) {
+            Point2f u1 { rng.UniformFloat(), rng.UniformFloat() };
+            Point2f u2 { rng.UniformFloat(), rng.UniformFloat() };
+            Ray ray;
+            Normal3f n;
+            Float pdfPos, pdfDir;
+            Spectrum Li = light.Sample_Le(u1, u2, 0 /* time */, &ray, &n, &pdfPos,
+                                          &pdfDir);
+            EXPECT_TRUE(ray.o == Point3f(0, 0, 0));
+            EXPECT_EQ(1, pdfPos);
+            // Importance should be perfect, so a single sample should
+            // compute power with zero variance.
+            EXPECT_LT(std::abs(light.Phi()[0] - (Li / pdfDir)[0]), 1e-3);
+        }
+    }
+}
+
 static Image MakeLightImage(Point2i res) {
     Image image(PixelFormat::Y32, res);
     for (int y = 0; y < image.resolution[1]; ++y)
