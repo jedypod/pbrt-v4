@@ -371,15 +371,18 @@ Float Fourier(absl::Span<const Float> a, double cosPhi) {
 
 Float SampleFourier(absl::Span<const Float> ak, absl::Span<const Float> recip, Float u,
                     Float *pdf, Float *phiPtr) {
-    // Pick a side and declare bisection variables
     bool flip = (u >= 0.5);
     if (flip)
         u = 1 - 2 * (u - .5f);
     else
         u *= 2;
-    double a = 0, b = Pi, phi = 0.5 * Pi;
+
+    // Hacky: trust that the last time NewtonBisection evaluates the lambda
+    // will be at the phi value that's returned. In turn, by declaring 'f'
+    // outside of the lambda (but capturing it by reference), we can grab
+    // the value of the derivative at phi below to compute the PDF.
     double F, f;
-    while (true) {
+    auto eval = [&](double phi) -> std::pair<double, double> {
         // Evaluate $F(\phi)$ and its derivative $f(\phi)$
 
         // Initialize sine and cosine iterates
@@ -405,22 +408,10 @@ Float SampleFourier(absl::Span<const Float> ak, absl::Span<const Float> recip, F
             f += ak[k] * cosPhiNext;
         }
         F -= u * ak[0] * Pi;
+        return { F, f };
+    };
+    double phi = NewtonBisection(0., double(Pi), eval);
 
-        // Update bisection bounds using updated $\phi$
-        if (F > 0)
-            b = phi;
-        else
-            a = phi;
-
-        // Stop the Fourier bisection iteration if converged
-        if (std::abs(F) < 1e-6f || b - a < 1e-6f) break;
-
-        // Perform a Newton step given $f(\phi)$ and $F(\phi)$
-        phi -= F / f;
-
-        // Fall back to a bisection step when $\phi$ is out of bounds
-        if (!(phi > a && phi < b)) phi = 0.5f * (a + b);
-    }
     // Potentially flip $\phi$ and return the result
     if (flip) phi = 2 * Pi - phi;
     *pdf = (Float)(Inv2Pi * f / ak[0]);

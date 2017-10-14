@@ -40,3 +40,50 @@ TEST(Math, Pow) {
     EXPECT_EQ(Pow<28>(2.f), 1 << 28);
     EXPECT_EQ(Pow<29>(2.f), 1 << 29);
 }
+
+TEST(Math, NewtonBisection) {
+    EXPECT_FLOAT_EQ(
+        1, NewtonBisection(0, 10, [](Float x) -> std::pair<Float, Float> {
+            return {Float(-1 + x), Float(1)};
+        }));
+    EXPECT_FLOAT_EQ(
+        Pi / 2, NewtonBisection(0, 2, [](Float x) -> std::pair<Float, Float> {
+            return {std::cos(x), -std::sin(x)};
+        }));
+
+    // The derivative is a lie--pointing in the wrong direction, even--but
+    // it should still work.
+    Float bad = NewtonBisection(0, 2, [](Float x) -> std::pair<Float, Float> {
+        return {std::cos(x), 10 * std::sin(x)};
+    });
+    EXPECT_LT(std::abs(Pi / 2 - bad), 1e-5);
+
+    // Multiple zeros in the domain; make sure we find one.
+    Float zero =
+        NewtonBisection(.1, 10.1, [](Float x) -> std::pair<Float, Float> {
+            return {std::sin(x), std::cos(x)};
+        });
+    EXPECT_LT(std::abs(std::sin(zero)), 1e-6);
+
+    // Ill-behaved function with derivatives that go to infinity (and also
+    // multiple zeros).
+    auto f = [](Float x) -> std::pair<Float, Float> {
+        return {
+            std::pow(Sqr(std::sin(x)), .05) - 0.3,
+            0.1 * std::cos(x) * std::sin(x) / std::pow(Sqr(std::sin(x)), 0.95)};
+    };
+    zero = NewtonBisection(.01, 9.42477798, f);
+    // Extra slop for a messy function.
+    EXPECT_LT(std::abs(f(zero).first), 1e-2);
+
+    // Ill-behaved function with derivatives that go to infinity (and also
+    // multiple zeros).
+    auto fd = [](double x) -> std::pair<double, double> {
+        return {
+            std::pow(Sqr(std::sin(x)), .05) - 0.3,
+            0.1 * std::cos(x) * std::sin(x) / std::pow(Sqr(std::sin(x)), 0.95)};
+    };
+    double dzero = NewtonBisection(.01, 9.42477798, fd, 0, 1e-10);
+    // Expect to come closer via double precision and tighter tolerances
+    EXPECT_LT(std::abs(fd(dzero).first), 1e-10);
+}

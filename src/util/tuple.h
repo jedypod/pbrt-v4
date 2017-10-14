@@ -51,15 +51,6 @@
 
 namespace pbrt {
 
-template <typename T>
-inline bool isNaN(const T x) {
-    return std::isnan(x);
-}
-template <>
-inline bool isNaN(const int x) {
-    return false;
-}
-
 template <template<typename> class Child, typename T>
 class Tuple2 {
   public:

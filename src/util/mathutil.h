@@ -47,6 +47,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <type_traits>
 
 #ifdef PBRT_IS_MSVC
 #include <intrin.h>
@@ -69,6 +70,15 @@ static constexpr Float PiOver4 = 0.78539816339744830961;
 static constexpr Float Sqrt2 = 1.41421356237309504880;
 
 // Global Inline Functions
+template <typename T>
+inline bool isNaN(const T x) {
+    return std::isnan(x);
+}
+template <>
+inline bool isNaN(const int x) {
+    return false;
+}
+
 inline uint32_t FloatToBits(float f) {
     uint32_t ui;
     std::memcpy(&ui, &f, sizeof(float));
@@ -432,6 +442,47 @@ inline Float WindowedSinc(Float x, Float radius, Float tau) {
     if (std::abs(x) > radius) return 0;
     Float lanczos = Sinc(x / tau);
     return Sinc(x) * lanczos;
+}
+
+// Solve f[x] == 0 over [x0, x1]. f should return a std::pair<FloatType,
+// FloatType>[f(x), f'(x)]. Only enabled for float and double.
+template <typename FloatType, typename Func>
+FloatType NewtonBisection(
+    FloatType x0, FloatType x1, Func f, Float xEps = 1e-6f, Float fEps = 1e-6f,
+    typename std::enable_if<std::is_floating_point<FloatType>::value>::type * =
+        nullptr) {
+    CHECK_LT(x0, x1);
+    bool startIsNegative = f(x0).first < 0;
+    FloatType xMid = (x0 + x1) / 2;
+
+    while (true) {
+        DCHECK((f(x0).first < 0) ^ (f(x1).first < 0));
+        std::pair<FloatType, FloatType> fxMid = f(xMid);
+        DCHECK(!isNaN(fxMid.first));
+
+        if (startIsNegative == fxMid.first < 0)
+            x0 = xMid;
+        else
+            x1 = xMid;
+
+        if ((x1 - x0) < xEps || std::abs(fxMid.first) < fEps) return xMid;
+
+        // Try a Newton step.
+        xMid -= fxMid.first / fxMid.second;
+        if (!(x0 < xMid && xMid < x1))
+            // Fall back to bisection.
+            xMid = (x0 + x1) / 2;
+    }
+}
+
+// If an integral type is used for x0 and x1, assume Float.
+template <typename NotFloatType, typename Func>
+Float NewtonBisection(
+    NotFloatType x0, NotFloatType x1, Func f, Float xEps = 1e-6f,
+    Float fEps = 1e-6f,
+    typename std::enable_if<std::is_integral<NotFloatType>::value>::type * =
+        nullptr) {
+    return NewtonBisection(Float(x0), Float(x1), f, xEps, fEps);
 }
 
 }  // namespace pbrt
