@@ -246,7 +246,7 @@ void MLTIntegrator::Render(const Scene &scene) {
                 Spectrum LProposed =
                     L(scene, arena, sampler, depth, &pProposed);
                 // Compute acceptance probability for proposed sample
-                Float accept = std::min((Float)1, LProposed.y() / LCurrent.y());
+                Float accept = std::min<Float>(1, LProposed.y() / LCurrent.y());
 
                 // Splat both current and proposed samples to _film_
                 if (accept > 0)

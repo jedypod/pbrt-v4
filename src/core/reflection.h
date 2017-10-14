@@ -64,7 +64,7 @@ inline Float CosTheta(const Vector3f &w) { return w.z; }
 inline Float Cos2Theta(const Vector3f &w) { return w.z * w.z; }
 inline Float AbsCosTheta(const Vector3f &w) { return std::abs(w.z); }
 inline Float Sin2Theta(const Vector3f &w) {
-    return std::max((Float)0, (Float)1 - Cos2Theta(w));
+    return std::max<Float>(0, 1 - Cos2Theta(w));
 }
 
 inline Float SinTheta(const Vector3f &w) { return std::sqrt(Sin2Theta(w)); }
@@ -104,7 +104,7 @@ inline bool Refract(const Vector3f &wi, const Normal3f &n, Float eta,
                     Vector3f *wt) {
     // Compute $\cos \theta_\roman{t}$ using Snell's law
     Float cosThetaI = Dot(n, wi);
-    Float sin2ThetaI = std::max(Float(0), Float(1 - cosThetaI * cosThetaI));
+    Float sin2ThetaI = std::max<Float>(0, 1 - cosThetaI * cosThetaI);
     Float sin2ThetaT = eta * eta * sin2ThetaI;
 
     // Handle total internal reflection for transmission

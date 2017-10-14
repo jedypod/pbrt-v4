@@ -203,7 +203,7 @@ Spectrum OrenNayar::f(const Vector3f &wo, const Vector3f &wi) const {
         Float sinPhiI = SinPhi(wi), cosPhiI = CosPhi(wi);
         Float sinPhiO = SinPhi(wo), cosPhiO = CosPhi(wo);
         Float dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
-        maxCos = std::max((Float)0, dCos);
+        maxCos = std::max<Float>(0, dCos);
     }
 
     // Compute sine and tangent terms of Oren-Nayar model
@@ -340,7 +340,7 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
 
     // Evaluate Fourier expansion for angle $\phi$
     absl::Span<const Float> akSpan(ak);
-    Float Y = std::max((Float)0, Fourier(akSpan.subspan(0, mMax), cosPhi));
+    Float Y = std::max<Float>(0, Fourier(akSpan.subspan(0, mMax), cosPhi));
     Float scale = muI != 0 ? (1 / std::abs(muI)) : (Float)0;
 
     // Update _scale_ to account for adjoint light transport
@@ -564,10 +564,10 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
     Float Y = SampleFourier(akSpan.subspan(0, size_t(mMax)),
                             absl::Span<const Float>(bsdfTable.recip).subspan(0, size_t(mMax)),
                             u[0], &pdfPhi, &phi);
-    *pdf = std::max((Float)0, pdfPhi * pdfMu);
+    *pdf = std::max<Float>(0, pdfPhi * pdfMu);
 
     // Compute the scattered direction for _FourierBSDF_
-    Float sin2ThetaI = std::max((Float)0, 1 - muI * muI);
+    Float sin2ThetaI = std::max<Float>(0, 1 - muI * muI);
     Float norm = SafeSqrt(sin2ThetaI / Sin2Theta(wo));
     if (std::isinf(norm)) norm = 0;
     Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
@@ -713,8 +713,8 @@ Spectrum BSDF::Sample_f(const Vector3f &woWorld, Vector3f *wiWorld,
         if (sampledType) *sampledType = BxDFType(0);
         return Spectrum(0);
     }
-    int comp =
-        std::min((int)std::floor(u[0] * matchingComps), matchingComps - 1);
+    int comp = std::min<int>(std::floor(u[0] * matchingComps),
+                             matchingComps - 1);
 
     // Get _BxDF_ pointer for chosen component
     BxDF *bxdf = nullptr;

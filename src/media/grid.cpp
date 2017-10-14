@@ -148,12 +148,12 @@ Spectrum GridDensityMedium::Tr(const Ray &rWorld, Sampler &sampler) const {
         t -= std::log(1 - sampler.Get1D()) * invMaxDensity / sigma_t;
         if (t >= tMax) break;
         Float density = Density(ray(t));
-        Tr *= 1 - std::max((Float)0, density * invMaxDensity);
+        Tr *= 1 - std::max<Float>(0, density * invMaxDensity);
         // Added after book publication: when transmittance gets low,
         // start applying Russian roulette to terminate sampling.
         const Float rrThreshold = .1;
         if (Tr < rrThreshold) {
-            Float q = std::max((Float).05, 1 - Tr);
+            Float q = std::max<Float>(.05, 1 - Tr);
             if (sampler.Get1D() < q) return 0;
             Tr /= 1 - q;
         }

@@ -212,7 +212,7 @@ T MIPMap::Lookup(const Point2f &st, Float width) const {
     ProfilePhase p(Prof::TexFiltBasic);
     // Compute MIPMap level
     int nLevels = Levels();
-    Float level = nLevels - 1 + Log2(std::max(width, (Float)1e-8));
+    Float level = nLevels - 1 + Log2(std::max<Float>(width, 1e-8));
 
     if (level >= Levels() - 1) return Texel<T>(Levels() - 1, {0, 0});
 
@@ -264,7 +264,7 @@ T MIPMap::Lookup(const Point2f &st, Vector2f dst0, Vector2f dst1) const {
     if (minorLength == 0) return Bilerp<T>(0, st);
 
     // Choose level of detail for EWA lookup and perform EWA filtering
-    Float lod = std::max((Float)0, Levels() - (Float)1 + Log2(minorLength));
+    Float lod = std::max<Float>(0, Levels() - 1 + Log2(minorLength));
     int ilod = std::floor(lod);
     // TODO: just do return EWA<T>(ilog, st, dst0, dst1);
     // TODO: also, when scaling camera ray differentials, just do e.g.
@@ -345,7 +345,7 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
             Float r2 = A * ss * ss + B * ss * tt + C * tt * tt;
             if (r2 < 1) {
                 int index =
-                    std::min((int)(r2 * WeightLUTSize), WeightLUTSize - 1);
+                    std::min<int>(r2 * WeightLUTSize, WeightLUTSize - 1);
                 Float weight = weightLut[index];
                 sum += weight * Texel<T>(level, {is, it});
                 sumWts += weight;

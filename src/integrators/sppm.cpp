@@ -218,7 +218,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                             beta *= f * AbsDot(wi, isect.shading.n) / pdf;
                             if (beta.y() < 0.25) {
                                 Float continueProb =
-                                    std::min((Float)1, beta.y());
+                                    std::min<Float>(1, beta.y());
                                 if (tileSampler->Get1D() > continueProb) break;
                                 beta /= continueProb;
                             }
@@ -255,7 +255,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
             int baseGridRes = (int)(maxDiag / maxRadius);
             CHECK_GT(baseGridRes, 0);
             for (int i = 0; i < 3; ++i)
-                gridRes[i] = std::max((int)(baseGridRes * diag[i] / maxDiag), 1);
+                gridRes[i] = std::max<int>(baseGridRes * diag[i] / maxDiag, 1);
 
             // Add visible points to SPPM grid
             ParallelFor(0, nPixels, 4096, [&](int64_t start, int64_t end) {
@@ -397,7 +397,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         beta * fr * AbsDot(wi, isect.shading.n) / pdf;
 
                     // Possibly terminate photon path with Russian roulette
-                    Float q = std::max((Float)0, 1 - bnew.y() / beta.y());
+                    Float q = std::max<Float>(0, 1 - bnew.y() / beta.y());
                     if (RadicalInverse(haltonDim++, haltonIndex) < q) break;
                     beta = bnew / (1 - q);
                     photonRay = (RayDifferential)isect.SpawnRay(wi);

@@ -63,7 +63,7 @@ static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
     /* Search interval -- everything is parameterized
        in the Erf() domain */
     Float a = -1, c = Erf(cotThetaI);
-    Float sample_x = std::max(U1, (Float)1e-6f);
+    Float sample_x = std::max<Float>(U1, 1e-6f);
 
     /* Start with a good initial guess */
     // Float b = (1-sample_x) * a + sample_x * c;
@@ -111,7 +111,7 @@ static void BeckmannSample11(Float cosThetaI, Float U1, Float U2,
     *slope_x = ErfInv(b);
 
     /* Simulate Y component */
-    *slope_y = ErfInv(2.0f * std::max(U2, (Float)1e-6f) - 1.0f);
+    *slope_y = ErfInv(2 * std::max<Float>(U2, 1e-6f) - 1);
 
     CHECK(!std::isinf(*slope_x));
     CHECK(!std::isnan(*slope_x));

@@ -72,7 +72,7 @@ class Sampler {
     virtual std::unique_ptr<Sampler> Clone() = 0;
 
     int GetDiscrete1D(int n) {
-        return std::min(int(Get1D() * n), n - 1);
+        return std::min<int>(Get1D() * n, n - 1);
     }
     // Sampler Public Data
     const int samplesPerPixel;

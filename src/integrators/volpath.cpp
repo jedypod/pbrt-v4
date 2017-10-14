@@ -173,7 +173,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         // Factor out radiance scaling due to refraction in rrBeta.
         Spectrum rrBeta = beta * etaScale;
         if (rrBeta.MaxComponentValue() < rrThreshold && bounces > 3) {
-            Float q = std::max((Float).05, 1 - rrBeta.MaxComponentValue());
+            Float q = std::max<Float>(.05, 1 - rrBeta.MaxComponentValue());
             if (sampler.Get1D() < q) break;
             beta /= 1 - q;
             DCHECK(std::isinf(beta.y()) == false);

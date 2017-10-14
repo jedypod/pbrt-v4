@@ -600,7 +600,7 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm,
     // Find exit pupil bound for sample distance from film center
     Float rFilm = std::sqrt(pFilm.x * pFilm.x + pFilm.y * pFilm.y);
     int rIndex = rFilm / (film->diagonal / 2) * exitPupilBounds.size();
-    rIndex = std::min((int)exitPupilBounds.size() - 1, rIndex);
+    rIndex = std::min<int>(exitPupilBounds.size() - 1, rIndex);
     Bounds2f pupilBounds = exitPupilBounds[rIndex];
     if (sampleBoundsArea) *sampleBoundsArea = pupilBounds.Area();
 
@@ -624,8 +624,8 @@ void RealisticCamera::TestExitPupilBounds() const {
 
     Float r = pFilm.x / (filmDiagonal / 2);
     int pupilIndex =
-        std::min((int)exitPupilBounds.size() - 1,
-                 (int)std::floor(r * (exitPupilBounds.size() - 1)));
+        std::min<int>(exitPupilBounds.size() - 1,
+                      std::floor(r * (exitPupilBounds.size() - 1)));
     Bounds2f pupilBounds = exitPupilBounds[pupilIndex];
     if (pupilIndex + 1 < (int)exitPupilBounds.size())
         pupilBounds = Union(pupilBounds, exitPupilBounds[pupilIndex + 1]);

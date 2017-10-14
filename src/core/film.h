@@ -151,13 +151,13 @@ class FilmTile {
         for (int x = p0.x; x < p1.x; ++x) {
             Float fx = std::abs((x - pFilmDiscrete.x) * invFilterRadius.x *
                                 filterTableWidth);
-            ifx[x - p0.x] = std::min((int)std::floor(fx), filterTableWidth - 1);
+            ifx[x - p0.x] = std::min<int>(std::floor(fx), filterTableWidth - 1);
         }
         absl::FixedArray<int> ify(p1.y - p0.y);
         for (int y = p0.y; y < p1.y; ++y) {
             Float fy = std::abs((y - pFilmDiscrete.y) * invFilterRadius.y *
                                 filterTableWidth);
-            ify[y - p0.y] = std::min((int)std::floor(fy), filterTableWidth - 1);
+            ify[y - p0.y] = std::min<int>(std::floor(fy), filterTableWidth - 1);
         }
         for (int y = p0.y; y < p1.y; ++y) {
             for (int x = p0.x; x < p1.x; ++x) {

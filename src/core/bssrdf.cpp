@@ -385,7 +385,7 @@ Float TabulatedBSSRDF::Pdf_Sr(int ch, Float r) const {
 
     // Cancel marginal PDF factor from tabulated BSSRDF profile
     if (rOptical != 0) sr /= 2 * Pi * rOptical;
-    return std::max((Float)0, sr * sigma_t[ch] * sigma_t[ch] / rhoEff);
+    return std::max<Float>(0, sr * sigma_t[ch] * sigma_t[ch] / rhoEff);
 }
 
 }  // namespace pbrt
