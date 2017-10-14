@@ -385,11 +385,13 @@ inline T AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
 template <typename T>
 inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
                              Vector3<T> *v3) {
-    if (std::abs(v1.x) > std::abs(v1.y))
-        *v2 = Vector3<T>(-v1.z, 0, v1.x) / std::sqrt(v1.x * v1.x + v1.z * v1.z);
-    else
-        *v2 = Vector3<T>(0, v1.z, -v1.y) / std::sqrt(v1.y * v1.y + v1.z * v1.z);
-    *v3 = Cross(v1, *v2);
+    // Was: Hughes-Moller 99
+    // Now: Duff et al 2017
+    Float sign = std::copysign(Float(1), v1.z);
+    Float a = -1 / (sign + v1.z);
+    Float b = v1.x * v1.y * a;
+    *v2 = Vector3<T>(1 + sign * v1.x * v1.x * a, sign * b, -sign * v1.x);
+    *v3 = Vector3<T>(b, sign + v1.y * v1.y * a, -v1.y);
 }
 
 template <typename T> template <typename U>
