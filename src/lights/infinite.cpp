@@ -49,27 +49,12 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
       image(std::move(im)),
       Lscale(L) {
     // Initialize sampling PDFs for infinite area light
-
-    // Compute scalar-valued image _img_ from environment map
-    int width = 2 * image.resolution.x, height = 2 * image.resolution.y;
-    std::vector<Float> img(width * height);
-
-    float fwidth = 0.5f / std::min(width, height);
-    ParallelFor(0, height, 32,
-        [&](int64_t start, int64_t end) {
-            for (int v = start; v < end; ++v) {
-                Float vp = (v + .5f) / (Float)height;
-                Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-                for (int u = 0; u < width; ++u) {
-                    Float up = (u + .5f) / (Float)width;
-                    img[u + v * width] = image.BilerpY({up, vp});
-                    img[u + v * width] *= sinTheta;
-                }
-            }
-        });
-
-    // Compute sampling distributions for rows and columns of image
-    distribution = std::make_unique<Distribution2D>(img, width, height);
+    auto dwdA = [&](Point2f p) {
+        // TODO: fixme? Do something slightly less accurate but more efficient?
+        // Can take advantage of knowing that p[1] in [0,1].
+        return std::sin(Pi * p[1]);
+    };
+    distribution = image.ComputeSamplingDistribution(dwdA);
 }
 
 Spectrum InfiniteAreaLight::Phi() const {

@@ -1,11 +1,12 @@
 
 #include "tests/gtest/gtest.h"
 
-#include "pbrt.h"
-#include "image.h"
-#include "util/rng.h"
-#include "mipmap.h"
 #include "half.h"
+#include "image.h"
+#include "mipmap.h"
+#include "pbrt.h"
+#include "sampling.h"
+#include "util/rng.h"
 
 #include <algorithm>
 
@@ -363,6 +364,79 @@ TEST(Image, ToSRGB_LUTMonotonic) {
         }
         // Make sure we actually did cross segments at some point.
         EXPECT_TRUE(spanned);
+    }
+}
+
+TEST(Image, SampleSimple) {
+    std::vector<Float> texels = {Float(0), Float(1), Float(0), Float(0)};
+    Image zeroOne(texels, PixelFormat::Y32, {2,2});
+    std::unique_ptr<Distribution2D> distrib = zeroOne.ComputeSamplingDistribution();
+    RNG rng;
+    for (int i = 0; i < 1000; ++i) {
+        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Float pdf;
+        Point2f p = distrib->SampleContinuous(u, &pdf);
+        // Due to bilerp on lookup, the non-zero range goes out a bit.
+        EXPECT_GE(p.x, 0.25);
+        EXPECT_LE(p.y, 0.75);
+    }
+}
+
+TEST(Image, SampleLinear) {
+    int w = 500, h = 500;
+    std::vector<Float> v;
+    for (int y = 0; y < h; ++y) {
+        Float fy = (y + .5) / h;
+        for (int x = 0; x < w; ++x) {
+            Float fx = (x + .5) / w;
+            // This integrates to 1 over [0,1]^2
+            Float f = fx + fy;
+            v.push_back(f);
+        }
+    }
+
+    Image image(v, PixelFormat::Y32, {w, h});
+    std::unique_ptr<Distribution2D> distrib = image.ComputeSamplingDistribution();
+    RNG rng;
+    for (int i = 0; i < 1000; ++i) {
+        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Float pdf;
+        Point2f p = distrib->SampleContinuous(u, &pdf);
+        Float f = p.x + p.y;
+        // Allow some error since Distribution2D uses a piecewise constant
+        // sampling distribution.
+        EXPECT_LE(std::abs(f - pdf), 1e-3) << u << ", f: " << f << ", pdf: " << pdf;
+    }
+}
+
+TEST(Image, SampleSinCos) {
+    int w = 1000, h = 1000;
+    auto f = [](Point2f p) {
+        return std::abs(std::sin(3. * p.x) * Sqr(std::cos(4. * p.y)));
+    };
+    // Integral of f over [0,1]^2
+    Float integral = 1./24. * Sqr(std::sin(1.5)) * (8 + std::sin(8.));
+
+    std::vector<Float> v;
+    for (int y = 0; y < h; ++y) {
+        Float fy = (y + .5) / h;
+        for (int x = 0; x < w; ++x) {
+            Float fx = (x + .5) / w;
+            v.push_back(f({fx, fy}));
+        }
+    }
+
+    Image image(v, PixelFormat::Y32, {w, h});
+    std::unique_ptr<Distribution2D> distrib = image.ComputeSamplingDistribution();
+    RNG rng;
+    for (int i = 0; i < 1000; ++i) {
+        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Float pdf;
+        Point2f p = distrib->SampleContinuous(u, &pdf);
+        Float fp = f(p);
+        // Allow some error since Distribution2D uses a piecewise constant
+        // sampling distribution.
+        EXPECT_LE(std::abs(fp - pdf * integral), 3e-3) << u << ", fp: " << fp << ", pdf: " << pdf;
     }
 }
 

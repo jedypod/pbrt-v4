@@ -41,10 +41,12 @@
 // core/image.h*
 #include "pbrt.h"
 
+#include "sampling.h"
 #include "spectrum.h"
 #include "util/bounds.h"
 #include "util/geometry.h"
 #include "util/half.h"
+#include "util/parallel.h"
 #include "util/transform.h"
 #include <glog/logging.h>
 #include <absl/types/span.h>
@@ -315,6 +317,32 @@ class Image {
     }
     void *RawPointer(Point2i p) {
         return const_cast<void *>(((const Image *)this)->RawPointer(p));
+    }
+
+    // F: Point2f in [0,1]^2 -> Float
+    template <typename F>
+    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(F dxdA) {
+        // Compute scalar-valued image _img_ from environment map
+        int width = 2 * resolution.x, height = 2 * resolution.y;
+        // TOODO: use an image?
+        std::vector<Float> img(width * height);
+
+        ParallelFor(0, height, 32,
+        [&](int64_t start, int64_t end) {
+            for (int v = start; v < end; ++v) {
+                Float vp = (v + .5f) / (Float)height;
+                for (int u = 0; u < width; ++u) {
+                    Float up = (u + .5f) / (Float)width;
+                    // TODO: Y vs max component
+                    img[u + v * width] = BilerpY({up, vp}) * dxdA({up, vp});
+                }
+            }
+        });
+
+        return std::make_unique<Distribution2D>(img, width, height);
+    }
+    std::unique_ptr<Distribution2D> ComputeSamplingDistribution() {
+        return ComputeSamplingDistribution([](Point2f) { return Float(1); });
     }
 
   private:
