@@ -440,6 +440,27 @@ TEST(Image, SampleSinCos) {
     }
 }
 
+TEST(Image, Wrap2D) {
+    std::vector<Float> texels = {Float(0), Float(1), Float(0),
+                                 Float(0), Float(0), Float(0),
+                                 Float(0), Float(0), Float(0)};
+    Image zeroOne(texels, PixelFormat::Y32, {3,3});
+
+    EXPECT_EQ(1, zeroOne.GetChannel({1, -1}, 0, {WrapMode::Clamp, WrapMode::Clamp}));
+    EXPECT_EQ(1, zeroOne.GetChannel({1, -1}, 0, {WrapMode::Black, WrapMode::Clamp}));
+    EXPECT_EQ(0, zeroOne.GetChannel({1, -1}, 0, {WrapMode::Black, WrapMode::Repeat}));
+    EXPECT_EQ(0, zeroOne.GetChannel({1, -1}, 0, {WrapMode::Clamp, WrapMode::Black}));
+
+    EXPECT_EQ(0, zeroOne.GetChannel({1, 3}, 0, {WrapMode::Clamp, WrapMode::Clamp}));
+    EXPECT_EQ(0, zeroOne.GetChannel({1, 3}, 0, {WrapMode::Repeat, WrapMode::Clamp}));
+    EXPECT_EQ(1, zeroOne.GetChannel({1, 3}, 0, {WrapMode::Black, WrapMode::Repeat}));
+    EXPECT_EQ(0, zeroOne.GetChannel({1, 3}, 0, {WrapMode::Clamp, WrapMode::Black}));
+
+    EXPECT_EQ(0.5, zeroOne.BilerpChannel(Point2f(0.5, 0.), 0, WrapMode::Repeat));
+    EXPECT_EQ(0.5, zeroOne.BilerpChannel(Point2f(0.5, 0.), 0, WrapMode::Black));
+    EXPECT_EQ(1, zeroOne.BilerpChannel(Point2f(0.5, 0.), 0, WrapMode::Clamp));
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 TEST(ImageTexelProvider, Y32) {

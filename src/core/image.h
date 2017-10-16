@@ -196,6 +196,13 @@ Spectrum ConvertTexel(const void *ptr, PixelFormat format) {
 
 enum class WrapMode { Repeat, Black, Clamp };
 
+struct WrapMode2D {
+    WrapMode2D(WrapMode w) : wrap{w, w} {}
+    WrapMode2D(WrapMode u, WrapMode v) : wrap{u, v} {}
+
+    std::array<WrapMode, 2> wrap;
+};
+
 inline bool ParseWrapMode(const char *w, WrapMode *wrapMode) {
     if (!strcmp(w, "clamp")) {
         *wrapMode = WrapMode::Clamp;
@@ -224,7 +231,7 @@ inline const char *WrapModeString(WrapMode mode) {
     }
 }
 
-bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode);
+bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode2D wrapMode);
 
 ///////////////////////////////////////////////////////////////////////////
 // ImageMetadata
@@ -265,33 +272,33 @@ class Image {
     // TODO? provide an iterator to iterate over all pixels and channels?
 
     Float GetChannel(Point2i p, int c,
-                     WrapMode wrapMode = WrapMode::Clamp) const;
-    Float GetY(Point2i p, WrapMode wrapMode = WrapMode::Clamp) const;
+                     WrapMode2D wrapMode = WrapMode::Clamp) const;
+    Float GetY(Point2i p, WrapMode2D wrapMode = WrapMode::Clamp) const;
     Spectrum GetSpectrum(Point2i p,
                          SpectrumType spectrumType = SpectrumType::Reflectance,
-                         WrapMode wrapMode = WrapMode::Clamp) const;
+                         WrapMode2D wrapMode = WrapMode::Clamp) const;
 
     // FIXME: could be / should be const...
     void CopyRectOut(const Bounds2i &extent,
                      absl::Span<Float> buf,
-                     WrapMode wrapMode = WrapMode::Clamp);
+                     WrapMode2D wrapMode = WrapMode::Clamp);
     void CopyRectIn(const Bounds2i &extent,
                     absl::Span<const Float> buf);
 
     Float BilerpChannel(Point2f p, int c,
-                        WrapMode wrapMode = WrapMode::Clamp) const;
-    Float BilerpY(Point2f p, WrapMode wrapMode = WrapMode::Clamp) const;
+                        WrapMode2D wrapMode = WrapMode::Clamp) const;
+    Float BilerpY(Point2f p, WrapMode2D wrapMode = WrapMode::Clamp) const;
     Spectrum BilerpSpectrum(
         Point2f p, SpectrumType spectrumType = SpectrumType::Reflectance,
-        WrapMode wrapMode = WrapMode::Clamp) const;
+        WrapMode2D wrapMode = WrapMode::Clamp) const;
 
     void SetChannel(Point2i p, int c, Float value);
     void SetY(Point2i p, Float value);
     void SetSpectrum(Point2i p, const Spectrum &value);
 
-    Image FloatResize(Point2i newResolution, WrapMode wrap) const;
+    Image FloatResize(Point2i newResolution, WrapMode2D wrap) const;
     void FlipY();
-    static std::vector<Image> GenerateMIPMap(Image image, WrapMode wrapMode);
+    static std::vector<Image> GenerateMIPMap(Image image, WrapMode2D wrapMode);
 
     int nChannels() const { return pbrt::nChannels(format); }
     size_t BytesUsed() const {
@@ -321,12 +328,14 @@ class Image {
 
     // F: Point2f in [0,1]^2 -> Float
     template <typename F>
-    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(F dxdA) {
+    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(F dxdA,
+                                                                WrapMode2D wrap = WrapMode::Clamp) {
         // Compute scalar-valued image _img_ from environment map
         int width = 2 * resolution.x, height = 2 * resolution.y;
         // TOODO: use an image?
         std::vector<Float> img(width * height);
 
+        // FIXME: assumes clamp
         ParallelFor(0, height, 32,
         [&](int64_t start, int64_t end) {
             for (int v = start; v < end; ++v) {
@@ -341,18 +350,18 @@ class Image {
 
         return std::make_unique<Distribution2D>(img, width, height);
     }
-    std::unique_ptr<Distribution2D> ComputeSamplingDistribution() {
-        return ComputeSamplingDistribution([](Point2f) { return Float(1); });
+    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(WrapMode2D wrap = WrapMode::Clamp) {
+        return ComputeSamplingDistribution([](Point2f) { return Float(1); }, wrap);
     }
 
   private:
-    std::array<Float, 3> GetRGB(Point2i p, WrapMode wrapMode) const;
+    std::array<Float, 3> GetRGB(Point2i p, WrapMode2D wrapMode) const;
 
     bool WriteEXR(const std::string &name, const ImageMetadata *metadata) const;
     bool WritePFM(const std::string &name, const ImageMetadata *metadata) const;
     bool WritePNG(const std::string &name, const ImageMetadata *metadata) const;
 
-    template <typename F> void ForExtent1(const Bounds2i &extent, WrapMode wrapMode, F op) {
+    template <typename F> void ForExtent1(const Bounds2i &extent, WrapMode2D wrapMode, F op) {
         CHECK_LT(extent.pMin.x, extent.pMax.x);
         CHECK_LT(extent.pMin.y, extent.pMax.y);
         CHECK_EQ(nChannels(), 1);
@@ -377,7 +386,7 @@ class Image {
             }
         }
     }
-    template <typename F> void ForExtent3(const Bounds2i &extent, WrapMode wrapMode,
+    template <typename F> void ForExtent3(const Bounds2i &extent, WrapMode2D wrapMode,
                                           F op) {
         CHECK_LT(extent.pMin.x, extent.pMax.x);
         CHECK_LT(extent.pMin.y, extent.pMax.y);

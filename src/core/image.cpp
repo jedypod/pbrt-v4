@@ -52,22 +52,26 @@
 
 namespace pbrt {
 
-bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode wrapMode) {
-    switch (wrapMode) {
-    case WrapMode::Repeat:
-        (*p)[0] = Mod((*p)[0], resolution[0]);
-        (*p)[1] = Mod((*p)[1], resolution[1]);
-        return true;
-    case WrapMode::Clamp:
-        (*p)[0] = Clamp((*p)[0], 0, resolution[0] - 1);
-        (*p)[1] = Clamp((*p)[1], 0, resolution[1] - 1);
-        return true;
-    case WrapMode::Black:
-        return ((*p)[0] >= 0 && (*p)[0] < resolution[0] && (*p)[1] >= 0 &&
-                (*p)[1] < resolution[1]);
-    default:
-        LOG(ERROR) << "Unhandled WrapMode mode";
+bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode2D wrapMode) {
+    for (int c = 0; c < 2; ++c) {
+        if ((*p)[c] >= 0 && (*p)[c] < resolution[c])
+            // in bounds
+            continue;
+
+        switch (wrapMode.wrap[c]) {
+        case WrapMode::Repeat:
+            (*p)[c] = Mod((*p)[c], resolution[c]);
+            break;
+        case WrapMode::Clamp:
+            (*p)[c] = Clamp((*p)[c], 0, resolution[c] - 1);
+            break;
+        case WrapMode::Black:
+            return false;
+        default:
+            LOG(ERROR) << "Unhandled WrapMode mode";
+        }
     }
+    return true;
 }
 
 Image::Image(PixelFormat format, Point2i resolution)
@@ -113,7 +117,7 @@ Image Image::ConvertToFormat(PixelFormat newFormat) const {
     return newImage;
 }
 
-Float Image::GetChannel(Point2i p, int c, WrapMode wrapMode) const {
+Float Image::GetChannel(Point2i p, int c, WrapMode2D wrapMode) const {
     if (!RemapPixelCoords(&p, resolution, wrapMode)) return 0;
 
     // Use convert()? Some rewrite/refactor?
@@ -135,7 +139,7 @@ Float Image::GetChannel(Point2i p, int c, WrapMode wrapMode) const {
     }
 }
 
-Float Image::GetY(Point2i p, WrapMode wrapMode) const {
+Float Image::GetY(Point2i p, WrapMode2D wrapMode) const {
     if (nChannels() == 1) return GetChannel(p, 0, wrapMode);
     CHECK_EQ(3, nChannels());
     std::array<Float, 3> rgb = GetRGB(p, wrapMode);
@@ -143,7 +147,7 @@ Float Image::GetY(Point2i p, WrapMode wrapMode) const {
     return (rgb[0] + rgb[1] + rgb[2]) / 3;
 }
 
-std::array<Float, 3> Image::GetRGB(Point2i p, WrapMode wrapMode) const {
+std::array<Float, 3> Image::GetRGB(Point2i p, WrapMode2D wrapMode) const {
     CHECK_EQ(3, nChannels());
 
     if (!RemapPixelCoords(&p, resolution, wrapMode))
@@ -174,14 +178,14 @@ std::array<Float, 3> Image::GetRGB(Point2i p, WrapMode wrapMode) const {
 }
 
 Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
-                            WrapMode wrapMode) const {
+                            WrapMode2D wrapMode) const {
     if (nChannels() == 1) return GetChannel(p, 0, wrapMode);
     std::array<Float, 3> rgb = GetRGB(p, wrapMode);
     return Spectrum::FromRGB(rgb, spectrumType);
 }
 
 void Image::CopyRectOut(const Bounds2i &extent,
-                        absl::Span<Float> buf, WrapMode wrapMode) {
+                        absl::Span<Float> buf, WrapMode2D wrapMode) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
 
     auto bufIter = buf.begin();
@@ -282,7 +286,7 @@ void Image::CopyRectIn(const Bounds2i &extent, absl::Span<const Float> buf) {
     }
 }
 
-Float Image::BilerpChannel(Point2f p, int c, WrapMode wrapMode) const {
+Float Image::BilerpChannel(Point2f p, int c, WrapMode2D wrapMode) const {
     Float s = p[0] * resolution.x - 0.5f;
     Float t = p[1] * resolution.y - 0.5f;
     int si = std::floor(s), ti = std::floor(t);
@@ -293,7 +297,7 @@ Float Image::BilerpChannel(Point2f p, int c, WrapMode wrapMode) const {
             ds * dt * GetChannel({si + 1, ti + 1}, c, wrapMode));
 }
 
-Float Image::BilerpY(Point2f p, WrapMode wrapMode) const {
+Float Image::BilerpY(Point2f p, WrapMode2D wrapMode) const {
     if (nChannels() == 1) return BilerpChannel(p, 0, wrapMode);
     CHECK_EQ(3, nChannels());
     return (BilerpChannel(p, 0, wrapMode) + BilerpChannel(p, 1, wrapMode) +
@@ -302,7 +306,7 @@ Float Image::BilerpY(Point2f p, WrapMode wrapMode) const {
 }
 
 Spectrum Image::BilerpSpectrum(Point2f p, SpectrumType spectrumType,
-                               WrapMode wrapMode) const {
+                               WrapMode2D wrapMode) const {
     if (nChannels() == 1) return Spectrum(BilerpChannel(p, 0, wrapMode));
     std::array<Float, 3> rgb = {BilerpChannel(p, 0, wrapMode),
                                 BilerpChannel(p, 1, wrapMode),
@@ -376,7 +380,7 @@ static std::vector<ResampleWeight> resampleWeights(int oldRes, int newRes) {
     return wt;
 }
 
-Image Image::FloatResize(Point2i newResolution, WrapMode wrapMode) const {
+Image Image::FloatResize(Point2i newResolution, WrapMode2D wrapMode) const {
     CHECK_GE(newResolution.x, resolution.x);
     CHECK_GE(newResolution.y, resolution.y);
 
@@ -499,7 +503,7 @@ void Image::FlipY() {
     }
 }
 
-std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode wrapMode) {
+std::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode) {
     PixelFormat origFormat = image.format;
     // Set things up so we have a power-of-two sized image stored with
     // floats.
