@@ -184,6 +184,14 @@ Spectrum Image::GetSpectrum(Point2i p, SpectrumType spectrumType,
     return Spectrum::FromRGB(rgb, spectrumType);
 }
 
+Float Image::MaxChannel(Point2i p, WrapMode2D wrapMode) const {
+    Float max = GetChannel(p, 0, wrapMode);
+    int nc = nChannels();
+    for (int c = 1; c < nc; ++c)
+        max = std::max(max, GetChannel(p, c, wrapMode));
+    return max;
+}
+
 void Image::CopyRectOut(const Bounds2i &extent,
                         absl::Span<Float> buf, WrapMode2D wrapMode) {
     CHECK_GE(buf.size(), extent.Area() * nChannels());
@@ -312,6 +320,14 @@ Spectrum Image::BilerpSpectrum(Point2f p, SpectrumType spectrumType,
                                 BilerpChannel(p, 1, wrapMode),
                                 BilerpChannel(p, 2, wrapMode)};
     return Spectrum::FromRGB(rgb, spectrumType);
+}
+
+Float Image::BilerpMax(Point2f p, WrapMode2D wrapMode) const {
+    int nc = nChannels();
+    Float max = BilerpChannel(p, 0, wrapMode);
+    for (int c = 1; c < nc; ++c)
+        max = std::max(max, BilerpChannel(p, c, wrapMode));
+    return max;
 }
 
 void Image::SetChannel(Point2i p, int c, Float value) {

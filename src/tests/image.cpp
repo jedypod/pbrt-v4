@@ -370,12 +370,12 @@ TEST(Image, ToSRGB_LUTMonotonic) {
 TEST(Image, SampleSimple) {
     std::vector<Float> texels = {Float(0), Float(1), Float(0), Float(0)};
     Image zeroOne(texels, PixelFormat::Y32, {2,2});
-    std::unique_ptr<Distribution2D> distrib = zeroOne.ComputeSamplingDistribution();
+    Distribution2D distrib = zeroOne.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
         Point2f u(rng.UniformFloat(), rng.UniformFloat());
         Float pdf;
-        Point2f p = distrib->SampleContinuous(u, &pdf);
+        Point2f p = distrib.SampleContinuous(u, &pdf);
         // Due to bilerp on lookup, the non-zero range goes out a bit.
         EXPECT_GE(p.x, 0.25);
         EXPECT_LE(p.y, 0.75);
@@ -396,12 +396,12 @@ TEST(Image, SampleLinear) {
     }
 
     Image image(v, PixelFormat::Y32, {w, h});
-    std::unique_ptr<Distribution2D> distrib = image.ComputeSamplingDistribution();
+    Distribution2D distrib = image.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
         Point2f u(rng.UniformFloat(), rng.UniformFloat());
         Float pdf;
-        Point2f p = distrib->SampleContinuous(u, &pdf);
+        Point2f p = distrib.SampleContinuous(u, &pdf);
         Float f = p.x + p.y;
         // Allow some error since Distribution2D uses a piecewise constant
         // sampling distribution.
@@ -410,7 +410,7 @@ TEST(Image, SampleLinear) {
 }
 
 TEST(Image, SampleSinCos) {
-    int w = 1000, h = 1000;
+    int w = 500, h = 500;
     auto f = [](Point2f p) {
         return std::abs(std::sin(3. * p.x) * Sqr(std::cos(4. * p.y)));
     };
@@ -427,17 +427,77 @@ TEST(Image, SampleSinCos) {
     }
 
     Image image(v, PixelFormat::Y32, {w, h});
-    std::unique_ptr<Distribution2D> distrib = image.ComputeSamplingDistribution();
+    Distribution2D distrib = image.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
         Point2f u(rng.UniformFloat(), rng.UniformFloat());
         Float pdf;
-        Point2f p = distrib->SampleContinuous(u, &pdf);
+        Point2f p = distrib.SampleContinuous(u, &pdf);
         Float fp = f(p);
         // Allow some error since Distribution2D uses a piecewise constant
         // sampling distribution.
         EXPECT_LE(std::abs(fp - pdf * integral), 3e-3) << u << ", fp: " << fp << ", pdf: " << pdf;
     }
+}
+
+TEST(Image, L1Sample) {
+    Point2i res(8, 15);
+    std::vector<Float> pixels = GetFloatPixels(res, 1);
+    for (Float &p : pixels) p = std::abs(p);
+    // Put a spike in the middle
+    pixels[27] = 10000;
+
+    Image image(pixels, PixelFormat::Y32, res);
+    Distribution2D imageDistrib = image.ComputeSamplingDistribution(1, Norm::L1);
+
+    auto bilerp = [&](Point2f p) {
+        return image.BilerpMax(p);
+    };
+    int nSamples = 65536;
+    Distribution2D sampledDistrib =
+        Distribution2D::SampleFunction(bilerp, res[0], res[1], nSamples, Norm::L1);
+
+    Distribution2D::TestCompareDistributions(imageDistrib, sampledDistrib, 1e-3f);
+}
+
+TEST(Image, L2Sample) {
+    Point2i res(8, 15);
+    std::vector<Float> pixels = GetFloatPixels(res, 1);
+    for (Float &p : pixels) p = std::abs(p);
+    // Put a spike in the middle
+    pixels[27] = 10000;
+
+    Image image(pixels, PixelFormat::Y32, res);
+    Distribution2D imageDistrib = image.ComputeSamplingDistribution(1, Norm::L2);
+
+    auto bilerp = [&](Point2f p) {
+        return image.BilerpMax(p);
+    };
+    int nSamples = 65536;
+    Distribution2D sampledDistrib =
+        Distribution2D::SampleFunction(bilerp, res[0], res[1], nSamples, Norm::L2);
+
+    Distribution2D::TestCompareDistributions(imageDistrib, sampledDistrib, 2e-4f);
+}
+
+TEST(Image, LInfinitySample) {
+    Point2i res(8, 15);
+    std::vector<Float> pixels = GetFloatPixels(res, 1);
+    for (Float &p : pixels) p = std::abs(p);
+
+    Image image(pixels, PixelFormat::Y32, res);
+    int resScale = 1;
+    Distribution2D imageDistrib = image.ComputeSamplingDistribution(resScale, Norm::LInfinity);
+
+    auto bilerp = [&](Point2f p) {
+        return image.BilerpMax(p);
+    };
+    int nSamples = 65536;
+    Distribution2D sampledDistrib =
+        Distribution2D::SampleFunction(bilerp, resScale * res[0], resScale * res[1],
+                                       nSamples, Norm::LInfinity);
+
+    Distribution2D::TestCompareDistributions(imageDistrib, sampledDistrib);
 }
 
 TEST(Image, Wrap2D) {

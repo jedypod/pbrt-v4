@@ -96,15 +96,24 @@ inline int nChannels(PixelFormat format) {
 
 inline const char *FormatName(PixelFormat format) {
     switch (format) {
-    case PixelFormat::SY8: return "SY8";
-    case PixelFormat::Y8: return "Y8";
-    case PixelFormat::Y16: return "Y16";
-    case PixelFormat::Y32: return "Y32";
-    case PixelFormat::RGB8: return "RGB8";
-    case PixelFormat::SRGB8: return "SRGB8";
-    case PixelFormat::RGB16: return "RGB16";
-    case PixelFormat::RGB32: return "RGB32";
-    default: return nullptr;
+    case PixelFormat::SY8:
+        return "SY8";
+    case PixelFormat::Y8:
+        return "Y8";
+    case PixelFormat::Y16:
+        return "Y16";
+    case PixelFormat::Y32:
+        return "Y32";
+    case PixelFormat::RGB8:
+        return "RGB8";
+    case PixelFormat::SRGB8:
+        return "SRGB8";
+    case PixelFormat::RGB16:
+        return "RGB16";
+    case PixelFormat::RGB32:
+        return "RGB32";
+    default:
+        return nullptr;
     }
 }
 
@@ -261,9 +270,9 @@ class Image {
 
     // TODO: make gamma option more flexible: sRGB vs provided gamma
     // exponent...
-    static absl::optional<Image> Read(
-        const std::string &filename, ImageMetadata *metadata = nullptr,
-        bool gamma = true);
+    static absl::optional<Image> Read(const std::string &filename,
+                                      ImageMetadata *metadata = nullptr,
+                                      bool gamma = true);
     bool Write(const std::string &name,
                const ImageMetadata *metadata = nullptr) const;
 
@@ -278,12 +287,12 @@ class Image {
                          SpectrumType spectrumType = SpectrumType::Reflectance,
                          WrapMode2D wrapMode = WrapMode::Clamp) const;
 
+    Float MaxChannel(Point2i p, WrapMode2D wrapMode = WrapMode::Clamp) const;
+
     // FIXME: could be / should be const...
-    void CopyRectOut(const Bounds2i &extent,
-                     absl::Span<Float> buf,
+    void CopyRectOut(const Bounds2i &extent, absl::Span<Float> buf,
                      WrapMode2D wrapMode = WrapMode::Clamp);
-    void CopyRectIn(const Bounds2i &extent,
-                    absl::Span<const Float> buf);
+    void CopyRectIn(const Bounds2i &extent, absl::Span<const Float> buf);
 
     Float BilerpChannel(Point2f p, int c,
                         WrapMode2D wrapMode = WrapMode::Clamp) const;
@@ -291,6 +300,7 @@ class Image {
     Spectrum BilerpSpectrum(
         Point2f p, SpectrumType spectrumType = SpectrumType::Reflectance,
         WrapMode2D wrapMode = WrapMode::Clamp) const;
+    Float BilerpMax(Point2f p, WrapMode2D wrapMode = WrapMode::Clamp) const;
 
     void SetChannel(Point2i p, int c, Float value);
     void SetY(Point2i p, Float value);
@@ -328,30 +338,125 @@ class Image {
 
     // F: Point2f in [0,1]^2 -> Float
     template <typename F>
-    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(F dxdA,
-                                                                WrapMode2D wrap = WrapMode::Clamp) {
-        // Compute scalar-valued image _img_ from environment map
-        int width = 2 * resolution.x, height = 2 * resolution.y;
-        // TOODO: use an image?
-        std::vector<Float> img(width * height);
+    Distribution2D ComputeSamplingDistribution(
+        F dxdA, int resScale = 1, Norm norm = Norm::LInfinity,
+        WrapMode2D wrap = WrapMode::Clamp) {
+        switch (norm) {
+        case Norm::L1: {
+            int width = resScale * resolution.x, height = resScale * resolution.y;
+            std::vector<Float> img(width * height);
 
-        // FIXME: assumes clamp
-        ParallelFor(0, height, 32,
-        [&](int64_t start, int64_t end) {
-            for (int v = start; v < end; ++v) {
-                Float vp = (v + .5f) / (Float)height;
-                for (int u = 0; u < width; ++u) {
-                    Float up = (u + .5f) / (Float)width;
-                    // TODO: Y vs max component
-                    img[u + v * width] = BilerpY({up, vp}) * dxdA({up, vp});
+            ParallelFor(0, height, 32, [&](int64_t start, int64_t end) {
+                for (int v = start; v < end; ++v) {
+                    Float fv[3] = {Float(v) / height, Float(v + 0.5f) / height,
+                                   Float(v + 1) / height};
+                    for (int u = 0; u < width; ++u) {
+                        Float fu[3] = {Float(u) / width,
+                                       Float(u + 0.5f) / width,
+                                       Float(u + 1) / width};
+                        // The integral of bilerp is the average of the
+                        // four corners.  Then some corners are counted
+                        // multiple times.  There is missing a constant
+                        // factor in the below, but that doesn't matter,
+                        // since this is turned into a PDF.
+                        // FIXME: want BilerpMaxAbs()
+                        Float fInt = (    BilerpMax({fu[0], fv[0]}, wrap) +
+                                      2 * BilerpMax({fu[1], fv[0]}, wrap) +
+                                          BilerpMax({fu[2], fv[0]}, wrap) +
+                                      2 * BilerpMax({fu[0], fv[1]}, wrap) +
+                                      4 * BilerpMax({fu[1], fv[1]}, wrap) +
+                                      2 * BilerpMax({fu[2], fv[1]}, wrap) +
+                                          BilerpMax({fu[0], fv[2]}, wrap) +
+                                      2 * BilerpMax({fu[1], fv[2]}, wrap) +
+                                          BilerpMax({fu[2], fv[2]}, wrap));
+                        img[u + v * width] = fInt * dxdA({fu[1], fv[1]});
+                    }
                 }
-            }
-        });
+            });
 
-        return std::make_unique<Distribution2D>(img, width, height);
+            return Distribution2D(img, width, height);
+        }
+        case Norm::L2: {
+            int width = resScale * resolution.x, height = resScale * resolution.y;
+            std::vector<Float> img(width * height);
+
+            ParallelFor(0, height, 32, [&](int64_t start, int64_t end) {
+                for (int v = start; v < end; ++v) {
+                    for (int u = 0; u < width; ++u) {
+                        // Closed form integral of bilinear interpolation,
+                        // squared, over the given four corners.
+                        auto integrateBilerp2 = [](Float v00, Float v01,
+                                                   Float v10, Float v11) {
+                            return (2 * (Sqr(v00) + Sqr(v01) + Sqr(v10) +  Sqr(v11)) +
+                                    2 * (v00 * v01 + v00 * v10 + v01 * v11 + v10 * v11) +
+                                    v00 * v11 + v01 * v10) / 18;
+                        };
+                        // FIXME: lots of redundancy in BilerpMax across
+                        // neighboring texels
+                        Float f2int = 0;
+                        for (Float dv = 0; dv <= 0.5f; dv += 0.5f) {
+                            Float v0 = (v + dv) / height,
+                                  v1 = (v + dv + 0.5f) / height;
+                            for (Float du = 0; du <= 0.5f; du += 0.5f) {
+                                Float u0 = (u + du) / width,
+                                      u1 = (u + du + 0.5f) / width;
+                                Float v00 = BilerpMax({u0, v0}, wrap);
+                                Float v01 = BilerpMax({u0, v1}, wrap);
+                                Float v10 = BilerpMax({u1, v0}, wrap);
+                                Float v11 = BilerpMax({u1, v1}, wrap);
+                                f2int += integrateBilerp2(v00, v01, v10, v11);
+                            }
+                        }
+                        Point2f p((u + .5f) / width, (v + .5f) / height);
+                        img[u + v * width] = std::sqrt(f2int) * dxdA(p);
+                    }
+                }
+            });
+            return Distribution2D(img, width, height);
+        }
+        case Norm::LInfinity: {
+            CHECK_EQ(1, resScale); // FIXME support this?
+            std::vector<Float> img(resolution[0] * resolution[1]);
+            ParallelFor(0, resolution[1], 32, [&](int64_t start, int64_t end) {
+                for (int v = start; v < end; ++v) {
+                    for (int u = 0; u < resolution[0]; ++u) {
+                        Float center = MaxChannel({u, v}, wrap);
+                        Float max = center;
+                        // Horizontal and vertical texel neighbors.
+                        max = std::max(max, (center + MaxChannel({u, v - 1}, wrap)) / 2);
+                        max = std::max(max, (center + MaxChannel({u, v + 1}, wrap)) / 2);
+                        max = std::max(max, (center + MaxChannel({u - 1, v}, wrap)) / 2);
+                        max = std::max(max, (center + MaxChannel({u + 1, v}, wrap)) / 2);
+
+                        // Diagonal corners.
+                        Float fu[2] = { Float(u) / resolution[0], Float(u + 1) / resolution[0] };
+                        Float fv[2] = { Float(v) / resolution[1], Float(v + 1) / resolution[1] };
+                        max = std::max(max, BilerpMax({fu[0], fv[0]}, wrap));
+                        max = std::max(max, BilerpMax({fu[1], fv[0]}, wrap));
+                        max = std::max(max, BilerpMax({fu[0], fv[1]}, wrap));
+                        max = std::max(max, BilerpMax({fu[1], fv[1]}, wrap));
+
+                        // Assume jacobian term is basically constant over the
+                        // region.
+                        Point2f p((u + .5f) / resolution[0],
+                                  (v + .5f) / resolution[1]);
+                        img[u + v * resolution[0]] = max * dxdA(p);
+                    }
+                }
+            });
+            return Distribution2D(img, resolution[0], resolution[1]);
+        }
+        default:
+            LOG(FATAL) << "Unhandled Norm";
+            return {};
+        }
     }
-    std::unique_ptr<Distribution2D> ComputeSamplingDistribution(WrapMode2D wrap = WrapMode::Clamp) {
-        return ComputeSamplingDistribution([](Point2f) { return Float(1); }, wrap);
+
+    Distribution2D ComputeSamplingDistribution(
+        int resScale = 1, Norm norm = Norm::LInfinity,
+        WrapMode2D wrap = WrapMode::Clamp) {
+        return ComputeSamplingDistribution([](Point2f) { return Float(1); },
+                                           resScale, norm, wrap);
     }
 
   private:
@@ -408,8 +513,7 @@ class Image {
                     // FIXME: this will return false on Black wrap mode
                     CHECK(RemapPixelCoords(&p, resolution, wrapMode));
                     int offset = PixelOffset(p, 0);
-                    for (int c = 0; c < 3; ++c)
-                        op(offset++);
+                    for (int c = 0; c < 3; ++c) op(offset++);
                 }
             }
         }

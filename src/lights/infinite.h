@@ -72,10 +72,11 @@ class InfiniteAreaLight : public Light {
   private:
     // InfiniteAreaLight Private Data
     Image image;
-    Spectrum Lscale;
+    const WrapMode2D wrapMode;
+    const Spectrum Lscale;
     Point3f worldCenter;
     Float worldRadius;
-    std::unique_ptr<Distribution2D> distribution;
+    Distribution2D distribution;
 };
 
 std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(

@@ -47,6 +47,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
     : Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(),
             attributes),
       image(std::move(im)),
+      wrapMode(WrapMode::Repeat, WrapMode::Clamp),
       Lscale(L) {
     // Initialize sampling PDFs for infinite area light
     auto dwdA = [&](Point2f p) {
@@ -54,7 +55,7 @@ InfiniteAreaLight::InfiniteAreaLight(const Transform &LightToWorld,
         // Can take advantage of knowing that p[1] in [0,1].
         return std::sin(Pi * p[1]);
     };
-    distribution = image.ComputeSamplingDistribution(dwdA);
+    distribution = image.ComputeSamplingDistribution(dwdA, 1, Norm::L2, wrapMode);
 }
 
 Spectrum InfiniteAreaLight::Phi() const {
@@ -65,10 +66,9 @@ Spectrum InfiniteAreaLight::Phi() const {
     int width = image.resolution.x, height = image.resolution.y;
     for (int v = 0; v < height; ++v) {
         Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-        for (int u = 0; u < width; ++u) {
-            sumL +=
-                image.GetSpectrum({u, v}, SpectrumType::Illuminant) * sinTheta;
-        }
+        for (int u = 0; u < width; ++u)
+            sumL += sinTheta *
+                image.GetSpectrum({u, v}, SpectrumType::Illuminant, wrapMode);
     }
     // Integrating over spherical coordinates, so have a scale of Pi for
     // theta and 2 Pi for phi.  Then one more for Pi r^2 for the area of
@@ -80,7 +80,7 @@ Spectrum InfiniteAreaLight::Phi() const {
 Spectrum InfiniteAreaLight::Le(const RayDifferential &ray) const {
     Vector3f w = Normalize(WorldToLight(ray.d));
     Point2f st(SphericalPhi(w) * Inv2Pi, SphericalTheta(w) * InvPi);
-    return Lscale * image.BilerpSpectrum(st, SpectrumType::Illuminant);
+    return Lscale * image.BilerpSpectrum(st, SpectrumType::Illuminant, wrapMode);
 }
 
 Spectrum InfiniteAreaLight::Sample_Li(const Interaction &ref, const Point2f &u,
@@ -89,7 +89,7 @@ Spectrum InfiniteAreaLight::Sample_Li(const Interaction &ref, const Point2f &u,
     ProfilePhase _(Prof::LightSample);
     // Find $(u,v)$ sample coordinates in infinite light texture
     Float mapPdf;
-    Point2f uv = distribution->SampleContinuous(u, &mapPdf);
+    Point2f uv = distribution.SampleContinuous(u, &mapPdf);
     if (mapPdf == 0) return Spectrum(0.f);
 
     // Convert infinite light sample point to direction
@@ -106,7 +106,7 @@ Spectrum InfiniteAreaLight::Sample_Li(const Interaction &ref, const Point2f &u,
     // Return radiance value for infinite light direction
     *vis = VisibilityTester(ref, Interaction(ref.p + *wi * (2 * worldRadius),
                                              ref.time, mediumInterface));
-    return Lscale * image.BilerpSpectrum(uv, SpectrumType::Illuminant);
+    return Lscale * image.BilerpSpectrum(uv, SpectrumType::Illuminant, wrapMode);
 }
 
 Float InfiniteAreaLight::Pdf_Li(const Interaction &, const Vector3f &w) const {
@@ -115,7 +115,7 @@ Float InfiniteAreaLight::Pdf_Li(const Interaction &, const Vector3f &w) const {
     Float theta = SphericalTheta(wi), phi = SphericalPhi(wi);
     Float sinTheta = std::sin(theta);
     if (sinTheta == 0) return 0;
-    return distribution->Pdf(Point2f(phi * Inv2Pi, theta * InvPi)) /
+    return distribution.Pdf(Point2f(phi * Inv2Pi, theta * InvPi)) /
            (2 * Pi * Pi * sinTheta);
 }
 
@@ -128,7 +128,7 @@ Spectrum InfiniteAreaLight::Sample_Le(const Point2f &u1, const Point2f &u2,
 
     // Find $(u,v)$ sample coordinates in infinite light texture
     Float mapPdf;
-    Point2f uv = distribution->SampleContinuous(u, &mapPdf);
+    Point2f uv = distribution.SampleContinuous(u, &mapPdf);
     if (mapPdf == 0) return Spectrum(0.f);
     Float theta = uv[1] * Pi, phi = uv[0] * 2.f * Pi;
     Float cosTheta = std::cos(theta), sinTheta = std::sin(theta);
@@ -147,7 +147,7 @@ Spectrum InfiniteAreaLight::Sample_Le(const Point2f &u1, const Point2f &u2,
     // Compute _InfiniteAreaLight_ ray PDFs
     *pdfDir = sinTheta == 0 ? 0 : mapPdf / (2 * Pi * Pi * sinTheta);
     *pdfPos = 1 / (Pi * worldRadius * worldRadius);
-    return Lscale * image.BilerpSpectrum(uv, SpectrumType::Illuminant);
+    return Lscale * image.BilerpSpectrum(uv, SpectrumType::Illuminant, wrapMode);
 }
 
 void InfiniteAreaLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
@@ -156,7 +156,7 @@ void InfiniteAreaLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
     Vector3f d = -WorldToLight(ray.d);
     Float theta = SphericalTheta(d), phi = SphericalPhi(d);
     Point2f uv(phi * Inv2Pi, theta * InvPi);
-    Float mapPdf = distribution->Pdf(uv);
+    Float mapPdf = distribution.Pdf(uv);
     *pdfDir = mapPdf / (2 * Pi * Pi * std::sin(theta));
     *pdfPos = 1 / (Pi * worldRadius * worldRadius);
 }
