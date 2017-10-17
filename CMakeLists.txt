@@ -406,6 +406,7 @@ FILE ( GLOB PBRT_SOURCE
   src/shapes/*.cpp
   src/textures/*.cpp
   src/util/*.cpp
+  src/tests/gtest/*.cc
   )
 
 INCLUDE_DIRECTORIES ( src )
@@ -489,7 +490,6 @@ TARGET_COMPILE_FEATURES ( cyhair2pbrt PRIVATE ${PBRT_CXX14_NEEDS} )
 
 FILE ( GLOB PBRT_TEST_SOURCE
   src/tests/*.cpp
-  src/tests/gtest/*.cc
   )
 
 ADD_EXECUTABLE ( pbrt_test ${PBRT_TEST_SOURCE} )

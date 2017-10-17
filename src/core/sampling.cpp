@@ -34,8 +34,10 @@
 // core/sampling.cpp*
 #include "sampling.h"
 
+#include "lowdiscrepancy.h"
 #include "util/stats.h"
 #include "util/transform.h"
+#include <tests/gtest/gtest.h>
 
 #include <numeric>
 
@@ -169,20 +171,86 @@ std::array<Float, 3> UniformSampleTriangle(const Point2f &u) {
     return b;
 }
 
+void Distribution1D::TestCompareDistributions(const Distribution1D &da,
+                                              const Distribution1D &db,
+                                              Float eps) {
+    ASSERT_EQ(da.func.size(), db.func.size());
+    ASSERT_EQ(da.cdf.size(), db.cdf.size());
+    for (size_t i = 0; i < da.func.size(); ++i) {
+        Float pdfa = da.func[i] / da.funcInt, pdfb = db.func[i] / db.funcInt;
+        Float err = std::abs(pdfa - pdfb) / ((pdfa + pdfb) / 2);
+        EXPECT_LT(err, eps) << pdfa << " - " << pdfb;
+    }
+}
+
 Distribution2D::Distribution2D(absl::Span<const Float> func, int nu, int nv) {
     CHECK_EQ(func.size(), (size_t)nu * (size_t)nv);
     pConditionalV.reserve(nv);
-    for (int v = 0; v < nv; ++v) {
+    for (int v = 0; v < nv; ++v)
         // Compute conditional sampling distribution for $\tilde{v}$
-        pConditionalV.push_back(std::make_unique<Distribution1D>(
-            func.subspan(v * nu, nu)));
-    }
+        pConditionalV.push_back(Distribution1D(func.subspan(v * nu, nu)));
     // Compute marginal sampling distribution $p[\tilde{v}]$
     std::vector<Float> marginalFunc;
     marginalFunc.reserve(nv);
     for (int v = 0; v < nv; ++v)
-        marginalFunc.push_back(pConditionalV[v]->funcInt);
-    pMarginal = std::make_unique<Distribution1D>(marginalFunc);
+        marginalFunc.push_back(pConditionalV[v].funcInt);
+    pMarginal = Distribution1D(marginalFunc);
+}
+
+
+Distribution2D Distribution2D::SampleFunction(std::function<Float(Point2f)> f,
+                                              int nu, int nv,
+                                              int nSamples, Norm norm) {
+    std::vector<Point2f> samples(nSamples);
+    for (int i = 0; i < nSamples; ++i)
+        samples[i] = Point2f(RadicalInverse(0, i), RadicalInverse(1, i));
+    if (norm == Norm::LInfinity) {
+        // Check the corners, too.
+        samples.push_back(Point2f(0, 1));
+        samples.push_back(Point2f(1, 0));
+        samples.push_back(Point2f(1, 1));
+    }
+
+    std::vector<Float> values(nu * nv, Float(0));
+    for (int v = 0; v < nv; ++v) {
+        for (int u = 0; u < nu; ++u) {
+            double accum = 0;
+            for (size_t i = 0; i < samples.size(); ++i) {
+                Point2f p((u + samples[i][0]) / nu, (v + samples[i][1]) / nv);
+                Float fuv = std::abs(f(p));
+                switch (norm) {
+                case Norm::L1:
+                    accum += fuv;
+                    break;
+                case Norm::L2:
+                    accum += fuv * fuv;
+                    break;
+                case Norm::LInfinity:
+                    accum = std::max<double>(accum, fuv);
+                    break;
+                default:
+                    LOG(FATAL) << "Unhandled norm";
+                }
+            }
+            // There's actually no need for the divide by nSamples, since
+            // these are normalzed into a PDF anyway.
+            if (norm == Norm::L2) accum = std::sqrt(accum);
+            values[u + v * nu] = accum;
+        }
+    }
+
+    return Distribution2D(values, nu, nv);
+}
+
+void Distribution2D::TestCompareDistributions(const Distribution2D &da,
+                                              const Distribution2D &db,
+                                              Float eps) {
+    Distribution1D::TestCompareDistributions(da.pMarginal, db.pMarginal, eps);
+
+    ASSERT_EQ(da.pConditionalV.size(), db.pConditionalV.size());
+    for (size_t i = 0; i < da.pConditionalV.size(); ++i)
+        Distribution1D::TestCompareDistributions(da.pConditionalV[i],
+                                                 db.pConditionalV[i], eps);
 }
 
 int SampleDiscrete(absl::Span<const Float> weights, Float u, Float *pdf,

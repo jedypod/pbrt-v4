@@ -387,6 +387,54 @@ TEST(Distribution1D, Continuous) {
     EXPECT_FLOAT_EQ(1., dist.SampleContinuous(1., &pdf));
 }
 
+TEST(Distribution2D, FromFuncL1) {
+    auto f = [](Point2f p) { return p[0] * p[0] * p[1]; }; // x^2 y
+    Distribution2D dSampled = Distribution2D::SampleFunction(f, 4, 2, 1024*1024, Norm::L1);
+
+    std::vector<Float> exact = { Float(0.0006510416653645833),
+                                 Float(0.004557291657552083),
+                                 Float(0.012369791641927086),
+                                 Float(0.024088541618489584),
+                                 Float(0.0019531249960937497),
+                                 Float(0.013671874972656246),
+                                 Float(0.037109374925781244),
+                                 Float(0.07226562485546874) };
+    Distribution2D dExact(exact, 4, 2);
+    Distribution2D::TestCompareDistributions(dSampled, dExact);
+}
+
+TEST(Distribution2D, FromFuncL2) {
+    auto f = [](Point2f p) { return p[0] * p[0] * p[1]; }; // x^2 y
+    Distribution2D dSampled = Distribution2D::SampleFunction(f, 4, 2, 1024*1024, Norm::L2);
+
+    std::vector<Float> exact = { Float(0.002852721649393658),
+                                 Float(0.015883281936567687),
+                                 Float(0.04143817552308458),
+                                 Float(0.07972323533177735),
+                                 Float(0.0075475920472202924),
+                                 Float(0.04202321402569243),
+                                 Float(0.10963510726531212),
+                                 Float(0.2109278544917584) };
+    Distribution2D dExact(exact, 4, 2);
+    Distribution2D::TestCompareDistributions(dSampled, dExact);
+}
+
+TEST(Distribution2D, FromFuncLInfinity) {
+    auto f = [](Point2f p) { return p[0] * p[0] * p[1]; }; // x^2 y
+    Distribution2D dSampled = Distribution2D::SampleFunction(f, 4, 2, 1024*1024, Norm::LInfinity);
+
+    std::vector<Float> exact = { Sqr(0.25) * Float(0.5),
+                                 Sqr(0.5) * Float(0.5),
+                                 Sqr(0.75) * Float(0.5),
+                                 Sqr(1) * Float(0.5),
+                                 Sqr(0.25) * Float(1),
+                                 Sqr(0.5) * Float(1),
+                                 Sqr(0.75) * Float(1),
+                                 Sqr(1) * Float(1) };
+    Distribution2D dExact(exact, 4, 2);
+    Distribution2D::TestCompareDistributions(dSampled, dExact);
+}
+
 TEST(Sampling, SampleDiscrete) {
     Float pdf, uRemapped;
 

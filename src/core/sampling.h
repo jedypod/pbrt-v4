@@ -49,6 +49,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -64,13 +65,16 @@ void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng);
 class Distribution1D {
  public:
     // Distribution1D Public Methods
+    Distribution1D() = default;
     Distribution1D(absl::Span<const Float> f)
         : func(f.begin(), f.end()), cdf(f.size() + 1) {
         // Compute integral of step function at $x_i$
         cdf[0] = 0;
         size_t n = f.size();
-        for (size_t i = 1; i < n + 1; ++i)
+        for (size_t i = 1; i < n + 1; ++i) {
+            CHECK_GE(func[i - 1], 0);
             cdf[i] = cdf[i - 1] + func[i - 1] / n;
+        }
 
         // Transform step function integral into CDF
         funcInt = cdf[n];
@@ -116,9 +120,12 @@ class Distribution1D {
         return func[index] / (funcInt * Count());
     }
 
+    static void TestCompareDistributions(const Distribution1D &da,
+                                         const Distribution1D &db,
+                                         Float eps = 1e-5);
     // Distribution1D Public Data
     std::vector<Float> func, cdf;
-    Float funcInt;
+    Float funcInt = 0;
 };
 
 Point2f RejectionSampleDisk(RNG &rng);
@@ -137,30 +144,39 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
                                              const Point3f &p, const Point2f &u,
                                              Float *pdf);
 
+enum class Norm { L1, L2, LInfinity };
+
 class Distribution2D {
   public:
     // Distribution2D Public Methods
+    Distribution2D() = default;
     Distribution2D(absl::Span<const Float> data, int nu, int nv);
+    static Distribution2D SampleFunction(std::function<Float(Point2f)> f,
+                                         int nu, int nv, int nSamples,
+                                         Norm norm = Norm::LInfinity);
     Point2f SampleContinuous(const Point2f &u, Float *pdf) const {
         Float pdfs[2];
         int v;
-        Float d1 = pMarginal->SampleContinuous(u[1], &pdfs[1], &v);
-        Float d0 = pConditionalV[v]->SampleContinuous(u[0], &pdfs[0]);
+        Float d1 = pMarginal.SampleContinuous(u[1], &pdfs[1], &v);
+        Float d0 = pConditionalV[v].SampleContinuous(u[0], &pdfs[0]);
         *pdf = pdfs[0] * pdfs[1];
         return Point2f(d0, d1);
     }
     Float Pdf(const Point2f &p) const {
-        int iu = Clamp(int(p[0] * pConditionalV[0]->Count()), 0,
-                       pConditionalV[0]->Count() - 1);
+        int iu = Clamp(int(p[0] * pConditionalV[0].Count()), 0,
+                       pConditionalV[0].Count() - 1);
         int iv =
-            Clamp(int(p[1] * pMarginal->Count()), 0, pMarginal->Count() - 1);
-        return pConditionalV[iv]->func[iu] / pMarginal->funcInt;
+            Clamp(int(p[1] * pMarginal.Count()), 0, pMarginal.Count() - 1);
+        return pConditionalV[iv].func[iu] / pMarginal.funcInt;
     }
 
-  private:
-    // Distribution2D Private Data
-    std::vector<std::unique_ptr<Distribution1D>> pConditionalV;
-    std::unique_ptr<Distribution1D> pMarginal;
+    static void TestCompareDistributions(const Distribution2D &da,
+                                         const Distribution2D &db,
+                                         Float eps = 1e-5);
+
+ private:
+    std::vector<Distribution1D> pConditionalV;
+    Distribution1D pMarginal;
 };
 
 // Sampling Inline Functions
