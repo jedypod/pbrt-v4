@@ -39,6 +39,22 @@
 namespace pbrt {
 
 // GonioPhotometricLight Method Definitions
+GonioPhotometricLight::GonioPhotometricLight(const Transform &LightToWorld,
+    const MediumInterface &mediumInterface, const Spectrum &I,
+    Image im, const std::shared_ptr<const ParamSet> &attributes)
+    : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
+            attributes),
+          pLight(LightToWorld(Point3f(0, 0, 0))),
+          I(I),
+          image(std::move(im)),
+          wrapMode(WrapMode::Repeat, WrapMode::Clamp) {
+    auto dwdA = [&](Point2f p) {
+        // TODO: improve efficiency?
+        return std::sin(Pi * p[1]);
+    };
+    distrib = image.ComputeSamplingDistribution(dwdA, 1, Norm::L2, wrapMode);
+}
+
 Spectrum GonioPhotometricLight::Sample_Li(const Interaction &ref,
                                           const Point2f &u, Vector3f *wi,
                                           Float *pdf,
@@ -58,8 +74,8 @@ Spectrum GonioPhotometricLight::Phi() const {
     for (int v = 0; v < height; ++v) {
         Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
         for (int u = 0; u < width; ++u) {
-            sumL +=
-                I * image.GetSpectrum({u, v}, SpectrumType::Illuminant) * sinTheta;
+            sumL += sinTheta * I *
+                image.GetSpectrum({u, v}, SpectrumType::Illuminant, wrapMode);
         }
     }
     return 2 * Pi * Pi * sumL / (width * height);
@@ -75,19 +91,33 @@ Spectrum GonioPhotometricLight::Sample_Le(const Point2f &u1, const Point2f &u2,
                                           Normal3f *nLight, Float *pdfPos,
                                           Float *pdfDir) const {
     ProfilePhase _(Prof::LightSample);
-    *ray = Ray(pLight, UniformSampleSphere(u1), Infinity, time,
-               mediumInterface.inside);
+
+    Float pdf;
+    Point2f uv = distrib.SampleContinuous(u1, &pdf);
+    Float theta = uv[1] * Pi, phi = uv[0] * 2 * Pi;
+    Float cosTheta = std::cos(theta), sinTheta = std::sin(theta);
+    Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
+    // swap y and z
+    Vector3f w =
+        LightToWorld(Vector3f(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi));
+    *pdfDir = sinTheta == 0 ? 0 : pdf / (2 * Pi * Pi * sinTheta);
+
+    *ray = Ray(pLight, w, Infinity, time, mediumInterface.inside);
     *nLight = (Normal3f)ray->d;
     *pdfPos = 1.f;
-    *pdfDir = UniformSpherePdf();
     return Scale(ray->d);
 }
 
-void GonioPhotometricLight::Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
+void GonioPhotometricLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
                                    Float *pdfDir) const {
     ProfilePhase _(Prof::LightPdf);
     *pdfPos = 0.f;
-    *pdfDir = UniformSpherePdf();
+
+    Vector3f w = Normalize(WorldToLight(ray.d));
+    std::swap(w.y, w.z);
+    Float theta = SphericalTheta(w), phi = SphericalPhi(w);
+    Point2f uv(phi * Inv2Pi, theta * InvPi);
+    *pdfDir = distrib.Pdf(uv) / (2 * Pi * Pi * std::sin(theta));
 }
 
 std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(

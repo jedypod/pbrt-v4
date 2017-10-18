@@ -40,9 +40,11 @@
 
 // lights/goniometric.h*
 #include "pbrt.h"
-#include "light.h"
-#include "shape.h"
+
 #include "image.h"
+#include "light.h"
+#include "sampling.h"
+#include "shape.h"
 
 namespace pbrt {
 
@@ -50,17 +52,12 @@ namespace pbrt {
 class GonioPhotometricLight : public Light {
   public:
     // GonioPhotometricLight Public Methods
-    Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
-                       Float *pdf, VisibilityTester *vis) const;
     GonioPhotometricLight(const Transform &LightToWorld,
                           const MediumInterface &mediumInterface,
                           const Spectrum &I, Image image,
-                          const std::shared_ptr<const ParamSet> &attributes)
-        : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
-                attributes),
-          pLight(LightToWorld(Point3f(0, 0, 0))),
-          I(I),
-          image(std::move(image)) { }
+                          const std::shared_ptr<const ParamSet> &attributes);
+    Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
+                       Float *pdf, VisibilityTester *vis) const;
     Spectrum Scale(const Vector3f &w) const {
         Vector3f wp = Normalize(WorldToLight(w));
         std::swap(wp.y, wp.z);
@@ -82,6 +79,8 @@ class GonioPhotometricLight : public Light {
     const Point3f pLight;
     const Spectrum I;
     Image image;
+    const WrapMode2D wrapMode;
+    Distribution2D distrib;
 };
 
 std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
