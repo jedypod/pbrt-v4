@@ -40,9 +40,11 @@
 
 // lights/projection.h*
 #include "pbrt.h"
-#include "light.h"
-#include "shape.h"
+
 #include "image.h"
+#include "light.h"
+#include "sampling.h"
+#include "shape.h"
 
 namespace pbrt {
 
@@ -70,11 +72,12 @@ class ProjectionLight : public Light {
     Image image;
     const Point3f pLight;
     const Spectrum I;
-    Transform lightToScreen;
+    Transform lightToScreen, screenToLight;
     Float hither, yon;
     Bounds2f screenBounds;
     Float cosTotalWidth;
     Float A;
+    Distribution2D distrib;
 };
 
 std::shared_ptr<ProjectionLight> CreateProjectionLight(

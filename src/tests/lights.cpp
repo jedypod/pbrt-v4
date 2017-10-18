@@ -101,13 +101,7 @@ TEST(GoniometricLight, Power) {
         " qmc: " << phiSampled << ", closed-form: " << phi[0];
 }
 
-TEST(GoniometricLight, Sampling) {
-    Image image = MakeLightImage({512, 256});
-
-    Spectrum I(10.);
-    GonioPhotometricLight light(Transform(), MediumInterface(), I, std::move(image),
-                                nullptr);
-
+static void testPhiVsSampled(const Light &light) {
     double sum = 0;
     int count = 100000;
     for (int i = 0; i < count; ++i) {
@@ -118,17 +112,29 @@ TEST(GoniometricLight, Sampling) {
         Float pdfPos, pdfDir;
         Spectrum Li = light.Sample_Le(u1, u2, 0 /* time */, &ray, &n, &pdfPos,
                                       &pdfDir);
+        if (pdfDir == 0 || !Li)
+            continue;
 
         EXPECT_TRUE(ray.o == Point3f(0, 0, 0));
         EXPECT_EQ(1, pdfPos);
         sum += Li[0] / pdfDir;
     }
-    EXPECT_LT(std::abs(sum / count - light.Phi()[0]) / light.Phi()[0], 1e-2) <<
-        light.Phi()[0] << ", sampled " << sum / count;
+    Spectrum Phi = light.Phi();
+    EXPECT_LT(std::abs(sum / count - Phi[0]) / Phi[0], 1e-2) <<
+        Phi[0] << ", sampled " << sum / count;
+}
+
+TEST(GoniometricLight, Sampling) {
+    Image image = MakeLightImage({512, 256});
+
+    Spectrum I(10.);
+    GonioPhotometricLight light(Transform(), MediumInterface(), I, std::move(image),
+                                nullptr);
+    testPhiVsSampled(light);
 }
 
 TEST(ProjectionLight, Power) {
-    for (Point2i res : { Point2i(512, 256), Point2i(30, 90) }) {
+    for (Point2i res : { Point2i(512, 256), Point2i(300, 900) }) {
         Image image = MakeLightImage(res);
 
         Spectrum I(10.);
@@ -147,5 +153,17 @@ TEST(ProjectionLight, Power) {
 
         EXPECT_LT(std::abs(phiSampled - phi[0]), 1e-3) << "res: " << res <<
             " qmc: " << phiSampled << ", closed-form: " << phi[0];
+    }
+}
+
+TEST(ProjectionLight, Sampling) {
+    for (Point2i res : { Point2i(512, 256), Point2i(300, 900) }) {
+        Image image = MakeLightImage(res);
+
+        Spectrum I(10.);
+        ProjectionLight light(Transform(), MediumInterface(), I, std::move(image),
+                              30 /* fov */, nullptr);
+
+        testPhiVsSampled(light);
     }
 }

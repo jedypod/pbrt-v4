@@ -1,11 +1,7 @@
 
-- get 3ed tests cleaned up / normal again
-  - verify clean with tot
+- distrib tests: plot function and distribution of a bunch of samples
 
-- use SampleDiscrete
-  - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
-  - light tree (eventually)
-  - other binary sampling decisions?
+- write end-to-end test that read/write exr gets all the metadata right...
 
 ---
 
@@ -19,8 +15,6 @@ GFX!
 - tests for light * -> pdf computaiton
 
 - implement improved delta/ratio tracking stuff...
-
-- try jacopo/heitz stuff for inf env map sampling e.g.
 
 - explicit path representation (review mitsuba libbidir stuff). Also, just
   build on top of bdpt Vertex stuff (or generalize, and build both on top?)
@@ -47,17 +41,21 @@ GFX!
 
 - http://aras-p.info/texts/CompactNormalStorage.html ?
 
-- do a better job of sampling projection lights, and gonio lights.
-  is there some reusable infrastructure for sampling images that that
-  and infinite light can be built on?
-  - this should be extra straightforward now that the Power stuff is
-    principled.  In turn, can implement Phi() via the sampling routines
-    (potentially)
-
 - BDPT: do standard MIS direct lighting at end (and then can use fancy
   light sampling stuff)
 
+- camera space experiments (all done at the API level?)
+
 -----------------
+
+- use SampleDiscrete
+  - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
+  - light tree (eventually)
+  - other binary sampling decisions?
+
+- crash in bvh build for curly hair (on mac).
+
+- more tests for bdpt, volumes, ...
 
 - REGISTER_CAMERA("perspective", PerspectiveCamera::Create) etc
 

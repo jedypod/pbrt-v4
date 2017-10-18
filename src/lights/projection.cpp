@@ -42,11 +42,11 @@ namespace pbrt {
 // ProjectionLight Method Definitions
 ProjectionLight::ProjectionLight(const Transform &LightToWorld,
                                  const MediumInterface &mediumInterface,
-                                 const Spectrum &I, Image image,
+                                 const Spectrum &I, Image im,
                                  Float fov, const std::shared_ptr<const ParamSet> &attributes)
     : Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface,
             attributes),
-      image(std::move(image)),
+      image(std::move(im)),
       pLight(LightToWorld(Point3f(0, 0, 0))),
       I(I) {
     // Initialize _ProjectionLight_ projection matrix
@@ -59,6 +59,7 @@ ProjectionLight::ProjectionLight(const Transform &LightToWorld,
     hither = 1e-3f;
     yon = 1e30f;
     lightToScreen = Perspective(fov, hither, yon);
+    screenToLight = Inverse(lightToScreen);
 
     // Compute cosine of cone surrounding projection directions
     Float opposite = std::tan(Radians(fov) / 2.f);
@@ -66,6 +67,14 @@ ProjectionLight::ProjectionLight(const Transform &LightToWorld,
     A = 4 * opposite * opposite * (aspect > 1 ? aspect : 1 / aspect);
     Float tanDiag = opposite * std::sqrt(1 + 1 / (aspect * aspect));
     cosTotalWidth = std::cos(std::atan(tanDiag));
+
+    auto dwdA = [&](Point2f p) {
+        Point2f ps = screenBounds.Lerp(p);
+        Vector3f w = Vector3f(screenToLight(Point3f(ps.x, ps.y, 0)));
+        w = Normalize(w);
+        return Pow<3>(w.z);
+    };
+    distrib = image.ComputeSamplingDistribution(dwdA, 1, Norm::L2);
 }
 
 Spectrum ProjectionLight::Sample_Li(const Interaction &ref, const Point2f &u,
@@ -93,14 +102,11 @@ Spectrum ProjectionLight::Projection(const Vector3f &w) const {
 
 Spectrum ProjectionLight::Phi() const {
     Spectrum sum(0.f);
-    Transform screenToLight = Inverse(lightToScreen);
-    Float minRes = std::min(image.resolution.x, image.resolution.y);
     for (int v = 0; v < image.resolution.y; ++v)
         for (int u = 0; u < image.resolution.x; ++u) {
-            Point3f ps(2 * (u - image.resolution.x / 2) / minRes,
-                       2 * (v - image.resolution.y / 2) / minRes,
-                       0);
-            Vector3f w = Vector3f(screenToLight(ps));
+            Point2f ps = screenBounds.Lerp({(u + .5f) / image.resolution.x,
+                                            (v + .5f) / image.resolution.y});
+            Vector3f w = Vector3f(screenToLight(Point3f(ps.x, ps.y, 0)));
             w = Normalize(w);
             Float dwdA = Pow<3>(w.z);
             sum += image.GetSpectrum({u, v}, SpectrumType::Illuminant) * dwdA;
@@ -117,21 +123,44 @@ Spectrum ProjectionLight::Sample_Le(const Point2f &u1, const Point2f &u2,
                                     Float time, Ray *ray, Normal3f *nLight,
                                     Float *pdfPos, Float *pdfDir) const {
     ProfilePhase _(Prof::LightSample);
-    Vector3f v = UniformSampleCone(u1, cosTotalWidth);
-    *ray = Ray(pLight, LightToWorld(v), Infinity, time, mediumInterface.inside);
-    *nLight = (Normal3f)ray->d;  /// same here
-    *pdfPos = 1.f;
-    *pdfDir = UniformConePdf(cosTotalWidth);
-    return Projection(ray->d);
+
+    Float pdf;
+    Point2f uv = distrib.SampleContinuous(u1, &pdf);
+    if (pdf == 0) {
+        *pdfPos = *pdfDir = 0;
+        return 0;
+    }
+
+    Point2f ps = screenBounds.Lerp(uv);
+    Vector3f w = Vector3f(screenToLight(Point3f(ps.x, ps.y, 0)));
+    w = Normalize(w);
+
+    *ray = Ray(pLight, LightToWorld(w), Infinity, time, mediumInterface.inside);
+    *nLight = (Normal3f)ray->d;
+    *pdfPos = 1;
+    CHECK_GT(w.z, 0);
+    *pdfDir = pdf / (A * Pow<3>(w.z));
+
+    return I * image.BilerpSpectrum(uv, SpectrumType::Illuminant);
 }
 
 void ProjectionLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
                              Float *pdfDir) const {
     ProfilePhase _(Prof::LightPdf);
-    *pdfPos = 0.f;
-    *pdfDir = (CosTheta(WorldToLight(ray.d)) >= cosTotalWidth)
-                  ? UniformConePdf(cosTotalWidth)
-                  : 0;
+    *pdfPos = 0;
+
+    Vector3f w = Normalize(WorldToLight(ray.d));
+    if (w.z < hither) {
+        *pdfDir = 0;
+        return;
+    }
+    Point3f ps = lightToScreen(Point3f(w));
+    if (!Inside(Point2f(ps.x, ps.y), screenBounds)) {
+        *pdfDir = 0;
+        return;
+    }
+    Point2f st = Point2f(screenBounds.Offset(Point2f(ps.x, ps.y)));
+    *pdfDir = distrib.Pdf(st) / (A * Pow<3>(w.z));
 }
 
 std::shared_ptr<ProjectionLight> CreateProjectionLight(
