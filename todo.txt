@@ -1,7 +1,15 @@
 
-- distrib tests: plot function and distribution of a bunch of samples
+- failures from run with debug checks:
+  anim-killeroos-moving: mathutil Safe* check out of range
+    also killeroo-crop, killeroo-simple (presumably same)
+  splash.pbrt, scattering-sphere-diel, plume-volpath: compute differentials NaN
+  spot-bdpt: newton bracketing issue
+  tabulated-transmission, lte-orb-roughglass: safe* check from SampleCatmullRom2D()
+  c-path, tabulated.pbrt: fourierr sampling newton bracketing
+  lte-orb-silver: TR::Sample_wh Safe* issue
+  frame1266: span ray nans
 
-- write end-to-end test that read/write exr gets all the metadata right...
+- distrib tests: plot function and distribution of a bunch of samples
 
 ---
 
@@ -57,8 +65,6 @@ GFX!
 - crash in bvh build for curly hair (on mac).
 
 - more tests for bdpt, volumes, ...
-
-- REGISTER_CAMERA("perspective", PerspectiveCamera::Create) etc
 
 - more mathutil tests..
 

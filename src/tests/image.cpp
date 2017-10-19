@@ -296,6 +296,87 @@ TEST(Image, ExrIO) {
     }
 }
 
+TEST(Image, ExrNoMetadata) {
+    Point2i res(16, 32);
+    std::vector<Float> rgbPixels = GetFloatPixels(res, 3);
+    Image image(rgbPixels, PixelFormat::RGB32, res);
+
+    std::string filename = "nometadata.exr";
+    EXPECT_TRUE(image.Write(filename));
+    ImageMetadata metadata;
+    absl::optional<Image> read = Image::Read(filename, &metadata);
+    EXPECT_TRUE((bool)read);
+
+    // All of the metadata should be unset
+    EXPECT_FALSE((bool)metadata.renderTimeSeconds);
+    EXPECT_FALSE((bool)metadata.worldToCamera);
+    EXPECT_FALSE((bool)metadata.worldToNDC);
+    EXPECT_TRUE((bool)metadata.pixelBounds);
+    EXPECT_EQ(*metadata.pixelBounds, Bounds2i({0, 0}, res));
+    EXPECT_TRUE((bool)metadata.fullResolution);
+    EXPECT_EQ(*metadata.fullResolution, res);
+    EXPECT_EQ(0, metadata.stringVectors.size());
+
+    EXPECT_EQ(0, remove(filename.c_str()));
+}
+
+TEST(Image, ExrMetadata) {
+    Point2i res(16, 32);
+    std::vector<Float> rgbPixels = GetFloatPixels(res, 3);
+    Image image(rgbPixels, PixelFormat::RGB32, res);
+
+    std::string filename = "metadata.exr";
+    ImageMetadata outMetadata;
+    outMetadata.renderTimeSeconds = 1234;
+    Matrix4x4 w2c(3, 1, 4, 1,
+                  5, 9, 2, Pi,
+                  2, 7, 1, 8,
+                  2, 8, 1, std::exp(1.f));
+    Matrix4x4 w2n(1.5, 2.5, 3.5, 4.75,
+                  5.333, 6.2135, -351.2, -552.,
+                  63.2, 47.2, Pi, std::cos(1.f),
+                  0, -14, 6, 1e-10f);
+    // Must be the same area as image resolution.
+    Bounds2i pb(Point2i(2, 10), Point2i(18, 42));
+    Point2i fullRes(1000, 200);
+    std::map<std::string, std::vector<std::string>> stringVectors;
+    stringVectors["yolo"] = { "foo", "bar" };
+
+    outMetadata.worldToCamera = w2c;
+    outMetadata.worldToNDC = w2n;
+    outMetadata.pixelBounds = pb;
+    outMetadata.fullResolution = fullRes;
+    outMetadata.stringVectors = stringVectors;
+    EXPECT_TRUE(image.Write(filename, &outMetadata));
+
+    ImageMetadata inMetadata;
+    absl::optional<Image> read = Image::Read(filename, &inMetadata);
+    EXPECT_TRUE((bool)read);
+
+    EXPECT_TRUE((bool)inMetadata.renderTimeSeconds);
+    EXPECT_EQ(1234, *inMetadata.renderTimeSeconds);
+
+    EXPECT_TRUE((bool)inMetadata.worldToCamera);
+    EXPECT_EQ(*inMetadata.worldToCamera, w2c);
+
+    EXPECT_TRUE((bool)inMetadata.worldToNDC);
+    EXPECT_EQ(*inMetadata.worldToNDC, w2n);
+
+    EXPECT_TRUE((bool)inMetadata.pixelBounds);
+    EXPECT_EQ(*inMetadata.pixelBounds, pb);
+
+    EXPECT_TRUE((bool)inMetadata.fullResolution);
+    EXPECT_EQ(*inMetadata.fullResolution, fullRes);
+
+    EXPECT_EQ(1, inMetadata.stringVectors.size());
+    auto iter = stringVectors.find("yolo");
+    EXPECT_TRUE(iter != stringVectors.end());
+    EXPECT_EQ("foo", iter->second[0]);
+    EXPECT_EQ("bar", iter->second[1]);
+
+    EXPECT_EQ(0, remove(filename.c_str()));
+}
+
 TEST(Image, PngRgbIO) {
     Point2i res(11, 50);
     std::vector<Float> rgbPixels = GetFloatPixels(res, 3);

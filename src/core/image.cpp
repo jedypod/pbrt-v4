@@ -723,11 +723,11 @@ static absl::optional<Image> ReadEXR(const std::string &name,
 
             // OpenEXR uses inclusive pixel bounds; adjust to non-inclusive
             // (the convention pbrt uses) in the values returned.
-            *metadata->pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
+            metadata->pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
 
             Imath::Box2i dispw = file.header().displayWindow();
-            metadata->fullResolution->x = dispw.max.x - dispw.min.x + 1;
-            metadata->fullResolution->y = dispw.max.y - dispw.min.y + 1;
+            metadata->fullResolution = Point2i(dispw.max.x - dispw.min.x + 1,
+                                               dispw.max.y - dispw.min.y + 1);
 
             // Find any string vector attributes
             for (auto iter = file.header().begin(); iter != file.header().end();
