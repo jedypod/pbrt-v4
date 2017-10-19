@@ -295,21 +295,24 @@ int cat(int argc, char *argv[]) {
             continue;
         }
 
-        absl::optional<Image> img = Image::Read(argv[i]);
+        ImageMetadata metadata;
+        absl::optional<Image> img = Image::Read(argv[i], &metadata);
         if (!img) {
             fprintf(stderr, "%s: unable to read image.\n", argv[i]);
             continue;
         }
 
+        Bounds2i pixelBounds =
+            metadata.pixelBounds.value_or(Bounds2i({0, 0}, img->resolution));
         if (sort) {
             std::vector<std::tuple<int, int, std::array<Float, 3>>> sorted;
-            sorted.reserve(img->resolution.x * img->resolution.y);
-            for (int y = 0; y < img->resolution.y; ++y)
-                for (int x = 0; x < img->resolution.x; ++x) {
-                    Spectrum s = img->GetSpectrum({x, y});
-                    std::array<Float, 3> rgb = s.ToRGB();
-                    sorted.push_back(std::make_tuple(x, y, rgb));
-                }
+            sorted.reserve(pixelBounds.Area());
+            for (Point2i p : pixelBounds) {
+                Spectrum s = img->GetSpectrum({p.x - pixelBounds.pMin.x,
+                            p.y - pixelBounds.pMin.y});
+                std::array<Float, 3> rgb = s.ToRGB();
+                sorted.push_back(std::make_tuple(p.x, p.y, rgb));
+            }
 
             std::sort(sorted.begin(), sorted.end(),
                       [](const std::tuple<int, int, std::array<Float, 3>> &a,
@@ -325,13 +328,12 @@ int cat(int argc, char *argv[]) {
                        std::get<1>(v), rgb[0], rgb[1], rgb[2]);
             }
         } else {
-            for (int y = 0; y < img->resolution.y; ++y) {
-                for (int x = 0; x < img->resolution.x; ++x) {
-                    Spectrum s = img->GetSpectrum({x, y});
-                    std::array<Float, 3> rgb = s.ToRGB();
-                    printf("(%d, %d): (%.9g %.9g %.9g)\n", x, y, rgb[0], rgb[1],
-                           rgb[2]);
-                }
+            for (Point2i p : pixelBounds) {
+                Spectrum s = img->GetSpectrum({p.x - pixelBounds.pMin.x,
+                            p.y - pixelBounds.pMin.y});
+                std::array<Float, 3> rgb = s.ToRGB();
+                printf("(%d, %d): (%.9g %.9g %.9g)\n", p.x, p.y, rgb[0], rgb[1],
+                       rgb[2]);
             }
         }
     }
