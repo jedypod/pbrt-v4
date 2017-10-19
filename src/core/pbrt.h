@@ -87,6 +87,7 @@ template <typename T>
 class Bounds2;
 template <typename T>
 class Bounds3;
+class AnimatedTransform;
 class Transform;
 class Interaction;
 class SurfaceInteraction;

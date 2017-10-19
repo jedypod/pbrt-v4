@@ -55,7 +55,7 @@ static int TerminalWidth();
 
 // ProgressReporter Method Definitions
 ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
-    : totalWork(std::max((int64_t)1, totalWork)),
+    : totalWork(std::max<int64_t>(1, totalWork)),
       title(title),
       startTime(std::chrono::system_clock::now()) {
     workDone = 0;
@@ -96,7 +96,7 @@ ProgressReporter::~ProgressReporter() {
 
 void ProgressReporter::PrintBar() {
     int barLength = TerminalWidth() - 28;
-    int totalPlusses = std::max(2, barLength - (int)title.size());
+    int totalPlusses = std::max<int>(2, barLength - title.size());
     int plussesPrinted = 0;
 
     // Initialize progress string
@@ -144,8 +144,7 @@ void ProgressReporter::PrintBar() {
         if (percentDone == 1.f)
             printf(" (%.1fs)       ", seconds);
         else if (!std::isinf(estRemaining))
-            printf(" (%.1fs|%.1fs)  ", seconds,
-                   std::max((Float)0., estRemaining));
+            printf(" (%.1fs|%.1fs)  ", seconds, std::max<Float>(0, estRemaining));
         else
             printf(" (%.1fs|?s)  ", seconds);
         fflush(stdout);

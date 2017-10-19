@@ -170,7 +170,7 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         if (!scene.Intersect(ray, &isect)) {
                             // Accumulate light contributions for ray with no
                             // intersection
-                            for (const auto &light : scene.lights)
+                            for (const auto &light : scene.infiniteLights)
                                 pixel.Ld += beta * light->Le(ray);
                             break;
                         }

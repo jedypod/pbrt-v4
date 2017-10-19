@@ -34,6 +34,7 @@ GFX!
     then always incorportate (and MIS) at intersections
 
 - move Light::Le() into infinitearealight only?
+  Light -> InfiniteLight -> InfiniteImageLight ?
 
 - implement filter importance sampling
 
@@ -61,8 +62,6 @@ GFX!
 
 - more mathutil tests..
 
-- sync / harmoize tests from gce to local
-
 - find places to use CHECK_RARE
 
 - feel like we want a separate Sampler instance for volume stuff. on very first
@@ -73,8 +72,6 @@ GFX!
   base/casts.h: bit_cast for float to bits sort of stuff
   container/inlined_vector.h: InlinedVector, in particular for
     Distribution1D stuff
-
-- Improved CoordinateSystem from jcgt papers?
 
 - rename GonioPhotometricLight -> GoniometricLight?
 
