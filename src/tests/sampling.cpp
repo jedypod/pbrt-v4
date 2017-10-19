@@ -503,3 +503,25 @@ TEST(Sampling, SphericalTriangle) {
 
     EXPECT_LT(std::abs(areaInt - sphInt), 1e-3);
 }
+
+TEST(Sampling, Smoothstep) {
+    Float start = SampleSmoothstep(0, 10, 20);
+    // Fairly high slop since lots of values close to the start are close
+    // to zero.
+    EXPECT_LT(std::abs(start - 10), .1) << start;
+
+    Float end = SampleSmoothstep(1, -10, -5);
+    EXPECT_LT(std::abs(end - -5), 1e-5) << end;
+
+    Float mid = SampleSmoothstep(0.5, 0, 1);
+    // Solved this numericalla in Mathematica.
+    EXPECT_LT(std::abs(mid - 0.733615), 1e-5) << mid;
+
+    RNG rng;
+    for (int i = 0; i < 100; ++i) {
+        Float x = SampleSmoothstep(rng.UniformFloat(), -3, 5);
+        Float ratio = Smoothstep(x, -3, 5) / SmoothstepPdf(x, -3, 5);
+        // Smoothstep over [-3,5] integrates to 4.
+        EXPECT_LT(std::abs(ratio - 4), 1e-5) << ratio;
+    }
+}

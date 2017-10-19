@@ -485,6 +485,12 @@ Float NewtonBisection(
     return NewtonBisection(Float(x0), Float(x1), f, xEps, fEps);
 }
 
+inline Float Smoothstep(Float x, Float a, Float b) {
+    CHECK_LT(a, b);
+    Float t = Clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+}
+
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_MATHUTIL_H

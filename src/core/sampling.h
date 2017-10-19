@@ -211,6 +211,9 @@ inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
 int SampleDiscrete(absl::Span<const Float> weights, Float u,
                    Float *pdf = nullptr, Float *uRemapped = nullptr);
 
+Float SampleSmoothstep(Float u, Float start, Float end);
+Float SmoothstepPdf(Float x, Float start, Float end);
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H
