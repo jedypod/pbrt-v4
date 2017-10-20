@@ -52,27 +52,6 @@ SpotLight::SpotLight(const Transform &LightToWorld,
       cosFalloffEnd(std::cos(Radians(totalWidth))),
       cosFalloffStart(std::cos(Radians(falloffStart))) {
     CHECK_LE(falloffStart, totalWidth);
-
-    // Compute coefficients for CDF polynomial
-    // cdf[t] = c0 + c1 Cos[t] + c2 Cos[t]^2 + ...
-    c[0] = (1280 * Pow<3>(cosFalloffEnd) * Pow<2>(cosFalloffStart) -
-            40 * (17 + 2 * (-1 + 2 * Pow<2>(cosFalloffEnd))) *
-                Pow<3>(cosFalloffStart) +
-            640 * cosFalloffEnd * Pow<4>(cosFalloffStart) -
-            88 * Pow<5>(cosFalloffStart) -
-            5 * cosFalloffStart *
-                (-74 + 240 * Pow<2>(cosFalloffEnd) +
-                 16 * (-1 + 2 * Pow<2>(-1 + 2 * Pow<2>(cosFalloffEnd))) +
-                 56 * (-1 + 2 * Pow<2>(cosFalloffEnd)) *
-                     (-1 + 2 * Pow<2>(cosFalloffStart)) +
-                 2 * Pow<2>(-1 + 2 * Pow<2>(cosFalloffStart)))) /
-           (128. * Pow<5>(cosFalloffEnd - cosFalloffStart));
-    c[1] = 5 * Pow<4>(cosFalloffEnd) / Pow<5>(cosFalloffEnd - cosFalloffStart);
-    c[2] =
-        -10 * Pow<3>(cosFalloffEnd) / Pow<5>(cosFalloffEnd - cosFalloffStart);
-    c[3] = 10 * Pow<2>(cosFalloffEnd) / Pow<5>(cosFalloffEnd - cosFalloffStart);
-    c[4] = -5 * cosFalloffEnd / Pow<5>(cosFalloffEnd - cosFalloffStart);
-    c[5] = 1 / Pow<5>(cosFalloffEnd - cosFalloffStart);
 }
 
 Spectrum SpotLight::Sample_Li(const Interaction &ref, const Point2f &u,
@@ -80,7 +59,7 @@ Spectrum SpotLight::Sample_Li(const Interaction &ref, const Point2f &u,
                               VisibilityTester *vis) const {
     ProfilePhase _(Prof::LightSample);
     *wi = Normalize(pLight - ref.p);
-    *pdf = 1.f;
+    *pdf = 1;
     *vis =
         VisibilityTester(ref, Interaction(pLight, ref.time, mediumInterface));
     return I * Falloff(-*wi) / DistanceSquared(pLight, ref.p);
@@ -88,21 +67,19 @@ Spectrum SpotLight::Sample_Li(const Interaction &ref, const Point2f &u,
 
 Float SpotLight::Falloff(const Vector3f &w) const {
     Vector3f wl = Normalize(WorldToLight(w));
-    Float cosTheta = wl.z;
-    if (cosTheta < cosFalloffEnd) return 0;
+    Float cosTheta = wl.z;  // CosTheta(wl);
     if (cosTheta >= cosFalloffStart) return 1;
     // Compute falloff inside spotlight cone
-    Float delta =
-        (cosTheta - cosFalloffEnd) / (cosFalloffStart - cosFalloffEnd);
-    return Pow<4>(delta);
+    return Smoothstep(cosTheta, cosFalloffEnd, cosFalloffStart);
 }
 
 Spectrum SpotLight::Phi() const {
     // int_0^start sin theta dtheta = 1 - cosFalloffStart
-    // int_start^end [(cos theta - cos end) / (cos start - cos end)]^4
-    //      sin theta dtheta = (cos start - cos end) / 5 (!!!!!)
-    return I * 2 * Pi *
-           ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 5);
+    // See notes/sample-spotlight.nb for the falloff part:
+    // int_start^end smoothstep(cost, end, start) sin theta dtheta =
+    //  (cosStart - cosEnd) / 2
+    return I * 2 * Pi * ((1 - cosFalloffStart) +
+                         (cosFalloffStart - cosFalloffEnd) / 2);
 }
 
 Float SpotLight::Pdf_Li(const Interaction &, const Vector3f &) const {
@@ -114,7 +91,7 @@ Spectrum SpotLight::Sample_Le(const Point2f &u1, const Point2f &u2, Float time,
                               Float *pdfDir) const {
     ProfilePhase _(Prof::LightSample);
     // Unnormalized probabilities of sampling each part.
-    Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 5};
+    Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 2};
     Float sectionPdf;
     Vector3f w;
     int section = SampleDiscrete(p, u2[0], &sectionPdf);
@@ -124,27 +101,15 @@ Spectrum SpotLight::Sample_Le(const Point2f &u1, const Point2f &u2, Float time,
         *pdfDir = sectionPdf * UniformConePdf(cosFalloffStart);
     } else {
         DCHECK_EQ(1, section);
-        // Sample the falloff region
-        // See notes/sample-spotlight.nb
 
-        // Want to solve u1[0] = cdf[t] for Cos[t], or
-        // CDF(theta) - u1[0] = 0.
-        auto CDFZero = [=](Float cosTheta) -> std::pair<Float, Float> {
-            return std::make_pair(-u1[0] +
-                c[0] + c[1] * cosTheta + c[2] * Pow<2>(cosTheta) +
-                    c[3] * Pow<3>(cosTheta) + c[4] * Pow<4>(cosTheta) +
-                    c[5] * Pow<5>(cosTheta),
-                c[1] + 2 * c[2] * cosTheta + 3 * c[3] * Pow<2>(cosTheta) +
-                    4 * c[4] * Pow<3>(cosTheta) + 5 * c[5] * Pow<4>(cosTheta));
-        };
-
-        Float cosTheta =
-            NewtonBisection(cosFalloffEnd, cosFalloffStart, CDFZero);
+        Float cosTheta = SampleSmoothstep(u1[0], cosFalloffEnd,
+                                          cosFalloffStart);
+        CHECK(cosTheta >= cosFalloffEnd && cosTheta <= cosFalloffStart);
         Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         Float phi = u1[1] * 2 * Pi;
         w = SphericalDirection(sinTheta, cosTheta, phi);
-        *pdfDir = sectionPdf * 5 * Pow<4>(cosTheta - cosFalloffEnd) /
-                  (2 * Pi * Pow<5>(cosFalloffStart - cosFalloffEnd));
+        *pdfDir = sectionPdf * SmoothstepPdf(cosTheta, cosFalloffEnd,
+                                             cosFalloffStart) / (2 * Pi);
     }
 
     *ray = Ray(pLight, LightToWorld(w), Infinity, time, mediumInterface.inside);
@@ -159,15 +124,14 @@ void SpotLight::Pdf_Le(const Ray &ray, const Normal3f &, Float *pdfPos,
     *pdfPos = 0;
 
     // Unnormalized probabilities of sampling each part.
-    Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 5};
+    Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 2};
 
     Float cosTheta = CosTheta(WorldToLight(ray.d));
     if (cosTheta >= cosFalloffStart)
         *pdfDir = UniformConePdf(cosFalloffStart) * p[0] / (p[0] + p[1]);
     else
-        *pdfDir = 5 * Pow<4>(cosTheta - cosFalloffEnd) /
-                  (2 * Pi * Pow<5>(cosFalloffStart - cosFalloffEnd)) *
-                  (p[1] / (p[0] + p[1]));
+        *pdfDir = SmoothstepPdf(cosTheta, cosFalloffEnd, cosFalloffStart) /
+            (2 * Pi) * (p[1] / (p[0] + p[1]));
 }
 
 std::shared_ptr<SpotLight> CreateSpotLight(
