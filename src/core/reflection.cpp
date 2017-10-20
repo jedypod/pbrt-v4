@@ -329,7 +329,7 @@ Spectrum FourierBSDF::f(const Vector3f &wo, const Vector3f &wi) const {
             Float weight = weightsI[a] * weightsO[b];
             if (weight != 0) {
                 int m;
-                const Float *ap = bsdfTable.GetAk(offsetI + a, offsetO + b, &m);
+                absl::Span<const Float> ap = bsdfTable.GetAk(offsetI + a, offsetO + b, &m);
                 mMax = std::max(mMax, m);
                 for (int c = 0; c < bsdfTable.nChannels; ++c)
                     for (int k = 0; k < m; ++k)
@@ -549,7 +549,7 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
             Float weight = weightsI[a] * weightsO[b];
             if (weight != 0) {
                 int m;
-                const Float *ap = bsdfTable.GetAk(offsetI + a, offsetO + b, &m);
+                absl::Span<const Float> ap = bsdfTable.GetAk(offsetI + a, offsetO + b, &m);
                 mMax = std::max(mMax, m);
                 for (int c = 0; c < bsdfTable.nChannels; ++c)
                     for (int k = 0; k < m; ++k)
@@ -619,11 +619,11 @@ Float FourierBSDF::Pdf(const Vector3f &wo, const Vector3f &wi) const {
             if (weight == 0) continue;
 
             int order;
-            const Float *coeffs =
+            absl::Span<const Float> coeffs =
                 bsdfTable.GetAk(offsetI + i, offsetO + o, &order);
             mMax = std::max(mMax, order);
 
-            for (int k = 0; k < order; ++k) ak[k] += *coeffs++ * weight;
+            for (int k = 0; k < order; ++k) ak[k] += coeffs[k] * weight;
         }
     }
 
