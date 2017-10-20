@@ -558,6 +558,13 @@ Spectrum FourierBSDF::Sample_f(const Vector3f &wo, Vector3f *wi,
         }
     }
 
+    if (mMax == 0) {
+        // The BSDF is zero for all directions wi for this wo.
+        // (e.g. because it's coming from the back side).
+        *pdf = 0;
+        return 0;
+    }
+
     // Importance sample the luminance Fourier expansion
     Float phi, pdfPhi;
     absl::Span<const Float> akSpan(ak);
