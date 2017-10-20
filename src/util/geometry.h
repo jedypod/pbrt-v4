@@ -539,6 +539,10 @@ inline Point3f OffsetRayOrigin(const Point3f &p, const Vector3f &pError,
 }
 
 inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta, Float phi) {
+    DCHECK(sinTheta >= -1.0001 && sinTheta <= 1.0001);
+    sinTheta = Clamp(sinTheta, -1, 1);
+    DCHECK(cosTheta >= -1.0001 && cosTheta <= 1.0001);
+    cosTheta = Clamp(cosTheta, -1, 1);
     return Vector3f(sinTheta * std::cos(phi), sinTheta * std::sin(phi),
                     cosTheta);
 }
@@ -546,6 +550,10 @@ inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta, Float phi) {
 inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta, Float phi,
                                    const Vector3f &x, const Vector3f &y,
                                    const Vector3f &z) {
+    DCHECK(sinTheta >= -1.0001 && sinTheta <= 1.0001);
+    sinTheta = Clamp(sinTheta, -1, 1);
+    DCHECK(cosTheta >= -1.0001 && cosTheta <= 1.0001);
+    cosTheta = Clamp(cosTheta, -1, 1);
     return sinTheta * std::cos(phi) * x + sinTheta * std::sin(phi) * y +
            cosTheta * z;
 }
