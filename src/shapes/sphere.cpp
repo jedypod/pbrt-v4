@@ -268,10 +268,18 @@ Interaction Sphere::Sample(const Interaction &ref, const Point2f &u,
 
     // Compute angle $\alpha$ from center of sphere to sampled point on surface
     Float dc = Distance(ref.p, pCenter);
-    Float ds = dc * cosTheta -
-               SafeSqrt(radius * radius - dc * dc * sinTheta * sinTheta);
-    Float cosAlpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
-    Float sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
+    Float dsExtra2 = radius * radius - dc * dc * sinTheta * sinTheta;
+    Float sinAlpha, cosAlpha;
+    if (dsExtra2 < 0) {
+        // Very far away / sphere subtends a very small solid angle; just
+        // sample the center of the visible cap.
+        sinAlpha = 0;
+        cosAlpha = 1;
+    } else {
+        Float ds = dc * cosTheta - std::sqrt(dsExtra2);
+        cosAlpha = (dc * dc + radius * radius - ds * ds) / (2 * dc * radius);
+        sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
+    }
 
     // Compute surface normal and sampled point on sphere
     Vector3f nWorld =
