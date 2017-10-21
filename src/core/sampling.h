@@ -62,6 +62,8 @@ void StratifiedSample2D(absl::Span<Point2f> samples, int nx, int ny,
                         RNG &rng, bool jitter = true);
 void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng);
 
+enum class Norm { L1, L2, LInfinity };
+
 class Distribution1D {
  public:
     // Distribution1D Public Methods
@@ -84,6 +86,9 @@ class Distribution1D {
             for (size_t i = 1; i < n + 1; ++i) cdf[i] /= funcInt;
         }
     }
+    static Distribution1D SampleFunction(std::function<Float(Float)> f,
+                                         int nSteps, int nSamples,
+                                         Norm norm = Norm::LInfinity);
     int Count() const { return (int)func.size(); }
     Float SampleContinuous(Float u, Float *pdf, int *off = nullptr) const {
         // Find surrounding CDF segments and _offset_
@@ -143,8 +148,6 @@ std::array<Float, 3> UniformSampleTriangle(const Point2f &u);
 std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
                                              const Point3f &p, const Point2f &u,
                                              Float *pdf);
-
-enum class Norm { L1, L2, LInfinity };
 
 class Distribution2D {
   public:

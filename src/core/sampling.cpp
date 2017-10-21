@@ -172,6 +172,39 @@ std::array<Float, 3> UniformSampleTriangle(const Point2f &u) {
     return b;
 }
 
+Distribution1D Distribution1D::SampleFunction(std::function<Float(Float)> f,
+                                              int nSteps, int nSamples,
+                                              Norm norm) {
+    std::vector<Float> values(nSteps, Float(0));
+    for (int i = 0; i < nSteps; ++i) {
+        double accum = 0;
+        // One extra so that we sample at the very start and the very end.
+        for (int j = 0; j < nSamples + 1; ++j) {
+            Float delta = Float(j) / nSamples;
+            Float v = (i + delta) / Float(nSteps);
+            Float fv = std::abs(f(v));
+            switch (norm) {
+            case Norm::L1:
+                accum += fv;
+                break;
+            case Norm::L2:
+                accum += fv * fv;
+                break;
+            case Norm::LInfinity:
+                accum = std::max<double>(accum, fv);
+                break;
+            default:
+                LOG(FATAL) << "Unhandled norm";
+            }
+        }
+        // There's actually no need for the divide by nSamples, since
+        // these are normalzed into a PDF anyway.
+        if (norm == Norm::L2) accum = std::sqrt(accum);
+        values[i] = accum;
+    }
+    return Distribution1D(values);
+}
+
 void Distribution1D::TestCompareDistributions(const Distribution1D &da,
                                               const Distribution1D &db,
                                               Float eps) {

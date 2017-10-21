@@ -387,6 +387,57 @@ TEST(Distribution1D, Continuous) {
     EXPECT_FLOAT_EQ(1., dist.SampleContinuous(1., &pdf));
 }
 
+TEST(Distribution1D, FromFuncL1) {
+    auto f = [](Float v) { return v * v; };
+    Distribution1D dSampled = Distribution1D::SampleFunction(f, 8, 1024*1024, Norm::L1);
+
+    std::vector<Float> exact = { Float(0.00195313),
+                                 Float(0.0136719),
+                                 Float(0.0371094),
+                                 Float(0.0722656),
+                                 Float(0.119141),
+                                 Float(0.177734),
+                                 Float(0.248047),
+                                 Float(0.330078) };
+    Distribution1D dExact(exact);
+    Distribution1D::TestCompareDistributions(dSampled, dExact);
+}
+
+TEST(Distribution1D, FromFuncL2) {
+    auto f = [](Float v) { return v * v; };
+    Distribution1D dSampled = Distribution1D::SampleFunction(f, 8, 1024*1024, Norm::L2);
+
+    std::vector<Float> exact = { Float(0.00552427),
+                                 Float(0.0307578),
+                                 Float(0.0802447),
+                                 Float(0.154383),
+                                 Float(0.253214),
+                                 Float(0.376746),
+                                 Float(0.52498),
+                                 Float(0.697919) };
+
+    Distribution1D dExact(exact);
+    Distribution1D::TestCompareDistributions(dSampled, dExact);
+}
+
+TEST(Distribution1D, FromFuncLInfinity) {
+    auto f = [](Float v) { return v * v; };
+    Distribution1D dSampled = Distribution1D::SampleFunction(f, 8, 1024*1024, Norm::LInfinity);
+
+    // pdf = 3v^2
+    std::vector<Float> exact = { 3 * f(1./8.),
+                                 3 * f(2./8.),
+                                 3 * f(3./8.),
+                                 3 * f(4./8.),
+                                 3 * f(5./8.),
+                                 3 * f(6./8.),
+                                 3 * f(7./8.),
+                                 3 * f(8./8.) };
+
+    Distribution1D dExact(exact);
+    Distribution1D::TestCompareDistributions(dSampled, dExact);
+}
+
 TEST(Distribution2D, FromFuncL1) {
     auto f = [](Point2f p) { return p[0] * p[0] * p[1]; }; // x^2 y
     Distribution2D dSampled = Distribution2D::SampleFunction(f, 4, 2, 1024*1024, Norm::L1);
