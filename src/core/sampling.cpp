@@ -434,9 +434,7 @@ Float SampleSmoothstep(Float u, Float start, Float end) {
         Float xp = (x - start) / (end - start);
         return { Pow<3>(xp) * (2 - xp) - u, SmoothstepPdf(x, start, end) };
     };
-    // Bump the endpoint down so that the CDF function is negative there
-    // and so that we bracket the root going into NewtonBisection().
-    return NewtonBisection(start - Float(.0001) * (end - start), end, cdfMinusU);
+    return NewtonBisection(start, end, cdfMinusU);
 }
 
 Float SmoothstepPdf(Float x, Float start, Float end) {

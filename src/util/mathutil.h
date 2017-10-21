@@ -452,11 +452,20 @@ FloatType NewtonBisection(
     typename std::enable_if<std::is_floating_point<FloatType>::value>::type * =
         nullptr) {
     CHECK_LT(x0, x1);
-    bool startIsNegative = f(x0).first < 0;
-    FloatType xMid = (x0 + x1) / 2;
+    Float fx0 = f(x0).first, fx1 = f(x1).first;
+    if (std::abs(fx0) < fEps) return x0;
+    if (std::abs(fx1) < fEps) return x1;
+    bool startIsNegative = fx0 < 0;
+    // Implicit line equation: (y-y0)/(y1-y0) = (x-x0)/(x1-x0).
+    // Solve for y = 0 to find x for starting point.
+    FloatType xMid = x0 + (x1 - x0) * -fx0 / (fx1 - fx0);
 
     while (true) {
-        DCHECK((f(x0).first < 0) ^ (f(x1).first < 0));
+        if (!(x0 < xMid && xMid < x1))
+            // Fall back to bisection.
+            xMid = (x0 + x1) / 2;
+
+        Float fx0 = f(x0).first, fx1 = f(x1).first;
         std::pair<FloatType, FloatType> fxMid = f(xMid);
         DCHECK(!isNaN(fxMid.first));
 
@@ -469,9 +478,6 @@ FloatType NewtonBisection(
 
         // Try a Newton step.
         xMid -= fxMid.first / fxMid.second;
-        if (!(x0 < xMid && xMid < x1))
-            // Fall back to bisection.
-            xMid = (x0 + x1) / 2;
     }
 }
 
