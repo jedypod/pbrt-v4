@@ -525,3 +525,26 @@ TEST(Sampling, Smoothstep) {
         EXPECT_LT(std::abs(ratio - 4), 1e-5) << ratio;
     }
 }
+
+TEST(Sampling, Linear) {
+    int nBuckets = 32;
+    std::vector<int> buckets(nBuckets, 0);
+
+    int ranges[][2] = { { 0, 1 }, { 1, 2 }, {5, 50}, {100, 0}, {75, 50} };
+    for (const auto r : ranges) {
+        Float f0 = r[0], f1 = r[1];
+        int nSamples = 1000000;
+        for (int i = 0; i < nSamples; ++i) {
+            Float u = (i + .5) / nSamples;
+            Float t = SampleLinear(u, f0, f1);
+            ++buckets[std::min<int>(t * nBuckets, nBuckets - 1)];
+        }
+
+        for (int i = 0; i < nBuckets; ++i) {
+            int expected = Lerp(Float(i) / (nBuckets - 1), buckets[0],
+                                buckets[nBuckets-1]);
+            EXPECT_GE(buckets[i], .99 * expected);
+            EXPECT_LE(buckets[i], 1.01 * expected);
+        }
+    }
+}

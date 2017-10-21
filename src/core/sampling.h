@@ -214,6 +214,10 @@ int SampleDiscrete(absl::Span<const Float> weights, Float u,
 Float SampleSmoothstep(Float u, Float start, Float end);
 Float SmoothstepPdf(Float x, Float start, Float end);
 
+// Sample ~Lerp(x, a, b). Returned value in [0,1]
+Float SampleLinear(Float u, Float a, Float b);
+Float LinearPdf(Float x, Float a, Float b);
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H

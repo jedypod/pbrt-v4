@@ -411,4 +411,17 @@ Float SmoothstepPdf(Float x, Float start, Float end) {
     return (2 / (end - start)) * Smoothstep(x, start, end);
 }
 
+Float SampleLinear(Float u, Float a, Float b) {
+    CHECK(a >= 0 && b >= 0);
+    if (a == b) return u;
+    Float x = (a - std::sqrt(Lerp(u, Sqr(a), Sqr(b)))) / (a - b);
+    return Clamp(x, 0, 1);
+}
+
+Float LinearPdf(Float x, Float a, Float b) {
+    CHECK(a >= 0 && b >= 0);
+    CHECK(x >= 0 && x <= 1);
+    return Lerp(x, a, b) / ((a + b) / 2);
+}
+
 }  // namespace pbrt
