@@ -136,41 +136,16 @@ Float SampleCatmullRom(absl::Span<const Float> x, absl::Span<const Float> f,
     u = (u - F[i]) / width;
 
     // Invert definite integral over spline segment and return solution
-
-    // Set initial guess for $t$ by importance sampling a linear interpolant
-    Float t;
-    if (f0 != f1)
-        t = (f0 - SafeSqrt(f0 * f0 + 2 * u * (f1 - f0))) /
-            (f0 - f1);
-    else
-        t = u / f0;
-    Float a = 0, b = 1, Fhat, fhat;
-    while (true) {
-        // Fall back to a bisection step when _t_ is out of bounds
-        if (!(t > a && t < b)) t = 0.5f * (a + b);
-
-        // Evaluate target function and its derivative in Horner form
-        Fhat = t * (f0 +
-                    t * (.5f * d0 +
-                         t * ((1.f / 3.f) * (-2 * d0 - d1) + f1 - f0 +
-                              t * (.25f * (d0 + d1) + .5f * (f0 - f1)))));
-        fhat = f0 +
-               t * (d0 +
-                    t * (-2 * d0 - d1 + 3 * (f1 - f0) +
-                         t * (d0 + d1 + 2 * (f0 - f1))));
-
-        // Stop the iteration if converged
-        if (std::abs(Fhat - u) < 1e-6f || b - a < 1e-6f) break;
-
-        // Update bisection bounds using updated _t_
-        if (Fhat - u < 0)
-            a = t;
-        else
-            b = t;
-
-        // Perform a Newton step
-        t -= (Fhat - u) / fhat;
-    }
+    Float Fhat, fhat;
+    auto eval = [&](Float t) -> std::pair<Float, Float> {
+        Fhat = EvaluatePolynomial(t, 0, f0, .5f * d0,
+                                  (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
+                                  .25f * (d0 + d1) + .5f * (f0 - f1));
+        fhat = EvaluatePolynomial(t, f0, d0, -2 * d0 - d1 + 3 * (f1 - f0),
+                                  d0 + d1 + 2 * (f0 - f1));
+        return {Fhat - u, fhat};
+    };
+    Float t = NewtonBisection(0, 1, eval);
 
     // Return the sample position and function value
     if (fval) *fval = fhat;
@@ -225,39 +200,16 @@ Float SampleCatmullRom2D(absl::Span<const Float> nodes1, absl::Span<const Float>
     // Invert definite integral over spline segment and return solution
 
     // Set initial guess for $t$ by importance sampling a linear interpolant
-    Float t;
-    if (f0 != f1)
-        t = (f0 - SafeSqrt(f0 * f0 + 2 * u * (f1 - f0))) /
-            (f0 - f1);
-    else
-        t = u / f0;
-    Float a = 0, b = 1, Fhat, fhat;
-    while (true) {
-        // Fall back to a bisection step when _t_ is out of bounds
-        if (!(t >= a && t <= b)) t = 0.5f * (a + b);
-
-        // Evaluate target function and its derivative in Horner form
-        Fhat = t * (f0 +
-                    t * (.5f * d0 +
-                         t * ((1.f / 3.f) * (-2 * d0 - d1) + f1 - f0 +
-                              t * (.25f * (d0 + d1) + .5f * (f0 - f1)))));
-        fhat = f0 +
-               t * (d0 +
-                    t * (-2 * d0 - d1 + 3 * (f1 - f0) +
-                         t * (d0 + d1 + 2 * (f0 - f1))));
-
-        // Stop the iteration if converged
-        if (std::abs(Fhat - u) < 1e-6f || b - a < 1e-6f) break;
-
-        // Update bisection bounds using updated _t_
-        if (Fhat - u < 0)
-            a = t;
-        else
-            b = t;
-
-        // Perform a Newton step
-        t -= (Fhat - u) / fhat;
-    }
+    Float Fhat, fhat;
+    auto eval = [&](Float t) -> std::pair<Float, Float> {
+        Fhat = EvaluatePolynomial(t, 0, f0, .5f * d0,
+                                  (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
+                                  .25f * (d0 + d1) + .5f * (f0 - f1));
+        fhat = EvaluatePolynomial(t, f0, d0, -2 * d0 - d1 + 3 * (f1 - f0),
+                                  d0 + d1 + 2 * (f0 - f1));
+        return {Fhat - u, fhat};
+    };
+    Float t = NewtonBisection(0, 1, eval);
 
     // Return the sample position and function value
     if (fval) *fval = fhat;
@@ -320,36 +272,20 @@ Float InvertCatmullRom(absl::Span<const Float> x, absl::Span<const Float> values
     else
         d1 = f1 - f0;
 
-    // Invert the spline interpolant using Newton-Bisection
-    Float a = 0, b = 1, t = .5f;
-    Float Fhat, fhat;
-    while (true) {
-        // Fall back to a bisection step when _t_ is out of bounds
-        if (!(t > a && t < b)) t = 0.5f * (a + b);
-
+    auto eval = [&](Float t) -> std::pair<Float, Float> {
         // Compute powers of _t_
         Float t2 = t * t, t3 = t2 * t;
 
         // Set _Fhat_ using Equation (8.27)
-        Fhat = (2 * t3 - 3 * t2 + 1) * f0 + (-2 * t3 + 3 * t2) * f1 +
+        Float Fhat = (2 * t3 - 3 * t2 + 1) * f0 + (-2 * t3 + 3 * t2) * f1 +
                (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
-
         // Set _fhat_ using Equation (not present)
-        fhat = (6 * t2 - 6 * t) * f0 + (-6 * t2 + 6 * t) * f1 +
+        Float fhat = (6 * t2 - 6 * t) * f0 + (-6 * t2 + 6 * t) * f1 +
                (3 * t2 - 4 * t + 1) * d0 + (3 * t2 - 2 * t) * d1;
+        return {Fhat - u, fhat};
+    };
+    Float t = NewtonBisection(0, 1, eval);
 
-        // Stop the iteration if converged
-        if (std::abs(Fhat - u) < 1e-6f || b - a < 1e-6f) break;
-
-        // Update bisection bounds using updated _t_
-        if (Fhat - u < 0)
-            a = t;
-        else
-            b = t;
-
-        // Perform a Newton step
-        t -= (Fhat - u) / fhat;
-    }
     return x0 + t * width;
 }
 
