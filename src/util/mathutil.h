@@ -491,6 +491,16 @@ Float NewtonBisection(
     return NewtonBisection(Float(x0), Float(x1), f, xEps, fEps);
 }
 
+template <typename Float, typename C>
+inline constexpr Float EvaluatePolynomial(Float t, C c) {
+    return c;
+}
+
+template <typename Float, typename C, typename ...Args>
+inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRemaining) {
+    return c + t * EvaluatePolynomial(t, cRemaining...);
+}
+
 inline Float Smoothstep(Float x, Float a, Float b) {
     CHECK_LT(a, b);
     Float t = Clamp((x - a) / (b - a), 0, 1);

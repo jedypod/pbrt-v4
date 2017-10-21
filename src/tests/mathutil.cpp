@@ -87,3 +87,11 @@ TEST(Math, NewtonBisection) {
     // Expect to come closer via double precision and tighter tolerances
     EXPECT_LT(std::abs(fd(dzero).first), 1e-10);
 }
+
+TEST(Math, EvaluatePolynomial) {
+    EXPECT_EQ(4, EvaluatePolynomial(100, 4));
+    EXPECT_EQ(10, EvaluatePolynomial(2, 4, 3));
+
+    EXPECT_EQ(1.5 + 2.75 * .5 - 4.25 * Pow<2>(.5) + 15.125 * Pow<3>(.5),
+              EvaluatePolynomial(.5, 1.5, 2.75, -4.25, 15.125));
+}
