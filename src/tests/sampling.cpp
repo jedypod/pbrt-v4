@@ -1,9 +1,8 @@
 
 #include "tests/gtest/gtest.h"
-#include <stdint.h>
-#include <algorithm>
-#include <iterator>
+
 #include "pbrt.h"
+#include "util/interpolation.h"
 #include "util/rng.h"
 #include "sampling.h"
 #include "lowdiscrepancy.h"
@@ -13,6 +12,10 @@
 #include "samplers/sobol.h"
 #include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
+
+#include <stdint.h>
+#include <algorithm>
+#include <iterator>
 
 using namespace pbrt;
 
@@ -575,6 +578,22 @@ TEST(Sampling, Smoothstep) {
         // Smoothstep over [-3,5] integrates to 4.
         EXPECT_LT(std::abs(ratio - 4), 1e-5) << ratio;
     }
+
+    auto ss = [](Float v) { return Smoothstep(v, 0, 1); };
+    Distribution1D distrib =
+        Distribution1D::SampleFunction(ss, 1024, 64*1024, Norm::L1);
+    for (int i = 0; i < 100; ++i) {
+        Float u = rng.UniformFloat();
+        Float cx = SampleSmoothstep(u, 0, 1);
+        Float cp = SmoothstepPdf(cx, 0, 1);
+
+        Float dp;
+        Float dx = distrib.SampleContinuous(u, &dp);
+        EXPECT_LT(std::abs(cx - dx), 3e-3) << "Closed form = " << cx <<
+            ", distrib = " << dx;
+        EXPECT_LT(std::abs(cp - dp), 3e-3) << "Closed form PDF = " << cp <<
+            ", distrib PDF = " << dp;
+    }
 }
 
 TEST(Sampling, Linear) {
@@ -597,5 +616,47 @@ TEST(Sampling, Linear) {
             EXPECT_GE(buckets[i], .99 * expected);
             EXPECT_LE(buckets[i], 1.01 * expected);
         }
+    }
+
+    RNG rng;
+    auto lin = [](Float v) { return 1 + 3 * v; };
+    Distribution1D distrib =
+        Distribution1D::SampleFunction(lin, 1024, 64*1024, Norm::L1);
+    for (int i = 0; i < 100; ++i) {
+        Float u = rng.UniformFloat();
+        Float cx = SampleLinear(u, 1, 4);
+        Float cp = LinearPdf(cx, 1, 4);
+
+        Float dp;
+        Float dx = distrib.SampleContinuous(u, &dp);
+        EXPECT_LT(std::abs(cx - dx), 3e-3) << "Closed form = " << cx <<
+            ", distrib = " << dx;
+        EXPECT_LT(std::abs(cp - dp), 3e-3) << "Closed form PDF = " << cp <<
+            ", distrib PDF = " << dp;
+    }
+}
+
+TEST(Sampling, CatmullRom) {
+    std::vector<Float> nodes = { Float(0), Float(.1), Float(.4), Float(.88), Float(1) };
+    std::vector<Float> values = { Float(0), Float(5), Float(2), Float(10), Float(5) };
+    std::vector<Float> cdf(values.size());
+
+    IntegrateCatmullRom(nodes, values, absl::Span<Float>(cdf));
+
+    RNG rng;
+    auto cr = [&](Float v) { return CatmullRom(nodes, values, v); };
+    Distribution1D distrib =
+        Distribution1D::SampleFunction(cr, 8192, 1024, Norm::L1);
+    for (int i = 0; i < 100; ++i) {
+        Float u = rng.UniformFloat();
+        Float cp;
+        Float cx = SampleCatmullRom(nodes, values, cdf, u, nullptr, &cp);
+
+        Float dp;
+        Float dx = distrib.SampleContinuous(u, &dp);
+        EXPECT_LT(std::abs(cx - dx), 3e-3) << "Closed form = " << cx <<
+            ", distrib = " << dx;
+        EXPECT_LT(std::abs(cp - dp), 3e-3) << "Closed form PDF = " << cp <<
+            ", distrib PDF = " << dp;
     }
 }
