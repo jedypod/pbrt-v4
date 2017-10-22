@@ -297,19 +297,36 @@ inline double SafeSqrt(double x) {
 // Would be nice to allow Float to be a template type here, but it's tricky:
 // https://stackoverflow.com/questions/5101516/why-function-template-cannot-be-partially-specialized
 template <int n>
-inline constexpr Float Pow(Float v) {
+inline constexpr float Pow(float v) {
     static_assert(n > 0, "Power can't be negative");
-    Float n2 = Pow<n / 2>(v);
+    float n2 = Pow<n / 2>(v);
     return n2 * n2 * Pow<n & 1>(v);
 }
 
 template <>
-inline constexpr Float Pow<1>(Float v) {
+inline constexpr float Pow<1>(float v) {
     return v;
 }
 
 template <>
-inline constexpr Float Pow<0>(Float v) {
+inline constexpr float Pow<0>(float v) {
+    return 1;
+}
+
+template <int n>
+inline constexpr double Pow(double v) {
+    static_assert(n > 0, "Power can't be negative");
+    double n2 = Pow<n / 2>(v);
+    return n2 * n2 * Pow<n & 1>(v);
+}
+
+template <>
+inline constexpr double Pow<1>(double v) {
+    return v;
+}
+
+template <>
+inline constexpr double Pow<0>(double v) {
     return 1;
 }
 
