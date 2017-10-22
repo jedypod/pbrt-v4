@@ -455,4 +455,27 @@ Float LinearPdf(Float x, Float a, Float b) {
     return Lerp(x, a, b) / ((a + b) / 2);
 }
 
+Point2f SampleBilinear(Point2f u, absl::Span<const Float> v) {
+    CHECK_EQ(4, v.size());
+    Point2f p;
+    // First sample in the v dimension. Compute the endpoints of the line
+    // that's the average of the two lines at the edges at u=0 and u=1.
+    Float v0 = v[0] + v[1], v1 = v[2] + v[3];
+    // Sample along that line.
+    p[1] = SampleLinear(u[1], v0, v1);
+    // Now in sample in the u direction from the two line end points at the
+    // sampled v position.
+    p[0] = SampleLinear(u[0], Lerp(p[1], v[0], v[2]), Lerp(p[1], v[1], v[3]));
+    return p;
+}
+
+Float BilinearPdf(Point2f p, absl::Span<const Float> v) {
+    CHECK_EQ(4, v.size());
+    Float c = (v[0] + v[1] + v[2] + v[3]) / 4;
+    return (1 / c) * ((1 - p[0]) * (1 - p[1]) * v[0] +
+                           p[0]  * (1 - p[1]) * v[1] +
+                      (1 - p[0]) *      p[1]  * v[2] +
+                           p[0]  *      p[1]  * v[3]);
+}
+
 }  // namespace pbrt

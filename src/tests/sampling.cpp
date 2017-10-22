@@ -660,3 +660,31 @@ TEST(Sampling, CatmullRom) {
             ", distrib PDF = " << dp;
     }
 }
+
+TEST(Sampling, Bilinear) {
+    RNG rng;
+    Float quads[][4] = { { 0, .5, 1.3, 4.7 }, { 1, 1, 1, 1 }, { 11, .25, 1, 20 } };
+    for (const auto v : quads) {
+        auto bilerp = [&](Point2f p) {
+            return ((1-p[0])*(1-p[1]) * v[0] + p[0]*(1-p[1]) * v[1] +
+                    (1-p[0])*p[1] * v[2] + p[0]*p[1] * v[3]); };
+
+        Distribution2D distrib = Distribution2D::SampleFunction(bilerp, 1024, 1024, 16,
+                                                                Norm::L1);
+        for (int i = 0; i < 100; ++i) {
+            Point2f u{rng.UniformFloat(), rng.UniformFloat()};
+            Point2f pb = SampleBilinear(u, {v, 4});
+            Float bp = BilinearPdf(pb, {v, 4});
+
+            Float dp;
+            Point2f pd = distrib.SampleContinuous(u, &dp);
+            EXPECT_LT(std::abs(pb[0] - pd[0]), 3e-3) << "X: Closed form = " << pb[0] <<
+                ", distrib = " << pd[0];
+            EXPECT_LT(std::abs(pb[1] - pd[1]), 3e-3) << "Y: Closed form = " << pb[1] <<
+                ", distrib = " << pd[1];
+            EXPECT_LT(std::abs(bp - dp), 3e-3) << "Closed form PDF = " << bp <<
+                ", distrib PDF = " << dp;
+        }
+    }
+}
+

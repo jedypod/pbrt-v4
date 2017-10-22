@@ -221,6 +221,9 @@ Float SmoothstepPdf(Float x, Float start, Float end);
 Float SampleLinear(Float u, Float a, Float b);
 Float LinearPdf(Float x, Float a, Float b);
 
+Point2f SampleBilinear(Point2f u, absl::Span<const Float> v);
+Float BilinearPdf(Point2f p, absl::Span<const Float> v);
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H
