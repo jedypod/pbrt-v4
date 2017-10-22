@@ -253,10 +253,15 @@ static void TrowbridgeReitzSample11(Float cosTheta, Float U1, Float U2,
 
     // sample slope_x
     Float A = 2 * U1 / G1 - 1;
-    Float tmp = 1.f / (A * A - 1.f);
+    Float tmp = 1 / (A * A - 1);
     if (tmp > 1e10) tmp = 1e10;
     Float B = tanTheta;
-    Float D = SafeSqrt(B * B * tmp * tmp - (A * A - B * B) * tmp);
+    // I think this only happens with cosTheta close to 1 but not close enough
+    // for the special case at the start of the function to hit.
+    // TODO: can we eliminate the earlier check, catch the case here when
+    // we have a negative value, and then handle it as that case does?
+    CHECK_RARE(1e-7, B * B * tmp * tmp - (A * A - B * B) * tmp < -1e-3);
+    Float D = std::sqrt(std::max<Float>(0, B * B * tmp * tmp - (A * A - B * B) * tmp));
     Float slope_x_1 = B * tmp - D;
     Float slope_x_2 = B * tmp + D;
     *slope_x = (A < 0 || slope_x_2 > 1.f / tanTheta) ? slope_x_1 : slope_x_2;
