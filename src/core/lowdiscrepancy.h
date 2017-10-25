@@ -74,21 +74,6 @@ inline double SobolSampleDouble(int64_t index, int dimension,
                                 uint64_t scramble = 0);
 
 // Low Discrepancy Inline Functions
-inline uint32_t ReverseBits32(uint32_t n) {
-    n = (n << 16) | (n >> 16);
-    n = ((n & 0x00ff00ff) << 8) | ((n & 0xff00ff00) >> 8);
-    n = ((n & 0x0f0f0f0f) << 4) | ((n & 0xf0f0f0f0) >> 4);
-    n = ((n & 0x33333333) << 2) | ((n & 0xcccccccc) >> 2);
-    n = ((n & 0x55555555) << 1) | ((n & 0xaaaaaaaa) >> 1);
-    return n;
-}
-
-inline uint64_t ReverseBits64(uint64_t n) {
-    uint64_t n0 = ReverseBits32((uint32_t)n);
-    uint64_t n1 = ReverseBits32((uint32_t)(n >> 32));
-    return (n0 << 32) | n1;
-}
-
 template <int base>
 inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
     uint64_t index = 0;
@@ -117,8 +102,6 @@ inline Float SampleGeneratorMatrix(absl::Span<const uint32_t> C, uint32_t a,
                     OneMinusEpsilon);
 #endif
 }
-
-inline uint32_t GrayCode(uint32_t v) { return (v >> 1) ^ v; }
 
 inline void GrayCodeSample(absl::Span<const uint32_t> C, uint32_t scramble,
                            absl::Span<Float> p) {

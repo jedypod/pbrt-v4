@@ -71,7 +71,6 @@ GFX!
   all subsequent dimensions...
 
 - absl:
-  base/casts.h: bit_cast for float to bits sort of stuff
   container/inlined_vector.h: InlinedVector, in particular for
     Distribution1D stuff
 
@@ -118,8 +117,6 @@ GFX!
 
 - Scene::ForEachLight, Shape(bool expandInstances), Material, ... ?
 
-- more std::optional usage ...
-
 - std::string_view (in many places) (absl equivalent?)
 
 - time reported by profiling system vs progress reporter (and reported in
@@ -139,6 +136,17 @@ GFX!
 - api.cpp: Create* vs Make*, etc.
 
 - CreateConeShape -> Cone::Create (etc..)
+  acceelerators
+  cameras
+  itnegrators
+  lights
+  materials
+  media
+  samplers
+  shapes
+  textures
+
+- main/pbrt.cpp -> tools/pbrt.cpp
 
 - api / MakeFilter error handling (exit) is inconsistent with others...
   General API error handling review. Recover and use something, or fail
@@ -152,8 +160,6 @@ GFX!
   specular, does it make a difference if there's a transparent plane
   between the viewer and the light? why should it? consistency here is
   tricky...
-
-- need tests based on more interesting scenes in v3-scenes
 
 - params faceindices face_indices faceIndices
 
