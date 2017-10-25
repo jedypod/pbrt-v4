@@ -461,7 +461,7 @@ SET(ALL_PBRT_LIBS
 )
 
 # Main renderer
-ADD_EXECUTABLE ( pbrt_exe src/main/pbrt.cpp )
+ADD_EXECUTABLE ( pbrt_exe src/tools/pbrt.cpp )
 ADD_SANITIZERS ( pbrt_exe )
 TARGET_COMPILE_FEATURES ( pbrt_exe PRIVATE ${PBRT_CXX14_NEEDS} )
 SET_TARGET_PROPERTIES ( pbrt_exe PROPERTIES OUTPUT_NAME pbrt )

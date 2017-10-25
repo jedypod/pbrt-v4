@@ -135,17 +135,6 @@ GFX!
   
 - api.cpp: Create* vs Make*, etc.
 
-- CreateConeShape -> Cone::Create (etc..)
-  acceelerators
-  cameras
-  itnegrators
-  lights
-  materials
-  media
-  samplers
-  shapes
-  textures
-
 - main/pbrt.cpp -> tools/pbrt.cpp
 
 - api / MakeFilter error handling (exit) is inconsistent with others...
