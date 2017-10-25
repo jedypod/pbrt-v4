@@ -52,7 +52,7 @@ licensed under a slightly-modified Apache 2.0 license.
 
 #include <pbrt/core/bssrdf.h>
 #include <pbrt/core/interaction.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/core/microfacet.h>
 #include <pbrt/core/paramset.h>

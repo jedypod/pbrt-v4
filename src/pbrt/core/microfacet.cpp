@@ -33,7 +33,7 @@
 // core/microfacet.cpp*
 #include <pbrt/core/microfacet.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/reflection.h> // Frame stuff only
 #include <glog/logging.h>
 

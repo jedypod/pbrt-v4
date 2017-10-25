@@ -41,7 +41,7 @@
 // core/spectrum.h*
 #include <pbrt/core/pbrt.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/stringprint.h>
 #include <absl/types/span.h>
 #include <glog/logging.h>

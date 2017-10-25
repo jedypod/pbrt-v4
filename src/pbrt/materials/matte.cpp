@@ -36,7 +36,7 @@
 
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/interaction.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/core/paramset.h>
 #include <pbrt/core/reflection.h>

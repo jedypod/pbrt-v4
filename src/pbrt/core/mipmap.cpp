@@ -34,7 +34,7 @@
 
 #include <pbrt/core/error.h>
 #include <pbrt/util/fileutil.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/spectrum.h>
 #include <pbrt/util/stats.h>
 #include <glog/logging.h>

@@ -35,7 +35,7 @@
 #include <pbrt/core/texture.h>
 
 #include <pbrt/core/interaction.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 
 #include <algorithm>
 #include <cmath>

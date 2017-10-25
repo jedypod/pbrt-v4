@@ -1,5 +1,5 @@
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 
 namespace pbrt {
 

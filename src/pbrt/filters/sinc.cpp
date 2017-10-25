@@ -34,7 +34,7 @@
 // filters/sinc.cpp*
 #include <pbrt/filters/sinc.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/paramset.h>
 
 namespace pbrt {

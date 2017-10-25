@@ -43,7 +43,7 @@
 
 #include <pbrt/util/bounds.h>
 #include <pbrt/util/geometry.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/quaternion.h>
 
 #include <cmath>

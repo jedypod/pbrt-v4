@@ -43,7 +43,7 @@
 
 #include <pbrt/util/geometry.h>
 #include <pbrt/core/interaction.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/spectrum.h>
 #include <absl/types/span.h>
 

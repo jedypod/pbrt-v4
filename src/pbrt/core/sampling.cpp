@@ -35,7 +35,7 @@
 #include <pbrt/core/sampling.h>
 
 #include <pbrt/core/lowdiscrepancy.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/stats.h>
 #include <pbrt/util/transform.h>
 #include <gtest/gtest.h>

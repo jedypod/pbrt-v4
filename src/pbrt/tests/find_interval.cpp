@@ -1,7 +1,7 @@
 
 #include <gtest/gtest.h>
 #include <pbrt/core/pbrt.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <vector>
 
 using namespace pbrt;

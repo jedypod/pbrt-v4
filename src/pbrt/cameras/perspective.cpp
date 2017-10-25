@@ -39,7 +39,7 @@
 #include <pbrt/core/sampler.h>
 #include <pbrt/core/sampling.h>
 #include <pbrt/core/light.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {

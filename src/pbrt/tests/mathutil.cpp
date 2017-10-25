@@ -3,7 +3,7 @@
 #include <cmath>
 
 #include <pbrt/core/pbrt.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 
 using namespace pbrt;
 

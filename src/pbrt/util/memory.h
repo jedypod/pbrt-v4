@@ -41,7 +41,7 @@
 // core/memory.h*
 #include <pbrt/core/pbrt.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <absl/types/span.h>
 
 #include <cstddef>

@@ -41,7 +41,7 @@
 // filters/sinc.h*
 #include <pbrt/core/filter.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 
 #include <memory>
 

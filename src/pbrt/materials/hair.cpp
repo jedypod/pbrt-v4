@@ -42,7 +42,7 @@
 #include <pbrt/core/texture.h>
 #include <pbrt/textures/constant.h>
 #include <pbrt/util/bits.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 
 #include <array>

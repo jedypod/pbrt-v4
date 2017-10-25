@@ -37,7 +37,7 @@
 #include <pbrt/util/memory.h>
 #include <pbrt/core/interaction.h>
 #include <pbrt/util/interpolation.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/core/reflection.h>
 #include <pbrt/core/scene.h>

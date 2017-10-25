@@ -41,7 +41,7 @@
 // core/rng.h*
 #include <pbrt/core/pbrt.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <glog/logging.h>
 
 #include <algorithm>

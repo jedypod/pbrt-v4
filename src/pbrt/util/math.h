@@ -35,10 +35,10 @@
 #pragma once
 #endif
 
-#ifndef PBRT_UTIL_MATHUTIL_H
-#define PBRT_UTIL_MATHUTIL_H
+#ifndef PBRT_UTIL_MATH_H
+#define PBRT_UTIL_MATH_H
 
-// core/mathutil.h*
+// core/math.h*
 #include <pbrt/core/pbrt.h>
 
 #include <glog/logging.h>
@@ -562,4 +562,4 @@ inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
 
 }  // namespace pbrt
 
-#endif  // PBRT_UTIL_MATHUTIL_H
+#endif  // PBRT_UTIL_MATH_H

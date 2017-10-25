@@ -44,7 +44,7 @@
 #include <glog/logging.h>
 #include <pbrt/core/error.h>
 #include <pbrt/util/geometry.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 
 #include <memory>
 

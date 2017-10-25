@@ -33,7 +33,7 @@
 // core/interpolation.cpp*
 #include <pbrt/util/interpolation.h>
 
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <glog/logging.h>
 
 
