@@ -217,10 +217,10 @@ IF(BISON_FOUND AND FLEX_FOUND)
   SET(BisonOutput ${CMAKE_BINARY_DIR}/pbrtparse.cpp)
   ADD_CUSTOM_COMMAND(
     OUTPUT ${BisonOutput} ${CMAKE_BINARY_DIR}/pbrtparse.h
-    DEPENDS ${CMAKE_SOURCE_DIR}/src/core/pbrtparse.y
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/pbrt/core/pbrtparse.y
     COMMAND ${BISON_EXECUTABLE} -d -v -t
             --output=${CMAKE_BINARY_DIR}/pbrtparse.c
-            ${CMAKE_SOURCE_DIR}/src/core/pbrtparse.y
+            ${CMAKE_SOURCE_DIR}/src/pbrt/core/pbrtparse.y
     COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/pbrtparse.c ${CMAKE_BINARY_DIR}/pbrtparse.cpp
     COMMENT "Generating pbrtparse.cpp and pbrtparse.h"
   )
@@ -228,10 +228,10 @@ IF(BISON_FOUND AND FLEX_FOUND)
   SET(FlexOutput ${CMAKE_BINARY_DIR}/pbrtlex.cpp)
   ADD_CUSTOM_COMMAND(
     OUTPUT ${FlexOutput}
-    DEPENDS ${CMAKE_BINARY_DIR}/pbrtparse.h ${CMAKE_SOURCE_DIR}/src/core/pbrtlex.ll
+    DEPENDS ${CMAKE_BINARY_DIR}/pbrtparse.h ${CMAKE_SOURCE_DIR}/src/pbrt/core/pbrtlex.ll
     COMMAND ${FLEX_EXECUTABLE}
             -o${FlexOutput}
-            ${CMAKE_SOURCE_DIR}/src/core/pbrtlex.ll
+            ${CMAKE_SOURCE_DIR}/src/pbrt/core/pbrtlex.ll
     COMMENT "Generating pbrtlex.cpp"
   )
 
@@ -241,8 +241,8 @@ IF(BISON_FOUND AND FLEX_FOUND)
     )
 ELSE()
   SET ( PBRT_YACC_LEX_SOURCE
-    src/core/pbrtlex.cpp
-    src/core/pbrtparse.cpp
+    src/pbrt/core/pbrtlex.cpp
+    src/pbrt/core/pbrtparse.cpp
     )
 ENDIF()
 
@@ -333,84 +333,85 @@ INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
-  src/core/api.cpp
-  src/core/bssrdf.cpp
-  src/core/camera.cpp
-  src/core/error.cpp
-  src/core/film.cpp
-  src/core/filter.cpp
-  src/core/image.cpp
-  src/core/integrator.cpp
-  src/core/interaction.cpp
-  src/core/light.cpp
-  src/core/lightdistrib.cpp
-  src/core/lowdiscrepancy.cpp
-  src/core/material.cpp
-  src/core/medium.cpp
-  src/core/microfacet.cpp
-  src/core/mipmap.cpp
-  src/core/paramset.cpp
-  src/core/parser.cpp
-  src/core/primitive.cpp
-  src/core/reflection.cpp
-  src/core/sampler.cpp
-  src/core/sampling.cpp
-  src/core/scene.cpp
-  src/core/shape.cpp
-  src/core/sobolmatrices.cpp
-  src/core/spectrum.cpp
-  src/core/texcache.cpp
-  src/core/texture.cpp
+  src/pbrt/core/api.cpp
+  src/pbrt/core/bssrdf.cpp
+  src/pbrt/core/camera.cpp
+  src/pbrt/core/error.cpp
+  src/pbrt/core/film.cpp
+  src/pbrt/core/filter.cpp
+  src/pbrt/core/image.cpp
+  src/pbrt/core/integrator.cpp
+  src/pbrt/core/interaction.cpp
+  src/pbrt/core/light.cpp
+  src/pbrt/core/lightdistrib.cpp
+  src/pbrt/core/lowdiscrepancy.cpp
+  src/pbrt/core/material.cpp
+  src/pbrt/core/medium.cpp
+  src/pbrt/core/microfacet.cpp
+  src/pbrt/core/mipmap.cpp
+  src/pbrt/core/paramset.cpp
+  src/pbrt/core/parser.cpp
+  src/pbrt/core/primitive.cpp
+  src/pbrt/core/reflection.cpp
+  src/pbrt/core/sampler.cpp
+  src/pbrt/core/sampling.cpp
+  src/pbrt/core/scene.cpp
+  src/pbrt/core/shape.cpp
+  src/pbrt/core/sobolmatrices.cpp
+  src/pbrt/core/spectrum.cpp
+  src/pbrt/core/texcache.cpp
+  src/pbrt/core/texture.cpp
   )
 
 SET ( PBRT_CORE_HEADERS
-  src/core/api.h
-  src/core/bssrdf.h
-  src/core/camera.h
-  src/core/error.h
-  src/core/film.h
-  src/core/filter.h
-  src/core/integrator.h
-  src/core/interaction.h
-  src/core/light.h
-  src/core/lowdiscrepancy.h
-  src/core/material.h
-  src/core/medium.h
-  src/core/microfacet.h
-  src/core/mipmap.h
-  src/core/paramset.h
-  src/core/parser.h
-  src/core/pbrt.h
-  src/core/primitive.h
-  src/core/reflection.h
-  src/core/sampler.h
-  src/core/sampling.h
-  src/core/scene.h
-  src/core/shape.h
-  src/core/sobolmatrices.h
-  src/core/spectrum.h
-  src/core/texture.h
+  src/pbrt/core/api.h
+  src/pbrt/core/bssrdf.h
+  src/pbrt/core/camera.h
+  src/pbrt/core/error.h
+  src/pbrt/core/film.h
+  src/pbrt/core/filter.h
+  src/pbrt/core/integrator.h
+  src/pbrt/core/interaction.h
+  src/pbrt/core/light.h
+  src/pbrt/core/lowdiscrepancy.h
+  src/pbrt/core/material.h
+  src/pbrt/core/medium.h
+  src/pbrt/core/microfacet.h
+  src/pbrt/core/mipmap.h
+  src/pbrt/core/paramset.h
+  src/pbrt/core/parser.h
+  src/pbrt/core/pbrt.h
+  src/pbrt/core/primitive.h
+  src/pbrt/core/reflection.h
+  src/pbrt/core/sampler.h
+  src/pbrt/core/sampling.h
+  src/pbrt/core/scene.h
+  src/pbrt/core/shape.h
+  src/pbrt/core/sobolmatrices.h
+  src/pbrt/core/spectrum.h
+  src/pbrt/core/texture.h
   )
 
 FILE ( GLOB PBRT_SOURCE
-  src/accelerators/*.cpp
-  src/cameras/*.cpp
+  src/pbrt/accelerators/*.cpp
+  src/pbrt/cameras/*.cpp
+  src/pbrt/filters/*.cpp
+  src/pbrt/integrators/*.cpp
+  src/pbrt/lights/*.cpp
+  src/pbrt/materials/*.cpp
+  src/pbrt/media/*.cpp
+  src/pbrt/samplers/*.cpp
+  src/pbrt/shapes/*.cpp
+  src/pbrt/textures/*.cpp
+  src/pbrt/util/*.cpp
+
   src/ext/*.c
   src/ext/*.cpp
-  src/filters/*.cpp
-  src/integrators/*.cpp
-  src/lights/*.cpp
-  src/materials/*.cpp
-  src/media/*.cpp
-  src/samplers/*.cpp
-  src/shapes/*.cpp
-  src/textures/*.cpp
-  src/util/*.cpp
-  src/tests/gtest/*.cc
+  src/ext/gtest/*.cc
   )
 
 INCLUDE_DIRECTORIES ( src )
-INCLUDE_DIRECTORIES ( src/core )
+INCLUDE_DIRECTORIES ( src/ext )
 
 ###########################################################################
 # pbrt libraries and executables
@@ -461,35 +462,35 @@ SET(ALL_PBRT_LIBS
 )
 
 # Main renderer
-ADD_EXECUTABLE ( pbrt_exe src/tools/pbrt.cpp )
+ADD_EXECUTABLE ( pbrt_exe src/pbrt/cmd/pbrt.cpp )
 ADD_SANITIZERS ( pbrt_exe )
 TARGET_COMPILE_FEATURES ( pbrt_exe PRIVATE ${PBRT_CXX14_NEEDS} )
 SET_TARGET_PROPERTIES ( pbrt_exe PROPERTIES OUTPUT_NAME pbrt )
 TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} )
 
 # Tools
-ADD_EXECUTABLE ( bsdftest src/tools/bsdftest.cpp )
+ADD_EXECUTABLE ( bsdftest src/pbrt/cmd/bsdftest.cpp )
 ADD_SANITIZERS ( bsdftest )
 TARGET_COMPILE_FEATURES ( bsdftest PRIVATE ${PBRT_CXX14_NEEDS} )
 TARGET_LINK_LIBRARIES ( bsdftest ${ALL_PBRT_LIBS} )
 
-ADD_EXECUTABLE ( imgtool src/tools/imgtool.cpp )
+ADD_EXECUTABLE ( imgtool src/pbrt/cmd/imgtool.cpp )
 ADD_SANITIZERS ( imgtool )
 TARGET_COMPILE_FEATURES ( imgtool PRIVATE ${PBRT_CXX14_NEEDS} )
 TARGET_LINK_LIBRARIES ( imgtool ${ALL_PBRT_LIBS} )
 
-ADD_EXECUTABLE ( obj2pbrt src/tools/obj2pbrt.cpp )
+ADD_EXECUTABLE ( obj2pbrt src/pbrt/cmd/obj2pbrt.cpp )
 ADD_SANITIZERS ( obj2pbrt )
 TARGET_COMPILE_FEATURES ( obj2pbrt PRIVATE ${PBRT_CXX14_NEEDS} )
 
-ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
+ADD_EXECUTABLE ( cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
 TARGET_COMPILE_FEATURES ( cyhair2pbrt PRIVATE ${PBRT_CXX14_NEEDS} )
 
 # Unit test
 
 FILE ( GLOB PBRT_TEST_SOURCE
-  src/tests/*.cpp
+  src/pbrt/tests/*.cpp
   )
 
 ADD_EXECUTABLE ( pbrt_test ${PBRT_TEST_SOURCE} )
