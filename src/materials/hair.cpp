@@ -67,28 +67,6 @@ static Float Mp(Float cosThetaI, Float cosThetaO, Float sinThetaI,
     return mp;
 }
 
-inline Float I0(Float x) {
-    Float val = 0;
-    Float x2i = 1;
-    int64_t ifact = 1;
-    int i4 = 1;
-    // I0(x) \approx Sum_i x^(2i) / (4^i (i!)^2)
-    for (int i = 0; i < 10; ++i) {
-        if (i > 1) ifact *= i;
-        val += x2i / (i4 * Sqr(ifact));
-        x2i *= x * x;
-        i4 *= 4;
-    }
-    return val;
-}
-
-inline Float LogI0(Float x) {
-    if (x > 12)
-        return x + 0.5 * (-std::log(2 * Pi) + std::log(1 / x) + 1 / (8 * x));
-    else
-        return std::log(I0(x));
-}
-
 static std::array<Spectrum, pMax + 1> Ap(Float cosThetaO, Float eta, Float h,
                                          const Spectrum &T) {
     std::array<Spectrum, pMax + 1> ap;
@@ -113,34 +91,12 @@ inline Float Phi(int p, Float gammaO, Float gammaT) {
     return 2 * p * gammaT - 2 * gammaO + p * Pi;
 }
 
-inline Float Logistic(Float x, Float s) {
-    x = std::abs(x);
-    return std::exp(-x / s) / (s * Sqr(1 + std::exp(-x / s)));
-}
-
-inline Float LogisticCDF(Float x, Float s) {
-    return 1 / (1 + std::exp(-x / s));
-}
-
-inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
-    CHECK_LT(a, b);
-    return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
-}
-
 inline Float Np(Float phi, int p, Float s, Float gammaO, Float gammaT) {
     Float dphi = phi - Phi(p, gammaO, gammaT);
     // Remap _dphi_ to $[-\pi,\pi]$
     while (dphi > Pi) dphi -= 2 * Pi;
     while (dphi < -Pi) dphi += 2 * Pi;
     return TrimmedLogistic(dphi, s, -Pi, Pi);
-}
-
-static Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
-    CHECK_LT(a, b);
-    Float k = LogisticCDF(b, s) - LogisticCDF(a, s);
-    Float x = -s * std::log(1 / (u * k + LogisticCDF(a, s)) - 1);
-    CHECK(!std::isnan(x));
-    return Clamp(x, a, b);
 }
 
 // HairMaterial Method Definitions

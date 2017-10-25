@@ -1,26 +1,5 @@
 
-- failures from run with debug checks:
-  anim-killeroos-moving: mathutil Safe* check out of range
-    also killeroo-crop, killeroo-simple (presumably same)
-  splash.pbrt, scattering-sphere-diel, plume-volpath: compute differentials NaN
-  spot-bdpt: newton bracketing issue
-  tabulated-transmission, lte-orb-roughglass: safe* check from SampleCatmullRom2D()
-  c-path, tabulated.pbrt: fourierr sampling newton bracketing
-  lte-orb-silver: TR::Sample_wh Safe* issue
-  frame1266: span ray nans
-
-- distrib tests: plot function and distribution of a bunch of samples
-
----
-
 GFX!
-
-- big rework of direct lighting: after bsdf sample, intersect scene to find
-  light
-  + scattering-heterogeneous-medium has big diffs.
-    add simpler volume scattering tests
-    
-- tests for light * -> pdf computaiton
 
 - implement improved delta/ratio tracking stuff...
 
@@ -41,21 +20,38 @@ GFX!
   - actually, the opposite---never sample the bsdf in direct lighting code,
     then always incorportate (and MIS) at intersections
 
-- move Light::Le() into infinitearealight only?
-  Light -> InfiniteLight -> InfiniteImageLight ?
-
 - implement filter importance sampling
 
 - BDPT RR
 
-- http://aras-p.info/texts/CompactNormalStorage.html ?
-
 - BDPT: do standard MIS direct lighting at end (and then can use fancy
   light sampling stuff)
 
+-----------------
+
+- add more simple volume scattering tests--verious light types, etc.
+  light in medium, light not in medium, camera in/out, etc.
+
+- camera autofocus functionality; via a PreRender() callback. (Name other
+  Preprocess() to PreRender() ?)
+
+- failures from run with debug checks:
+  splash.pbrt, plume-volpath, transparent machines/frame1266: compute differentials NaN for scattering 
+
+- provide an option for blinear sampling Distribution2D
+  - option for Distribution1D to sample linear? Or separate class?
+    Constant1dDistribution
+    Linear1dDistribution
+    ... ?
+
+--onesample x,y,samp (+ enough logging to chase it down)
+
+- move Light::Le() into infinitearealight only?
+  Light -> InfiniteLight -> InfiniteImageLight ?
+
 - camera space experiments (all done at the API level?)
 
------------------
+- tests for light * -> pdf computaiton
 
 - use SampleDiscrete
   - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
@@ -68,7 +64,7 @@ GFX!
 
 - more mathutil tests..
 
-- find places to use CHECK_RARE
+- find places to use CHECK_RARE (microfacet, bsdf evaluations?)
 
 - feel like we want a separate Sampler instance for volume stuff. on very first
   shadow ray, Scene::IntersectTr() may use dimensions, which messes up

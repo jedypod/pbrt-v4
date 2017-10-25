@@ -224,6 +224,14 @@ Float LinearPdf(Float x, Float a, Float b);
 Point2f SampleBilinear(Point2f u, absl::Span<const Float> v);
 Float BilinearPdf(Point2f p, absl::Span<const Float> v);
 
+inline Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
+    CHECK_LT(a, b);
+    Float k = LogisticCDF(b, s) - LogisticCDF(a, s);
+    Float x = -s * std::log(1 / (u * k + LogisticCDF(a, s)) - 1);
+    CHECK(!std::isnan(x));
+    return Clamp(x, a, b);
+}
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H

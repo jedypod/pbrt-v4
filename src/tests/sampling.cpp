@@ -688,3 +688,29 @@ TEST(Sampling, Bilinear) {
     }
 }
 
+TEST(Sampling, Logistic) {
+    RNG rng;
+    Float params[][3] = { { 1., -Pi, Pi }, { 5, 0, 3 }, { .25, -5, -3 } };
+    for (const auto p : params) {
+        Float s = p[0], a = p[1], b = p[2];
+        auto logistic = [&](Float v) { return TrimmedLogistic(Lerp(v, a, b), s, a, b); };
+
+        Distribution1D distrib =
+            Distribution1D::SampleFunction(logistic, 8192, 16, Norm::L1);
+        for (int i = 0; i < 100; ++i) {
+            Float u = rng.UniformFloat();
+            Float cx = SampleTrimmedLogistic(u, s, a, b);
+            Float cp = TrimmedLogistic(cx, s, a, b);
+
+            // Need some additional scales and lerps here since the sampling
+            // and PDF routines above aren't over [0,1].
+            Float dp;
+            Float dx = Lerp(distrib.SampleContinuous(u, &dp), a, b);
+            dp /= b - a;
+            EXPECT_LT(std::abs(cx - dx), 3e-3) << "Closed form = " << cx <<
+                ", distrib = " << dx;
+            EXPECT_LT(std::abs(cp - dp), 3e-3) << "Closed form PDF = " << cp <<
+                ", distrib PDF = " << dp;
+        }
+    }
+}
