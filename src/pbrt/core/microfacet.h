@@ -42,6 +42,7 @@
 #include <pbrt/core/pbrt.h>
 
 #include <pbrt/util/geometry.h>
+#include <pbrt/util/math.h>
 
 #include <algorithm>
 #include <cmath>
@@ -88,8 +89,8 @@ class BeckmannDistribution : public MicrofacetDistribution {
     static Float RoughnessToAlpha(Float roughness) {
         roughness = std::max<Float>(roughness, 1e-3);
         Float x = std::log(roughness);
-        return 1.62142f + 0.819955f * x + 0.1734f * x * x +
-               0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
+        return EvaluatePolynomial(x, 1.62142f, 0.819955f, 0.1734f,
+                                  0.0171201f, 0.000640711f);
     }
     BeckmannDistribution(Float alphax, Float alphay, bool samplevis = true)
         : MicrofacetDistribution(samplevis), alphax(alphax), alphay(alphay) {}
@@ -128,8 +129,8 @@ class TrowbridgeReitzDistribution : public MicrofacetDistribution {
 inline Float TrowbridgeReitzDistribution::RoughnessToAlpha(Float roughness) {
     roughness = std::max<Float>(roughness, 1e-3);
     Float x = std::log(roughness);
-    return 1.62142f + 0.819955f * x + 0.1734f * x * x + 0.0171201f * x * x * x +
-           0.000640711f * x * x * x * x;
+    return EvaluatePolynomial(x, 1.62142f, 0.819955f, 0.1734f, 0.0171201f,
+                              0.000640711f);
 }
 
 }  // namespace pbrt
