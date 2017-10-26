@@ -17,7 +17,7 @@
 #include <pbrt/util/fileutil.h>
 #include <pbrt/util/parallel.h>
 extern "C" {
-#include <ArHosekSkyModel.h>
+#include <skymodel/ArHosekSkyModel.h>
 }
 #include <glog/logging.h>
 

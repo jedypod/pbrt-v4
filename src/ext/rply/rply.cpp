@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 
-#include "ext/rply.h"
+#include "rply.h"
 
 /* ----------------------------------------------------------------------
  * Make sure we get our integer types right

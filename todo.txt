@@ -29,6 +29,15 @@ GFX!
 
 -----------------
 
+- code organization:
+  base/{camera,shape,light,...}
+  sampling/...
+  core/paramset, api, parse,
+  scattering: reflection,
+  too much decomposition for core/?
+
+- why is error.* in core?
+
 - add more simple volume scattering tests--verious light types, etc.
   light in medium, light not in medium, camera in/out, etc.
 
@@ -134,8 +143,6 @@ GFX!
   final pixel outputs
   
 - api.cpp: Create* vs Make*, etc.
-
-- main/pbrt.cpp -> tools/pbrt.cpp
 
 - api / MakeFilter error handling (exit) is inconsistent with others...
   General API error handling review. Recover and use something, or fail

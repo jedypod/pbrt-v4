@@ -405,9 +405,11 @@ FILE ( GLOB PBRT_SOURCE
   src/pbrt/textures/*.cpp
   src/pbrt/util/*.cpp
 
-  src/ext/*.c
-  src/ext/*.cpp
-  src/ext/gtest/*.cc
+  src/ext/gtest/gtest-all.cc
+  src/ext/gtest/gtest_main.cc
+  src/ext/lodepng/lodepng.cpp
+  src/ext/rply/rply.cpp
+  src/ext/skymodel/ArHosekSkyModel.c
   )
 
 INCLUDE_DIRECTORIES ( src )

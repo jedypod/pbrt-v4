@@ -40,7 +40,7 @@
 #include <pbrt/core/spectrum.h>
 #include <pbrt/core/texture.h>
 
-#include <lodepng.h>
+#include <lodepng/lodepng.h>
 
 #include <ImfChannelList.h>
 #include <ImfFloatAttribute.h>

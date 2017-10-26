@@ -36,7 +36,7 @@
 
 #include <pbrt/core/error.h>
 #include <pbrt/core/paramset.h>
-#include <rply.h>
+#include <rply/rply.h>
 
 #include <iostream>
 

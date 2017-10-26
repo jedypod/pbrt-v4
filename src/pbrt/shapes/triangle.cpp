@@ -38,7 +38,7 @@
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/sampling.h>
 #include <pbrt/util/efloat.h>
-#include <rply.h>
+#include <rply/rply.h>
 
 #include <array>
 
