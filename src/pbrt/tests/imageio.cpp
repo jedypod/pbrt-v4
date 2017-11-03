@@ -7,6 +7,8 @@
 
 using namespace pbrt;
 
+static std::string inTestDir(const std::string &path) { return path; }
+
 static void TestRoundTrip(const char *fn, bool gamma) {
     Point2i res(16, 29);
     Image image(PixelFormat::RGB32, res);
@@ -18,10 +20,11 @@ static void TestRoundTrip(const char *fn, bool gamma) {
             image.SetSpectrum({x, y}, s);
         }
 
-    ASSERT_TRUE(image.Write(fn));
+    std::string filename = inTestDir(fn);
+    ASSERT_TRUE(image.Write(filename));
 
     Point2i readRes;
-    auto readImage = Image::Read(fn);
+    auto readImage = Image::Read(filename);
     ASSERT_TRUE((bool)readImage);
     ASSERT_EQ(readImage->resolution, res);
 
@@ -33,13 +36,13 @@ static void TestRoundTrip(const char *fn, bool gamma) {
             for (int c = 0; c < 3; ++c) {
                 float wrote = image.GetChannel({x, y}, c);
                 float delta = wrote - rgb[c];
-                if (HasExtension(fn, "pfm")) {
+                if (HasExtension(filename, "pfm")) {
                     // Everything should come out exact.
-                    EXPECT_EQ(0, delta) << fn << ":(" << x << ", " << y
+                    EXPECT_EQ(0, delta) << filename << ":(" << x << ", " << y
                                         << ") c = " << c << " wrote " << wrote
                                         << ", read " << rgb[c]
                                         << ", delta = " << delta;
-                } else if (HasExtension(fn, "exr")) {
+                } else if (HasExtension(filename, "exr")) {
                     if (c == 2)
                         // -1.5 is exactly representable as a float.
                         EXPECT_EQ(0, delta) << "(" << x << ", " << y
@@ -48,7 +51,7 @@ static void TestRoundTrip(const char *fn, bool gamma) {
                                             << ", delta = " << delta;
                     else
                         EXPECT_LT(std::abs(delta), .001)
-                            << fn << ":(" << x << ", " << y << ") c = " << c
+                            << filename << ":(" << x << ", " << y << ") c = " << c
                             << " wrote " << wrote << ", read " << rgb[c]
                             << ", delta = " << delta;
                 } else {
@@ -63,7 +66,7 @@ static void TestRoundTrip(const char *fn, bool gamma) {
                         // Allow a fair amount of slop, since there's an sRGB
                         // conversion before quantization to 8-bits...
                         EXPECT_LT(std::abs(delta), .02)
-                            << fn << ":(" << x << ", " << y << ") c = " << c
+                            << filename << ":(" << x << ", " << y << ") c = " << c
                             << " wrote " << wrote << ", read " << rgb[c]
                             << ", delta = " << delta;
                 }
@@ -71,7 +74,7 @@ static void TestRoundTrip(const char *fn, bool gamma) {
         }
 
     // Clean up
-    EXPECT_EQ(0, remove(fn));
+    EXPECT_EQ(0, remove(filename.c_str()));
 }
 
 TEST(ImageIO, RoundTripEXR) { TestRoundTrip("out.exr", false); }

@@ -34,7 +34,7 @@
 #include <pbrt/core/interaction.h>
 
 #include <pbrt/core/light.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/primitive.h>
 #include <pbrt/core/reflection.h>
 #include <pbrt/core/shape.h>

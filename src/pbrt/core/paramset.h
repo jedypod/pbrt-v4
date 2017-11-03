@@ -138,6 +138,8 @@ class ParamSet {
     std::string ToString(int indent = 0) const;
 
   private:
+    friend class TextureParams;
+
     // ParamSet Private Data
     std::vector<ParamSetItem<uint8_t>> bools;
     std::vector<ParamSetItem<int>> ints;

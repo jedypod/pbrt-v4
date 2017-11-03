@@ -620,9 +620,7 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &name, const Spectrum &def) const {
     auto tex = GetSpectrumTextureOrNull(name);
     if (tex) return tex;
-
-    Spectrum val = GetOneSpectrum(name, def);
-    return std::make_shared<ConstantTexture<Spectrum>>(val);
+    return std::make_shared<ConstantTexture<Spectrum>>(def);
 }
 
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
@@ -644,13 +642,12 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
         return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
 }
+
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
     const std::string &name, Float def) const {
     auto tex = GetFloatTextureOrNull(name);
     if (tex) return tex;
-
-    Float val = GetOneFloat(name, def);
-    return std::make_shared<ConstantTexture<Float>>(val);
+    return std::make_shared<ConstantTexture<Float>>(def);
 }
 
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(

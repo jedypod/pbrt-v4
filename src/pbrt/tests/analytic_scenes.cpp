@@ -30,6 +30,8 @@
 
 using namespace pbrt;
 
+static std::string inTestDir(const std::string &path) { return path; }
+
 struct TestScene {
     std::shared_ptr<Scene> scene;
     std::string description;
@@ -47,7 +49,7 @@ void PrintTo(const TestIntegrator &tr, ::std::ostream *os) {
     *os << tr.description;
 }
 
-void CheckSceneAverage(const char *filename, float expected) {
+void CheckSceneAverage(const std::string &filename, float expected) {
     absl::optional<Image> image = Image::Read(filename);
     ASSERT_TRUE((bool)image);
     ASSERT_EQ(image->nChannels(), 3);
@@ -280,7 +282,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
@@ -300,7 +302,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
@@ -320,7 +322,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
@@ -339,7 +341,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
@@ -360,7 +362,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
@@ -380,7 +382,7 @@ std::vector<TestIntegrator> GetIntegrators() {
     for (auto &sampler : GetSamplers(Bounds2i(Point2i(0,0), resolution))) {
       std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
       std::unique_ptr<Film> film = std::make_unique<Film>(resolution, Bounds2f(Point2f(0,0), Point2f(1,1)),
-                            std::move(filter), 1., "test.exr", 1.);
+                            std::move(filter), 1., inTestDir("test.exr"), 1.);
       std::shared_ptr<Camera> camera = std::make_shared<OrthographicCamera>(
           identity, Bounds2f(Point2f(-.1,-.1), Point2f(.1,.1)), 0., 1.,
           0., 10., std::move(film), nullptr);
@@ -398,7 +400,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             std::unique_ptr<Filter> filter = std::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
             std::unique_ptr<Film> film =
                 std::make_unique<Film>(resolution, Bounds2f(Point2f(0, 0), Point2f(1, 1)),
-                         std::move(filter), 1., "test.exr", 1.);
+                         std::move(filter), 1., inTestDir("test.exr"), 1.);
             std::shared_ptr<Camera> camera =
                 std::make_shared<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
@@ -425,7 +427,7 @@ TEST_P(RenderTest, RadianceMatches) {
 
     const TestIntegrator &tr = GetParam();
     tr.integrator->Render(*tr.scene.scene);
-    CheckSceneAverage("test.exr", tr.scene.expected);
+    CheckSceneAverage(inTestDir("test.exr"), tr.scene.expected);
     // The SpatialLightDistribution class keeps a per-thread cache that
     // must be cleared out between test runs. In turn, this means that we
     // must delete the Integrator here in order to make sure that its
@@ -434,7 +436,7 @@ TEST_P(RenderTest, RadianceMatches) {
 
     pbrtCleanup();
 
-    EXPECT_EQ(0, remove("test.exr"));
+    EXPECT_EQ(0, remove(inTestDir("test.exr").c_str()));
 }
 
 INSTANTIATE_TEST_CASE_P(AnalyticTestScenes, RenderTest,

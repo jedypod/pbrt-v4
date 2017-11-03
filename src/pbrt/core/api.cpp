@@ -186,25 +186,42 @@ struct RenderOptions {
     bool haveScatteringMedia = false;
 };
 
+// MaterialInstance represents both an instance of a material as well as
+// the information required to create another instance of it (possibly with
+// different parameters from the shape).
+struct MaterialInstance {
+    MaterialInstance() = default;
+    MaterialInstance(const std::string &name, const std::shared_ptr<Material> &mtl,
+                     ParamSet params)
+        : name(name), material(mtl), params(std::move(params)) {}
+
+    std::string name;
+    std::shared_ptr<Material> material;
+    ParamSet params;
+};
+
 struct GraphicsState {
     // Graphics State Methods
     GraphicsState() {
         ParamSet params;
         TextureParams tp(std::move(params), floatTextures, spectrumTextures);
-        material = CreateMatteMaterial(tp, nullptr);
+        std::shared_ptr<Material> mtl(CreateMatteMaterial(tp, nullptr));
+        currentMaterial = std::make_shared<MaterialInstance>("matte", mtl, ParamSet());
+
         shapeAttributes = std::make_shared<ParamSet>();
         lightAttributes = std::make_shared<ParamSet>();
         materialAttributes = std::make_shared<ParamSet>();
         mediumAttributes = std::make_shared<ParamSet>();
     }
+    std::shared_ptr<Material> GetMaterialForShape(const ParamSet &geomParams);
     MediumInterface CreateMediumInterface();
 
     // Graphics State
     std::string currentInsideMedium, currentOutsideMedium;
     std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
-    std::shared_ptr<Material> material;
-    std::map<std::string, std::shared_ptr<Material>> namedMaterials;
+    std::map<std::string, std::shared_ptr<MaterialInstance>> namedMaterials;
+    std::shared_ptr<MaterialInstance> currentMaterial;
     std::shared_ptr<ParamSet> areaLightParams;
     std::string areaLightName;
     bool reverseOrientation = false;
@@ -438,19 +455,22 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     else if (name == "mix") {
         std::string m1 = mp.GetOneString("namedmaterial1", "");
         std::string m2 = mp.GetOneString("namedmaterial2", "");
-        std::shared_ptr<Material> mat1 = graphicsState.namedMaterials[m1];
-        std::shared_ptr<Material> mat2 = graphicsState.namedMaterials[m2];
-        if (!mat1) {
+        std::shared_ptr<Material> mat1, mat2;
+        if (graphicsState.namedMaterials.find(m1) ==
+            graphicsState.namedMaterials.end()) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m1.c_str());
-            mat1 = CreateMatteMaterial(mp, graphicsState.materialAttributes);
-        }
-        if (!mat2) {
+            mat1 = MakeMaterial("matte", mp);
+        } else
+            mat1 = graphicsState.namedMaterials[m1]->material;
+
+        if (graphicsState.namedMaterials.find(m2) ==
+            graphicsState.namedMaterials.end()) {
             Error("Named material \"%s\" undefined.  Using \"matte\"",
                   m2.c_str());
-            mat2 = CreateMatteMaterial(mp, graphicsState.materialAttributes);
-        }
-
+            mat2 = MakeMaterial("matte", mp);
+        } else
+            mat2 = graphicsState.namedMaterials[m2]->material;
         material = CreateMixMaterial(mp, mat1, mat2, graphicsState.materialAttributes);
     } else if (name == "metal")
         material = CreateMetalMaterial(mp, graphicsState.materialAttributes);
@@ -1103,7 +1123,9 @@ void pbrtMaterial(const std::string &name, ParamSet params) {
     }
     TextureParams tp(std::move(params), graphicsState.floatTextures,
                      graphicsState.spectrumTextures);
-    graphicsState.material = MakeMaterial(name, tp);
+    std::shared_ptr<Material> mtl = MakeMaterial(name, tp);
+    graphicsState.currentMaterial =
+        std::make_shared<MaterialInstance>(name, mtl, params);
 }
 
 void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
@@ -1144,8 +1166,9 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
         if (graphicsState.namedMaterials.find(name) !=
             graphicsState.namedMaterials.end())
             Warning("Named material \"%s\" redefined.", name.c_str());
-        graphicsState.namedMaterials[name] = mtl;
 
+        graphicsState.namedMaterials[name] =
+            std::make_shared<MaterialInstance>(matName, mtl, params);
     }
 }
 
@@ -1154,17 +1177,12 @@ void pbrtNamedMaterial(const std::string &name) {
     if (PbrtOptions.cat || PbrtOptions.toPly)
         printf("%*sNamedMaterial \"%s\"\n", catIndentCount, "", name.c_str());
     else {
-        if (graphicsState.namedMaterials.find(name) ==
-            graphicsState.namedMaterials.end()) {
-            Error("Named material \"%s\" not defined. Using \"matte\"", name.c_str());
-            ParamSet params;
-            std::map<std::string, std::shared_ptr<Texture<Float>>> floatTextures;
-            std::map<std::string, std::shared_ptr<Texture<Spectrum>>> spectrumTextures;
-            TextureParams tp(std::move(params), floatTextures, spectrumTextures);
-            graphicsState.material = CreateMatteMaterial(
-                tp, graphicsState.materialAttributes);
-        } else
-            graphicsState.material = graphicsState.namedMaterials[name];
+        auto iter = graphicsState.namedMaterials.find(name);
+        if (iter == graphicsState.namedMaterials.end()) {
+            Error("NamedMaterial \"%s\" unknown.", name.c_str());
+            return;
+        }
+        graphicsState.currentMaterial = iter->second;
     }
 }
 
@@ -1236,6 +1254,8 @@ void pbrtShape(const std::string &name, ParamSet params) {
             MakeShapes(name, ObjToWorld, WorldToObj,
                        graphicsState.reverseOrientation, params);
         if (shapes.empty()) return;
+        std::shared_ptr<Material> mtl = graphicsState.GetMaterialForShape(params);
+        params.ReportUnused();
         MediumInterface mi = graphicsState.CreateMediumInterface();
         for (auto &s : shapes) {
             // Possibly create area light for shape
@@ -1247,11 +1267,11 @@ void pbrtShape(const std::string &name, ParamSet params) {
             }
             if (!area && !mi.IsMediumTransition() && !alphaTex &&
                 !shadowAlphaTex)
-                prims.push_back(std::make_shared<SimplePrimitive>(s, graphicsState.material));
+                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
             else
                 prims.push_back(
-                    std::make_shared<GeometricPrimitive>(s, graphicsState.material, area, mi,
-                                                         alphaTex, shadowAlphaTex));
+                    std::make_shared<GeometricPrimitive>(s, mtl, area, mi, alphaTex,
+                                                         shadowAlphaTex));
         }
         params.ReportUnused();
     } else {
@@ -1269,15 +1289,17 @@ void pbrtShape(const std::string &name, ParamSet params) {
         if (shapes.empty()) return;
 
         // Create _GeometricPrimitive_(s) for animated shape
+        std::shared_ptr<Material> mtl = graphicsState.GetMaterialForShape(params);
+        params.ReportUnused();
         MediumInterface mi = graphicsState.CreateMediumInterface();
 
         for (auto &s : shapes) {
             if (!mi.IsMediumTransition() && !alphaTex && !shadowAlphaTex)
-                prims.push_back(std::make_shared<SimplePrimitive>(s, graphicsState.material));
+                prims.push_back(std::make_shared<SimplePrimitive>(s, mtl));
             else
                 prims.push_back(
-                    std::make_shared<GeometricPrimitive>(s, graphicsState.material, nullptr, mi,
-                                                         alphaTex, shadowAlphaTex));
+                    std::make_shared<GeometricPrimitive>(s, mtl, nullptr, mi, alphaTex,
+                                                         shadowAlphaTex));
         }
         params.ReportUnused();
 
@@ -1313,6 +1335,82 @@ void pbrtShape(const std::string &name, ParamSet params) {
             renderOptions->lights.insert(renderOptions->lights.end(),
                                          areaLights.begin(), areaLights.end());
     }
+}
+
+// Attempt to determine if the ParamSet for a shape may provide a value for
+// its material's parameters. Unfortunately, materials don't provide an
+// explicit representation of their parameters that we can query and
+// cross-reference with the parameter values available from the shape.
+//
+// Therefore, we'll apply some "heuristics".
+bool shapeMaySetMaterialParameters(const ParamSet &ps) {
+#if 0
+    // FIXME
+    for (const auto &param : ps.textures)
+        // Any texture other than one for an alpha mask is almost certainly
+        // for a Material (or is unused!).
+        if (param->name != "alpha" && param->name != "shadowalpha")
+            return true;
+
+    // Special case spheres, which are the most common non-mesh primitive.
+    for (const auto &param : ps.floats)
+        if (param->nValues == 1 && param->name != "radius")
+            return true;
+
+    // Extra special case strings, since plymesh uses "filename", curve "type",
+    // and loopsubdiv "scheme".
+    for (const auto &param : ps.strings)
+        if (param->nValues == 1 && param->name != "filename" &&
+            param->name != "type" && param->name != "scheme")
+            return true;
+
+    // For all other parameter types, if there is a single value of the
+    // parameter, assume it may be for the material. This should be valid
+    // (if conservative), since no materials currently take array
+    // parameters.
+    for (const auto &param : ps.bools)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.ints)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.point2fs)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.vector2fs)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.point3fs)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.vector3fs)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.normals)
+        if (param->nValues == 1)
+            return true;
+    for (const auto &param : ps.spectra)
+        if (param->nValues == 1)
+            return true;
+#endif
+    return false;
+}
+
+std::shared_ptr<Material> GraphicsState::GetMaterialForShape(
+    const ParamSet &shapeParams) {
+    CHECK(currentMaterial);
+#if 0
+    // FIXME override
+    if (shapeMaySetMaterialParameters(shapeParams)) {
+        // Only create a unique material for the shape if the shape's
+        // parameters are (apparently) going to provide values for some of
+        // the material parameters.
+        TextureParams mp(shapeParams, currentMaterial->params, floatTextures,
+                         spectrumTextures);
+        return MakeMaterial(currentMaterial->name, mp);
+    } else
+#endif
+        return currentMaterial->material;
 }
 
 MediumInterface GraphicsState::CreateMediumInterface() {

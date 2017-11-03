@@ -123,9 +123,9 @@ std::unique_ptr<AOIntegrator> CreateAOIntegrator(
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
-    Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
-    bool cosSample = params.GetOneBool("cossample", "true");
+    bool cosSample = params.GetOneBool("cossample", true);
     int nSamples = params.GetOneInt("nsamples", 64);
+    if (PbrtOptions.quickRender) nSamples = 1;
     return std::make_unique<AOIntegrator>(cosSample, nSamples, camera,
                                           std::move(sampler), pixelBounds);
 }

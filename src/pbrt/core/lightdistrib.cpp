@@ -40,7 +40,7 @@
 #include <pbrt/core/integrator.h> // FIXME only for ComputeLightPowerDistribution()
 #include <pbrt/core/light.h>
 #include <pbrt/core/lowdiscrepancy.h>
-#include <pbrt/util/mathutil.h>
+#include <pbrt/util/math.h>
 #include <pbrt/core/sampling.h>
 #include <pbrt/core/scene.h>
 #include <pbrt/core/spectrum.h>
