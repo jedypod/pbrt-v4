@@ -72,7 +72,7 @@ class PerspectiveCamera : public ProjectiveCamera {
 
 std::shared_ptr<PerspectiveCamera> CreatePerspectiveCamera(
     const ParamSet &params,const AnimatedTransform &cam2world,
-    std::unique_ptr<Film> film, const Medium *medium);
+    std::unique_ptr<Film> film, const Medium *medium, const Scene &scene);
 
 }  // namespace pbrt
 

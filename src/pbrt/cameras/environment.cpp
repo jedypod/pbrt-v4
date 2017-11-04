@@ -60,7 +60,7 @@ Float EnvironmentCamera::GenerateRay(const CameraSample &sample,
 
 std::shared_ptr<EnvironmentCamera> CreateEnvironmentCamera(
         const ParamSet &params, const AnimatedTransform &cam2world,
-        std::unique_ptr<Film> film, const Medium *medium) {
+        std::unique_ptr<Film> film, const Medium *medium, const Scene &scene) {
     // Extract common camera parameters from _ParamSet_
     Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = params.GetOneFloat("shutterclose", 1.f);

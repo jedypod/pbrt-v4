@@ -58,7 +58,7 @@ class EnvironmentCamera : public Camera {
 
 std::shared_ptr<EnvironmentCamera> CreateEnvironmentCamera(
         const ParamSet &params, const AnimatedTransform &cam2world,
-        std::unique_ptr<Film> film, const Medium *medium);
+        std::unique_ptr<Film> film, const Medium *medium, const Scene &scene);
 
 }  // namespace pbrt
 

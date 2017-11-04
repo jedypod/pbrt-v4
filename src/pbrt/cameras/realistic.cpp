@@ -699,7 +699,7 @@ Float RealisticCamera::GenerateRay(const CameraSample &sample, Ray *ray) const {
 
 std::shared_ptr<RealisticCamera> CreateRealisticCamera(
         const ParamSet &params, const AnimatedTransform &cam2world,
-        std::unique_ptr<Film> film, const Medium *medium) {
+        std::unique_ptr<Film> film, const Medium *medium, const Scene &scene) {
     Float shutteropen = params.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = params.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {

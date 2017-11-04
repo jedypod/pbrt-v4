@@ -161,7 +161,7 @@ struct RenderOptions {
     // RenderOptions Public Methods
     std::unique_ptr<Integrator> MakeIntegrator(const Scene &scene) const;
     std::unique_ptr<Scene> MakeScene();
-    std::shared_ptr<Camera> MakeCamera() const;
+    std::shared_ptr<Camera> MakeCamera(const Scene &scene) const;
 
     // RenderOptions Public Data
     Float transformStartTime = 0, transformEndTime = 1;
@@ -654,7 +654,7 @@ std::shared_ptr<Primitive> MakeAccelerator(
 
 std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &paramSet,
         const TransformSet &cam2worldSet, Float transformStart,
-        Float transformEnd, std::unique_ptr<Film> film) {
+        Float transformEnd, const Scene &scene, std::unique_ptr<Film> film) {
     std::shared_ptr<Camera> camera;
     MediumInterface mediumInterface = graphicsState.CreateMediumInterface();
     static_assert(MaxTransforms == 2,
@@ -666,16 +666,16 @@ std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &para
                                         cam2world[1], transformEnd);
     if (name == "perspective")
         camera = CreatePerspectiveCamera(paramSet, animatedCam2World, std::move(film),
-                                         mediumInterface.outside);
+                                         mediumInterface.outside, scene);
     else if (name == "orthographic")
         camera = CreateOrthographicCamera(paramSet, animatedCam2World, std::move(film),
-                                          mediumInterface.outside);
+                                          mediumInterface.outside, scene);
     else if (name == "realistic")
         camera = CreateRealisticCamera(paramSet, animatedCam2World, std::move(film),
-                                       mediumInterface.outside);
+                                       mediumInterface.outside, scene);
     else if (name == "environment")
         camera = CreateEnvironmentCamera(paramSet, animatedCam2World, std::move(film),
-                                         mediumInterface.outside);
+                                         mediumInterface.outside, scene);
     else {
         Error("Camera \"%s\" unknown.", name.c_str());
         exit(1);
@@ -1592,7 +1592,7 @@ std::unique_ptr<Scene> RenderOptions::MakeScene() {
 }
 
 std::unique_ptr<Integrator> RenderOptions::MakeIntegrator(const Scene &scene) const {
-    std::shared_ptr<Camera> camera = MakeCamera();
+    std::shared_ptr<Camera> camera = MakeCamera(scene);
     std::unique_ptr<Sampler> sampler =
         MakeSampler(SamplerName, SamplerParams, camera->film->GetSampleBounds());
 
@@ -1635,7 +1635,7 @@ std::unique_ptr<Integrator> RenderOptions::MakeIntegrator(const Scene &scene) co
     return integrator;
 }
 
-std::shared_ptr<Camera> RenderOptions::MakeCamera() const {
+std::shared_ptr<Camera> RenderOptions::MakeCamera(const Scene &scene) const {
     std::unique_ptr<Filter> filter = MakeFilter(FilterName, FilterParams);
     std::unique_ptr<Film> film = MakeFilm(FilmName, FilmParams, std::move(filter));
     if (!film) {
@@ -1644,7 +1644,7 @@ std::shared_ptr<Camera> RenderOptions::MakeCamera() const {
     }
     return pbrt::MakeCamera(CameraName, CameraParams, CameraToWorld,
                             renderOptions->transformStartTime,
-                            renderOptions->transformEndTime, std::move(film));
+                            renderOptions->transformEndTime, scene, std::move(film));
 }
 
 }  // namespace pbrt

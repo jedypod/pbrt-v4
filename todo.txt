@@ -29,6 +29,8 @@ GFX!
 
 -----------------
 
+- use Bilerp() for texture filtering, other places?
+
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet
   TextureParams -> ...?
@@ -38,14 +40,9 @@ GFX!
 - more robust checking for shape material param overrides; add a mode where
   the parameter set tracks which parameters are requested (and their types?)
 
-- reorder initialization to remove preprocess callbacks:
-  Scene
-  At WorldEnd:
-    Filter
-    Film
-    Camera / Sampler
-    Integrator
-  -> can pass Scene to Camera and Integrator constructors
+- be more consistent to not do error checking during pbrt cat and to ply
+
+- inconsistent: RenderOptions::MakeIntegrator vs e.g. standalone MakeFilter
 
 - merge in segment tree stuff, add tests
 
