@@ -204,7 +204,7 @@ struct GraphicsState {
     // Graphics State Methods
     GraphicsState() {
         ParamSet params;
-        TextureParams tp(std::move(params), floatTextures, spectrumTextures);
+        TextureParams tp({&params}, floatTextures, spectrumTextures);
         std::shared_ptr<Material> mtl(CreateMatteMaterial(tp, nullptr));
         currentMaterial = std::make_shared<MaterialInstance>("matte", mtl, ParamSet());
 
@@ -1091,7 +1091,7 @@ void pbrtTexture(const std::string &name, const std::string &type,
         printf("%s\n", params.ToString(catIndentCount).c_str());
     }
 
-    TextureParams tp(std::move(params), graphicsState.floatTextures,
+    TextureParams tp({&params}, graphicsState.floatTextures,
                      graphicsState.spectrumTextures);
     if (type == "float") {
         // Create _Float_ texture and store in _floatTextures_
@@ -1121,11 +1121,11 @@ void pbrtMaterial(const std::string &name, ParamSet params) {
         printf("%*sMaterial \"%s\" ", catIndentCount, "", name.c_str());
         printf("%s\n", params.ToString(catIndentCount).c_str());
     }
-    TextureParams tp(std::move(params), graphicsState.floatTextures,
+    TextureParams tp({&params}, graphicsState.floatTextures,
                      graphicsState.spectrumTextures);
     std::shared_ptr<Material> mtl = MakeMaterial(name, tp);
     graphicsState.currentMaterial =
-        std::make_shared<MaterialInstance>(name, mtl, params);
+        std::make_shared<MaterialInstance>(name, mtl, std::move(params));
 }
 
 void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
@@ -1136,9 +1136,7 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
         printf("%s\n", params.ToString(catIndentCount).c_str());
     } else {
         // error checking, warning if replace, what to use for transform?
-        TextureParams mp(std::move(params), graphicsState.floatTextures,
-                         graphicsState.spectrumTextures);
-        std::string matName = mp.GetOneString("type", "");
+        std::string matName = params.GetOneString("type", "");
         WARN_IF_ANIMATED_TRANSFORM("MakeNamedMaterial");
         if (matName == "")
             Error("No parameter string \"type\" found in MakeNamedMaterial");
@@ -1158,6 +1156,8 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
             pbrtAttribute("material", nv);
         }
 
+        TextureParams mp({&params}, graphicsState.floatTextures,
+                         graphicsState.spectrumTextures);
         std::shared_ptr<Material> mtl = MakeMaterial(matName, mp);
 
         if (setNameAttribute)
@@ -1167,8 +1167,10 @@ void pbrtMakeNamedMaterial(const std::string &name, ParamSet params) {
             graphicsState.namedMaterials.end())
             Warning("Named material \"%s\" redefined.", name.c_str());
 
+        // Ugly: move tp for the paramset so we carry through the "was it
+        // used" info.
         graphicsState.namedMaterials[name] =
-            std::make_shared<MaterialInstance>(matName, mtl, params);
+            std::make_shared<MaterialInstance>(matName, mtl, std::move(params));
     }
 }
 
@@ -1344,24 +1346,23 @@ void pbrtShape(const std::string &name, ParamSet params) {
 //
 // Therefore, we'll apply some "heuristics".
 bool shapeMaySetMaterialParameters(const ParamSet &ps) {
-#if 0
     // FIXME
     for (const auto &param : ps.textures)
         // Any texture other than one for an alpha mask is almost certainly
         // for a Material (or is unused!).
-        if (param->name != "alpha" && param->name != "shadowalpha")
+        if (param.name != "alpha" && param.name != "shadowalpha")
             return true;
 
     // Special case spheres, which are the most common non-mesh primitive.
     for (const auto &param : ps.floats)
-        if (param->nValues == 1 && param->name != "radius")
+        if (param.values.size() == 1 && param.name != "radius")
             return true;
 
     // Extra special case strings, since plymesh uses "filename", curve "type",
     // and loopsubdiv "scheme".
     for (const auto &param : ps.strings)
-        if (param->nValues == 1 && param->name != "filename" &&
-            param->name != "type" && param->name != "scheme")
+        if (param.values.size() == 1 && param.name != "filename" &&
+            param.name != "type" && param.name != "scheme")
             return true;
 
     // For all other parameter types, if there is a single value of the
@@ -1369,47 +1370,45 @@ bool shapeMaySetMaterialParameters(const ParamSet &ps) {
     // (if conservative), since no materials currently take array
     // parameters.
     for (const auto &param : ps.bools)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.ints)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.point2fs)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.vector2fs)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.point3fs)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.vector3fs)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.normals)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
     for (const auto &param : ps.spectra)
-        if (param->nValues == 1)
+        if (param.values.size() == 1)
             return true;
-#endif
+
     return false;
 }
 
 std::shared_ptr<Material> GraphicsState::GetMaterialForShape(
     const ParamSet &shapeParams) {
     CHECK(currentMaterial);
-#if 0
-    // FIXME override
     if (shapeMaySetMaterialParameters(shapeParams)) {
         // Only create a unique material for the shape if the shape's
         // parameters are (apparently) going to provide values for some of
         // the material parameters.
-        TextureParams mp(shapeParams, currentMaterial->params, floatTextures,
+        TextureParams mp({&shapeParams, &currentMaterial->params}, floatTextures,
                          spectrumTextures);
-        return MakeMaterial(currentMaterial->name, mp);
+        std::shared_ptr<Material> mtl = MakeMaterial(currentMaterial->name, mp);
+        return mtl;
     } else
-#endif
         return currentMaterial->material;
 }
 

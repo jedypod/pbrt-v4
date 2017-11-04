@@ -41,7 +41,6 @@
 
 #include <glog/logging.h>
 
-
 namespace pbrt {
 
 ///////////////////////////////////////////////////////////////////////////
@@ -69,7 +68,6 @@ void NamedValues::AddBool(bool v) {
     else
         bools.push_back(v);
 }
-
 
 std::string NamedValues::ToString() const {
     CHECK_NOTNULL(name);
@@ -107,23 +105,25 @@ static void addParam(const std::string &name, std::vector<T> values,
 
 template <typename T>
 static absl::Span<const T> lookupPtr(const std::string &name,
-                               const std::vector<ParamSetItem<T>> &vec) {
-    for (const auto &v : vec)
+                                     const std::vector<ParamSetItem<T>> &vec) {
+    for (const auto &v : vec) {
         if (v.name == name) {
             v.lookedUp = true;
             return absl::Span<const T>(v.values);
         }
+    }
     return {};
 }
 
 template <typename T>
 static T lookupOne(const std::string &name, T def,
                    const std::vector<ParamSetItem<T>> &vec) {
-    for (const auto &v : vec)
+    for (const auto &v : vec) {
         if (v.name == name && v.values.size() == 1) {
             v.lookedUp = true;
             return v.values[0];
         }
+    }
     return def;
 }
 
@@ -271,35 +271,8 @@ std::string ParamSet::GetOneString(const std::string &name,
     return lookupOne(name, def, strings);
 }
 
-std::string ParamSet::GetOneFilename(const std::string &name,
-                                     const std::string &def) const {
-    std::string filename = GetOneString(name, "");
-    if (filename == "") return def;
-    return AbsolutePath(ResolveFilename(filename));
-}
-
 std::string ParamSet::FindTexture(const std::string &name) const {
     return lookupOne(name, std::string(""), textures);
-}
-
-template <typename T>
-static void checkUnused(const std::vector<ParamSetItem<T>> &vec) {
-    for (const auto &v : vec)
-        if (!v.lookedUp) Warning("Parameter \"%s\" not used", v.name.c_str());
-}
-
-void ParamSet::ReportUnused() const {
-    checkUnused(ints);
-    checkUnused(bools);
-    checkUnused(floats);
-    checkUnused(point2fs);
-    checkUnused(vector2fs);
-    checkUnused(point3fs);
-    checkUnused(vector3fs);
-    checkUnused(normals);
-    checkUnused(spectra);
-    checkUnused(strings);
-    checkUnused(textures);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -613,8 +586,208 @@ std::string ParamSet::ToString(int indent) const {
     return ret;
 }
 
+template <typename T>
+static void checkUnused(const std::vector<ParamSetItem<T>> &vec) {
+    for (const auto &p : vec)
+        if (!p.lookedUp)
+            Warning("Parameter \"%s\" not used", p.name.c_str());
+}
+
+void ParamSet::ReportUnused() const {
+    checkUnused(ints);
+    checkUnused(bools);
+    checkUnused(floats);
+    checkUnused(point2fs);
+    checkUnused(vector2fs);
+    checkUnused(point3fs);
+    checkUnused(vector3fs);
+    checkUnused(normals);
+    checkUnused(strings);
+    checkUnused(textures);
+    checkUnused(spectra);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // TextureParams Method Definitions
+
+Float TextureParams::GetOneFloat(const std::string &name, Float def) const {
+    absl::Span<const Float> v = GetFloatArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+int TextureParams::GetOneInt(const std::string &name, int def) const {
+    absl::Span<const int> v = GetIntArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+bool TextureParams::GetOneBool(const std::string &name, bool def) const {
+    absl::Span<const uint8_t> v = GetBoolArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Point2f TextureParams::GetOnePoint2f(const std::string &name, const Point2f &def) const {
+    absl::Span<const Point2f> v = GetPoint2fArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Vector2f TextureParams::GetOneVector2f(const std::string &name, const Vector2f &def) const {
+    absl::Span<const Vector2f> v = GetVector2fArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Point3f TextureParams::GetOnePoint3f(const std::string &name, const Point3f &def) const {
+    absl::Span<const Point3f> v = GetPoint3fArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Vector3f TextureParams::GetOneVector3f(const std::string &name, const Vector3f &def) const {
+    absl::Span<const Vector3f> v = GetVector3fArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Normal3f TextureParams::GetOneNormal3f(const std::string &name, const Normal3f &def) const {
+    absl::Span<const Normal3f> v = GetNormal3fArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+Spectrum TextureParams::GetOneSpectrum(const std::string &name, const Spectrum &def) const {
+    absl::Span<const Spectrum> v = GetSpectrumArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+std::string TextureParams::GetOneString(const std::string &name,
+                                        const std::string &def) const {
+    absl::Span<const std::string> v = GetStringArray(name);
+    if (v.empty())
+        return def;
+    if (v.size() > 1)
+        Warning("Ignoring excess values for parameter \"%s\".", name.c_str());
+    return v[0];
+}
+
+std::string TextureParams::FindTexture(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        std::string tex = ps->FindTexture(name);
+        if (!tex.empty()) return tex;
+    }
+    return "";
+}
+
+absl::Span<const Float> TextureParams::GetFloatArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetFloatArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const int> TextureParams::GetIntArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetIntArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const uint8_t> TextureParams::GetBoolArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetBoolArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Point2f> TextureParams::GetPoint2fArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetPoint2fArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Vector2f> TextureParams::GetVector2fArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetVector2fArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Point3f> TextureParams::GetPoint3fArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetPoint3fArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Vector3f> TextureParams::GetVector3fArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetVector3fArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Normal3f> TextureParams::GetNormal3fArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetNormal3fArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const Spectrum> TextureParams::GetSpectrumArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetSpectrumArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
+
+absl::Span<const std::string> TextureParams::GetStringArray(const std::string &name) const {
+    for (const ParamSet *ps : paramSets) {
+        auto v = ps->GetStringArray(name);
+        if (!v.empty()) return v;
+    }
+    return {};
+}
 
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &name, const Spectrum &def) const {
@@ -625,21 +798,26 @@ std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
 
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTextureOrNull(
     const std::string &n) const {
-    std::string name = FindTexture(n);
-    if (name != "") {
-        if (spectrumTextures.find(name) != spectrumTextures.end())
-            return spectrumTextures[name];
-        else {
-            Error(
-                "Couldn't find spectrum texture named \"%s\" for parameter "
-                "\"%s\"",
-                name.c_str(), n.c_str());
-            return nullptr;
+    for (const ParamSet *ps : paramSets) {
+        std::string name = ps->FindTexture(n);
+        if (!name.empty()) {
+            if (spectrumTextures.find(name) != spectrumTextures.end())
+                return spectrumTextures[name];
+            else {
+                Error(
+                      "Couldn't find spectrum texture named \"%s\" for parameter \"%s\"",
+                      name.c_str(), n.c_str());
+                return nullptr;
+            }
+        } else {
+            absl::Span<const Spectrum> val = ps->GetSpectrumArray(n);
+            if (!val.empty()) {
+                if (val.size() > 1)
+                    Warning("Ignoring excess values for parameter \"%s\".", n.c_str());
+                return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
+            }
         }
     }
-    absl::Span<const Spectrum> val = GetSpectrumArray(n);
-    if (!val.empty())
-        return std::make_shared<ConstantTexture<Spectrum>>(val[0]);
     return nullptr;
 }
 
@@ -652,21 +830,65 @@ std::shared_ptr<Texture<Float>> TextureParams::GetFloatTexture(
 
 std::shared_ptr<Texture<Float>> TextureParams::GetFloatTextureOrNull(
     const std::string &n) const {
-    std::string name = FindTexture(n);
-    if (name != "") {
-        if (floatTextures.find(name) != floatTextures.end())
-            return floatTextures[name];
-        else {
-            Error(
-                "Couldn't find float texture named \"%s\" for parameter \"%s\"",
-                name.c_str(), n.c_str());
-            return nullptr;
+    for (const ParamSet *ps : paramSets) {
+        std::string name = ps->FindTexture(n);
+        if (!name.empty()) {
+            if (floatTextures.find(name) != floatTextures.end())
+                return floatTextures[name];
+            else {
+                Error(
+                      "Couldn't find float texture named \"%s\" for parameter \"%s\"",
+                      name.c_str(), n.c_str());
+                return nullptr;
+            }
+        } else {
+            absl::Span<const Float> val = ps->GetFloatArray(n);
+            if (!val.empty()) {
+                if (val.size() > 1)
+                    Warning("Ignoring excess values for parameter \"%s\".", n.c_str());
+                return std::make_shared<ConstantTexture<Float>>(val[0]);
+            }
         }
     }
-
-    absl::Span<const Float> val = GetFloatArray(n);
-    if (!val.empty()) return std::make_shared<ConstantTexture<Float>>(val[0]);
     return nullptr;
+}
+
+template <typename T>
+static void checkUnused(const std::vector<ParamSetItem<T>> &vec,
+                        absl::InlinedVector<const std::string *, 16> *seen) {
+    for (const auto &p : vec) {
+        bool haveSeen = std::find_if(seen->begin(), seen->end(),
+                                     [&p](const std::string *s) {
+                                         return *s == p.name;
+                                     }) != seen->end();
+        if (p.lookedUp) {
+            // A parameter may be used when creating an initial Material, say,
+            // but then an override from a Shape may shadow it such that its
+            // name is already in the seen array.
+            if (!haveSeen)
+                seen->push_back(&p.name);
+        } else if (haveSeen) {
+            // It's shadowed by another parameter; that's fine.
+        } else
+            Warning("Parameter \"%s\" not used", p.name.c_str());
+    }
+}
+
+void TextureParams::ReportUnused() const {
+    absl::InlinedVector<const std::string *, 16> seen;
+    for (const ParamSet *ps : paramSets) {
+        checkUnused(ps->ints, &seen);
+        checkUnused(ps->bools, &seen);
+        checkUnused(ps->floats, &seen);
+        checkUnused(ps->point2fs, &seen);
+        checkUnused(ps->vector2fs, &seen);
+        checkUnused(ps->point3fs, &seen);
+        checkUnused(ps->vector3fs, &seen);
+        checkUnused(ps->normals, &seen);
+        checkUnused(ps->spectra, &seen);
+        checkUnused(ps->strings, &seen);
+        checkUnused(ps->textures, &seen);
+    }
 }
 
 }  // namespace pbrt

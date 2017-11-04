@@ -41,6 +41,7 @@
 // core/paramset.h*
 #include <pbrt/core/pbrt.h>
 
+#include <absl/container/inlined_vector.h>
 #include <absl/types/span.h>
 #include <pbrt/util/geometry.h>
 #include <pbrt/core/spectrum.h>
@@ -88,7 +89,6 @@ struct ParamSetItem {
 class ParamSet {
   public:
     // ParamSet Public Methods
-
     void Parse(const NamedValues *namedValuesList, SpectrumType spectrumType);
 
     void AddFloat(const std::string &, std::vector<Float> v);
@@ -118,8 +118,6 @@ class ParamSet {
     Spectrum GetOneSpectrum(const std::string &name, const Spectrum &def) const;
     std::string GetOneString(const std::string &name,
                              const std::string &def) const;
-    std::string GetOneFilename(const std::string &name,
-                               const std::string &def) const;
     std::string FindTexture(const std::string &) const;
 
     absl::Span<const Float> GetFloatArray(const std::string &name) const;
@@ -134,13 +132,13 @@ class ParamSet {
     absl::Span<const std::string> GetStringArray(const std::string &name) const;
 
     void ReportUnused() const;
-
     std::string ToString(int indent = 0) const;
 
   private:
-    friend class TextureParams;
-
     // ParamSet Private Data
+    friend class TextureParams;
+    friend bool shapeMaySetMaterialParameters(const ParamSet &ps);
+
     std::vector<ParamSetItem<uint8_t>> bools;
     std::vector<ParamSetItem<int>> ints;
     std::vector<ParamSetItem<Float>> floats;
@@ -155,16 +153,40 @@ class ParamSet {
 };
 
 // TextureParams Declarations
-class TextureParams : public ParamSet {
+class TextureParams {
   public:
     // TextureParams Public Methods
     TextureParams(
-        ParamSet params,
+        std::initializer_list<const ParamSet *> params,
         std::map<std::string, std::shared_ptr<Texture<Float>>> &fTex,
         std::map<std::string, std::shared_ptr<Texture<Spectrum>>> &sTex)
-        : ParamSet(std::move(params)),
+        : paramSets(params),
           floatTextures(fTex),
           spectrumTextures(sTex) {}
+
+    Float GetOneFloat(const std::string &name, Float def) const;
+    int GetOneInt(const std::string &name, int def) const;
+    bool GetOneBool(const std::string &name, bool def) const;
+    Point2f GetOnePoint2f(const std::string &name, const Point2f &def) const;
+    Vector2f GetOneVector2f(const std::string &name, const Vector2f &def) const;
+    Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
+    Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
+    Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
+    Spectrum GetOneSpectrum(const std::string &name, const Spectrum &def) const;
+    std::string GetOneString(const std::string &name,
+                             const std::string &def) const;
+    std::string FindTexture(const std::string &) const;
+
+    absl::Span<const Float> GetFloatArray(const std::string &name) const;
+    absl::Span<const int> GetIntArray(const std::string &name) const;
+    absl::Span<const uint8_t> GetBoolArray(const std::string &name) const;
+    absl::Span<const Point2f> GetPoint2fArray(const std::string &name) const;
+    absl::Span<const Vector2f> GetVector2fArray(const std::string &name) const;
+    absl::Span<const Point3f> GetPoint3fArray(const std::string &name) const;
+    absl::Span<const Vector3f> GetVector3fArray(const std::string &name) const;
+    absl::Span<const Normal3f> GetNormal3fArray(const std::string &name) const;
+    absl::Span<const Spectrum> GetSpectrumArray(const std::string &name) const;
+    absl::Span<const std::string> GetStringArray(const std::string &name) const;
 
     std::shared_ptr<Texture<Spectrum>> GetSpectrumTexture(
         const std::string &name, const Spectrum &def) const;
@@ -175,8 +197,11 @@ class TextureParams : public ParamSet {
     std::shared_ptr<Texture<Float>> GetFloatTextureOrNull(
         const std::string &name) const;
 
-  private:
+    void ReportUnused() const;
+
+ private:
     // TextureParams Private Data
+    absl::InlinedVector<const ParamSet *, 4> paramSets;
     std::map<std::string, std::shared_ptr<Texture<Float>>> &floatTextures;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> &spectrumTextures;
 };

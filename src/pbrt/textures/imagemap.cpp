@@ -111,7 +111,7 @@ std::shared_ptr<ImageTexture<Float>> CreateImageFloatTexture(
     if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
         Warning("%s: wrap mode unknown", wrapString.c_str());
     Float scale = tp.GetOneFloat("scale", 1.f);
-    std::string filename = tp.GetOneFilename("filename", "");
+    std::string filename = AbsolutePath(ResolveFilename(tp.GetOneString("filename", "")));
     bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
                                             HasExtension(filename, ".png"));
     return std::make_shared<ImageTexture<Float>>(
@@ -152,7 +152,7 @@ std::shared_ptr<ImageTexture<Spectrum>> CreateImageSpectrumTexture(
     if (!ParseWrapMode(wrapString.c_str(), &wrapMode))
         Warning("%s: wrap mode unknown", wrapString.c_str());
     Float scale = tp.GetOneFloat("scale", 1.f);
-    std::string filename = tp.GetOneFilename("filename", "");
+    std::string filename = AbsolutePath(ResolveFilename(tp.GetOneString("filename", "")));
     bool gamma = tp.GetOneBool("gamma", HasExtension(filename, ".tga") ||
                                             HasExtension(filename, ".png"));
     return std::make_shared<ImageTexture<Spectrum>>(

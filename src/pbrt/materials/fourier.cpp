@@ -33,10 +33,11 @@
 // materials/fourier.cpp*
 #include <pbrt/materials/fourier.h>
 
-#include <pbrt/core/interaction.h>
-#include <pbrt/util/memory.h>
-#include <pbrt/core/paramset.h>
 #include <pbrt/core/error.h>
+#include <pbrt/core/interaction.h>
+#include <pbrt/core/paramset.h>
+#include <pbrt/util/fileutil.h>
+#include <pbrt/util/memory.h>
 
 #include <map>
 #include <string>
@@ -232,8 +233,8 @@ std::shared_ptr<FourierMaterial> CreateFourierMaterial(
     const TextureParams &mp, const std::shared_ptr<const ParamSet> &attributes) {
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
-    return std::make_shared<FourierMaterial>(mp.GetOneFilename("bsdffile", ""),
-                                             bumpMap, attributes);
+    std::string path = AbsolutePath(ResolveFilename(mp.GetOneString("bsdffile", "")));
+    return std::make_shared<FourierMaterial>(path, bumpMap, attributes);
 }
 
 }  // namespace pbrt

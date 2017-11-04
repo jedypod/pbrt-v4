@@ -34,14 +34,16 @@
 #include <pbrt/cameras/realistic.h>
 
 #include <pbrt/core/error.h>
+#include <pbrt/core/image.h>
+#include <pbrt/core/lowdiscrepancy.h>
 #include <pbrt/core/paramset.h>
+#include <pbrt/core/reflection.h>
 #include <pbrt/core/sampler.h>
 #include <pbrt/core/sampling.h>
+#include <pbrt/util/fileutil.h>
 #include <pbrt/util/floatfile.h>
-#include <pbrt/core/image.h>
-#include <pbrt/core/reflection.h>
 #include <pbrt/util/stats.h>
-#include <pbrt/core/lowdiscrepancy.h>
+
 #include <array>
 
 namespace pbrt {
@@ -707,7 +709,7 @@ std::shared_ptr<RealisticCamera> CreateRealisticCamera(
     }
 
     // Realistic camera-specific parameters
-    std::string lensFile = params.GetOneFilename("lensfile", "");
+    std::string lensFile = AbsolutePath(ResolveFilename(params.GetOneString("lensfile", "")));
     Float apertureDiameter = params.GetOneFloat("aperturediameter", 1.0);
     Float focusDistance = params.GetOneFloat("focusdistance", 10.0);
     bool simpleWeighting = params.GetOneBool("simpleweighting", true);

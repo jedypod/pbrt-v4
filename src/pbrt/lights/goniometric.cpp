@@ -32,8 +32,10 @@
 
 // lights/goniometric.cpp*
 #include <pbrt/lights/goniometric.h>
+
 #include <pbrt/core/paramset.h>
 #include <pbrt/core/sampling.h>
+#include <pbrt/util/fileutil.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {
@@ -126,7 +128,7 @@ std::shared_ptr<GonioPhotometricLight> CreateGoniometricLight(
     Spectrum I = paramSet.GetOneSpectrum("I", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
 
-    std::string texname = paramSet.GetOneFilename("mapname", "");
+    std::string texname = AbsolutePath(ResolveFilename(paramSet.GetOneString("mapname", "")));
     absl::optional<Image> image;
     if (texname != "")
         image = Image::Read(texname);

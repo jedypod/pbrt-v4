@@ -36,6 +36,7 @@
 #include <pbrt/core/error.h>
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/paramset.h>
+#include <pbrt/util/fileutil.h>
 #include <pbrt/util/stats.h>
 
 #include <Ptexture.h>
@@ -159,13 +160,15 @@ T PtexTexture<T>::Evaluate(const SurfaceInteraction &si) const {
 
 std::shared_ptr<PtexTexture<Float>> CreatePtexFloatTexture(
     const Transform &tex2world, const TextureParams &tp) {
-    std::string filename = tp.GetOneFilename("filename", "");
+    std::string filename =
+        AbsolutePath(ResolveFilename(tp.GetOneString("filename", "")));
     return std::make_shared<PtexTexture<Float>>(filename);
 }
 
 std::shared_ptr<PtexTexture<Spectrum>> CreatePtexSpectrumTexture(
     const Transform &tex2world, const TextureParams &tp) {
-    std::string filename = tp.GetOneFilename("filename", "");
+    std::string filename =
+        AbsolutePath(ResolveFilename(tp.GetOneString("filename", "")));
     return std::make_shared<PtexTexture<Spectrum>>(filename);
 }
 

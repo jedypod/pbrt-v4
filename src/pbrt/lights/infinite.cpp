@@ -34,6 +34,7 @@
 #include <pbrt/lights/infinite.h>
 #include <pbrt/core/sampling.h>
 #include <pbrt/core/paramset.h>
+#include <pbrt/util/fileutil.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/stats.h>
 
@@ -166,7 +167,7 @@ std::shared_ptr<InfiniteAreaLight> CreateInfiniteLight(
     const std::shared_ptr<const ParamSet> &attributes) {
     Spectrum L = paramSet.GetOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
-    std::string texmap = paramSet.GetOneFilename("mapname", "");
+    std::string texmap = AbsolutePath(ResolveFilename(paramSet.GetOneString("mapname", "")));
 
     absl::optional<Image> image;
     if (texmap != "")

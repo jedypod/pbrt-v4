@@ -35,6 +35,7 @@
 #include <pbrt/core/sampling.h>
 #include <pbrt/core/paramset.h>
 #include <pbrt/core/reflection.h>
+#include <pbrt/util/fileutil.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {
@@ -170,7 +171,7 @@ std::shared_ptr<ProjectionLight> CreateProjectionLight(
     Spectrum sc = paramSet.GetOneSpectrum("scale", Spectrum(1.0));
     Float fov = paramSet.GetOneFloat("fov", 45.);
 
-    std::string texname = paramSet.GetOneFilename("mapname", "");
+    std::string texname = AbsolutePath(ResolveFilename(paramSet.GetOneString("mapname", "")));
     absl::optional<Image> image;
     if (texname != "")
         image = Image::Read(texname);
