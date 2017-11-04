@@ -143,8 +143,8 @@ void MLTSampler::StartStream(int index) {
 }
 
 // MLT Method Definitions
-Spectrum MLTIntegrator::L(const Scene &scene, MemoryArena &arena,
-                          MLTSampler &sampler, int depth, Point2f *pRaster) {
+Spectrum MLTIntegrator::L(MemoryArena &arena, MLTSampler &sampler, int depth,
+                          Point2f *pRaster) {
     sampler.StartStream(cameraStreamIndex);
     // Determine the number of available strategies and pick a specific one
     int s, t, nStrategies;
@@ -180,7 +180,7 @@ Spectrum MLTIntegrator::L(const Scene &scene, MemoryArena &arena,
            nStrategies;
 }
 
-void MLTIntegrator::Render(const Scene &scene) {
+void MLTIntegrator::Render() {
     lightDistr = std::make_unique<PowerLightDistribution>(scene);
 
     // Generate bootstrap samples and compute normalization constant $b$
@@ -201,7 +201,7 @@ void MLTIntegrator::Render(const Scene &scene) {
                                        largeStepProbability, nSampleStreams);
                     Point2f pRaster;
                     bootstrapWeights[rngIndex] =
-                        L(scene, arena, sampler, depth, &pRaster).y();
+                        L(arena, sampler, depth, &pRaster).y();
                     arena.Reset();
                 }
                 if ((i + 1 % 256) == 0) progress.Update();
@@ -237,14 +237,14 @@ void MLTIntegrator::Render(const Scene &scene) {
                                largeStepProbability, nSampleStreams);
             Point2f pCurrent;
             Spectrum LCurrent =
-                L(scene, arena, sampler, depth, &pCurrent);
+                L(arena, sampler, depth, &pCurrent);
 
             // Run the Markov chain for _nChainMutations_ steps
             for (int64_t j = 0; j < nChainMutations; ++j) {
                 sampler.StartIteration();
                 Point2f pProposed;
                 Spectrum LProposed =
-                    L(scene, arena, sampler, depth, &pProposed);
+                    L(arena, sampler, depth, &pProposed);
                 // Compute acceptance probability for proposed sample
                 Float accept = std::min<Float>(1, LProposed.y() / LCurrent.y());
 
@@ -280,7 +280,8 @@ void MLTIntegrator::Render(const Scene &scene) {
 }
 
 std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(
-    const ParamSet &params, std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     int nBootstrap = params.GetOneInt("bootstrapsamples", 100000);
     int64_t nChains = params.GetOneInt("chains", 1000);
@@ -292,7 +293,7 @@ std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(
         mutationsPerPixel = std::max(1, mutationsPerPixel / 16);
         nBootstrap = std::max(1, nBootstrap / 16);
     }
-    return std::make_unique<MLTIntegrator>(camera, maxDepth, nBootstrap,
+    return std::make_unique<MLTIntegrator>(scene, camera, maxDepth, nBootstrap,
                                            nChains, mutationsPerPixel, sigma,
                                            largeStepProbability);
 }

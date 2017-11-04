@@ -166,8 +166,7 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
 }
 
 // SamplerIntegrator Method Definitions
-void SamplerIntegrator::Render(const Scene &scene) {
-    Preprocess(scene, *sampler);
+void SamplerIntegrator::Render() {
     // Render image tiles in parallel
 
     // Compute number of tiles, _nTiles_, to use for parallel rendering
@@ -185,7 +184,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
             MemoryArena arena;
 
             // Get sampler instance for tile
-            std::unique_ptr<Sampler> tileSampler = sampler->Clone();
+            std::unique_ptr<Sampler> tileSampler = initialSampler->Clone();
 
             LOG(INFO) << "Starting image tile " << tileBounds;
 
@@ -198,7 +197,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
                 if (!InsideExclusive(pixel, pixelBounds))
                     continue;
 
-                int spp = sampler->samplesPerPixel;
+                int spp = tileSampler->samplesPerPixel;
                 for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
                     tileSampler->StartSequence(pixel, sampleIndex);
 
@@ -220,7 +219,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
 
                     // Evaluate radiance along camera ray
                     Spectrum L(0.f);
-                    if (rayWeight > 0) L = Li(ray, scene, *tileSampler, arena);
+                    if (rayWeight > 0) L = Li(ray, *tileSampler, arena);
 
                     // Issue warning if unexpected radiance value returned
                     if (L.HasNaNs()) {
@@ -272,7 +271,7 @@ void SamplerIntegrator::Render(const Scene &scene) {
 
 Spectrum SamplerIntegrator::SpecularReflect(
     const RayDifferential &ray, const SurfaceInteraction &isect,
-    const Scene &scene, Sampler &sampler, MemoryArena &arena, int depth) const {
+    Sampler &sampler, MemoryArena &arena, int depth) const {
     // Compute specular reflection direction _wi_ and BSDF value
     Vector3f wo = isect.wo, wi;
     Float pdf;
@@ -302,7 +301,7 @@ Spectrum SamplerIntegrator::SpecularReflect(
             rd.ryDirection =
                 wi - dwody + 2 * Vector3f(Dot(wo, ns) * dndy + dDNdy * ns);
         }
-        return f * Li(rd, scene, sampler, arena, depth + 1) * AbsDot(wi, ns) /
+        return f * Li(rd, sampler, arena, depth + 1) * AbsDot(wi, ns) /
                pdf;
     } else
         return Spectrum(0.f);
@@ -310,7 +309,7 @@ Spectrum SamplerIntegrator::SpecularReflect(
 
 Spectrum SamplerIntegrator::SpecularTransmit(
     const RayDifferential &ray, const SurfaceInteraction &isect,
-    const Scene &scene, Sampler &sampler, MemoryArena &arena, int depth) const {
+    Sampler &sampler, MemoryArena &arena, int depth) const {
     Vector3f wo = isect.wo, wi;
     Float pdf;
     const Point3f &p = isect.p;
@@ -352,7 +351,7 @@ Spectrum SamplerIntegrator::SpecularTransmit(
             rd.ryDirection =
                 wi + eta * dwody - Vector3f(mu * dndy + dmudy * ns);
         }
-        L = f * Li(rd, scene, sampler, arena, depth + 1) * AbsDot(wi, ns) / pdf;
+        L = f * Li(rd, sampler, arena, depth + 1) * AbsDot(wi, ns) / pdf;
     }
     return L;
 }

@@ -56,7 +56,11 @@ class Integrator {
   public:
     // Integrator Interface
     virtual ~Integrator();
-    virtual void Render(const Scene &scene) = 0;
+    virtual void Render() = 0;
+
+ protected:
+    Integrator(const Scene &scene) : scene(scene) {}
+    const Scene &scene;
 };
 
 Spectrum EstimateLd(const Interaction &it, const Scene &scene,
@@ -67,23 +71,23 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
 class SamplerIntegrator : public Integrator {
   public:
     // SamplerIntegrator Public Methods
-    SamplerIntegrator(std::shared_ptr<const Camera> camera,
-                      std::unique_ptr<Sampler> sampler,
-                      const Bounds2i &pixelBounds)
-        : camera(camera), sampler(std::move(sampler)), pixelBounds(pixelBounds) {}
-    virtual void Preprocess(const Scene &scene, Sampler &sampler) {}
-    void Render(const Scene &scene);
-    virtual Spectrum Li(const RayDifferential &ray, const Scene &scene,
-                        Sampler &sampler, MemoryArena &arena,
-                        int depth = 0) const = 0;
+   SamplerIntegrator(const Scene &scene,
+                     std::shared_ptr<const Camera> camera,
+                     std::unique_ptr<Sampler> sampler,
+                     const Bounds2i &pixelBounds)
+       : Integrator(scene), camera(camera), initialSampler(std::move(sampler)),
+         pixelBounds(pixelBounds) {}
+    void Render();
+    virtual Spectrum Li(const RayDifferential &ray, Sampler &sampler,
+                        MemoryArena &arena, int depth = 0) const = 0;
     Spectrum SpecularReflect(const RayDifferential &ray,
                              const SurfaceInteraction &isect,
-                             const Scene &scene, Sampler &sampler,
-                             MemoryArena &arena, int depth) const;
+                             Sampler &sampler, MemoryArena &arena,
+                             int depth) const;
     Spectrum SpecularTransmit(const RayDifferential &ray,
                               const SurfaceInteraction &isect,
-                              const Scene &scene, Sampler &sampler,
-                              MemoryArena &arena, int depth) const;
+                              Sampler &sampler, MemoryArena &arena,
+                              int depth) const;
 
   protected:
     // SamplerIntegrator Protected Data
@@ -91,7 +95,7 @@ class SamplerIntegrator : public Integrator {
 
   private:
     // SamplerIntegrator Private Data
-    std::unique_ptr<Sampler> sampler;
+    std::unique_ptr<Sampler> initialSampler;
     const Bounds2i pixelBounds;
 };
 

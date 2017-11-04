@@ -49,24 +49,20 @@ STAT_PERCENT("Integrator/Zero-radiance paths", zeroRadiancePaths, totalPaths);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
 // PathIntegrator Method Definitions
-PathIntegrator::PathIntegrator(int maxDepth,
+PathIntegrator::PathIntegrator(int maxDepth, const Scene &scene,
                                std::shared_ptr<const Camera> camera,
                                std::unique_ptr<Sampler> sampler,
                                const Bounds2i &pixelBounds, Float rrThreshold,
                                const std::string &lightSampleStrategy)
-    : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
+    : SamplerIntegrator(scene, camera, std::move(sampler), pixelBounds),
       maxDepth(maxDepth),
-      rrThreshold(rrThreshold),
-      lightSampleStrategy(lightSampleStrategy) {}
-
-void PathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
+      rrThreshold(rrThreshold) {
     lightDistribution =
         CreateLightSampleDistribution(lightSampleStrategy, scene);
 }
 
-Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
-                            Sampler &sampler, MemoryArena &arena,
-                            int depth) const {
+Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
+                            MemoryArena &arena, int depth) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
@@ -189,8 +185,8 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 }
 
 std::unique_ptr<PathIntegrator> CreatePathIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
@@ -208,7 +204,7 @@ std::unique_ptr<PathIntegrator> CreatePathIntegrator(
     Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
         params.GetOneString("lightsamplestrategy", "spatial");
-    return std::make_unique<PathIntegrator>(maxDepth, camera,
+    return std::make_unique<PathIntegrator>(maxDepth, scene, camera,
                                             std::move(sampler), pixelBounds,
                                             rrThreshold, lightStrategy);
 }

@@ -111,7 +111,7 @@ inline unsigned int hash(const Point3i &p, int hashSize) {
 }
 
 // SPPM Method Definitions
-void SPPMIntegrator::Render(const Scene &scene) {
+void SPPMIntegrator::Render() {
     ProfilePhase p(Prof::IntegratorRender);
     // Initialize _pixelBounds_ and _pixels_ array for SPPM
     Bounds2i pixelBounds = camera->film->croppedPixelBounds;
@@ -500,7 +500,8 @@ void SPPMIntegrator::Render(const Scene &scene) {
 }
 
 std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
-    const ParamSet &params, std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera) {
     int nIterations =
         params.GetOneInt("iterations", params.GetOneInt("numiterations", 64));
     int maxDepth = params.GetOneInt("maxdepth", 5);
@@ -508,7 +509,7 @@ std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
     int writeFreq = params.GetOneInt("imagewritefrequency", 1 << 31);
     Float radius = params.GetOneFloat("radius", 1.f);
     if (PbrtOptions.quickRender) nIterations = std::max(1, nIterations / 16);
-    return std::make_unique<SPPMIntegrator>(camera, nIterations, photonsPerIter,
+    return std::make_unique<SPPMIntegrator>(scene, camera, nIterations, photonsPerIter,
                                             maxDepth, radius, writeFreq);
 }
 

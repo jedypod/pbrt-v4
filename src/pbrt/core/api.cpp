@@ -159,8 +159,8 @@ struct TransformSet {
 
 struct RenderOptions {
     // RenderOptions Public Methods
-    std::unique_ptr<Integrator> MakeIntegrator() const;
-    Scene *MakeScene();
+    std::unique_ptr<Integrator> MakeIntegrator(const Scene &scene) const;
+    std::unique_ptr<Scene> MakeScene();
     std::shared_ptr<Camera> MakeCamera() const;
 
     // RenderOptions Public Data
@@ -1531,8 +1531,8 @@ void pbrtWorldEnd() {
     if (PbrtOptions.cat || PbrtOptions.toPly) {
         printf("%*sWorldEnd\n", catIndentCount, "");
     } else {
-        std::unique_ptr<Integrator> integrator = renderOptions->MakeIntegrator();
-        std::unique_ptr<Scene> scene(renderOptions->MakeScene());
+        std::unique_ptr<Scene> scene = renderOptions->MakeScene();
+        std::unique_ptr<Integrator> integrator = renderOptions->MakeIntegrator(*scene);
 
         // This is kind of ugly; we directly override the current profiler
         // state to switch from parsing/scene construction related stuff to
@@ -1543,7 +1543,7 @@ void pbrtWorldEnd() {
         CHECK_EQ(CurrentProfilerState(), ProfToBits(Prof::SceneConstruction));
         ProfilerState = ProfToBits(Prof::IntegratorRender);
 
-        if (scene && integrator) integrator->Render(*scene);
+        if (scene && integrator) integrator->Render();
 
         CHECK_EQ(CurrentProfilerState(), ProfToBits(Prof::IntegratorRender));
         ProfilerState = ProfToBits(Prof::SceneConstruction);
@@ -1580,39 +1580,39 @@ void pbrtWorldEnd() {
                                  namedCoordinateSystems.end());
 }
 
-Scene *RenderOptions::MakeScene() {
+std::unique_ptr<Scene> RenderOptions::MakeScene() {
     std::shared_ptr<Primitive> accelerator =
         MakeAccelerator(AcceleratorName, primitives, AcceleratorParams);
     if (!accelerator) accelerator = std::make_shared<BVHAccel>(primitives);
-    Scene *scene = new Scene(accelerator, lights);
+    std::unique_ptr<Scene> scene = std::make_unique<Scene>(accelerator, lights);
     // Erase primitives and lights from _RenderOptions_
     primitives.erase(primitives.begin(), primitives.end());
     lights.erase(lights.begin(), lights.end());
     return scene;
 }
 
-std::unique_ptr<Integrator> RenderOptions::MakeIntegrator() const {
+std::unique_ptr<Integrator> RenderOptions::MakeIntegrator(const Scene &scene) const {
     std::shared_ptr<Camera> camera = MakeCamera();
     std::unique_ptr<Sampler> sampler =
         MakeSampler(SamplerName, SamplerParams, camera->film->GetSampleBounds());
 
     std::unique_ptr<Integrator> integrator;
     if (IntegratorName == "whitted")
-        integrator = CreateWhittedIntegrator(IntegratorParams, std::move(sampler), camera);
+        integrator = CreateWhittedIntegrator(IntegratorParams, scene, camera, std::move(sampler));
     else if (IntegratorName == "path")
-        integrator = CreatePathIntegrator(IntegratorParams, std::move(sampler), camera);
+        integrator = CreatePathIntegrator(IntegratorParams, scene, camera, std::move(sampler));
     else if (IntegratorName == "volpath")
-        integrator = CreateVolPathIntegrator(IntegratorParams, std::move(sampler), camera);
+        integrator = CreateVolPathIntegrator(IntegratorParams, scene, camera, std::move(sampler));
     else if (IntegratorName == "bdpt")
-        integrator = CreateBDPTIntegrator(IntegratorParams, std::move(sampler), camera);
+        integrator = CreateBDPTIntegrator(IntegratorParams, scene, camera, std::move(sampler));
     else if (IntegratorName == "aov")
-        integrator = CreateAOVIntegrator(IntegratorParams, camera);
+        integrator = CreateAOVIntegrator(IntegratorParams, scene, camera);
     else if (IntegratorName == "mlt")
-        integrator = CreateMLTIntegrator(IntegratorParams, camera);
+        integrator = CreateMLTIntegrator(IntegratorParams, scene, camera);
     else if (IntegratorName == "ambientocclusion")
-        integrator = CreateAOIntegrator(IntegratorParams, std::move(sampler), camera);
+        integrator = CreateAOIntegrator(IntegratorParams, scene, camera, std::move(sampler));
     else if (IntegratorName == "sppm")
-        integrator = CreateSPPMIntegrator(IntegratorParams, camera);
+        integrator = CreateSPPMIntegrator(IntegratorParams, scene, camera);
     else {
         Error("Integrator \"%s\" unknown.", IntegratorName.c_str());
         exit(1);

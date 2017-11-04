@@ -51,29 +51,31 @@ namespace pbrt {
 class VolPathIntegrator : public SamplerIntegrator {
   public:
     // VolPathIntegrator Public Methods
-    VolPathIntegrator(int maxDepth, std::shared_ptr<const Camera> camera,
+    VolPathIntegrator(int maxDepth, const Scene &scene,
+                      std::shared_ptr<const Camera> camera,
                       std::unique_ptr<Sampler> sampler,
                       const Bounds2i &pixelBounds, Float rrThreshold = 1,
                       const std::string &lightSampleStrategy = "spatial")
-        : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
+        : SamplerIntegrator(scene, camera, std::move(sampler), pixelBounds),
           maxDepth(maxDepth),
-          rrThreshold(rrThreshold),
-          lightSampleStrategy(lightSampleStrategy) { }
-    void Preprocess(const Scene &scene, Sampler &sampler);
-    Spectrum Li(const RayDifferential &ray, const Scene &scene,
-                Sampler &sampler, MemoryArena &arena, int depth) const;
+          rrThreshold(rrThreshold) {
+              lightDistribution =
+                  CreateLightSampleDistribution(lightSampleStrategy, scene);
+          }
+
+    Spectrum Li(const RayDifferential &ray, Sampler &sampler,
+                MemoryArena &arena, int depth) const;
 
   private:
     // VolPathIntegrator Private Data
     const int maxDepth;
     const Float rrThreshold;
-    const std::string lightSampleStrategy;
     std::unique_ptr<LightDistribution> lightDistribution;
 };
 
 std::unique_ptr<VolPathIntegrator> CreateVolPathIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera);
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
 }  // namespace pbrt
 

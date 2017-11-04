@@ -46,11 +46,11 @@
 namespace pbrt {
 
 // AOIntegrator Method Definitions
-AOIntegrator::AOIntegrator(bool cosSample, int ns,
+AOIntegrator::AOIntegrator(bool cosSample, int ns, const Scene &scene,
                            std::shared_ptr<const Camera> camera,
                            std::unique_ptr<Sampler> sampler,
                            const Bounds2i &pixelBounds)
-    : SamplerIntegrator(camera, std::move(sampler), pixelBounds),
+    : SamplerIntegrator(scene, camera, std::move(sampler), pixelBounds),
       cosSample(cosSample) {
     nSamples = sampler->RoundCount(ns);
     if (ns != nSamples)
@@ -58,9 +58,8 @@ AOIntegrator::AOIntegrator(bool cosSample, int ns,
     sampler->Request2DArray(nSamples);
 }
 
-Spectrum AOIntegrator::Li(const RayDifferential &r, const Scene &scene,
-                          Sampler &sampler, MemoryArena &arena,
-                          int depth) const {
+Spectrum AOIntegrator::Li(const RayDifferential &r, Sampler &sampler,
+                          MemoryArena &arena, int depth) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f);
     RayDifferential ray(r);
@@ -107,8 +106,8 @@ Spectrum AOIntegrator::Li(const RayDifferential &r, const Scene &scene,
 }
 
 std::unique_ptr<AOIntegrator> CreateAOIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int np;
     absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
@@ -123,10 +122,11 @@ std::unique_ptr<AOIntegrator> CreateAOIntegrator(
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
+
     bool cosSample = params.GetOneBool("cossample", true);
     int nSamples = params.GetOneInt("nsamples", 64);
     if (PbrtOptions.quickRender) nSamples = 1;
-    return std::make_unique<AOIntegrator>(cosSample, nSamples, camera,
+    return std::make_unique<AOIntegrator>(cosSample, nSamples, scene, camera,
                                           std::move(sampler), pixelBounds);
 }
 

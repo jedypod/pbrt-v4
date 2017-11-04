@@ -29,14 +29,79 @@ GFX!
 
 -----------------
 
+- paramset unit tests, especially shadowing stuff
+  ParamSet -> ParameterSet
+  TextureParams -> ...?
+  why doesn't everyone just take a TextureParams, make ParamSet an
+    implementation detail of it?  ScopedParameters? ...?
+
+- more robust checking for shape material param overrides; add a mode where
+  the parameter set tracks which parameters are requested (and their types?)
+
+- reorder initialization to remove preprocess callbacks:
+  Scene
+  At WorldEnd:
+    Filter
+    Film
+    Camera / Sampler
+    Integrator
+  -> can pass Scene to Camera and Integrator constructors
+
+- merge in segment tree stuff, add tests
+
+- Waverfront based stuff.  Make optional, only do if writing out
+  intermediate images, or.... ?  Or is this too much complexity in the main
+  render loop??
+
 - code organization:
   base/{camera,shape,light,...}
   sampling/...
   core/paramset, api, parse,
-  scattering: reflection,
-  too much decomposition for core/?
+  scattering: reflection, phase function implementations
+  or is that too much decomposition for core/?
+  - why is error.* in core?
 
-- why is error.* in core?
+base/
+camera.h
+filter.h
+integrator.h
+light.h
+material.h
+medium.h
+primitive.h
+sampler.h
+shape.h
+texture.h
+bssrdf.h (some)
+reflection.h (some)
+
+scattering/
+bssrdf.h (some)
+reflection.h (some), break apart?
+microfacet.h
+
+core/
+pbrt.h
+api.h
+paramset.h
+parser.h
+pbrtparse.h
+scene.h
+film.h
+error.h -> util? (or here because uses context from parsing--file, line no?) 
+? core/
+texcache.h
+spectrum.h
+image.h -> util ?
+interaction.h
+lightdistrib.h
+mipmap.h
+
+sampling/
+lowdiscrepancy.h
+sampling.h
+sobolmatrices.h
+much break apart? shapes.h, ... ?
 
 - add more simple volume scattering tests--verious light types, etc.
   light in medium, light not in medium, camera in/out, etc.
@@ -166,7 +231,7 @@ GFX!
 
 - do we actually use tHit at this point? (for anything besides far hit culling)
 
-- store Integrator and Camera in Scene (eliminate places where it's plumbed through)
+- store Integrator and Camera in Scene? (eliminate places where it's plumbed through)
 
 - how come e.g. a triangle isn't xformed twice when an area light source?
   light to world versus the baked in world space xform

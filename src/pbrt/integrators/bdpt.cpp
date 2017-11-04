@@ -299,7 +299,7 @@ inline int BufferIndex(int s, int t) {
     return s + above * (5 + above) / 2;
 }
 
-void BDPTIntegrator::Render(const Scene &scene) {
+void BDPTIntegrator::Render() {
     PowerLightDistribution lightDistribution(scene);
 
     // Partition the image into tiles
@@ -515,8 +515,8 @@ Spectrum ConnectBDPT(
 }
 
 std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     bool visualizeStrategies = params.GetOneBool("visualizestrategies", false);
     bool visualizeWeights = params.GetOneBool("visualizeweights", false);
@@ -545,7 +545,7 @@ std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
     std::string lightStrategy =
         params.GetOneString("lightsamplestrategy", "power");
     return std::make_unique<BDPTIntegrator>(
-        std::move(sampler), camera, maxDepth, visualizeStrategies,
+        scene, camera, std::move(sampler), maxDepth, visualizeStrategies,
         visualizeWeights, pixelBounds, lightStrategy);
 }
 

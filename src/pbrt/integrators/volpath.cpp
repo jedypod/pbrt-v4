@@ -50,14 +50,8 @@ STAT_COUNTER("Integrator/Volume interactions", volumeInteractions);
 STAT_COUNTER("Integrator/Surface interactions", surfaceInteractions);
 
 // VolPathIntegrator Method Definitions
-void VolPathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
-    lightDistribution =
-        CreateLightSampleDistribution(lightSampleStrategy, scene);
-}
-
-Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
-                               Sampler &sampler, MemoryArena &arena,
-                               int depth) const {
+Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
+                               MemoryArena &arena, int depth) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
@@ -184,8 +178,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 }
 
 std::unique_ptr<VolPathIntegrator> CreateVolPathIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
@@ -203,7 +197,7 @@ std::unique_ptr<VolPathIntegrator> CreateVolPathIntegrator(
     Float rrThreshold = params.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
         params.GetOneString("lightsamplestrategy", "spatial");
-    return std::make_unique<VolPathIntegrator>(maxDepth, camera,
+    return std::make_unique<VolPathIntegrator>(maxDepth, scene, camera,
                                                std::move(sampler), pixelBounds,
                                                rrThreshold, lightStrategy);
 }

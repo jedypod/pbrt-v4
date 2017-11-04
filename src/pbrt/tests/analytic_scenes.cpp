@@ -289,7 +289,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new PathIntegrator(8, camera, std::move(sampler.first),
+                new PathIntegrator(8, *scene.scene, camera, std::move(sampler.first),
                                    camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Perspective, " +
@@ -309,7 +309,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     1., 0., 10., std::move(film), nullptr);
 
             Integrator *integrator =
-                new PathIntegrator(8, camera, std::move(sampler.first),
+                new PathIntegrator(8, *scene.scene, camera, std::move(sampler.first),
                                    camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "Path, depth 8, Ortho, " + sampler.second +
@@ -329,7 +329,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new VolPathIntegrator(8, camera, std::move(sampler.first),
+                new VolPathIntegrator(8, *scene.scene, camera, std::move(sampler.first),
                                       camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Perspective, " +
@@ -348,7 +348,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     1., 0., 10., std::move(film), nullptr);
 
             Integrator *integrator =
-                new VolPathIntegrator(8, camera, std::move(sampler.first),
+                new VolPathIntegrator(8, *scene.scene, camera, std::move(sampler.first),
                                       camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "VolPath, depth 8, Ortho, " +
@@ -369,7 +369,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator =
-                new BDPTIntegrator(std::move(sampler.first), camera, 6, false, false,
+                new BDPTIntegrator(*scene.scene, camera, std::move(sampler.first), 6, false, false,
                                    camera->film->croppedPixelBounds);
             integrators.push_back({integrator, camera->film.get(),
                                    "BDPT, depth 8, Perspective, " +
@@ -387,8 +387,8 @@ std::vector<TestIntegrator> GetIntegrators() {
           identity, Bounds2f(Point2f(-.1,-.1), Point2f(.1,.1)), 0., 1.,
           0., 10., std::move(film), nullptr);
 
-      Integrator *integrator = new BDPTIntegrator(std::move(sampler.first), camera, 8,
-                                            false, false);
+      Integrator *integrator = new BDPTIntegrator(*scene.scene, std::move(sampler.first), camera, 8,
+                                                  false, false);
       integrators.push_back({integrator, camera->film.get(),
               "BDPT, depth 8, Ortho, " + sampler.second + ", " +
               scene.description, scene});
@@ -407,7 +407,7 @@ std::vector<TestIntegrator> GetIntegrators() {
                     0., 10., 45, std::move(film), nullptr);
 
             Integrator *integrator = new MLTIntegrator(
-                camera, 8 /* depth */, 100000 /* n bootstrap */,
+                *scene.scene, camera, 8 /* depth */, 100000 /* n bootstrap */,
                 1000 /* nchains */, 1024 /* mutations per pixel */,
                 0.01 /* sigma */, 0.3 /* large step prob */);
             integrators.push_back({integrator, camera->film.get(),
@@ -426,7 +426,7 @@ TEST_P(RenderTest, RadianceMatches) {
     pbrtInit(options);
 
     const TestIntegrator &tr = GetParam();
-    tr.integrator->Render(*tr.scene.scene);
+    tr.integrator->Render();
     CheckSceneAverage(inTestDir("test.exr"), tr.scene.expected);
     // The SpatialLightDistribution class keeps a per-thread cache that
     // must be cleared out between test runs. In turn, this means that we

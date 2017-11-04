@@ -45,9 +45,8 @@
 namespace pbrt {
 
 // WhittedIntegrator Method Definitions
-Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
-                               Sampler &sampler, MemoryArena &arena,
-                               int depth) const {
+Spectrum WhittedIntegrator::Li(const RayDifferential &ray, Sampler &sampler,
+                               MemoryArena &arena, int depth) const {
     Spectrum L(0.);
     // Find closest ray intersection or return background radiance
     SurfaceInteraction isect;
@@ -65,7 +64,7 @@ Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
     // Compute scattering functions for surface interaction
     isect.ComputeScatteringFunctions(ray, arena);
     if (!isect.bsdf)
-        return Li(isect.SpawnRay(ray.d), scene, sampler, arena, depth);
+        return Li(isect.SpawnRay(ray.d), sampler, arena, depth);
 
     // Compute emitted light if ray hit an area light source
     L += isect.Le(wo);
@@ -84,15 +83,15 @@ Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
     }
     if (depth + 1 < maxDepth) {
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, isect, scene, sampler, arena, depth);
-        L += SpecularTransmit(ray, isect, scene, sampler, arena, depth);
+        L += SpecularReflect(ray, isect, sampler, arena, depth);
+        L += SpecularTransmit(ray, isect, sampler, arena, depth);
     }
     return L;
 }
 
 std::unique_ptr<WhittedIntegrator> CreateWhittedIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = params.GetOneInt("maxdepth", 5);
     absl::Span<const int> pb = params.GetIntArray("pixelbounds");
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
@@ -107,7 +106,7 @@ std::unique_ptr<WhittedIntegrator> CreateWhittedIntegrator(
                 Error("Degenerate \"pixelbounds\" specified.");
         }
     }
-    return std::make_unique<WhittedIntegrator>(maxDepth, camera,
+    return std::make_unique<WhittedIntegrator>(maxDepth, scene, camera,
                                                std::move(sampler), pixelBounds);
 }
 

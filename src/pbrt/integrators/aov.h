@@ -51,17 +51,18 @@ namespace pbrt {
 class AOVIntegrator : public Integrator {
   public:
     // AOVIntegrator Public Methods
-    AOVIntegrator(std::shared_ptr<const Camera> camera,
+    AOVIntegrator(const Scene &scene, std::shared_ptr<const Camera> camera,
                   const Bounds2i &pixelBounds, int albedoSamples, int aoSamples,
                   Float aoMaxDist, int eSamples)
-        : camera(camera),
+        : Integrator(scene),
+          camera(camera),
           pixelBounds(pixelBounds),
           albedoSamples(albedoSamples),
           aoSamples(aoSamples),
           aoMaxDist(aoMaxDist),
           eSamples(eSamples) {}
 
-    void Render(const Scene &scene);
+    void Render();
 
   private:
     std::shared_ptr<const Camera> camera;
@@ -72,7 +73,8 @@ class AOVIntegrator : public Integrator {
 };
 
 std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(
-    const ParamSet &params, std::shared_ptr<const Camera> camera);
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera);
 
 }  // namespace pbrt
 

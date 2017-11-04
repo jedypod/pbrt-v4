@@ -125,19 +125,20 @@ inline Float InfiniteLightDensity(
 class BDPTIntegrator : public Integrator {
   public:
     // BDPTIntegrator Public Methods
-    BDPTIntegrator(std::unique_ptr<Sampler> sampler,
-                   std::shared_ptr<const Camera> camera, int maxDepth,
+    BDPTIntegrator(const Scene &scene, std::shared_ptr<const Camera> camera,
+                   std::unique_ptr<Sampler> sampler, int maxDepth,
                    bool visualizeStrategies, bool visualizeWeights,
                    const Bounds2i &pixelBounds,
                    const std::string &lightSampleStrategy = "power")
-        : sampler(std::move(sampler)),
+        : Integrator(scene),
+          sampler(std::move(sampler)),
           camera(camera),
           maxDepth(maxDepth),
           visualizeStrategies(visualizeStrategies),
           visualizeWeights(visualizeWeights),
           pixelBounds(pixelBounds),
           lightSampleStrategy(lightSampleStrategy) {}
-    void Render(const Scene &scene);
+    void Render();
 
   private:
     // BDPTIntegrator Private Data
@@ -426,8 +427,8 @@ Spectrum ConnectBDPT(
     const Camera &camera, Sampler &sampler, Point2f *pRaster,
     Float *misWeight = nullptr);
 std::unique_ptr<BDPTIntegrator> CreateBDPTIntegrator(
-    const ParamSet &params, std::unique_ptr<Sampler> sampler,
-    std::shared_ptr<const Camera> camera);
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
 // Vertex Inline Method Definitions
 inline Vertex Vertex::CreateCamera(const Camera *camera, const Ray &ray,

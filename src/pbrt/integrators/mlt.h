@@ -112,19 +112,20 @@ class MLTSampler : public Sampler {
 class MLTIntegrator : public Integrator {
   public:
     // MLTIntegrator Public Methods
-    MLTIntegrator(std::shared_ptr<const Camera> camera, int maxDepth,
-                  int nBootstrap, int nChains, int mutationsPerPixel,
-                  Float sigma, Float largeStepProbability)
-        : camera(camera),
+    MLTIntegrator(const Scene &scene, std::shared_ptr<const Camera> camera,
+                  int maxDepth, int nBootstrap, int nChains,
+                  int mutationsPerPixel, Float sigma, Float largeStepProbability)
+        : Integrator(scene),
+          camera(camera),
           maxDepth(maxDepth),
           nBootstrap(nBootstrap),
           nChains(nChains),
           mutationsPerPixel(mutationsPerPixel),
           sigma(sigma),
           largeStepProbability(largeStepProbability) {}
-    void Render(const Scene &scene);
-    Spectrum L(const Scene &scene, MemoryArena &arena,
-               MLTSampler &sampler, int k, Point2f *pRaster);
+    void Render();
+    Spectrum L(MemoryArena &arena, MLTSampler &sampler, int k,
+               Point2f *pRaster);
 
   private:
     // MLTIntegrator Private Data
@@ -138,7 +139,8 @@ class MLTIntegrator : public Integrator {
 };
 
 std::unique_ptr<MLTIntegrator> CreateMLTIntegrator(
-    const ParamSet &params, std::shared_ptr<const Camera> camera);
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera);
 
 }  // namespace pbrt
 

@@ -55,7 +55,7 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/AOV images", aovImageBytes);
 
-void AOVIntegrator::Render(const Scene &scene) {
+void AOVIntegrator::Render() {
     // Allocate FBs (Image vs e.g. vector<Point3f>?)
     Bounds2i croppedPixelBounds = camera->film->croppedPixelBounds;
     Point2i resolution = Point2i(croppedPixelBounds.Diagonal());
@@ -124,7 +124,7 @@ void AOVIntegrator::Render(const Scene &scene) {
                 camera->GenerateRayDifferential(cameraSample, &ray);
             if (rayWeight == 0) continue;
 
-            auto findIntersectionAndShade = [&scene, &arena](
+            auto findIntersectionAndShade = [this, &arena](
                 RayDifferential &ray, SurfaceInteraction *isect) {
                 retry:
                     bool hit = scene.Intersect(ray, isect);
@@ -293,7 +293,8 @@ void AOVIntegrator::Render(const Scene &scene) {
 }
 
 std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(
-    const ParamSet &params, std::shared_ptr<const Camera> camera) {
+    const ParamSet &params, const Scene &scene,
+    std::shared_ptr<const Camera> camera) {
     int albedoSamples = params.GetOneInt("abledosamples", 32);
     int aoSamples = params.GetOneInt("aosamples", 512);
     Float aoMaxDist = params.GetOneFloat("aomaxdist", Infinity);
@@ -322,7 +323,7 @@ std::unique_ptr<AOVIntegrator> CreateAOVIntegrator(
         }
     }
 
-    return std::make_unique<AOVIntegrator>(camera, pixelBounds, albedoSamples,
+    return std::make_unique<AOVIntegrator>(scene, camera, pixelBounds, albedoSamples,
                                            aoSamples, aoMaxDist, eSamples);
 }
 
