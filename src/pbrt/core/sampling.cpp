@@ -472,10 +472,7 @@ Point2f SampleBilinear(Point2f u, absl::Span<const Float> v) {
 Float BilinearPdf(Point2f p, absl::Span<const Float> v) {
     CHECK_EQ(4, v.size());
     Float c = (v[0] + v[1] + v[2] + v[3]) / 4;
-    return (1 / c) * ((1 - p[0]) * (1 - p[1]) * v[0] +
-                           p[0]  * (1 - p[1]) * v[1] +
-                      (1 - p[0]) *      p[1]  * v[2] +
-                           p[0]  *      p[1]  * v[3]);
+    return (1 / c) * Bilerp(p, v);
 }
 
 }  // namespace pbrt

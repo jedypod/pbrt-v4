@@ -38,11 +38,13 @@
 #ifndef PBRT_UTIL_MATH_H
 #define PBRT_UTIL_MATH_H
 
-// core/math.h*
+// util/math.h*
 #include <pbrt/core/pbrt.h>
 
+#include <absl/types/span.h>
 #include <glog/logging.h>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -259,6 +261,15 @@ size_t FindInterval(size_t size, const Predicate &pred) {
 
 inline constexpr Float Lerp(Float t, Float v1, Float v2) {
     return (1 - t) * v1 + t * v2;
+}
+
+// (0,0): v[0], (1, 0): v[1], (0, 1): v[2], (1, 1): v[3]
+inline Float
+Bilerp(std::array<Float, 2> p, absl::Span<const Float> v) {
+    return ((1 - p[0]) * (1 - p[1]) * v[0] +
+                 p[0]  * (1 - p[1]) * v[1] +
+            (1 - p[0]) *      p[1]  * v[2] +
+                 p[0]  *      p[1]  * v[3]);
 }
 
 template <typename T>

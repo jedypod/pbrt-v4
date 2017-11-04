@@ -132,6 +132,8 @@ class Tuple2 {
 
     Child<T> operator-() const { return { -x, -y }; }
 
+    operator std::array<T, 2>() const { return { x, y }; }
+
     T operator[](int i) const {
         DCHECK(i >= 0 && i <= 1);
         if (i == 0) return x;
