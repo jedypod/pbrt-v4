@@ -37,9 +37,6 @@ GFX!
   why doesn't everyone just take a TextureParams, make ParamSet an
     implementation detail of it?  ScopedParameters? ...?
 
-- more robust checking for shape material param overrides; add a mode where
-  the parameter set tracks which parameters are requested (and their types?)
-
 - be more consistent to not do error checking during pbrt cat and to ply
 
 - inconsistent: RenderOptions::MakeIntegrator vs e.g. standalone MakeFilter

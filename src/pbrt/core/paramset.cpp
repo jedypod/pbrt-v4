@@ -103,30 +103,6 @@ static void addParam(const std::string &name, std::vector<T> values,
     vec.push_back(ParamSetItem<T>(name, std::move(values)));
 }
 
-template <typename T>
-static absl::Span<const T> lookupPtr(const std::string &name,
-                                     const std::vector<ParamSetItem<T>> &vec) {
-    for (const auto &v : vec) {
-        if (v.name == name) {
-            v.lookedUp = true;
-            return absl::Span<const T>(v.values);
-        }
-    }
-    return {};
-}
-
-template <typename T>
-static T lookupOne(const std::string &name, T def,
-                   const std::vector<ParamSetItem<T>> &vec) {
-    for (const auto &v : vec) {
-        if (v.name == name && v.values.size() == 1) {
-            v.lookedUp = true;
-            return v.values[0];
-        }
-    }
-    return def;
-}
-
 // ParamSet Methods
 void ParamSet::AddFloat(const std::string &name,
                         std::vector<Float> values) {
@@ -183,95 +159,161 @@ void ParamSet::AddTexture(const std::string &name, const std::string &value) {
     addParam(name, std::move(str), textures);
 }
 
+template <typename T>
+static absl::Span<const T> lookupPtr(const std::string &name,
+                                     const std::vector<ParamSetItem<T>> &vec) {
+    for (const auto &v : vec) {
+        if (v.name == name) {
+            v.lookedUp = true;
+            return absl::Span<const T>(v.values);
+        }
+    }
+    return {};
+}
+
+template <typename T>
+static T lookupOne(const std::string &name, T def,
+                   const std::vector<ParamSetItem<T>> &vec) {
+    for (const auto &v : vec) {
+        if (v.name == name && v.values.size() == 1) {
+            v.lookedUp = true;
+            return v.values[0];
+        }
+    }
+    return def;
+}
+
 Float ParamSet::GetOneFloat(const std::string &name, Float def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Float, name));
     return lookupOne(name, def, floats);
 }
 
 absl::Span<const Float> ParamSet::GetFloatArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Float, name));
     return lookupPtr(name, floats);
 }
 
 absl::Span<const int> ParamSet::GetIntArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Int, name));
     return lookupPtr(name, ints);
 }
 
 absl::Span<const uint8_t> ParamSet::GetBoolArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Bool, name));
     return lookupPtr(name, bools);
 }
 
 int ParamSet::GetOneInt(const std::string &name, int def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Int, name));
     return lookupOne(name, def, ints);
 }
 
 bool ParamSet::GetOneBool(const std::string &name, bool def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Bool, name));
     return lookupOne(name, uint8_t(def), bools);
 }
 
 absl::Span<const Point2f> ParamSet::GetPoint2fArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Point2f, name));
     return lookupPtr(name, point2fs);
 }
 
 Point2f ParamSet::GetOnePoint2f(const std::string &name,
                                 const Point2f &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Point2f, name));
     return lookupOne(name, def, point2fs);
 }
 
 absl::Span<const Vector2f> ParamSet::GetVector2fArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Vector2f, name));
     return lookupPtr(name, vector2fs);
 }
 
 Vector2f ParamSet::GetOneVector2f(const std::string &name,
                                   const Vector2f &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Vector2f, name));
     return lookupOne(name, def, vector2fs);
 }
 
 absl::Span<const Point3f> ParamSet::GetPoint3fArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Point3f, name));
     return lookupPtr(name, point3fs);
 }
 
 Point3f ParamSet::GetOnePoint3f(const std::string &name,
                                 const Point3f &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Point3f, name));
     return lookupOne(name, def, point3fs);
 }
 
 absl::Span<const Vector3f> ParamSet::GetVector3fArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Vector3f, name));
     return lookupPtr(name, vector3fs);
 }
 
 Vector3f ParamSet::GetOneVector3f(const std::string &name,
                                   const Vector3f &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Vector3f, name));
     return lookupOne(name, def, vector3fs);
 }
 
 absl::Span<const Normal3f> ParamSet::GetNormal3fArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Normal, name));
     return lookupPtr(name, normals);
 }
 
 Normal3f ParamSet::GetOneNormal3f(const std::string &name,
                                   const Normal3f &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Normal, name));
     return lookupOne(name, def, normals);
 }
 
 absl::Span<const Spectrum> ParamSet::GetSpectrumArray(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Spectrum, name));
     return lookupPtr(name, spectra);
 }
 
 Spectrum ParamSet::GetOneSpectrum(const std::string &name,
                                   const Spectrum &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Spectrum, name));
     return lookupOne(name, def, spectra);
 }
 
 absl::Span<const std::string> ParamSet::GetStringArray(
     const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::String, name));
     return lookupPtr(name, strings);
 }
 
 std::string ParamSet::GetOneString(const std::string &name,
                                    const std::string &def) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::String, name));
     return lookupOne(name, def, strings);
 }
 
 std::string ParamSet::FindTexture(const std::string &name) const {
+    if (trackLookups)
+        requestedParameters.push_back(std::make_pair(ParameterType::Texture, name));
     return lookupOne(name, std::string(""), textures);
 }
 
@@ -605,6 +647,65 @@ void ParamSet::ReportUnused() const {
     checkUnused(strings);
     checkUnused(textures);
     checkUnused(spectra);
+}
+
+template <typename T>
+static bool checkShadow(const std::vector<ParamSetItem<T>> &vec,
+                        const std::string &name) {
+    for (const auto &p : vec)
+        if (p.name == name) { LOG(INFO) << "SHADOW " << name; return true; }
+    return false;
+}
+
+bool ParamSet::ShadowsAny(const ParamSet &ps) const {
+    CHECK(ps.trackLookups);
+    for (const auto &rp : ps.requestedParameters) {
+        switch (rp.first) {
+        case ParameterType::Bool:
+            if (checkShadow(bools, rp.second)) return true;
+            break;
+        case ParameterType::Float:
+            // Check textures, too, since they can shadow floats (and vice
+            // versa). Similarly for the Spectrum and Texture cases
+            // below...
+            if (checkShadow(floats, rp.second)) return true;
+            if (checkShadow(textures, rp.second)) return true;
+            break;
+        case ParameterType::Int:
+            if (checkShadow(ints, rp.second)) return true;
+            break;
+        case ParameterType::Point2f:
+            if (checkShadow(point2fs, rp.second)) return true;
+            break;
+        case ParameterType::Vector2f:
+            if (checkShadow(vector2fs, rp.second)) return true;
+            break;
+        case ParameterType::Point3f:
+            if (checkShadow(point3fs, rp.second)) return true;
+            break;
+        case ParameterType::Vector3f:
+            if (checkShadow(vector3fs, rp.second)) return true;
+            break;
+        case ParameterType::Normal:
+            if (checkShadow(normals, rp.second)) return true;
+            break;
+        case ParameterType::Spectrum:
+            if (checkShadow(spectra, rp.second)) return true;
+            if (checkShadow(textures, rp.second)) return true;
+            break;
+        case ParameterType::String:
+            if (checkShadow(strings, rp.second)) return true;
+            break;
+        case ParameterType::Texture:
+            if (checkShadow(textures, rp.second)) return true;
+            if (checkShadow(floats, rp.second)) return true;
+            if (checkShadow(spectra, rp.second)) return true;
+            break;
+        default:
+            LOG(FATAL) << "Unhandled ParameterType";
+        }
+    }
+    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////

@@ -89,6 +89,8 @@ struct ParamSetItem {
 class ParamSet {
   public:
     // ParamSet Public Methods
+    void EnableLookupTracking() { trackLookups = true; }
+
     void Parse(const NamedValues *namedValuesList, SpectrumType spectrumType);
 
     void AddFloat(const std::string &, std::vector<Float> v);
@@ -134,10 +136,13 @@ class ParamSet {
     void ReportUnused() const;
     std::string ToString(int indent = 0) const;
 
+    // Returns true if this ParamSet shadows anything represented in
+    // ps::requestedParameters.
+    bool ShadowsAny(const ParamSet &ps) const;
+
   private:
     // ParamSet Private Data
     friend class TextureParams;
-    friend bool shapeMaySetMaterialParameters(const ParamSet &ps);
 
     std::vector<ParamSetItem<uint8_t>> bools;
     std::vector<ParamSetItem<int>> ints;
@@ -150,6 +155,13 @@ class ParamSet {
     std::vector<ParamSetItem<Spectrum>> spectra;
     std::vector<ParamSetItem<std::string>> strings;
     std::vector<ParamSetItem<std::string>> textures;
+
+    enum class ParameterType {
+        Bool, Float, Int, Point2f, Vector2f, Point3f, Vector3f, Normal,
+            Spectrum, String, Texture
+    };
+    bool trackLookups = false;
+    mutable absl::InlinedVector<std::pair<ParameterType, std::string>, 16> requestedParameters;
 };
 
 // TextureParams Declarations
