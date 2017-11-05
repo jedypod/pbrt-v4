@@ -40,7 +40,7 @@ GFX!
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
   
-- be more consistent to not do error checking during pbrt cat and to ply
++ be more consistent to not do error checking during pbrt cat and to ply
 
 - merge in segment tree stuff, add tests
   - double-buffer; can threads update their own and then periodically merge?
@@ -192,9 +192,6 @@ much break apart? shapes.h, ... ?
 
 - remove black filtering mode?
 
-- use kahan summation for accumulating into the image, not for accumulating
-  into the tile!!!
-  
 - add test for elementary intervals on e.g. sobol arrays, just to be sure
   the array sampling isn't borked
 
@@ -254,3 +251,6 @@ much break apart? shapes.h, ... ?
 - v3->v4 upgrade option  (cat variant)
 
 - rename --cat to --fmt ?
+
+- consistent multithreaded results (incl with MLT) if doubles used for both
+  splat and xyz accumulation. hmm..
