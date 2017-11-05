@@ -427,7 +427,7 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
         shapes = CreateNURBS(object2world, world2object, reverseOrientation,
                              paramSet, graphicsState.shapeAttributes);
     else
-        Warning("Shape \"%s\" unknown.", name.c_str());
+        ErrorExit("Shape \"%s\" unknown.", name.c_str());
 
     return shapes;
 }
@@ -485,10 +485,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         material = CreateKdSubsurfaceMaterial(mp, graphicsState.materialAttributes);
     else if (name == "fourier")
         material = CreateFourierMaterial(mp, graphicsState.materialAttributes);
-    else {
-        Warning("Material \"%s\" unknown. Using \"matte\".", name.c_str());
-        material = CreateMatteMaterial(mp, graphicsState.materialAttributes);
-    }
+    else
+        ErrorExit("Material \"%s\" unknown.", name.c_str());
 
     if ((name == "subsurface" || name == "kdsubsurface") &&
         (renderOptions->IntegratorName != "path" &&
@@ -587,7 +585,7 @@ std::shared_ptr<Medium> MakeMedium(const std::string &name,
         m = GridDensityMedium::Create(paramSet, medium2world,
                                       graphicsState.mediumAttributes);
     else
-        Warning("Medium \"%s\" unknown.", name.c_str());
+        ErrorExit("Medium \"%s\" unknown.", name.c_str());
 
     paramSet.ReportUnused();
     return m;
@@ -618,7 +616,8 @@ std::shared_ptr<Light> MakeLight(const std::string &name,
         light = CreateInfiniteLight(light2world, paramSet,
                                     graphicsState.lightAttributes);
     else
-        Warning("Light \"%s\" unknown.", name.c_str());
+        ErrorExit("Light \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return light;
 }
@@ -633,7 +632,8 @@ std::shared_ptr<AreaLight> MakeAreaLight(const std::string &name,
         area = CreateDiffuseAreaLight(light2world, mediumInterface.outside,
                                       paramSet, shape, graphicsState.lightAttributes);
     else
-        Warning("Area light \"%s\" unknown.", name.c_str());
+        ErrorExit("Area light \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return area;
 }
@@ -648,7 +648,8 @@ std::shared_ptr<Primitive> MakeAccelerator(
     else if (name == "kdtree")
         accel = CreateKdTreeAccelerator(prims, paramSet);
     else
-        Warning("Accelerator \"%s\" unknown.", name.c_str());
+        ErrorExit("Accelerator \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return accel;
 }
@@ -677,10 +678,9 @@ std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &para
     else if (name == "environment")
         camera = CreateEnvironmentCamera(paramSet, animatedCam2World, std::move(film),
                                          mediumInterface.outside, scene);
-    else {
-        Error("Camera \"%s\" unknown.", name.c_str());
-        exit(1);
-    }
+    else
+        ErrorExit("Camera \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return camera;
 }
@@ -701,10 +701,9 @@ std::unique_ptr<Sampler> MakeSampler(const std::string &name,
         sampler = CreateRandomSampler(paramSet);
     else if (name == "stratified")
         sampler = CreateStratifiedSampler(paramSet);
-    else {
-        Error("Sampler \"%s\" unknown.", name.c_str());
-        exit(1);
-    }
+    else
+        ErrorExit("Sampler \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return sampler;
 }
@@ -722,10 +721,9 @@ std::unique_ptr<Filter> MakeFilter(const std::string &name,
         filter = CreateSincFilter(paramSet);
     else if (name == "triangle")
         filter = CreateTriangleFilter(paramSet);
-    else {
-        Error("Filter \"%s\" unknown.", name.c_str());
-        exit(1);
-    }
+    else
+        ErrorExit("Filter \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return filter;
 }
@@ -735,10 +733,9 @@ std::unique_ptr<Film> MakeFilm(const std::string &name, const ParamSet &paramSet
     std::unique_ptr<Film> film;
     if (name == "image")
         film = CreateFilm(paramSet, std::move(filter));
-    else {
-        Error("Film \"%s\" unknown.", name.c_str());
-        exit(1);
-    }
+    else
+        ErrorExit("Film \"%s\" unknown.", name.c_str());
+
     paramSet.ReportUnused();
     return film;
 }
@@ -1009,9 +1006,7 @@ void pbrtAttributeBegin() {
 void pbrtAttributeEnd() {
     VERIFY_WORLD("AttributeEnd");
     if (!pushedGraphicsStates.size()) {
-        Error(
-            "Unmatched pbrtAttributeEnd() encountered. "
-            "Ignoring it.");
+        Error("Unmatched AttributeEnd encountered. Ignoring it.");
         return;
     }
 
@@ -1068,9 +1063,7 @@ void pbrtTransformBegin() {
 void pbrtTransformEnd() {
     VERIFY_WORLD("TransformEnd");
     if (!pushedTransforms.size()) {
-        Error(
-            "Unmatched pbrtTransformEnd() encountered. "
-            "Ignoring it.");
+        Error("Unmatched TransformEnd encountered. Ignoring it.");
         return;
     }
     curTransform = pushedTransforms.back();
@@ -1113,7 +1106,7 @@ void pbrtTexture(const std::string &name, const std::string &type,
             MakeSpectrumTexture(texname, curTransform[0], tp);
         if (st) graphicsState.spectrumTextures[name] = st;
     } else
-        Error("Texture type \"%s\" unknown.", type.c_str());
+        ErrorExit("Texture type \"%s\" unknown.", type.c_str());
 }
 
 void pbrtMaterial(const std::string &name, ParamSet params) {
@@ -1461,12 +1454,12 @@ void pbrtWorldEnd() {
     VERIFY_WORLD("WorldEnd");
     // Ensure there are no pushed graphics states
     while (pushedGraphicsStates.size()) {
-        Warning("Missing end to pbrtAttributeBegin()");
+        Warning("Missing end to AttributeBegin");
         pushedGraphicsStates.pop_back();
         pushedTransforms.pop_back();
     }
     while (pushedTransforms.size()) {
-        Warning("Missing end to pbrtTransformBegin()");
+        Warning("Missing end to TransformBegin");
         pushedTransforms.pop_back();
     }
 
@@ -1514,7 +1507,7 @@ void pbrtWorldEnd() {
             ClearProfiler();
         }
         if (PrintCheckRare(stdout))
-            exit(1);
+            ErrorExit("CHECK_RARE failures");
     }
 
     for (int i = 0; i < MaxTransforms; ++i) curTransform[i] = Transform();

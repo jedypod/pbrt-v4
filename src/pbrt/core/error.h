@@ -53,6 +53,7 @@ namespace pbrt {
 #endif  // __GNUG__
 void Warning(const char *, ...) PRINTF_FUNC;
 void Error(const char *, ...) PRINTF_FUNC;
+[[noreturn]] void ErrorExit(const char *, ...) PRINTF_FUNC;
 
 }  // namespace pbrt
 

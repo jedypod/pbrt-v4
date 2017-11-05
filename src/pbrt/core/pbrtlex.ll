@@ -74,15 +74,14 @@ static std::vector<IncludeInfo> includeStack;
 
 void includePush(const std::string &filename) {
     if (includeStack.size() > 32) {
-        Error("Only 32 levels of nested Include allowed in scene files.");
-        exit(1);
+        ErrorExit("Only 32 levels of nested Include allowed in scene files.");
     }
 
     std::string newFilename = AbsolutePath(ResolveFilename(filename));
 
     FILE *f = fopen(newFilename.c_str(), "r");
     if (!f)
-        Error("Unable to open included scene file \"%s\"", newFilename.c_str());
+        ErrorExit("Unable to open included scene file \"%s\"", newFilename.c_str());
     else {
         IncludeInfo ii;
         ii.filename = currentFilename;

@@ -34,6 +34,7 @@
 #include <pbrt/core/error.h>
 
 #include <pbrt/core/parser.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/stringprint.h>
 #include <pbrt/util/progressreporter.h>
 
@@ -103,6 +104,16 @@ void Error(const char *format, ...) {
     va_start(args, format);
     processError(format, args, "Error");
     va_end(args);
+}
+
+void ErrorExit(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    processError(format, args, "Error");
+    va_end(args);
+    // This is annoying, but gives a cleaner exit.
+    ParallelCleanup();
+    exit(1);
 }
 
 }  // namespace pbrt

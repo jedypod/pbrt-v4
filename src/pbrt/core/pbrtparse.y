@@ -48,9 +48,9 @@
 #endif // PBRT_IS_MSVC
 
 void yyerror(const char *str) {
-    pbrt::Error("Parsing error: %s", str);
-    exit(1);
+    pbrt::ErrorExit("Parsing error: %s", str);
 }
+
 extern int yylex();
 
 #define YYMAXDEPTH 100000000
