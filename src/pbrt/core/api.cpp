@@ -1571,10 +1571,8 @@ std::unique_ptr<Integrator> RenderOptions::MakeIntegrator(const Scene &scene) co
 
     IntegratorParams.ReportUnused();
     // Warn if no light sources are defined
-    if (lights.empty())
-        Warning(
-            "No light sources defined in scene; "
-            "rendering a black image.");
+    if (scene.lights.empty())
+        Warning("No light sources defined in scene; rendering a black image.");
     return integrator;
 }
 
