@@ -158,10 +158,8 @@ struct TransformSet {
 };
 
 struct RenderOptions {
-    // RenderOptions Public Methods
-    std::unique_ptr<Integrator> MakeIntegrator(const Scene &scene) const;
-    std::unique_ptr<Scene> MakeScene();
-    std::shared_ptr<Camera> MakeCamera(const Scene &scene) const;
+    void CreateSceneAndIntegrator(std::unique_ptr<Scene> *scene,
+                                  std::unique_ptr<Integrator> *integrator);
 
     // RenderOptions Public Data
     Float transformStartTime = 0, transformEndTime = 1;
@@ -272,13 +270,6 @@ static std::vector<uint32_t> pushedActiveTransformBits;
 static TransformCache transformCache;
 int catIndentCount = 0;
 
-// API Forward Declarations
-std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
-                                               const Transform *ObjectToWorld,
-                                               const Transform *WorldToObject,
-                                               bool reverseOrientation,
-                                               const ParamSet &paramSet);
-
 // API Macros
 #define VERIFY_INITIALIZED(func)                           \
     if (!(PbrtOptions.cat || PbrtOptions.toPly) &&           \
@@ -324,11 +315,10 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
     } while (false) /* swallow trailing semicolon */
 
 // Object Creation Function Definitions
-std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
-                                               std::shared_ptr<const Transform> object2world,
-                                               std::shared_ptr<const Transform> world2object,
-                                               bool reverseOrientation,
-                                               const ParamSet &paramSet) {
+static std::vector<std::shared_ptr<Shape>> MakeShapes(
+        const std::string &name, std::shared_ptr<const Transform> object2world,
+        std::shared_ptr<const Transform> world2object, bool reverseOrientation,
+        const ParamSet &paramSet) {
     std::vector<std::shared_ptr<Shape>> shapes;
     std::shared_ptr<Shape> s;
     if (name == "sphere")
@@ -434,8 +424,8 @@ std::vector<std::shared_ptr<Shape>> MakeShapes(const std::string &name,
 
 STAT_COUNTER("Scene/Materials created", nMaterialsCreated);
 
-std::shared_ptr<Material> MakeMaterial(const std::string &name,
-                                       const TextureParams &mp) {
+static std::shared_ptr<Material> MakeMaterial(const std::string &name,
+                                              const TextureParams &mp) {
     std::shared_ptr<Material> material;
     if (name == "" || name == "none")
         return nullptr;
@@ -503,9 +493,9 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     return material;
 }
 
-std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
-                                                 const Transform &tex2world,
-                                                 const TextureParams &tp) {
+static std::shared_ptr<Texture<Float>> MakeFloatTexture(
+        const std::string &name, const Transform &tex2world,
+        const TextureParams &tp) {
     std::shared_ptr<Texture<Float>> tex;
     if (name == "constant")
         tex = CreateConstantFloatTexture(tex2world, tp);
@@ -535,13 +525,14 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
         tex = CreatePtexFloatTexture(tex2world, tp);
     else
         Warning("Float texture \"%s\" unknown.", name.c_str());
+
     tp.ReportUnused();
     return tex;
 }
 
-std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
-    const std::string &name, const Transform &tex2world,
-    const TextureParams &tp) {
+static std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
+        const std::string &name, const Transform &tex2world,
+        const TextureParams &tp) {
     std::shared_ptr<Texture<Spectrum>> tex;
     if (name == "constant")
         tex = CreateConstantSpectrumTexture(tex2world, tp);
@@ -571,13 +562,14 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
         tex = CreatePtexSpectrumTexture(tex2world, tp);
     else
         Warning("Spectrum texture \"%s\" unknown.", name.c_str());
+
     tp.ReportUnused();
     return tex;
 }
 
-std::shared_ptr<Medium> MakeMedium(const std::string &name,
-                                   const ParamSet &paramSet,
-                                   const Transform &medium2world) {
+static std::shared_ptr<Medium> MakeMedium(const std::string &name,
+                                          const ParamSet &paramSet,
+                                          const Transform &medium2world) {
     std::shared_ptr<Medium> m;
     if (name == "homogeneous")
         m = HomogeneousMedium::Create(paramSet, graphicsState.mediumAttributes);
@@ -591,10 +583,10 @@ std::shared_ptr<Medium> MakeMedium(const std::string &name,
     return m;
 }
 
-std::shared_ptr<Light> MakeLight(const std::string &name,
-                                 const ParamSet &paramSet,
-                                 const Transform &light2world,
-                                 const MediumInterface &mediumInterface) {
+static std::shared_ptr<Light> MakeLight(const std::string &name,
+                                        const ParamSet &paramSet,
+                                        const Transform &light2world,
+                                        const MediumInterface &mediumInterface) {
     std::shared_ptr<Light> light;
     if (name == "point")
         light =
@@ -622,11 +614,10 @@ std::shared_ptr<Light> MakeLight(const std::string &name,
     return light;
 }
 
-std::shared_ptr<AreaLight> MakeAreaLight(const std::string &name,
-                                         const Transform &light2world,
-                                         const MediumInterface &mediumInterface,
-                                         const ParamSet &paramSet,
-                                         const std::shared_ptr<Shape> &shape) {
+static std::shared_ptr<AreaLight> MakeAreaLight(
+    const std::string &name, const Transform &light2world,
+    const MediumInterface &mediumInterface, const ParamSet &paramSet,
+    const std::shared_ptr<Shape> &shape) {
     std::shared_ptr<AreaLight> area;
     if (name == "diffuse")
         area = CreateDiffuseAreaLight(light2world, mediumInterface.outside,
@@ -638,9 +629,8 @@ std::shared_ptr<AreaLight> MakeAreaLight(const std::string &name,
     return area;
 }
 
-std::shared_ptr<Primitive> MakeAccelerator(
-    const std::string &name,
-    const std::vector<std::shared_ptr<Primitive>> &prims,
+static std::shared_ptr<Primitive> MakeAccelerator(
+    const std::string &name, const std::vector<std::shared_ptr<Primitive>> &prims,
     const ParamSet &paramSet) {
     std::shared_ptr<Primitive> accel;
     if (name == "bvh")
@@ -654,9 +644,10 @@ std::shared_ptr<Primitive> MakeAccelerator(
     return accel;
 }
 
-std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &paramSet,
-        const TransformSet &cam2worldSet, Float transformStart,
-        Float transformEnd, const Scene &scene, std::unique_ptr<Film> film) {
+static std::shared_ptr<Camera> MakeCamera(
+    const std::string &name, const ParamSet &paramSet,
+    const TransformSet &cam2worldSet, Float transformStart, Float transformEnd,
+    const Scene &scene, std::unique_ptr<Film> film) {
     std::shared_ptr<Camera> camera;
     MediumInterface mediumInterface = graphicsState.CreateMediumInterface();
     static_assert(MaxTransforms == 2,
@@ -685,9 +676,9 @@ std::shared_ptr<Camera> MakeCamera(const std::string &name, const ParamSet &para
     return camera;
 }
 
-std::unique_ptr<Sampler> MakeSampler(const std::string &name,
-                                     const ParamSet &paramSet,
-                                     const Bounds2i &sampleBounds) {
+static std::unique_ptr<Sampler> MakeSampler(const std::string &name,
+                                            const ParamSet &paramSet,
+                                            const Bounds2i &sampleBounds) {
     std::unique_ptr<Sampler> sampler;
     if (name == "02sequence")
         sampler = CreateZeroTwoSequenceSampler(paramSet);
@@ -708,8 +699,8 @@ std::unique_ptr<Sampler> MakeSampler(const std::string &name,
     return sampler;
 }
 
-std::unique_ptr<Filter> MakeFilter(const std::string &name,
-                                   const ParamSet &paramSet) {
+static std::unique_ptr<Filter> MakeFilter(const std::string &name,
+                                          const ParamSet &paramSet) {
     std::unique_ptr<Filter> filter;
     if (name == "box")
         filter = CreateBoxFilter(paramSet);
@@ -728,8 +719,8 @@ std::unique_ptr<Filter> MakeFilter(const std::string &name,
     return filter;
 }
 
-std::unique_ptr<Film> MakeFilm(const std::string &name, const ParamSet &paramSet,
-                               std::unique_ptr<Filter> filter) {
+static std::unique_ptr<Film> MakeFilm(const std::string &name, const ParamSet &paramSet,
+                                      std::unique_ptr<Filter> filter) {
     std::unique_ptr<Film> film;
     if (name == "image")
         film = CreateFilm(paramSet, std::move(filter));
@@ -738,6 +729,35 @@ std::unique_ptr<Film> MakeFilm(const std::string &name, const ParamSet &paramSet
 
     paramSet.ReportUnused();
     return film;
+}
+
+static std::unique_ptr<Integrator> MakeIntegrator(const std::string &name,
+                                                  const ParamSet &paramSet,
+                                                  const Scene &scene,
+                                                  std::shared_ptr<Camera> camera,
+                                                  std::unique_ptr<Sampler> sampler) {
+    std::unique_ptr<Integrator> integrator;
+    if (name == "whitted")
+        integrator = CreateWhittedIntegrator(paramSet, scene, camera, std::move(sampler));
+    else if (name == "path")
+        integrator = CreatePathIntegrator(paramSet, scene, camera, std::move(sampler));
+    else if (name == "volpath")
+        integrator = CreateVolPathIntegrator(paramSet, scene, camera, std::move(sampler));
+    else if (name == "bdpt")
+        integrator = CreateBDPTIntegrator(paramSet, scene, camera, std::move(sampler));
+    else if (name == "aov")
+        integrator = CreateAOVIntegrator(paramSet, scene, camera);
+    else if (name == "mlt")
+        integrator = CreateMLTIntegrator(paramSet, scene, camera);
+    else if (name == "ambientocclusion")
+        integrator = CreateAOIntegrator(paramSet, scene, camera, std::move(sampler));
+    else if (name == "sppm")
+        integrator = CreateSPPMIntegrator(paramSet, scene, camera);
+    else
+        ErrorExit("Integrator \"%s\" unknown.", name.c_str());
+
+    paramSet.ReportUnused();
+    return integrator;
 }
 
 // API Function Definitions
@@ -1187,10 +1207,8 @@ void pbrtLightSource(const std::string &name, ParamSet params) {
     WARN_IF_ANIMATED_TRANSFORM("LightSource");
     MediumInterface mi = graphicsState.CreateMediumInterface();
     std::shared_ptr<Light> lt = MakeLight(name, params, curTransform[0], mi);
-    if (!lt)
-        Error("LightSource: light type \"%s\" unknown.", name.c_str());
-    else
-        renderOptions->lights.push_back(lt);
+    renderOptions->lights.push_back(lt);
+
     if (PbrtOptions.cat || PbrtOptions.toPly) {
         printf("%*sLightSource \"%s\" ", catIndentCount, "", name.c_str());
         printf("%s\n", params.ToString(catIndentCount).c_str());
@@ -1333,42 +1351,6 @@ void pbrtShape(const std::string &name, ParamSet params) {
     }
 }
 
-std::shared_ptr<Material> GraphicsState::GetMaterialForShape(
-    const ParamSet &shapeParams) {
-    CHECK(currentMaterial);
-    if (shapeParams.ShadowsAny(currentMaterial->params)) {
-        // Only create a unique material for the shape if the shape's
-        // parameters are going to provide values for some of the material
-        // parameters.
-        TextureParams mp({&shapeParams, &currentMaterial->params}, floatTextures,
-                         spectrumTextures);
-        std::shared_ptr<Material> mtl = MakeMaterial(currentMaterial->name, mp);
-        return mtl;
-    } else
-        return currentMaterial->material;
-}
-
-MediumInterface GraphicsState::CreateMediumInterface() {
-    MediumInterface m;
-    if (currentInsideMedium != "") {
-        if (renderOptions->namedMedia.find(currentInsideMedium) !=
-            renderOptions->namedMedia.end())
-            m.inside = renderOptions->namedMedia[currentInsideMedium].get();
-        else
-            Error("Named medium \"%s\" undefined.",
-                  currentInsideMedium.c_str());
-    }
-    if (currentOutsideMedium != "") {
-        if (renderOptions->namedMedia.find(currentOutsideMedium) !=
-            renderOptions->namedMedia.end())
-            m.outside = renderOptions->namedMedia[currentOutsideMedium].get();
-        else
-            Error("Named medium \"%s\" undefined.",
-                  currentOutsideMedium.c_str());
-    }
-    return m;
-}
-
 void pbrtReverseOrientation() {
     VERIFY_WORLD("ReverseOrientation");
     graphicsState.reverseOrientation = !graphicsState.reverseOrientation;
@@ -1467,8 +1449,9 @@ void pbrtWorldEnd() {
     if (PbrtOptions.cat || PbrtOptions.toPly) {
         printf("%*sWorldEnd\n", catIndentCount, "");
     } else {
-        std::unique_ptr<Scene> scene = renderOptions->MakeScene();
-        std::unique_ptr<Integrator> integrator = renderOptions->MakeIntegrator(*scene);
+        std::unique_ptr<Scene> scene;
+        std::unique_ptr<Integrator> integrator;
+        renderOptions->CreateSceneAndIntegrator(&scene, &integrator);
 
         // This is kind of ugly; we directly override the current profiler
         // state to switch from parsing/scene construction related stuff to
@@ -1479,7 +1462,8 @@ void pbrtWorldEnd() {
         CHECK_EQ(CurrentProfilerState(), ProfToBits(Prof::SceneConstruction));
         ProfilerState = ProfToBits(Prof::IntegratorRender);
 
-        if (scene && integrator) integrator->Render();
+        // Render!
+        integrator->Render();
 
         CHECK_EQ(CurrentProfilerState(), ProfToBits(Prof::IntegratorRender));
         ProfilerState = ProfToBits(Prof::SceneConstruction);
@@ -1516,69 +1500,80 @@ void pbrtWorldEnd() {
                                  namedCoordinateSystems.end());
 }
 
-std::unique_ptr<Scene> RenderOptions::MakeScene() {
+std::shared_ptr<Material> GraphicsState::GetMaterialForShape(
+    const ParamSet &shapeParams) {
+    CHECK(currentMaterial);
+    // Only create a unique material for the shape if the shape's
+    // parameters are going to provide values for some of the material
+    // parameters.
+    if (shapeParams.ShadowsAny(currentMaterial->params)) {
+        TextureParams mp({&shapeParams, &currentMaterial->params}, floatTextures,
+                         spectrumTextures);
+        return MakeMaterial(currentMaterial->name, mp);
+    } else
+        return currentMaterial->material;
+}
+
+MediumInterface GraphicsState::CreateMediumInterface() {
+    MediumInterface m;
+    if (currentInsideMedium != "") {
+        if (renderOptions->namedMedia.find(currentInsideMedium) !=
+            renderOptions->namedMedia.end())
+            m.inside = renderOptions->namedMedia[currentInsideMedium].get();
+        else
+            Error("Named medium \"%s\" undefined.",
+                  currentInsideMedium.c_str());
+    }
+    if (currentOutsideMedium != "") {
+        if (renderOptions->namedMedia.find(currentOutsideMedium) !=
+            renderOptions->namedMedia.end())
+            m.outside = renderOptions->namedMedia[currentOutsideMedium].get();
+        else
+            Error("Named medium \"%s\" undefined.",
+                  currentOutsideMedium.c_str());
+    }
+    return m;
+}
+
+void RenderOptions::CreateSceneAndIntegrator(std::unique_ptr<Scene> *scene,
+                                             std::unique_ptr<Integrator> *integrator) {
+    // Create Scene
     std::shared_ptr<Primitive> accelerator =
         MakeAccelerator(AcceleratorName, primitives, AcceleratorParams);
-    if (!accelerator) accelerator = std::make_shared<BVHAccel>(primitives);
-    std::unique_ptr<Scene> scene = std::make_unique<Scene>(accelerator, lights);
+    *scene = std::make_unique<Scene>(accelerator, lights);
+
     // Erase primitives and lights from _RenderOptions_
     primitives.erase(primitives.begin(), primitives.end());
     lights.erase(lights.begin(), lights.end());
-    return scene;
-}
 
-std::unique_ptr<Integrator> RenderOptions::MakeIntegrator(const Scene &scene) const {
-    std::shared_ptr<Camera> camera = MakeCamera(scene);
-    std::unique_ptr<Sampler> sampler =
-        MakeSampler(SamplerName, SamplerParams, camera->film->GetSampleBounds());
-
-    std::unique_ptr<Integrator> integrator;
-    if (IntegratorName == "whitted")
-        integrator = CreateWhittedIntegrator(IntegratorParams, scene, camera, std::move(sampler));
-    else if (IntegratorName == "path")
-        integrator = CreatePathIntegrator(IntegratorParams, scene, camera, std::move(sampler));
-    else if (IntegratorName == "volpath")
-        integrator = CreateVolPathIntegrator(IntegratorParams, scene, camera, std::move(sampler));
-    else if (IntegratorName == "bdpt")
-        integrator = CreateBDPTIntegrator(IntegratorParams, scene, camera, std::move(sampler));
-    else if (IntegratorName == "aov")
-        integrator = CreateAOVIntegrator(IntegratorParams, scene, camera);
-    else if (IntegratorName == "mlt")
-        integrator = CreateMLTIntegrator(IntegratorParams, scene, camera);
-    else if (IntegratorName == "ambientocclusion")
-        integrator = CreateAOIntegrator(IntegratorParams, scene, camera, std::move(sampler));
-    else if (IntegratorName == "sppm")
-        integrator = CreateSPPMIntegrator(IntegratorParams, scene, camera);
-    else {
-        Error("Integrator \"%s\" unknown.", IntegratorName.c_str());
-        exit(1);
-    }
-
-    if (renderOptions->haveScatteringMedia && IntegratorName != "volpath" &&
-        IntegratorName != "bdpt" && IntegratorName != "mlt") {
-        Warning(
-            "Scene has scattering media but \"%s\" integrator doesn't support "
-            "volume scattering. Consider using \"volpath\", \"bdpt\", or "
-            "\"mlt\".", IntegratorName.c_str());
-    }
-
-    IntegratorParams.ReportUnused();
-    // Warn if no light sources are defined
-    if (scene.lights.empty())
-        Warning("No light sources defined in scene; rendering a black image.");
-    return integrator;
-}
-
-std::shared_ptr<Camera> RenderOptions::MakeCamera(const Scene &scene) const {
+    // Create Filter, Film, and Camera
     std::unique_ptr<Filter> filter = MakeFilter(FilterName, FilterParams);
     std::unique_ptr<Film> film = MakeFilm(FilmName, FilmParams, std::move(filter));
-    if (!film) {
-        Error("Unable to create film.");
-        exit(1);
+    std::shared_ptr<Camera> camera =
+        MakeCamera(CameraName, CameraParams, CameraToWorld,
+                   transformStartTime, transformEndTime, **scene,
+                   std::move(film));
+
+    // Create Sampler and Integrator
+    std::unique_ptr<Sampler> sampler =
+        MakeSampler(SamplerName, SamplerParams, camera->film->GetSampleBounds());
+    *integrator = MakeIntegrator(IntegratorName, IntegratorParams, **scene,
+                                 camera, std::move(sampler));
+
+    // Check if volume scattering integrator is expected but not specified.
+    if (haveScatteringMedia &&
+        IntegratorName != "volpath" &&
+        IntegratorName != "bdpt" &&
+        IntegratorName != "mlt") {
+        Warning("Scene has scattering media but \"%s\" integrator doesn't support "
+                "volume scattering. Consider using \"volpath\", \"bdpt\", or "
+                "\"mlt\".", IntegratorName.c_str());
     }
-    return pbrt::MakeCamera(CameraName, CameraParams, CameraToWorld,
-                            renderOptions->transformStartTime,
-                            renderOptions->transformEndTime, scene, std::move(film));
+
+    // Warn if no light sources are defined
+    if ((*scene)->lights.empty() && IntegratorName != "ambientocclusion" &&
+        IntegratorName != "aov")
+        Warning("No light sources defined in scene; rendering a black image.");
 }
 
 }  // namespace pbrt

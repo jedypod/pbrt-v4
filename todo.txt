@@ -42,8 +42,6 @@ GFX!
   
 - be more consistent to not do error checking during pbrt cat and to ply
 
-+ inconsistent: RenderOptions::MakeIntegrator vs e.g. standalone MakeFilter
-
 - merge in segment tree stuff, add tests
   - double-buffer; can threads update their own and then periodically merge?
 
