@@ -69,6 +69,9 @@ class PointLight : public Light {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
+    Spectrum MaxLiContribution(const Point3f &p) const;
+    LightBounds Bounds() const;
+
   private:
     // PointLight Private Data
     const Point3f pLight;

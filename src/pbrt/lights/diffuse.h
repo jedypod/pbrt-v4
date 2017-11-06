@@ -42,9 +42,10 @@
 #include <pbrt/core/pbrt.h>
 
 #include <pbrt/core/light.h>
-#include <pbrt/util/geometry.h>
-#include <pbrt/core/spectrum.h>
 #include <pbrt/core/primitive.h>
+#include <pbrt/core/shape.h>
+#include <pbrt/core/spectrum.h>
+#include <pbrt/util/geometry.h>
 
 #include <memory>
 
@@ -71,6 +72,9 @@ class DiffuseAreaLight : public AreaLight {
                        Float *pdfDir) const;
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
+
+    Spectrum MaxLiContribution(const Point3f &p) const;
+    LightBounds Bounds() const;
 
   protected:
     // DiffuseAreaLight Protected Data

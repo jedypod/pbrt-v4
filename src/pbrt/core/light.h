@@ -43,6 +43,7 @@
 
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/medium.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/util/transform.h>
 
 #include <memory>
@@ -61,6 +62,14 @@ inline bool IsDeltaLight(int flags) {
     return flags & (int)LightFlags::DeltaPosition ||
            flags & (int)LightFlags::DeltaDirection;
 }
+
+struct LightBounds {
+    // assumes r^2 reduction for points outside of worldBound
+    Spectrum maxLiContrib;
+    // TODO: for distant and infinite lights, have a non r^2 falloff
+    // contribution bound.
+    Bounds3f worldBound;
+};
 
 // Light Declarations
 class Light {
@@ -82,6 +91,15 @@ class Light {
                                Float *pdfDir) const = 0;
     virtual void Pdf_Le(const Ray &ray, const Normal3f &nLight, Float *pdfPos,
                         Float *pdfDir) const = 0;
+
+    virtual Spectrum MaxLiContribution(const Point3f &p) const {
+        LOG(FATAL) << "Unimplemented Light::MaxLiContribution() method";
+        return {};
+    }
+    virtual LightBounds Bounds() const {
+        LOG(FATAL) << "Unimplemented Light::Bounds() method";
+        return {};
+    }
 
     // Light Public Data
     const int flags;

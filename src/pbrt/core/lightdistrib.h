@@ -162,6 +162,30 @@ class SpatialLightDistribution : public LightDistribution {
     size_t hashTableSize;
 };
 
+class BVHLightDistribution : public LightDistribution {
+ public:
+    BVHLightDistribution(const Scene &scene);
+
+    const Light *Sample(const Point3f &p, Float u, Float *pdf) const;
+    Float Pdf(const Point3f &p, const Light *light) const;
+
+ private:
+    class LightBVHNode *buildBVH(std::vector<class LightInfo> &lightInfo,
+                                 int start, int end, MemoryArena &arena,
+                                 int *nNodes);
+
+    class LightBVHNode *root;
+    std::unordered_map<const Light *, LightBVHNode *> lightToNode;
+};
+
+class ExhaustiveLightDistribution : public LightDistribution {
+ public:
+    ExhaustiveLightDistribution(const Scene &scene);
+
+    const Light *Sample(const Point3f &p, Float u, Float *pdf) const;
+    Float Pdf(const Point3f &p, const Light *light) const;
+};
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_LIGHTDISTRIB_H

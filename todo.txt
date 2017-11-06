@@ -41,8 +41,6 @@ GFX!
 - merge in segment tree stuff, add tests
   - double-buffer; can threads update their own and then periodically merge?
 
-- could nuke worldbegin/worldend entirely--not at all relevant to us...
-
 - Waverfront based stuff.  Make optional, only do if writing out
   intermediate images, or.... ?  Or is this too much complexity in the main
   render loop??

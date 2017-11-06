@@ -76,6 +76,17 @@ void PointLight::Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
     *pdfDir = UniformSpherePdf();
 }
 
+Spectrum PointLight::MaxLiContribution(const Point3f &p) const {
+    return I / DistanceSquared(pLight, p);
+}
+
+LightBounds PointLight::Bounds() const {
+    LightBounds b;
+    b.worldBound = Bounds3f(pLight);
+    b.maxLiContrib = I;
+    return b;
+}
+
 std::shared_ptr<PointLight> CreatePointLight(
     const Transform &light2world, const Medium *medium, const ParamSet &paramSet,
     const std::shared_ptr<const ParamSet> &attributes) {

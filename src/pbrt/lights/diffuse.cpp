@@ -135,6 +135,18 @@ void DiffuseAreaLight::Pdf_Le(const Ray &ray, const Normal3f &n, Float *pdfPos,
                        : CosineHemispherePdf(Dot(n, ray.d));
 }
 
+Spectrum DiffuseAreaLight::MaxLiContribution(const Point3f &p) const {
+    // TODO: can we sometimes return 0 if the light is one-sided?
+    return Lemit * shape->SolidAngle(p, 8);
+}
+
+LightBounds DiffuseAreaLight::Bounds() const {
+    LightBounds b;
+    b.worldBound = shape->WorldBound();
+    b.maxLiContrib = Lemit * area;
+    return b;
+}
+
 std::shared_ptr<AreaLight> CreateDiffuseAreaLight(
     const Transform &light2world, const Medium *medium,
     const ParamSet &paramSet, const std::shared_ptr<Shape> &shape,
