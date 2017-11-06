@@ -714,3 +714,73 @@ TEST(Sampling, Logistic) {
         }
     }
 }
+
+TEST(Sampling, DynamicDistribution1D) {
+    // Check basic agreement. Set up so that values sum to 8 -> can do
+    // exact probabilities.
+    Float v[] = { 1, 0, 2, 1, 0, 0, 3, 1 };
+    Distribution1D d(v);
+    DynamicDistribution1D dd(v);
+    EXPECT_EQ(ABSL_ARRAYSIZE(v), dd.size());
+
+    Float pd, pdd;
+    for (Float u = 0; u < 1; u += .05) {
+        EXPECT_EQ(d.SampleDiscrete(u, &pd),
+                  dd.SampleDiscrete(u, &pdd)) << u;
+        EXPECT_LT(std::abs(pd - pdd), 1e-5) << u;
+    }
+
+    // Dynamic update; update just individual ones.
+    std::swap(v[0], v[5]);
+    dd[0] = v[0];
+    dd[5] = v[5];
+    d = Distribution1D(v);
+    dd.Update(0);
+    dd.Update(5);
+    for (Float u = 0; u < 1; u += .05) {
+        EXPECT_EQ(d.SampleDiscrete(u, &pd),
+                  dd.SampleDiscrete(u, &pdd)) << u;
+        EXPECT_LT(std::abs(pd - pdd), 1e-5) << u;
+    }
+
+    // Test UpdateAll()
+    v[6] = 0;
+    dd[6] = 0;
+    v[1] = .5;
+    dd[1] = .5;
+    v[2] = .5;
+    dd[2] = .5;
+    d = Distribution1D(v);
+    dd.UpdateAll();
+
+    for (Float u = 0; u < 1; u += .05) {
+        EXPECT_EQ(d.SampleDiscrete(u, &pd),
+                  dd.SampleDiscrete(u, &pdd)) <<
+            "u = " << u << "dd = " << dd.ToString();
+        EXPECT_LT(std::abs(pd - pdd), 1e-5) <<
+            "u = " << u << "dd = " << dd.ToString();
+    }
+
+    // Test varying sizes; not just power of 2...
+    std::vector<Float> vec;
+    RNG rng;
+    vec.push_back(1);
+    for (int i = 0; i < 40; ++i) {
+        Distribution1D d(vec);
+        DynamicDistribution1D dd(vec);
+        EXPECT_EQ(vec.size(), dd.size());
+
+        // This is a little dicey to test, since due to fp roundoff error,
+        // one or the other may reasonably choose one side or the other
+        // when on the edge. This value of u seems to get us through the tests.
+        // TODO: think about how to properly make this more robust.
+        Float u = .75;
+        EXPECT_EQ(d.SampleDiscrete(u, &pd),
+                  dd.SampleDiscrete(u, &pdd)) <<
+            "u = " << u << "dd = " << dd.ToString();
+        EXPECT_LT(std::abs(pd - pdd), 1e-5) <<
+            "u = " << u << "dd = " << dd.ToString();
+
+        vec.push_back(rng.UniformUInt32(8));
+    }
+}

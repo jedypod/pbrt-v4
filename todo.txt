@@ -38,13 +38,13 @@ GFX!
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
   
-- merge in segment tree stuff, add tests
-  - double-buffer; can threads update their own and then periodically merge?
-
 - Waverfront based stuff.  Make optional, only do if writing out
   intermediate images, or.... ?  Or is this too much complexity in the main
   render loop??
-
+  -> use dynamicdistribution1d for lights...
+    - double-buffer; can threads update their own and then periodically merge?
+    - provider iterator access to copy out, etc?
+  
 - code organization:
   base/{camera,shape,light,...}
   sampling/...

@@ -232,6 +232,109 @@ inline Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
     return Clamp(x, a, b);
 }
 
+class DynamicDistribution1D {
+public:
+    DynamicDistribution1D(int count)
+        // Just allocate the extra nodes and let them hold zero forever.
+        // it's fine.
+        : nValidLeaves(count),
+          nodes(2 * RoundUpPow2(count) - 1, Float(0)) {
+            // The tree is laid out breadth-first in |nodes|.
+            firstLeafOffset = nodes.size() - RoundUpPow2(count);
+        }
+    DynamicDistribution1D(absl::Span<const Float> v)
+        : DynamicDistribution1D(v.size()) {
+        for (size_t i = 0; i < v.size(); ++i)
+            (*this)[i] = v[i];
+        UpdateAll();
+    }
+
+    Float &operator[](int index) {
+        DCHECK(index >= 0 && index + firstLeafOffset < nodes.size());
+        return nodes[index + firstLeafOffset];
+    }
+    Float operator[](int index) const {
+        DCHECK(index >= 0 && index + firstLeafOffset < nodes.size());
+        return nodes[index + firstLeafOffset];
+    }
+    size_t size() const { return nValidLeaves; }
+
+    // Update probabilities after a single value has been modified. O(log n).
+    void Update(int index) {
+        DCHECK(index >= 0 && index + firstLeafOffset < nodes.size());
+        index += firstLeafOffset;
+        while (index != 0) {
+            int parentIndex = (index - 1) / 2;
+            nodes[parentIndex] = (nodes[2 * parentIndex + 1] +
+                                  nodes[2 * parentIndex + 2]);
+            index = parentIndex;
+        }
+    }
+
+    // Update all probabilities. O(n).
+    void UpdateAll() {
+        std::function<void(int)> updateRecursive = [&](int index) {
+            if (index >= firstLeafOffset)
+                return;
+            updateRecursive(2 * index + 1);
+            updateRecursive(2 * index + 2);
+            nodes[index] = nodes[2 * index + 1] + nodes[2 * index + 2];
+        };
+        updateRecursive(0);
+    }
+
+    std::string ToString() const {
+        std::string ret;
+        int newline = 0, nextCount = 2;
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            ret += std::to_string(nodes[i]) + ' ';
+            if (i == newline) {
+                ret += '\n';
+                newline = i + nextCount;
+                nextCount *= 2;
+            }
+        }
+        return ret;
+    }
+
+    int SampleDiscrete(Float u, Float *pdf) const {
+        int index = 0;
+        *pdf = 1;
+        while (index < firstLeafOffset) {
+            Float p[2] = { nodes[2 * index + 1], nodes[2 * index + 2] };
+            Float q = p[0] / (p[0] + p[1]);
+            if (u < q) {
+                *pdf *= q;
+                u = std::min(u / q, OneMinusEpsilon);
+                index = 2 * index + 1;
+            } else {
+                *pdf *= 1 - q;
+                u = std::min((u - q) / (1 - q), OneMinusEpsilon);
+                index = 2 * index + 2;
+            }
+        }
+        return index - firstLeafOffset;
+    }
+
+    Float Pdf(int index) const {
+        Float pdf = 1;
+        index += firstLeafOffset;
+        while (index != 0) {
+            int parentIndex = (index - 1) / 2;
+            Float psum = (nodes[2 * parentIndex + 1] +
+                          nodes[2 * parentIndex + 2]);
+            pdf *= nodes[index]  / psum;
+            index = parentIndex;
+        }
+        return pdf;
+    }
+
+private:
+    int nValidLeaves;
+    std::vector<Float> nodes;
+    size_t firstLeafOffset;
+};
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H
