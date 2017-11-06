@@ -42,6 +42,8 @@
 
 #include <lodepng/lodepng.h>
 
+#include <array>
+
 #include <ImfChannelList.h>
 #include <ImfFloatAttribute.h>
 #include <ImfFrameBuffer.h>
@@ -299,10 +301,11 @@ Float Image::BilerpChannel(Point2f p, int c, WrapMode2D wrapMode) const {
     Float t = p[1] * resolution.y - 0.5f;
     int si = std::floor(s), ti = std::floor(t);
     Float ds = s - si, dt = t - ti;
-    return ((1 - ds) * (1 - dt) * GetChannel({si, ti}, c, wrapMode) +
-            (1 - ds) * dt * GetChannel({si, ti + 1}, c, wrapMode) +
-            ds * (1 - dt) * GetChannel({si + 1, ti}, c, wrapMode) +
-            ds * dt * GetChannel({si + 1, ti + 1}, c, wrapMode));
+    std::array<Float, 4> v = { GetChannel({si, ti}, c, wrapMode),
+                               GetChannel({si + 1, ti}, c, wrapMode),
+                               GetChannel({si, ti + 1}, c, wrapMode),
+                               GetChannel({si + 1, ti + 1}, c, wrapMode) };
+    return Bilerp({ds, dt}, v);
 }
 
 Float Image::BilerpY(Point2f p, WrapMode2D wrapMode) const {

@@ -29,8 +29,6 @@ GFX!
 
 -----------------
 
-- use Bilerp() for texture filtering, other places?
-
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet
   TextureParams -> ...?
@@ -40,8 +38,6 @@ GFX!
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
   
-+ be more consistent to not do error checking during pbrt cat and to ply
-
 - merge in segment tree stuff, add tests
   - double-buffer; can threads update their own and then periodically merge?
 

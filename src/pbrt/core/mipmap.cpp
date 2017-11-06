@@ -235,8 +235,8 @@ T MIPMap::Lookup(const Point2f &st, Float width) const {
         else {
             Float delta = level - iLevel;
             CHECK_LE(delta, 1);
-            return ((1 - delta) * Bilerp<T>(iLevel, st) +
-                    delta * Bilerp<T>(iLevel + 1, st));
+            return Lerp(delta, Bilerp<T>(iLevel, st),
+                        Bilerp<T>(iLevel + 1, st));
         }
     }
 }
