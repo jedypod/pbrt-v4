@@ -251,6 +251,7 @@ struct ImageMetadata {
     absl::optional<Matrix4x4> worldToCamera, worldToNDC;
     absl::optional<Bounds2i> pixelBounds;
     absl::optional<Point2i> fullResolution;
+    absl::optional<int> samplesPerPixel;
     std::map<std::string, std::vector<std::string>> stringVectors;
 };
 

@@ -48,6 +48,7 @@
 #include <ImfFloatAttribute.h>
 #include <ImfFrameBuffer.h>
 #include <ImfInputFile.h>
+#include <ImfIntAttribute.h>
 #include <ImfMatrixAttribute.h>
 #include <ImfOutputFile.h>
 #include <ImfStringVectorAttribute.h>
@@ -732,6 +733,11 @@ static absl::optional<Image> ReadEXR(const std::string &name,
             metadata->fullResolution = Point2i(dispw.max.x - dispw.min.x + 1,
                                                dispw.max.y - dispw.min.y + 1);
 
+            const Imf::IntAttribute *sppAttrib =
+                file.header().findTypedAttribute<Imf::IntAttribute>("samplesPerPixel");
+            if (sppAttrib)
+                metadata->samplesPerPixel = sppAttrib->value();
+
             // Find any string vector attributes
             for (auto iter = file.header().begin(); iter != file.header().end();
                  ++iter) {
@@ -827,6 +833,8 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
                 header.insert("worldToCamera", Imf::M44fAttribute(metadata->worldToCamera->m));
             if (metadata->worldToNDC)
                 header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC->m));
+            if (metadata->samplesPerPixel)
+                header.insert("samplesPerPixel", Imf::IntAttribute(*metadata->samplesPerPixel));
             for (const auto &iter : metadata->stringVectors)
                 header.insert(iter.first, Imf::StringVectorAttribute(iter.second));
         }

@@ -469,6 +469,9 @@ static void printImageStats(const char *name, const Image &image,
         if (metadata->worldToNDC)
             printf("\tworld to NDC: %s\n",
                    metadata->worldToNDC->ToString().c_str());
+        if (metadata->samplesPerPixel)
+            printf("\tsamples per pixel: %d\n", *metadata->samplesPerPixel);
+
         for (const auto iter : metadata->stringVectors) {
             printf("\t\"%s\": [ ", iter.first.c_str());
             for (const std::string &str : iter.second)
