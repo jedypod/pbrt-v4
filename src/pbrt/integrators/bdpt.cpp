@@ -309,7 +309,8 @@ void BDPTIntegrator::Render() {
     const int tileSize = 16;
     const int nXTiles = (sampleExtent.x + tileSize - 1) / tileSize;
     const int nYTiles = (sampleExtent.y + tileSize - 1) / tileSize;
-    ProgressReporter reporter(nXTiles * nYTiles, "Rendering");
+    int spp = sampler->samplesPerPixel;
+    ProgressReporter reporter(spp * nXTiles * nYTiles, "Rendering");
 
     // Allocate buffers for debug visualization
     const int bufferCount = (1 + maxDepth) * (6 + maxDepth) / 2;
@@ -333,7 +334,8 @@ void BDPTIntegrator::Render() {
     }
 
     // Render and write the output image to disk
-    if (scene.lights.size() > 0) {
+    int startWave = 0, endWave = 1, waveDelta = 1;
+    while (startWave < spp) {
         ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
             LOG(INFO) << "Starting tile " << tileBounds;
             // Render a single tile using BDPT
@@ -345,8 +347,7 @@ void BDPTIntegrator::Render() {
                 if (!InsideExclusive(pPixel, pixelBounds))
                     continue;
 
-                int spp = sampler->samplesPerPixel;
-                for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
+                for (int sampleIndex = startWave; sampleIndex < endWave; ++sampleIndex) {
                     tileSampler->StartSequence(pPixel, sampleIndex);
 
                     // Generate a single sample using BDPT
@@ -404,14 +405,21 @@ void BDPTIntegrator::Render() {
                 }
             }
             film->MergeFilmTile(std::move(filmTile));
-            reporter.Update();
+            reporter.Update(endWave - startWave);
         });
-        reporter.Done();
+
+        startWave = endWave;
+        endWave = std::min(spp, endWave + waveDelta);
+        waveDelta *= 2;
+
+        LOG(INFO) << "Writing image with spp = " << startWave;
+        ImageMetadata metadata;
+        metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
+        metadata.samplesPerPixel = startWave;
+        camera->InitMetadata(&metadata);
+        camera->film->WriteImage(&metadata, 1.0f / sampler->samplesPerPixel);
     }
-    ImageMetadata metadata;
-    metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.;
-    camera->InitMetadata(&metadata);
-    camera->film->WriteImage(&metadata, 1.0f / sampler->samplesPerPixel);
+    reporter.Done();
 
     // Write buffers for debug visualization
     if (visualizeStrategies || visualizeWeights) {

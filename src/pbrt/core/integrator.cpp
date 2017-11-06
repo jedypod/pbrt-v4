@@ -175,18 +175,26 @@ void SamplerIntegrator::Render() {
     const int tileSize = 16;
     Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
                    (sampleExtent.y + tileSize - 1) / tileSize);
-    ProgressReporter reporter(nTiles.x * nTiles.y, "Rendering");
-    {
+    int spp = initialSampler->samplesPerPixel;
+    ProgressReporter reporter(spp * nTiles.x * nTiles.y, "Rendering");
+    int startWave = 0, endWave = 1, waveDelta = 1;
+    std::vector<MemoryArena> arenas(MaxThreadIndex());
+    std::vector<std::unique_ptr<Sampler>> samplers(MaxThreadIndex());
+
+    while (startWave < spp) {
         ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
             // Render section of image corresponding to _tile_
 
             // Allocate _MemoryArena_ for tile
-            MemoryArena arena;
+            MemoryArena &arena = arenas[ThreadIndex];
 
             // Get sampler instance for tile
-            std::unique_ptr<Sampler> tileSampler = initialSampler->Clone();
+            std::unique_ptr<Sampler> &tileSampler = samplers[ThreadIndex];
+            if (!tileSampler)
+                tileSampler = initialSampler->Clone();
 
-            LOG(INFO) << "Starting image tile " << tileBounds;
+            LOG(INFO) << "Starting image tile " << tileBounds << " startWave " <<
+                startWave << ", endWave " << endWave;
 
             // Get _FilmTile_ for tile
             std::unique_ptr<FilmTile> filmTile =
@@ -197,8 +205,7 @@ void SamplerIntegrator::Render() {
                 if (!InsideExclusive(pixel, pixelBounds))
                     continue;
 
-                int spp = tileSampler->samplesPerPixel;
-                for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
+                for (int sampleIndex = startWave; sampleIndex < endWave; ++sampleIndex) {
                     tileSampler->StartSequence(pixel, sampleIndex);
 
                     // Initialize _CameraSample_ for current sample
@@ -256,17 +263,23 @@ void SamplerIntegrator::Render() {
 
             // Merge image tile into _Film_
             camera->film->MergeFilmTile(std::move(filmTile));
-            reporter.Update();
+            reporter.Update(endWave - startWave);
         });
-        reporter.Done();
-    }
-    LOG(INFO) << "Rendering finished";
 
-    // Save final image after rendering
-    ImageMetadata metadata;
-    metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.f;
-    camera->InitMetadata(&metadata);
-    camera->film->WriteImage(&metadata);
+        startWave = endWave;
+        endWave = std::min(spp, endWave + waveDelta);
+        waveDelta *= 2;
+
+        LOG(INFO) << "Writing image with spp = " << startWave;
+        ImageMetadata metadata;
+        metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.f;
+        metadata.samplesPerPixel = startWave;
+        camera->InitMetadata(&metadata);
+        camera->film->WriteImage(&metadata);
+    }
+
+    reporter.Done();
+    LOG(INFO) << "Rendering finished";
 }
 
 Spectrum SamplerIntegrator::SpecularReflect(

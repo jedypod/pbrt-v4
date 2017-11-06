@@ -37,13 +37,23 @@ GFX!
     doesn't make sense for film to take textures? or is that what we should
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
-  
-- Waverfront based stuff.  Make optional, only do if writing out
-  intermediate images, or.... ?  Or is this too much complexity in the main
-  render loop??
-  -> use dynamicdistribution1d for lights...
-    - double-buffer; can threads update their own and then periodically merge?
-    - provider iterator access to copy out, etc?
+
++ new sampling/ directory, reorganization
+sampling/
+lowdiscrepancy.h
+sampling.h
+sobolmatrices.h
+much break apart? shapes.h, ... ?
+
+- implement adaptive sampling / dual image buffer stuff
+
+- imgtool info: compute mc efficiency if one images has > spp than the other
+
+- update sppm and mlt to write out WIP images
+
+- use dynamicdistribution1d for light sampling
+ - double-buffer; can threads update their own and then periodically merge?
+ - provider iterator access to copy out, etc?
   
 - code organization:
   base/{camera,shape,light,...}
@@ -89,12 +99,6 @@ interaction.h
 lightdistrib.h
 mipmap.h
 
-sampling/
-lowdiscrepancy.h
-sampling.h
-sobolmatrices.h
-much break apart? shapes.h, ... ?
-
 - add more simple volume scattering tests--verious light types, etc.
   light in medium, light not in medium, camera in/out, etc.
 
@@ -110,6 +114,8 @@ much break apart? shapes.h, ... ?
     ... ?
 
 --onesample x,y,samp (+ enough logging to chase it down)
+
+- merge in interactive ray tracing stuff?
 
 - move Light::Le() into infinitearealight only?
   Light -> InfiniteLight -> InfiniteImageLight ?
