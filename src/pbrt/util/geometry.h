@@ -99,7 +99,7 @@ class Point2 : public Tuple2<Point2, T> {
   public:
     using Tuple2<Point2::template Point2, T>::x;
     using Tuple2<Point2::template Point2, T>::y;
-    using Tuple2<Point2::template Point2, T>::HasNaNs;
+    using Tuple2<Point2::template Point2, T>::HasNaN;
     using Tuple2<Point2::template Point2, T>::operator+;
 
     // Point2 Public Methods
@@ -121,12 +121,12 @@ class Point2 : public Tuple2<Point2, T> {
 
     template <typename U>
     auto operator+(const Vector2<U> &v) const -> Point2<decltype(T{}+U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x + v.x, y + v.y };
     }
     template <typename U>
     Point2<T> &operator+=(const Vector2<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
         return *this;
@@ -134,17 +134,17 @@ class Point2 : public Tuple2<Point2, T> {
 
     template <typename U>
     auto operator-(const Point2<U> &p) const -> Vector2<decltype(T{}-U{})> {
-        DCHECK(!p.HasNaNs());
+        DCHECK(!p.HasNaN());
         return { x - p.x, y - p.y };
     }
     template <typename U>
     auto operator-(const Vector2<U> &v) const -> Point2<decltype(T{}-U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x - v.x, y - v.y };
     }
     template <typename U>
     Point2<T> &operator-=(const Vector2<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
         return *this;
@@ -157,7 +157,7 @@ class Point3 : public Tuple3<Point3, T> {
     using Tuple3<Point3::template Point3, T>::x;
     using Tuple3<Point3::template Point3, T>::y;
     using Tuple3<Point3::template Point3, T>::z;
-    using Tuple3<Point3::template Point3, T>::HasNaNs;
+    using Tuple3<Point3::template Point3, T>::HasNaN;
     using Tuple3<Point3::template Point3, T>::operator+;
     using Tuple3<Point3::template Point3, T>::operator+=;
 
@@ -179,26 +179,26 @@ class Point3 : public Tuple3<Point3, T> {
     }
 
     Point3<T> operator+(const Vector3<T> &v) const {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return Point3<T>(x + v.x, y + v.y, z + v.z);
     }
     Point3<T> &operator+=(const Vector3<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
         z += v.z;
         return *this;
     }
     Vector3<T> operator-(const Point3<T> &p) const {
-        DCHECK(!p.HasNaNs());
+        DCHECK(!p.HasNaN());
         return Vector3<T>(x - p.x, y - p.y, z - p.z);
     }
     Point3<T> operator-(const Vector3<T> &v) const {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return Point3<T>(x - v.x, y - v.y, z - v.z);
     }
     Point3<T> &operator-=(const Vector3<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
         z -= v.z;
@@ -218,7 +218,7 @@ class Normal3 : public Tuple3<Normal3, T> {
     using Tuple3<Normal3::template Normal3, T>::x;
     using Tuple3<Normal3::template Normal3, T>::y;
     using Tuple3<Normal3::template Normal3, T>::z;
-    using Tuple3<Normal3::template Normal3, T>::HasNaNs;
+    using Tuple3<Normal3::template Normal3, T>::HasNaN;
     using Tuple3<Normal3::template Normal3, T>::operator+;
 
     // Normal3 Public Methods
@@ -239,7 +239,7 @@ class Ray {
         Float time = 0.f, const Medium *medium = nullptr)
         : o(o), d(d), tMax(tMax), time(time), medium(medium) {}
     Point3f operator()(Float t) const { return o + d * t; }
-    bool HasNaNs() const { return (o.HasNaNs() || d.HasNaNs() || isNaN(tMax)); }
+    bool HasNaN() const { return (o.HasNaN() || d.HasNaN() || std::isnan(tMax)); }
 
     std::string ToString() const;
 
@@ -265,11 +265,11 @@ class RayDifferential : public Ray {
         hasDifferentials = false;
     }
     RayDifferential(const Ray &ray) : Ray(ray) { hasDifferentials = false; }
-    bool HasNaNs() const {
-        return Ray::HasNaNs() ||
+    bool HasNaN() const {
+        return Ray::HasNaN() ||
                (hasDifferentials &&
-                (rxOrigin.HasNaNs() || ryOrigin.HasNaNs() ||
-                 rxDirection.HasNaNs() || ryDirection.HasNaNs()));
+                (rxOrigin.HasNaN() || ryOrigin.HasNaN() ||
+                 rxDirection.HasNaN() || ryDirection.HasNaN()));
     }
     void ScaleDifferentials(Float s) {
         rxOrigin = o + (rxOrigin - o) * s;
@@ -322,19 +322,19 @@ inline Vector3<T>::Vector3(const Point3<T> &p)
 
 template <typename T>
 inline T Dot(const Vector3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
 template <typename T>
 inline T AbsDot(const Vector3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return std::abs(Dot(v1, v2));
 }
 
 template <typename T>
 inline Vector3<T> Cross(const Vector3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     double v1x = v1.x, v1y = v1.y, v1z = v1.z;
     double v2x = v2.x, v2y = v2.y, v2z = v2.z;
     return Vector3<T>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z),
@@ -343,7 +343,7 @@ inline Vector3<T> Cross(const Vector3<T> &v1, const Vector3<T> &v2) {
 
 template <typename T>
 inline Vector3<T> Cross(const Vector3<T> &v1, const Normal3<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     double v1x = v1.x, v1y = v1.y, v1z = v1.z;
     double v2x = v2.x, v2y = v2.y, v2z = v2.z;
     return Vector3<T>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z),
@@ -352,7 +352,7 @@ inline Vector3<T> Cross(const Vector3<T> &v1, const Normal3<T> &v2) {
 
 template <typename T>
 inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     double v1x = v1.x, v1y = v1.y, v1z = v1.z;
     double v2x = v2.x, v2y = v2.y, v2z = v2.z;
     return Vector3<T>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z),
@@ -400,13 +400,13 @@ Vector2<T>::Vector2(const Point2<U> &p)
 
 template <typename T>
 inline Float Dot(const Vector2<T> &v1, const Vector2<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return v1.x * v2.x + v1.y * v2.y;
 }
 
 template <typename T>
 inline Float AbsDot(const Vector2<T> &v1, const Vector2<T> &v2) {
-    DCHECK(!v1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return std::abs(Dot(v1, v2));
 }
 
@@ -462,37 +462,37 @@ inline Vector3<T>::Vector3(const Normal3<T> &n)
 
 template <typename T>
 inline T Dot(const Normal3<T> &n1, const Vector3<T> &v2) {
-    DCHECK(!n1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!n1.HasNaN() && !v2.HasNaN());
     return n1.x * v2.x + n1.y * v2.y + n1.z * v2.z;
 }
 
 template <typename T>
 inline T Dot(const Vector3<T> &v1, const Normal3<T> &n2) {
-    DCHECK(!v1.HasNaNs() && !n2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !n2.HasNaN());
     return v1.x * n2.x + v1.y * n2.y + v1.z * n2.z;
 }
 
 template <typename T>
 inline T Dot(const Normal3<T> &n1, const Normal3<T> &n2) {
-    DCHECK(!n1.HasNaNs() && !n2.HasNaNs());
+    DCHECK(!n1.HasNaN() && !n2.HasNaN());
     return n1.x * n2.x + n1.y * n2.y + n1.z * n2.z;
 }
 
 template <typename T>
 inline T AbsDot(const Normal3<T> &n1, const Vector3<T> &v2) {
-    DCHECK(!n1.HasNaNs() && !v2.HasNaNs());
+    DCHECK(!n1.HasNaN() && !v2.HasNaN());
     return std::abs(n1.x * v2.x + n1.y * v2.y + n1.z * v2.z);
 }
 
 template <typename T>
 inline T AbsDot(const Vector3<T> &v1, const Normal3<T> &n2) {
-    DCHECK(!v1.HasNaNs() && !n2.HasNaNs());
+    DCHECK(!v1.HasNaN() && !n2.HasNaN());
     return std::abs(v1.x * n2.x + v1.y * n2.y + v1.z * n2.z);
 }
 
 template <typename T>
 inline T AbsDot(const Normal3<T> &n1, const Normal3<T> &n2) {
-    DCHECK(!n1.HasNaNs() && !n2.HasNaNs());
+    DCHECK(!n1.HasNaN() && !n2.HasNaN());
     return std::abs(n1.x * n2.x + n1.y * n2.y + n1.z * n2.z);
 }
 

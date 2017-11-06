@@ -375,7 +375,7 @@ std::array<Float, 3> SphericalSampleTriangle(const std::array<Point3f, 3> &v,
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
     // is sort of ugly/unfortunate.
-    CHECK(!isNaN(cosBetap));
+    CHECK(!std::isnan(cosBetap));
     cosBetap = Clamp(cosBetap, -1, 1);
     double sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
 

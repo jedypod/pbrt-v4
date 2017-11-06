@@ -72,15 +72,6 @@ static constexpr Float PiOver4 = 0.78539816339744830961;
 static constexpr Float Sqrt2 = 1.41421356237309504880;
 
 // Global Inline Functions
-template <typename T>
-inline bool isNaN(const T x) {
-    return std::isnan(x);
-}
-template <>
-inline bool isNaN(const int x) {
-    return false;
-}
-
 inline uint32_t FloatToBits(float f) {
     uint32_t ui;
     std::memcpy(&ui, &f, sizeof(float));
@@ -495,7 +486,7 @@ FloatType NewtonBisection(
 
         Float fx0 = f(x0).first, fx1 = f(x1).first;
         std::pair<FloatType, FloatType> fxMid = f(xMid);
-        DCHECK(!isNaN(fxMid.first));
+        DCHECK(!std::isnan(fxMid.first));
 
         if (startIsNegative == fxMid.first < 0)
             x0 = xMid;

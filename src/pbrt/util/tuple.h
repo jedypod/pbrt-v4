@@ -48,25 +48,42 @@
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 
 namespace pbrt {
+
+namespace {
+
+template <typename T>
+inline typename std::enable_if<std::is_floating_point<T>::value, bool>::type
+isNaN(const T x) {
+    return std::isnan(x);
+}
+
+template <typename T>
+inline typename std::enable_if<std::is_integral<T>::value, bool>::type
+isNaN(const T x) {
+    return false;
+}
+
+}  // anonymous namespace
 
 template <template<typename> class Child, typename T>
 class Tuple2 {
   public:
     Tuple2() { x = y = 0; }
-    Tuple2(T xx, T yy) : x(xx), y(yy) { DCHECK(!HasNaNs()); }
-    bool HasNaNs() const { return isNaN(x) || isNaN(y); }
+    Tuple2(T xx, T yy) : x(xx), y(yy) { DCHECK(!HasNaN()); }
+    bool HasNaN() const { return isNaN(x) || isNaN(y); }
 #ifndef NDEBUG
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     Tuple2(const Child<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x = v.x;
         y = v.y;
     }
     Child<T> &operator=(const Child<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x = v.x;
         y = v.y;
         return *this;
@@ -77,12 +94,12 @@ class Tuple2 {
     // WHY doesn't this work?
     // Child<std::common_type<T, U>> operator+(const Child<U> &v) const {
     auto operator+(const Child<U> &v) const -> Child<decltype(T{}+U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x + v.x, y + v.y };
     }
     template <typename U>
     Child<T> &operator+=(const Child<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
         return *this;
@@ -90,12 +107,12 @@ class Tuple2 {
 
     template <typename U>
     auto operator-(const Child<U> &v) const -> Child<decltype(T{}-U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x - v.x, y - v.y };
     }
     template <typename U>
     Child<T> &operator-=(const Child<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
         return *this;
@@ -169,7 +186,7 @@ inline C<T> Abs(const Tuple2<C, T> &v) {
 
 template <template<class> class C, typename T, typename U>
 inline auto operator*(U f, const C<T> &t) -> C<decltype(T{}*U{})> {
-    DCHECK(!t.HasNaNs());
+    DCHECK(!t.HasNaN());
     return t * f;
 }
 
@@ -204,20 +221,20 @@ class Tuple3 {
   public:
     // Tuple3 Public Methods
     Tuple3() { x = y = z = 0; }
-    Tuple3(T x, T y, T z) : x(x), y(y), z(z) { DCHECK(!HasNaNs()); }
-    bool HasNaNs() const { return isNaN(x) || isNaN(y) || isNaN(z); }
+    Tuple3(T x, T y, T z) : x(x), y(y), z(z) { DCHECK(!HasNaN()); }
+    bool HasNaN() const { return isNaN(x) || isNaN(y) || isNaN(z); }
 #ifndef NDEBUG
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     Tuple3(const Child<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x = v.x;
         y = v.y;
         z = v.z;
     }
 
     Tuple3 &operator=(const Child<T> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x = v.x;
         y = v.y;
         z = v.z;
@@ -240,12 +257,12 @@ class Tuple3 {
 
     template <typename U>
     auto operator+(const Child<U> &v) const -> Child<decltype(T{}+U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x + v.x, y + v.y, z + v.z };
     }
     template <typename U>
     Child<T> &operator+=(const Child<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
         z += v.z;
@@ -254,12 +271,12 @@ class Tuple3 {
 
     template <typename U>
     auto operator-(const Child<U> &v) const -> Child<decltype(T{}-U{})> {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         return { x - v.x, y - v.y, z - v.z };
     }
     template <typename U>
     Child<T> &operator-=(const Child<U> &v) {
-        DCHECK(!v.HasNaNs());
+        DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
         z -= v.z;
