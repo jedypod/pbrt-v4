@@ -484,7 +484,7 @@ static void printImageStats(const char *name, const Image &image,
     Float max[3] = {-Infinity, -Infinity, -Infinity};
     double sum[3] = {0., 0., 0.};
     double logYSum = 0.;
-    int nNaN = 0, nInf = 0, nValid = 0;
+    int nNaN = 0, nInf = 0, nValid[3] = {0, 0, 0};
     int nc = image.nChannels();
     CHECK_LE(nc, 3);  // fixed-sized arrays above...
     for (int y = 0; y < image.resolution.y; ++y)
@@ -503,13 +503,13 @@ static void printImageStats(const char *name, const Image &image,
                     min[c] = std::min(min[c], v);
                     max[c] = std::max(max[c], v);
                     sum[c] += v;
-                    ++nValid;
+                    ++nValid[c];
                 }
             }
         }
 
-    printf("\t%d infinite pixel components, %d NaN, %d valid.\n", nInf,
-           nNaN, nValid);
+    printf("\t%d infinite pixel components, %d NaN, (%d, %d, %d) valid.\n",
+           nInf, nNaN, nValid[0], nValid[1], nValid[2]);
     printf("\tlog average luminance %f\n",
            std::exp(logYSum / (image.resolution.x * image.resolution.y)));
     printf("\tmin channel:");
@@ -522,7 +522,7 @@ static void printImageStats(const char *name, const Image &image,
     printf("\n");
     printf("\tavg channel:");
     for (int c = 0; c < nc; ++c)
-        printf(" %f%c", sum[c] / nValid, (c < nc - 1) ? ',' : ' ');
+        printf(" %f%c", sum[c] / nValid[c], (c < nc - 1) ? ',' : ' ');
     printf("\n");
 }
 
