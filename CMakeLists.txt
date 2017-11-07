@@ -51,6 +51,9 @@ FIND_PACKAGE ( Threads )
 IF(CMAKE_BUILD_TYPE MATCHES RELEASE)
   ADD_DEFINITIONS (-DNDEBUG)
 ENDIF()
+# To build a release build with CHECKs enabled, comment-out the above
+# 3 lines and un-comment out this one:
+# SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 ###########################################################################
 # Annoying compiler-specific details
