@@ -410,7 +410,7 @@ void BDPTIntegrator::Render() {
 
         startWave = endWave;
         endWave = std::min(spp, endWave + waveDelta);
-        waveDelta *= 2;
+        waveDelta = std::min(2 * waveDelta, 64);
 
         LOG(INFO) << "Writing image with spp = " << startWave;
         ImageMetadata metadata;
