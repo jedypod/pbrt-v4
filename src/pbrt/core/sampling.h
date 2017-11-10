@@ -232,6 +232,43 @@ inline Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
     return Clamp(x, a, b);
 }
 
+class LinearDistribution1D {
+  public:
+    LinearDistribution1D(int n, std::function<Float(Float)> f) : values(n) {
+        CHECK_GT(n, 1);
+        for (int i = 0; i < n; ++i)
+            values[i] = f(Float(i) / Float(n - 1));
+
+        std::vector<Float> p(n - 1);
+        for (int i = 0; i < n - 1; ++i)
+            p[i] = values[i] + values[i + 1];
+        distrib = Distribution1D(p);
+    }
+
+    Float Sample(Float u, Float *pdf) {
+        Float uRemapped;
+        int index = distrib.SampleDiscrete(u, pdf, &uRemapped);
+        CHECK_NE(*pdf, 0);
+        CHECK_LT(index + 1, values.size());
+        Float x = SampleLinear(uRemapped, values[index], values[index + 1]);
+        *pdf *= (values.size() - 1) *
+            LinearPdf(x, values[index], values[index + 1]);
+        return Float(index + x) / (values.size() - 1);
+    }
+    Float Pdf(Float x) {
+        int index = std::min<int>(x * (values.size() - 1), values.size() - 1);
+        Float pdf = distrib.DiscretePDF(index);
+        // Fractional part
+        Float fx = x * (values.size() - 1) - index;
+        return pdf * (values.size() - 1) *
+            LinearPdf(fx, values[index], values[index + 1]);
+    }
+
+  private:
+    Distribution1D distrib;
+    std::vector<Float> values;
+};
+
 class DynamicDistribution1D {
 public:
     DynamicDistribution1D(int count)

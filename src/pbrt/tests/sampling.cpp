@@ -715,6 +715,29 @@ TEST(Sampling, Logistic) {
     }
 }
 
+TEST(Sampling, LinearDistribution1D) {
+    // First test against simple linear
+    auto f = [](Float x) { return Lerp(x, 1, 3); };
+    {
+        LinearDistribution1D ld(2, f);
+        Float xpdf;
+        Float xl = ld.Sample(.25, &xpdf);
+        EXPECT_EQ(SampleLinear(.25, 1, 3), xl);
+        EXPECT_EQ(LinearPdf(xl, 1, 3), xpdf);
+        EXPECT_EQ(LinearPdf(xl, 1, 3), ld.Pdf(xl));
+    }
+
+    // Same but sample more
+    {
+        LinearDistribution1D ld(5, f);
+        Float xpdf;
+        Float xl = ld.Sample(.25, &xpdf);
+        EXPECT_EQ(SampleLinear(.25, 1, 3), xl);
+        EXPECT_LT(std::abs(LinearPdf(xl, 1, 3) - xpdf), 1e-5);
+        EXPECT_LT(std::abs(LinearPdf(xl, 1, 3) - ld.Pdf(xl)), 1e-5);
+    }
+}
+
 TEST(Sampling, DynamicDistribution1D) {
     // Check basic agreement. Set up so that values sum to 8 -> can do
     // exact probabilities.
