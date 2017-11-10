@@ -110,10 +110,12 @@ void SurfaceInteraction::ComputeDifferentials(
         Float d = Dot(n, Vector3f(p.x, p.y, p.z));
         Float tx =
             -(Dot(n, Vector3f(ray.rxOrigin)) - d) / Dot(n, ray.rxDirection);
+        CHECK_RARE(1e-6, std::isinf(tx) || std::isnan(tx));
         if (std::isinf(tx) || std::isnan(tx)) goto fail;
         Point3f px = ray.rxOrigin + tx * ray.rxDirection;
         Float ty =
             -(Dot(n, Vector3f(ray.ryOrigin)) - d) / Dot(n, ray.ryDirection);
+        CHECK_RARE(1e-6, std::isinf(tx) || std::isnan(tx));
         if (std::isinf(ty) || std::isnan(ty)) goto fail;
         Point3f py = ray.ryOrigin + ty * ray.ryDirection;
         dpdx = px - p;
