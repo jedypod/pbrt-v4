@@ -290,7 +290,7 @@ void ParallelFor2D(const Bounds2i &extent, int chunkSize, std::function<void(Bou
 
 ///////////////////////////////////////////////////////////////////////////
 
-PBRT_THREAD_LOCAL int ThreadIndex;
+thread_local int ThreadIndex;
 
 static int AvailableCores() {
     return std::max(1u, std::thread::hardware_concurrency());

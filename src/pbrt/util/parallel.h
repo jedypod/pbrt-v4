@@ -122,7 +122,7 @@ ParallelReduce(int64_t start, int64_t end, int chunkSize, F func, R reduce) {
     }
 }
 
-extern PBRT_THREAD_LOCAL int ThreadIndex;
+extern thread_local int ThreadIndex;
 
 int MaxThreadIndex();
 

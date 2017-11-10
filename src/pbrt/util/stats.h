@@ -279,7 +279,7 @@ static_assert((int)Prof::NumProfCategories == ABSL_ARRAYSIZE(ProfNames),
               "ProfNames[] array and Prof enumerant have different "
               "numbers of entries!");
 
-extern PBRT_THREAD_LOCAL uint64_t ProfilerState;
+extern thread_local uint64_t ProfilerState;
 inline uint64_t CurrentProfilerState() { return ProfilerState; }
 
 class ProfilePhase {
@@ -312,14 +312,14 @@ void CleanupProfiler();
 
 // Statistics Macros
 #define STAT_COUNTER(title, var)                           \
-    static PBRT_THREAD_LOCAL int64_t var;                  \
+    static thread_local int64_t var;                  \
     static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) { \
         accum.ReportCounter(title, var);                   \
         var = 0;                                           \
     });
 
 #define STAT_MEMORY_COUNTER(title, var)                    \
-    static PBRT_THREAD_LOCAL int64_t var;                  \
+    static thread_local int64_t var;                  \
     static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) { \
         accum.ReportMemoryCounter(title, var);             \
         var = 0;                                           \
@@ -331,10 +331,10 @@ void CleanupProfiler();
 #define STATS_DBL_T_MAX std::numeric_limits<double>::lowest()
 
 #define STAT_INT_DISTRIBUTION(title, var)                                  \
-    static PBRT_THREAD_LOCAL int64_t var##sum;                             \
-    static PBRT_THREAD_LOCAL int64_t var##count;                           \
-    static PBRT_THREAD_LOCAL int64_t var##min = (STATS_INT64_T_MIN);       \
-    static PBRT_THREAD_LOCAL int64_t var##max = (STATS_INT64_T_MAX);       \
+    static thread_local int64_t var##sum;                               \
+    static thread_local int64_t var##count;                             \
+    static thread_local int64_t var##min = (STATS_INT64_T_MIN);         \
+    static thread_local int64_t var##max = (STATS_INT64_T_MAX);         \
     static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {  \
         accum.ReportIntDistribution(title, var##sum, var##count, var##min, \
                                     var##max);                             \
@@ -345,10 +345,10 @@ void CleanupProfiler();
     });
 
 #define STAT_FLOAT_DISTRIBUTION(title, var)                                  \
-    static PBRT_THREAD_LOCAL double var##sum;                                \
-    static PBRT_THREAD_LOCAL int64_t var##count;                             \
-    static PBRT_THREAD_LOCAL double var##min = (STATS_DBL_T_MIN);            \
-    static PBRT_THREAD_LOCAL double var##max = (STATS_DBL_T_MAX);            \
+    static thread_local double var##sum;                                \
+    static thread_local int64_t var##count;                             \
+    static thread_local double var##min = (STATS_DBL_T_MIN);            \
+    static thread_local double var##max = (STATS_DBL_T_MAX);            \
     static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {       \
         accum.ReportFloatDistribution(title, var##sum, var##count, var##min, \
                                       var##max);                             \
@@ -367,14 +367,14 @@ void CleanupProfiler();
     } while (0)
 
 #define STAT_PERCENT(title, numVar, denomVar)                 \
-    static PBRT_THREAD_LOCAL int64_t numVar, denomVar;        \
+    static thread_local int64_t numVar, denomVar;        \
     static StatRegisterer STATS_REG##numVar([](StatsAccumulator &accum) { \
         accum.ReportPercentage(title, numVar, denomVar);      \
         numVar = denomVar = 0;                                \
     });
 
 #define STAT_RATIO(title, numVar, denomVar)                   \
-    static PBRT_THREAD_LOCAL int64_t numVar, denomVar;        \
+    static thread_local int64_t numVar, denomVar;        \
     static StatRegisterer STATS_REG##numVar([](StatsAccumulator &accum) { \
         accum.ReportRatio(title, numVar, denomVar);           \
         numVar = denomVar = 0;                                \

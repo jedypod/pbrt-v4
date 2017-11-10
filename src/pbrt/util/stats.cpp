@@ -218,7 +218,7 @@ void StatsAccumulator::Clear() {
     ratios.clear();
 }
 
-PBRT_THREAD_LOCAL uint64_t ProfilerState;
+thread_local uint64_t ProfilerState;
 static std::atomic<bool> profilerRunning{false};
 
 void InitProfiler() {
