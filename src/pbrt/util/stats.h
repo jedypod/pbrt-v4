@@ -49,6 +49,7 @@
 #include <map>
 #include <stdio.h>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace pbrt {
@@ -383,16 +384,20 @@ void CleanupProfiler();
 #define TO_STRING(x) #x
 #define EXPAND_AND_TO_STRING(x) TO_STRING(x)
 
-#define CHECK_RARE(freq, condition)                                  \
-    do {                                                             \
-        static thread_local int64_t numTrue, total;                  \
-        static StatRegisterer reg([](StatsAccumulator &accum) {     \
+#define CHECK_RARE(freq, condition)                                     \
+    static_assert(std::is_floating_point<decltype(freq)>::value,        \
+                  "Expected floating-point frequency as first argument to CHECK_RARE"); \
+    static_assert(std::is_integral<decltype(condition)>::value,         \
+                  "Expected Boolean condition as second argument to CHECK_RARE"); \
+    do {                                                                \
+        static thread_local int64_t numTrue, total;                     \
+        static StatRegisterer reg([](StatsAccumulator &accum) {         \
                 accum.ReportRareCheck(__FILE__ " " EXPAND_AND_TO_STRING(__LINE__) ": CHECK_RARE failed: " #condition, \
                                   freq, numTrue, total);               \
-            numTrue = total = 0;                                     \
-            });                                                      \
-        ++total;                                                     \
-        if (condition) ++numTrue;                                    \
+                numTrue = total = 0;                                   \
+            });                                                        \
+        ++total;                                                       \
+        if (condition) ++numTrue;                                      \
     } while(0)
 
 }  // namespace pbrt
