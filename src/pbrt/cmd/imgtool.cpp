@@ -365,8 +365,9 @@ int diff(int argc, char *argv[]) {
               int(filenames.size()));
 
     Image img[2];
+    ImageMetadata metadata[2];
     for (int i = 0; i < 2; ++i) {
-        absl::optional<Image> imRead = Image::Read(filenames[i]);
+        absl::optional<Image> imRead = Image::Read(filenames[i], &metadata[i]);
         if (imRead)
             img[i] = std::move(*imRead);
         else {
@@ -428,6 +429,7 @@ int diff(int argc, char *argv[]) {
             100.f * float(smallDiff) / (3 * res.x * res.y), avg[0], avg[1],
             100. * avgDelta, mse / (3. * res.x * res.y),
             100. * sqrt(mse / (3. * res.x * res.y)));
+
         if (!outfile.empty()) {
             if (!diffImage.Write(outfile))
                 fprintf(stderr, "%s: unable to write image: %s\n",
@@ -472,6 +474,16 @@ static void printImageStats(const char *name, const Image &image,
         if (metadata->samplesPerPixel)
             printf("\tsamples per pixel: %d\n", *metadata->samplesPerPixel);
 
+        if (metadata->estimatedVariance) {
+            printf("\testimated pixel variance: %f\n",
+                   *metadata->estimatedVariance);
+            if (metadata->renderTimeSeconds)
+                printf("\tMonte Carlo efficiency: %f\n",
+                       1. / (*metadata->renderTimeSeconds *
+                             *metadata->estimatedVariance));
+            else printf("\n");
+        }
+
         for (const auto iter : metadata->stringVectors) {
             printf("\t\"%s\": [ ", iter.first.c_str());
             for (const std::string &str : iter.second)
@@ -510,7 +522,7 @@ static void printImageStats(const char *name, const Image &image,
 
     printf("\t%d infinite pixel components, %d NaN, (%d, %d, %d) valid.\n",
            nInf, nNaN, nValid[0], nValid[1], nValid[2]);
-    printf("\tlog average luminance %f\n",
+    printf("\tlog average luminance: %f\n",
            std::exp(logYSum / (image.resolution.x * image.resolution.y)));
     printf("\tmin channel:");
     for (int c = 0; c < nc; ++c)

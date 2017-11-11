@@ -738,6 +738,11 @@ static absl::optional<Image> ReadEXR(const std::string &name,
             if (sppAttrib)
                 metadata->samplesPerPixel = sppAttrib->value();
 
+            const Imf::FloatAttribute *varianceAttrib =
+                file.header().findTypedAttribute<Imf::FloatAttribute>("estimatedVariance");
+            if (varianceAttrib)
+                metadata->estimatedVariance = varianceAttrib->value();
+
             // Find any string vector attributes
             for (auto iter = file.header().begin(); iter != file.header().end();
                  ++iter) {
@@ -835,6 +840,8 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata *metadata) con
                 header.insert("worldToNDC", Imf::M44fAttribute(metadata->worldToNDC->m));
             if (metadata->samplesPerPixel)
                 header.insert("samplesPerPixel", Imf::IntAttribute(*metadata->samplesPerPixel));
+            if (metadata->estimatedVariance)
+                header.insert("estimatedVariance", Imf::FloatAttribute(*metadata->estimatedVariance));
             for (const auto &iter : metadata->stringVectors)
                 header.insert(iter.first, Imf::StringVectorAttribute(iter.second));
         }

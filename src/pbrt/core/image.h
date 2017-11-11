@@ -247,11 +247,12 @@ bool RemapPixelCoords(Point2i *p, Point2i resolution, WrapMode2D wrapMode);
 
 struct ImageMetadata {
     // These may or may not be present in the metadata of an Image.
-    absl::optional<Float> renderTimeSeconds;
+    absl::optional<float> renderTimeSeconds;
     absl::optional<Matrix4x4> worldToCamera, worldToNDC;
     absl::optional<Bounds2i> pixelBounds;
     absl::optional<Point2i> fullResolution;
     absl::optional<int> samplesPerPixel;
+    absl::optional<float> estimatedVariance;
     std::map<std::string, std::vector<std::string>> stringVectors;
 };
 
