@@ -441,7 +441,9 @@ void SPPMIntegrator::Render() {
         }
 
         // Periodically store SPPM image in film and write image
-        if (iter + 1 == nIterations || ((iter + 1) % writeFrequency) == 0) {
+        if (iter + 1 == nIterations ||
+            (iter + 1 <= 64 && IsPowerOf2(iter + 1)) ||
+            ((iter + 1) % 64 == 0)) {
             int x0 = pixelBounds.pMin.x;
             int x1 = pixelBounds.pMax.x;
             uint64_t Np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
@@ -460,6 +462,7 @@ void SPPMIntegrator::Render() {
             camera->film->SetImage(image);
             ImageMetadata metadata;
             metadata.renderTimeSeconds = progress.ElapsedMS() / 1000.;
+            metadata.samplesPerPixel = iter + 1;
             camera->InitMetadata(&metadata);
             camera->film->WriteImage(&metadata);
 
@@ -506,11 +509,10 @@ std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
         params.GetOneInt("iterations", params.GetOneInt("numiterations", 64));
     int maxDepth = params.GetOneInt("maxdepth", 5);
     int photonsPerIter = params.GetOneInt("photonsperiteration", -1);
-    int writeFreq = params.GetOneInt("imagewritefrequency", 1 << 31);
     Float radius = params.GetOneFloat("radius", 1.f);
     if (PbrtOptions.quickRender) nIterations = std::max(1, nIterations / 16);
     return std::make_unique<SPPMIntegrator>(scene, camera, nIterations, photonsPerIter,
-                                            maxDepth, radius, writeFreq);
+                                            maxDepth, radius);
 }
 
 }  // namespace pbrt

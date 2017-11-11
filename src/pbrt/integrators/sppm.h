@@ -54,7 +54,7 @@ class SPPMIntegrator : public Integrator {
     // SPPMIntegrator Public Methods
     SPPMIntegrator(const Scene &scene, std::shared_ptr<const Camera> &camera,
                    int nIterations, int photonsPerIteration, int maxDepth,
-                   Float initialSearchRadius, int writeFrequency)
+                   Float initialSearchRadius)
         : Integrator(scene),
           camera(camera),
           initialSearchRadius(initialSearchRadius),
@@ -62,8 +62,7 @@ class SPPMIntegrator : public Integrator {
           maxDepth(maxDepth),
           photonsPerIteration(photonsPerIteration > 0
                                   ? photonsPerIteration
-                                  : camera->film->croppedPixelBounds.Area()),
-          writeFrequency(writeFrequency) {}
+                                  : camera->film->croppedPixelBounds.Area()) {}
     void Render();
 
   private:
@@ -73,7 +72,6 @@ class SPPMIntegrator : public Integrator {
     const int nIterations;
     const int maxDepth;
     const int photonsPerIteration;
-    const int writeFrequency;
 };
 
 std::unique_ptr<SPPMIntegrator> CreateSPPMIntegrator(
