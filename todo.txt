@@ -14,12 +14,14 @@ GFX!
   
 - revisit materials, mitsuba style
 
-- Direct lighting: does it make sense to run this for specular bsdf
-  components as well (and not sample the light, obviously), and then just
-  always ignore emission after the very first intersection?
-  - actually, the opposite---never sample the bsdf in direct lighting code,
-    then always incorportate (and MIS) at intersections
+- revisit sample bsdf components by rho; can we get rid of the glass
+  special case one that does the fresnel-based choice?
 
+- implement adaptive sampling / dual image buffer stuff
+
+- direct-lighting-redo branch has WIP direct lighting redo for path
+  integrators
+  
 - implement filter importance sampling
 
 - BDPT RR
@@ -27,7 +29,14 @@ GFX!
 - BDPT: do standard MIS direct lighting at end (and then can use fancy
   light sampling stuff)
 
+- WIP: AdaptiveLightDsitribution: use dynamicdistribution1d for light sampling
+ - double-buffer; can threads update their own and then periodically merge?
+  - have some way to provide an initial distribution
+ - why so much brightness variation vs spatial sampling???
+
 -----------------
+
+- don't checkin todo.txt?
 
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet
@@ -38,23 +47,14 @@ GFX!
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
 
-+ new sampling/ directory, reorganization
-sampling/
-lowdiscrepancy.h
-sampling.h
-sobolmatrices.h
-much break apart? shapes.h, ... ?
+- imgtool diff: compute mc efficiency if one images has > spp than the other
 
-- implement adaptive sampling / dual image buffer stuff
+- it would be nice if mlt wrote out WIP images, but it's not clear how best
+  to do that without a lot of surgery
 
-- imgtool info: compute mc efficiency if one images has > spp than the other
+- try using dynamicdistribution1d for e.g. infinite light source sampling:
+  is it faster thanks to better cache coherence?
 
-- update sppm and mlt to write out WIP images
-
-- use dynamicdistribution1d for light sampling
- - double-buffer; can threads update their own and then periodically merge?
- - provider iterator access to copy out, etc?
-  
 - code organization:
   base/{camera,shape,light,...}
   sampling/...
@@ -63,7 +63,14 @@ much break apart? shapes.h, ... ?
   or is that too much decomposition for core/?
   - why is error.* in core?
 
-base/
++ new sampling/ directory, reorganization
+sampling/
+lowdiscrepancy.h
+sampling.h
+sobolmatrices.h
+much break apart? shapes.h, ... ?
+
+base/ (review all of these for detritus)
 camera.h
 filter.h
 integrator.h
@@ -104,13 +111,8 @@ mipmap.h
 
 - camera autofocus functionality
 
-- failures from run with debug checks:
-  splash.pbrt, plume-volpath, transparent machines/frame1266: compute differentials NaN for scattering 
-
-- provide an option for blinear sampling Distribution2D
-  - option for Distribution1D to sample linear? Or separate class?
-    Constant1dDistribution
-    Linear1dDistribution
+- Constant1dDistribution
+  Linear1dDistribution
     ... ?
 
 --onesample x,y,samp (+ enough logging to chase it down)
@@ -122,7 +124,7 @@ mipmap.h
 
 - camera space experiments (all done at the API level?)
 
-- tests for light * -> pdf computaiton
+- add tests for light * -> pdf computaiton
 
 - use SampleDiscrete
   - BSDF component sampling? (can we generalize the glass dual lobe stuff?)
@@ -141,9 +143,7 @@ mipmap.h
   shadow ray, Scene::IntersectTr() may use dimensions, which messes up
   all subsequent dimensions...
 
-- absl:
-  container/inlined_vector.h: InlinedVector, in particular for
-    Distribution1D stuff
+- why is spatiallightdistribution creation not in flattened profile?
 
 - rename GonioPhotometricLight -> GoniometricLight?
 
@@ -198,12 +198,6 @@ mipmap.h
 - figure out consistent merging of film tiles so have fully deterministic
   final pixel outputs
   
-- api.cpp: Create* vs Make*, etc.
-
-- api / MakeFilter error handling (exit) is inconsistent with others...
-  General API error handling review. Recover and use something, or fail
-  hard?
-  
 - test alpha tex for non triangles. also review how it's passed through for
   non-triangles in --cat/--toply
 
@@ -254,3 +248,5 @@ mipmap.h
 
 - consistent multithreaded results (incl with MLT) if doubles used for both
   splat and xyz accumulation. hmm..
+
+- switch to abseil-based cmake
