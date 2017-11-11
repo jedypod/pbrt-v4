@@ -562,6 +562,26 @@ inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
     return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
 }
 
+template <typename Float = double>
+class KahanSum {
+  public:
+    KahanSum() = default;
+    explicit KahanSum(Float d) : sum(d) { }
+
+    KahanSum &operator+=(Float v) {
+        Float delta = v - c;
+        Float newSum = sum + delta;
+        c = (newSum - sum) - delta;
+        sum = newSum;
+        return *this;
+    }
+    explicit operator double() const { return sum; }
+    explicit operator float() const { return sum; }
+
+  private:
+    Float sum = 0., c = 0.;
+};
+
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_MATH_H

@@ -38,6 +38,12 @@ GFX!
 
 - don't checkin todo.txt?
 
+- scattering-sphere-diel is hitting check_rare (just barely though)
+  many times in transparent-machines/frame1266 (0.1%!)
+
+- estimate variance from samples (and store in metadata) ->
+  - imgtool diff: compute mc efficiency?
+
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet
   TextureParams -> ...?
@@ -46,8 +52,6 @@ GFX!
     doesn't make sense for film to take textures? or is that what we should
     do to e.g. specify light emissing stuff. then tabularize if procedural?
     etc..
-
-- imgtool diff: compute mc efficiency if one images has > spp than the other
 
 - it would be nice if mlt wrote out WIP images, but it's not clear how best
   to do that without a lot of surgery
@@ -70,7 +74,11 @@ sampling.h
 sobolmatrices.h
 much break apart? shapes.h, ... ?
 
-base/ (review all of these for detritus)
+base/ ?
+review all of these for detritus.
+what about semi-implementations: ProjectiveCamera
+and implementations: GeometricPrimitive
+?
 camera.h
 filter.h
 integrator.h
@@ -105,6 +113,12 @@ image.h -> util ?
 interaction.h
 lightdistrib.h
 mipmap.h
+
+- would be nice to somehow be able to print current pixel and sample
+  information on fatal errors
+  - move error to util, but have some sort of global per-thread
+    error context, virtual std::string function. then integrators
+    can maintain?
 
 - add more simple volume scattering tests--verious light types, etc.
   light in medium, light not in medium, camera in/out, etc.

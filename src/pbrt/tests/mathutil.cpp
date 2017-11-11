@@ -1,9 +1,11 @@
 
 #include <gtest/gtest.h>
 #include <cmath>
+#include <cstdint>
 
 #include <pbrt/core/pbrt.h>
 #include <pbrt/util/math.h>
+#include <pbrt/util/rng.h>
 
 using namespace pbrt;
 
@@ -94,4 +96,44 @@ TEST(Math, EvaluatePolynomial) {
 
     EXPECT_EQ(1.5 + 2.75 * .5 - 4.25 * Pow<2>(.5) + 15.125 * Pow<3>(.5),
               EvaluatePolynomial(.5, 1.5, 2.75, -4.25, 15.125));
+}
+
+TEST(Math, KahanSum) {
+    // In order of decreasing accuracy...
+    long double ldSum = 0;
+    KahanSum<double> kahanSumD;
+    double doubleSum = 0;
+    KahanSum<float> kahanSumF;
+    float floatSum = 0;
+
+    RNG rng;
+    for (int i = 0; i < 16*1024*1024; ++i) {
+        // Hard to sum accurately since the values span many magnitudes.
+        float v = std::exp(Lerp(rng.UniformFloat(), -5, 20));
+        ldSum += v;
+        kahanSumD += v;
+        doubleSum += v;
+        kahanSumF += v;
+        floatSum += v;
+    }
+
+    int64_t ldBits = FloatToBits(double(ldSum));
+    int64_t kahanDBits = FloatToBits(double(kahanSumD));
+    int64_t doubleBits = FloatToBits(doubleSum);
+    int64_t kahanFBits = FloatToBits(double(kahanSumF));
+    int64_t floatBits = FloatToBits(double(floatSum));
+
+    int64_t kahanDErrorUlps = std::abs(kahanDBits - ldBits);
+    int64_t doubleErrorUlps = std::abs(doubleBits - ldBits);
+    int64_t kahanFErrorUlps = std::abs(kahanFBits - ldBits);
+    int64_t floatErrorUlps = std::abs(floatBits - ldBits);
+
+    // Expect each to be much more accurate than the one before it.
+    EXPECT_LT(kahanDErrorUlps * 10000, doubleErrorUlps) <<
+        kahanDErrorUlps << " - " << doubleErrorUlps;
+    // Less slop between double and Kahan with floats.
+    EXPECT_LT(doubleErrorUlps * 1000, kahanFErrorUlps) <<
+        doubleErrorUlps << " - " << kahanFErrorUlps;
+    EXPECT_LT(kahanFErrorUlps * 10000, floatErrorUlps) <<
+        kahanFErrorUlps << " - " << floatErrorUlps;
 }
