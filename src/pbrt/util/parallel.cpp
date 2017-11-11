@@ -341,15 +341,19 @@ void ParallelJob::TerminateThreads() {
     shutdownThreads = false;
 }
 
-void MergeWorkerThreadStats() {
+void ForEachWorkerThread(std::function<void(void)> func) {
     int nThreads = MaxThreadIndex();
     absl::Barrier *barrier = new absl::Barrier(nThreads);
 
     ParallelFor(0, nThreads,
-                [barrier](int64_t index) {
-                    ReportThreadStats();
+                [barrier,&func](int64_t) {
+                    func();
                     if (barrier->Block()) delete barrier;
                 });
+}
+
+void MergeWorkerThreadStats() {
+    ForEachWorkerThread(ReportThreadStats);
 }
 
 }  // namespace pbrt

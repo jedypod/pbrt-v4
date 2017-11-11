@@ -122,6 +122,8 @@ ParallelReduce(int64_t start, int64_t end, int chunkSize, F func, R reduce) {
     }
 }
 
+void ForEachWorkerThread(std::function<void(void)> func);
+
 extern thread_local int ThreadIndex;
 
 int MaxThreadIndex();
