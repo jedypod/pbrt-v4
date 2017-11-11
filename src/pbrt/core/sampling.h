@@ -372,6 +372,30 @@ private:
     size_t firstLeafOffset;
 };
 
+struct VarianceEstimator {
+    void Add(Float contrib) {
+        sumContrib += contrib;
+        sumSquaredContrib += Sqr(contrib);
+        CHECK_LT(count, std::numeric_limits<int64_t>::max());
+        ++count;
+    }
+
+    void Add(const VarianceEstimator &est) {
+        sumContrib += (double)est.sumContrib;
+        sumSquaredContrib += (double)est.sumSquaredContrib;
+        count += est.count;
+    }
+
+    Float VarianceEstimate() const {
+        // http://ib.berkeley.edu/labs/slatkin/eriq/classes/guest_lect/mc_lecture_notes.pdf
+        return (1. / (count * (count - 1))) * double(sumSquaredContrib)  -
+            1. / (count - 1) * Sqr(double(sumContrib) / count);
+    }
+
+    KahanSum<double> sumContrib, sumSquaredContrib;
+    int64_t count = 0;
+};
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SAMPLING_H

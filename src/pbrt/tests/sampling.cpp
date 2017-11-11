@@ -807,3 +807,24 @@ TEST(Sampling, DynamicDistribution1D) {
         vec.push_back(rng.UniformUInt32(8));
     }
 }
+
+TEST(Sampling, VarianceEstimatorZero) {
+    VarianceEstimator ve;
+    for (int i = 0; i < 100; ++i)
+        ve.Add(10.);
+    CHECK_EQ(ve.VarianceEstimate(), 0);
+}
+
+TEST(Sampling, VarianceEstimator) {
+    VarianceEstimator ve;
+    RNG rng;
+    int count = 10000;
+    for (int i = 0; i < count; ++i)
+        // Stratified sampling
+        ve.Add(Lerp((i + rng.UniformFloat()) / count, -1, 1));
+
+    // f(x) = 0, random variables x_i uniform in [-1,1] ->
+    // variance is E[x^2] on [-1,1] == 1/3
+    Float err = std::abs((count - 1) * ve.VarianceEstimate() - 1./3.);
+    EXPECT_LT(err, 1e-5) << count * ve.VarianceEstimate();
+}
