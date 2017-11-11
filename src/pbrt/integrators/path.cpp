@@ -62,12 +62,12 @@ PathIntegrator::PathIntegrator(int maxDepth, const Scene &scene,
 }
 
 Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
-                            MemoryArena &arena, int depth) const {
+                            MemoryArena &arena, int /*depth*/) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
     bool specularBounce = false;
-    int bounces;
+    int depth;
     // Added after book publication: etaScale tracks the accumulated effect
     // of radiance scaling due to rays passing through refractive
     // boundaries (see the derivation on p. 527 of the third edition). We
@@ -77,9 +77,9 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
     // out of a medium and thus have their beta value increased.
     Float etaScale = 1;
 
-    for (bounces = 0;; ++bounces) {
+    for (depth = 0;; ++depth) {
         // Find next path vertex and accumulate contribution
-        VLOG(2) << "Path tracer bounce " << bounces << ", current L = " << L
+        VLOG(2) << "Path tracer depth " << depth << ", current L = " << L
                 << ", beta = " << beta;
 
         // Intersect _ray_ with scene and store intersection in _isect_
@@ -87,7 +87,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
         bool foundIntersection = scene.Intersect(ray, &isect);
 
         // Possibly add emitted light at intersection
-        if (bounces == 0 || specularBounce) {
+        if (depth == 0 || specularBounce) {
             // Add emitted light at path vertex or from the environment
             if (foundIntersection) {
                 L += beta * isect.Le(-ray.d);
@@ -100,14 +100,14 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
         }
 
         // Terminate path if ray escaped or _maxDepth_ was reached
-        if (!foundIntersection || bounces >= maxDepth) break;
+        if (!foundIntersection || depth >= maxDepth) break;
 
         // Compute scattering functions and skip over medium boundaries
         isect.ComputeScatteringFunctions(ray, arena);
         if (!isect.bsdf) {
             VLOG(2) << "Skipping intersection due to null bsdf";
             ray = isect.SpawnRay(ray.d);
-            bounces--;
+            depth--;
             continue;
         }
 
@@ -173,14 +173,14 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
         // Possibly terminate the path with Russian roulette.
         // Factor out radiance scaling due to refraction in rrBeta.
         Spectrum rrBeta = beta * etaScale;
-        if (rrBeta.MaxComponentValue() < rrThreshold && bounces > 3) {
+        if (rrBeta.MaxComponentValue() < rrThreshold && depth > 3) {
             Float q = std::max<Float>(.05, 1 - rrBeta.MaxComponentValue());
             if (sampler.Get1D() < q) break;
             beta /= 1 - q;
             DCHECK(!std::isinf(beta.y()));
         }
     }
-    ReportValue(pathLength, bounces);
+    ReportValue(pathLength, depth);
     return L;
 }
 

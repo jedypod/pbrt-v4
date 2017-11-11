@@ -51,12 +51,12 @@ STAT_COUNTER("Integrator/Surface interactions", surfaceInteractions);
 
 // VolPathIntegrator Method Definitions
 Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
-                               MemoryArena &arena, int depth) const {
+                               MemoryArena &arena, int /*depth*/) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
     bool specularBounce = false;
-    int bounces;
+    int depth;
     // Added after book publication: etaScale tracks the accumulated effect
     // of radiance scaling due to rays passing through refractive
     // boundaries (see the derivation on p. 527 of the third edition). We
@@ -66,7 +66,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
     // out of a medium and thus have their beta value increased.
     Float etaScale = 1;
 
-    for (bounces = 0;; ++bounces) {
+    for (depth = 0;; ++depth) {
         // Intersect _ray_ with scene and store intersection in _isect_
         SurfaceInteraction isect;
         bool foundIntersection = scene.Intersect(ray, &isect);
@@ -79,7 +79,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
         // Handle an interaction with a medium or a surface
         if (mi.IsValid()) {
             // Terminate path if ray escaped or _maxDepth_ was reached
-            if (bounces >= maxDepth) break;
+            if (depth >= maxDepth) break;
 
             ++volumeInteractions;
             // Handle scattering at point in medium for volumetric path tracer
@@ -93,7 +93,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
             // Handle scattering at point on surface for volumetric path tracer
 
             // Possibly add emitted light at intersection
-            if (bounces == 0 || specularBounce) {
+            if (depth == 0 || specularBounce) {
                 // Add emitted light at path vertex or from the environment
                 if (foundIntersection)
                     L += beta * isect.Le(-ray.d);
@@ -103,13 +103,13 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
             }
 
             // Terminate path if ray escaped or _maxDepth_ was reached
-            if (!foundIntersection || bounces >= maxDepth) break;
+            if (!foundIntersection || depth >= maxDepth) break;
 
             // Compute scattering functions and skip over medium boundaries
             isect.ComputeScatteringFunctions(ray, arena);
             if (!isect.bsdf) {
                 ray = isect.SpawnRay(ray.d);
-                bounces--;
+                depth--;
                 continue;
             }
 
@@ -166,14 +166,14 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, Sampler &sampler,
         // Possibly terminate the path with Russian roulette
         // Factor out radiance scaling due to refraction in rrBeta.
         Spectrum rrBeta = beta * etaScale;
-        if (rrBeta.MaxComponentValue() < rrThreshold && bounces > 3) {
+        if (rrBeta.MaxComponentValue() < rrThreshold && depth > 3) {
             Float q = std::max<Float>(.05, 1 - rrBeta.MaxComponentValue());
             if (sampler.Get1D() < q) break;
             beta /= 1 - q;
             DCHECK(std::isinf(beta.y()) == false);
         }
     }
-    ReportValue(pathLength, bounces);
+    ReportValue(pathLength, depth);
     return L;
 }
 
