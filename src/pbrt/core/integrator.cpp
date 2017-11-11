@@ -180,6 +180,7 @@ void SamplerIntegrator::Render() {
     int startWave = 0, endWave = 1, waveDelta = 1;
     std::vector<MemoryArena> arenas(MaxThreadIndex());
     std::vector<std::unique_ptr<Sampler>> samplers(MaxThreadIndex());
+    std::vector<VarianceEstimator> varianceEstimators(MaxThreadIndex());
 
     while (startWave < spp) {
         ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
@@ -192,6 +193,8 @@ void SamplerIntegrator::Render() {
             std::unique_ptr<Sampler> &tileSampler = samplers[ThreadIndex];
             if (!tileSampler)
                 tileSampler = initialSampler->Clone();
+
+            VarianceEstimator &estimator = varianceEstimators[ThreadIndex];
 
             LOG(INFO) << "Starting image tile " << tileBounds << " startWave " <<
                 startWave << ", endWave " << endWave;
@@ -250,6 +253,7 @@ void SamplerIntegrator::Render() {
                     }
                     VLOG(1) << "Camera sample: " << cameraSample << " -> ray: " <<
                         ray << " -> L = " << L;
+                    estimator.Add(L.Average());
 
                     // Add camera ray's contribution to image
                     filmTile->AddSample(cameraSample.pFilm, L, rayWeight);
@@ -270,10 +274,21 @@ void SamplerIntegrator::Render() {
         endWave = std::min(spp, endWave + waveDelta);
         waveDelta = std::min(2 * waveDelta, 64);
 
+        // Compute variance estimate
+        VarianceEstimator aggregate;
+        std::mutex mutex;
+        ForEachWorkerThread([&mutex,&varianceEstimators,&aggregate]() {
+                std::lock_guard<std::mutex> lock(mutex);
+                aggregate.Add(varianceEstimators[ThreadIndex]);
+            });
+        Float estimatedVariance = sampleBounds.Area() * aggregate.VarianceEstimate();
+        LOG(INFO) << "Estimated variance " << estimatedVariance;
+
         LOG(INFO) << "Writing image with spp = " << startWave;
         ImageMetadata metadata;
         metadata.renderTimeSeconds = reporter.ElapsedMS() / 1000.f;
         metadata.samplesPerPixel = startWave;
+        metadata.estimatedVariance = estimatedVariance;
         camera->InitMetadata(&metadata);
         camera->film->WriteImage(&metadata);
     }

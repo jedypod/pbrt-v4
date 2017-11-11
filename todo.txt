@@ -41,8 +41,11 @@ GFX!
 - scattering-sphere-diel is hitting check_rare (just barely though)
   many times in transparent-machines/frame1266 (0.1%!)
 
-- estimate variance from samples (and store in metadata) ->
-  - imgtool diff: compute mc efficiency?
+- bdpt: estimate variance there as well
+
+- track per pixel estimated variance
+  - use for efficiency-optimized RR
+  - use to drive adaptive sampling
 
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet
