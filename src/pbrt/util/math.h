@@ -566,8 +566,9 @@ template <typename Float = double>
 class KahanSum {
   public:
     KahanSum() = default;
-    explicit KahanSum(Float d) : sum(d) { }
+    explicit KahanSum(Float v) : sum(v) { }
 
+    KahanSum &operator=(Float v) { sum = v; c = 0; return *this; }
     KahanSum &operator+=(Float v) {
         Float delta = v - c;
         Float newSum = sum + delta;
@@ -575,8 +576,8 @@ class KahanSum {
         sum = newSum;
         return *this;
     }
-    explicit operator double() const { return sum; }
-    explicit operator float() const { return sum; }
+
+    explicit operator Float() const { return sum; }
 
   private:
     Float sum = 0., c = 0.;

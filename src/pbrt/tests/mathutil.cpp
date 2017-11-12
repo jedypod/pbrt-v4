@@ -99,6 +99,10 @@ TEST(Math, EvaluatePolynomial) {
 }
 
 TEST(Math, KahanSum) {
+    // FIXME: apparently MSVC implements long double as double; should
+    // rewrite this test to be robust to that.
+    static_assert(sizeof(long double) > sizeof(double),
+                  "Long double must have more precision than double");
     // In order of decreasing accuracy...
     long double ldSum = 0;
     KahanSum<double> kahanSumD;
@@ -120,7 +124,7 @@ TEST(Math, KahanSum) {
     int64_t ldBits = FloatToBits(double(ldSum));
     int64_t kahanDBits = FloatToBits(double(kahanSumD));
     int64_t doubleBits = FloatToBits(doubleSum);
-    int64_t kahanFBits = FloatToBits(double(kahanSumF));
+    int64_t kahanFBits = FloatToBits(double(float(kahanSumF)));
     int64_t floatBits = FloatToBits(double(floatSum));
 
     int64_t kahanDErrorUlps = std::abs(kahanDBits - ldBits);

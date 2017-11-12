@@ -809,14 +809,14 @@ TEST(Sampling, DynamicDistribution1D) {
 }
 
 TEST(Sampling, VarianceEstimatorZero) {
-    VarianceEstimator ve;
+    VarianceEstimator<Float> ve;
     for (int i = 0; i < 100; ++i)
         ve.Add(10.);
     CHECK_EQ(ve.VarianceEstimate(), 0);
 }
 
 TEST(Sampling, VarianceEstimator) {
-    VarianceEstimator ve;
+    VarianceEstimator<Float> ve;
     RNG rng;
     int count = 10000;
     for (int i = 0; i < count; ++i)

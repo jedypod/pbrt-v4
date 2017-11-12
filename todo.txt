@@ -43,7 +43,12 @@ GFX!
 
 - bdpt: estimate variance there as well
 
+- use alignas for Pixel to avoid the pad member?
+
 - track per pixel estimated variance
+  - maybe do this in the film, and include VarianceEstimator in FilmTile?
+  - should we actually report the true average of this, not the image-wide
+    value? (consider half black half white image example)
   - use for efficiency-optimized RR
   - use to drive adaptive sampling
 

@@ -372,7 +372,9 @@ private:
     size_t firstLeafOffset;
 };
 
-struct VarianceEstimator {
+template <typename AccumType>
+class VarianceEstimator {
+ public:
     void Add(Float contrib) {
         sumContrib += contrib;
         sumSquaredContrib += Sqr(contrib);
@@ -381,8 +383,8 @@ struct VarianceEstimator {
     }
 
     void Add(const VarianceEstimator &est) {
-        sumContrib += (double)est.sumContrib;
-        sumSquaredContrib += (double)est.sumSquaredContrib;
+        sumContrib += double(est.sumContrib);
+        sumSquaredContrib += double(est.sumSquaredContrib);
         count += est.count;
     }
 
@@ -392,7 +394,8 @@ struct VarianceEstimator {
             1. / (count - 1) * Sqr(double(sumContrib) / count);
     }
 
-    KahanSum<double> sumContrib, sumSquaredContrib;
+ private:
+    AccumType sumContrib{0.}, sumSquaredContrib{0.};
     int64_t count = 0;
 };
 

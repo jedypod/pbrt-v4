@@ -180,7 +180,8 @@ void SamplerIntegrator::Render() {
     int startWave = 0, endWave = 1, waveDelta = 1;
     std::vector<MemoryArena> arenas(MaxThreadIndex());
     std::vector<std::unique_ptr<Sampler>> samplers(MaxThreadIndex());
-    std::vector<VarianceEstimator> varianceEstimators(MaxThreadIndex());
+    using VarianceEstimatorType = VarianceEstimator<KahanSum<double>>;
+    std::vector<VarianceEstimatorType> varianceEstimators(MaxThreadIndex());
 
     while (startWave < spp) {
         ParallelFor2D(sampleBounds, tileSize, [&](Bounds2i tileBounds) {
@@ -194,7 +195,7 @@ void SamplerIntegrator::Render() {
             if (!tileSampler)
                 tileSampler = initialSampler->Clone();
 
-            VarianceEstimator &estimator = varianceEstimators[ThreadIndex];
+            VarianceEstimatorType &estimator = varianceEstimators[ThreadIndex];
 
             LOG(INFO) << "Starting image tile " << tileBounds << " startWave " <<
                 startWave << ", endWave " << endWave;
@@ -275,7 +276,7 @@ void SamplerIntegrator::Render() {
         waveDelta = std::min(2 * waveDelta, 64);
 
         // Compute variance estimate
-        VarianceEstimator aggregate;
+        VarianceEstimatorType aggregate;
         std::mutex mutex;
         ForEachWorkerThread([&mutex,&varianceEstimators,&aggregate]() {
                 std::lock_guard<std::mutex> lock(mutex);
