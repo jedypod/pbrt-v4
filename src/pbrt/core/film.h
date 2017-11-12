@@ -41,10 +41,11 @@
 // core/film.h*
 #include <pbrt/core/pbrt.h>
 
+#include <pbrt/core/filter.h>
+#include <pbrt/core/sampling.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/util/bounds.h>
 #include <pbrt/util/geometry.h>
-#include <pbrt/core/spectrum.h>
-#include <pbrt/core/filter.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/stats.h>
@@ -63,6 +64,7 @@ namespace pbrt {
 struct FilmTilePixel {
     Spectrum contribSum = 0.f;
     Float filterWeightSum = 0.f;
+    VarianceEstimator<Float> varianceEstimator;
 };
 
 // Film Declarations
@@ -80,7 +82,9 @@ class Film {
     void MergeFilmTile(std::unique_ptr<FilmTile> tile);
     void SetImage(absl::Span<const Spectrum> img) const;
     void AddSplat(const Point2f &p, Spectrum v);
-    void WriteImage(ImageMetadata *metadata, Float splatScale = 1);
+    Image WriteImage(ImageMetadata *metadata, Float splatScale = 1);
+    Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+    Image GetVarianceImage(const Image &);
     void Clear();
 
     // Film Public Data
@@ -97,7 +101,7 @@ class Film {
         Float xyz[3];
         Float filterWeightSum;
         AtomicFloat splatXYZ[3];
-        Float pad;
+        VarianceEstimator<Float> varianceEstimator;
     };
     std::unique_ptr<Pixel[]> pixels;
     static constexpr int filterTableWidth = 16;
@@ -136,6 +140,12 @@ class FilmTile {
         ProfilePhase _(Prof::AddFilmSample);
         if (L.y() > maxSampleLuminance)
             L *= maxSampleLuminance / L.y();
+
+        // Update variance estimate.
+        // Box filter this. FIXME?
+        if (InsideExclusive(Point2i(pFilm), pixelBounds))
+            GetPixel(Point2i(pFilm)).varianceEstimator.Add(L.Average());
+
         // Compute sample's raster bounds
         Point2f pFilmDiscrete = pFilm - Vector2f(0.5f, 0.5f);
         Point2i p0 = (Point2i)Ceil(pFilmDiscrete - filterRadius);

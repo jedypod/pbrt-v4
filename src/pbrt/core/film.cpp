@@ -133,6 +133,7 @@ void Film::MergeFilmTile(std::unique_ptr<FilmTile> tile) {
         std::array<Float, 3> xyz =  tilePixel.contribSum.ToXYZ();
         for (int i = 0; i < 3; ++i) mergePixel.xyz[i] += xyz[i];
         mergePixel.filterWeightSum += tilePixel.filterWeightSum;
+        mergePixel.varianceEstimator.Add(tilePixel.varianceEstimator);
     }
 }
 
@@ -174,12 +175,20 @@ void Film::AddSplat(const Point2f &p, Spectrum v) {
     for (int i = 0; i < 3; ++i) pixel.splatXYZ[i].Add(xyz[i]);
 }
 
-void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
+Image Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
+    Image image = GetImage(metadata, splatScale);
+    LOG(INFO) << "Writing image " << filename << " with bounds " <<
+        croppedPixelBounds;
+    image.Write(filename, metadata);
+    return image;
+}
+
+Image Film::GetImage(ImageMetadata *metadata, Float splatScale) {
     // Convert image to RGB and compute final pixel values
     LOG(INFO) <<
         "Converting image to RGB and computing final weighted pixel values";
     PixelFormat format = writeFP16 ? PixelFormat::RGB16 : PixelFormat::RGB32;
-    Image rgbImage(format, Point2i(croppedPixelBounds.Diagonal()));
+    Image image(format, Point2i(croppedPixelBounds.Diagonal()));
     for (Point2i p : croppedPixelBounds) {
         // Convert pixel XYZ color to RGB
         Pixel &pixel = GetPixel(p);
@@ -201,15 +210,25 @@ void Film::WriteImage(ImageMetadata *metadata, Float splatScale) {
 
         Point2i pOffset(p.x - croppedPixelBounds.pMin.x,
                         p.y - croppedPixelBounds.pMin.y);
-        rgbImage.SetSpectrum(pOffset, Spectrum::FromXYZ(xyz));
-    }
+        Spectrum s = Spectrum::FromXYZ(xyz);
+        image.SetSpectrum(pOffset, s);
 
-    // Write RGB image
-    LOG(INFO) << "Writing image " << filename << " with bounds " <<
-        croppedPixelBounds;
-    metadata->pixelBounds = croppedPixelBounds;
-    metadata->fullResolution = fullResolution;
-    rgbImage.Write(filename, metadata);
+    }
+    return image;
+}
+
+Image Film::GetVarianceImage(const Image &spectralImage) {
+    Image varianceImage(PixelFormat::Y32, Point2i(croppedPixelBounds.Diagonal()));
+
+    for (Point2i p : croppedPixelBounds) {
+        Point2i pOffset(p.x - croppedPixelBounds.pMin.x,
+                        p.y - croppedPixelBounds.pMin.y);
+        Float a = spectralImage.GetSpectrum(pOffset).Average();
+        Float var = Float(GetPixel(p).varianceEstimator.VarianceEstimate());
+        if (!std::isnan(var) && a != 0)
+            varianceImage.SetChannel(pOffset, 0, var / a);
+    }
+    return varianceImage;
 }
 
 std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
