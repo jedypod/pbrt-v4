@@ -226,6 +226,8 @@ Image Film::GetVarianceImage(const Image &spectralImage) {
         Float a = spectralImage.GetSpectrum(pOffset).Average();
         Float var = Float(GetPixel(p).varianceEstimator.VarianceEstimate());
         if (!std::isnan(var) && a != 0)
+            // Divide by the mean to get the coefficient of variation /
+            // relative standard deviation.
             varianceImage.SetChannel(pOffset, 0, var / a);
     }
     return varianceImage;
