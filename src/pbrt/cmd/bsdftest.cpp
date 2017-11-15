@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include <pbrt/core/api.h>
+#include <pbrt/core/interaction.h>
 #include <pbrt/core/microfacet.h>
 #include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>

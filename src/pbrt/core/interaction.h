@@ -41,9 +41,10 @@
 // core/interaction.h*
 #include <pbrt/core/pbrt.h>
 
+#include <pbrt/core/medium.h>
+#include <pbrt/core/reflection.h>
 #include <pbrt/util/geometry.h>
 #include <pbrt/util/transform.h>
-#include <pbrt/core/medium.h>
 
 namespace pbrt {
 

@@ -50,8 +50,6 @@ GFX!
 - save variance estimate as an extra channel in EXR images
   - imgtool support to be able to extract that
 
-- move TransportMode to another header than pbrt.h
-
 - Refactor ParallelJob: pull all the static stuff into a separate class
 
 - efficiency-optimized RR with tracked pixel variance

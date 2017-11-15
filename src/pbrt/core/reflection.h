@@ -42,7 +42,6 @@
 #include <pbrt/core/pbrt.h>
 
 #include <pbrt/util/geometry.h>
-#include <pbrt/core/interaction.h>
 #include <pbrt/util/math.h>
 #include <pbrt/core/spectrum.h>
 #include <absl/types/span.h>
@@ -53,6 +52,9 @@
 #include <string>
 
 namespace pbrt {
+
+ // TransportMode Declarations
+enum class TransportMode { Radiance, Importance };
 
 // Reflection Declarations
 Float FrDielectric(Float cosThetaI, Float etaI, Float etaT);
@@ -160,12 +162,8 @@ struct FourierBSDFTable {
 class BSDF {
   public:
     // BSDF Public Methods
-    BSDF(const SurfaceInteraction &si, Float eta = 1)
-        : eta(eta),
-          ng(si.n),
-          shadingFrame(Frame::FromXZ(Normalize(si.shading.dpdu),
-                                     Vector3f(si.shading.n)))
-                     {}
+    BSDF(const SurfaceInteraction &si, Float eta = 1);
+
     void Add(BxDF *b) {
         CHECK_LT(nBxDFs, MaxBxDFs);
         bxdfs[nBxDFs++] = b;

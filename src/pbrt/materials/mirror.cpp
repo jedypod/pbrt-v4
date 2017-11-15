@@ -34,11 +34,12 @@
 // materials/mirror.cpp*
 #include <pbrt/materials/mirror.h>
 
-#include <pbrt/core/spectrum.h>
-#include <pbrt/util/memory.h>
-#include <pbrt/core/reflection.h>
+#include <pbrt/core/interaction.h>
 #include <pbrt/core/paramset.h>
+#include <pbrt/core/reflection.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/core/texture.h>
+#include <pbrt/util/memory.h>
 
 namespace pbrt {
 

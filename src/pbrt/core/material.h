@@ -41,6 +41,8 @@
 // core/material.h*
 #include <pbrt/core/pbrt.h>
 
+#include <pbrt/core/reflection.h>
+
 #include <memory>
 
 namespace pbrt {

@@ -33,10 +33,11 @@
 // core/reflection.cpp*
 #include <pbrt/core/reflection.h>
 
-#include <pbrt/util/interpolation.h>
+#include <pbrt/core/interaction.h>
 #include <pbrt/core/microfacet.h>
-#include <pbrt/util/memory.h>
 #include <pbrt/core/sampling.h>
+#include <pbrt/util/interpolation.h>
+#include <pbrt/util/memory.h>
 
 #include <absl/container/fixed_array.h>
 #include <glog/logging.h>
@@ -676,6 +677,14 @@ Spectrum BxDF::rho(absl::Span<const Point2f> u1,
 }
 
 // BSDF Method Definitions
+BSDF::BSDF(const SurfaceInteraction &si, Float eta)
+    : eta(eta),
+      ng(si.n),
+      shadingFrame(Frame::FromXZ(Normalize(si.shading.dpdu),
+                                 Vector3f(si.shading.n)))
+{
+}
+
 Spectrum BSDF::f(const Vector3f &woW, const Vector3f &wiW,
                  BxDFType flags) const {
     ProfilePhase pp(Prof::BSDFEvaluation);

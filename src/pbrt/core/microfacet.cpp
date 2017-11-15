@@ -34,6 +34,7 @@
 #include <pbrt/core/microfacet.h>
 
 #include <pbrt/util/math.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/core/reflection.h> // Frame stuff only
 #include <glog/logging.h>
 

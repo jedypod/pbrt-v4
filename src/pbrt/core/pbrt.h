@@ -143,9 +143,6 @@ class NamedValues;
 class TextureParams;
 struct Options;
 
- // TransportMode Declarations
-enum class TransportMode { Radiance, Importance };
-
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_PBRT_H
