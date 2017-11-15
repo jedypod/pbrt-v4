@@ -32,6 +32,8 @@
 
 // samplers/halton.cpp*
 #include <pbrt/samplers/halton.h>
+
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
 #include <pbrt/util/rng.h>
 

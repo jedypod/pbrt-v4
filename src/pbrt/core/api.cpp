@@ -34,14 +34,15 @@
 #include <pbrt/core/api.h>
 
 #include <pbrt/core/error.h>
-#include <pbrt/util/parallel.h>
-#include <pbrt/core/paramset.h>
-#include <pbrt/core/spectrum.h>
-#include <pbrt/core/scene.h>
 #include <pbrt/core/film.h>
 #include <pbrt/core/medium.h>
-#include <pbrt/util/stats.h>
+#include <pbrt/core/options.h>
+#include <pbrt/core/paramset.h>
+#include <pbrt/core/scene.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/core/texcache.h>
+#include <pbrt/util/parallel.h>
+#include <pbrt/util/stats.h>
 
 // API Additional Headers
 #include <pbrt/accelerators/bvh.h>
@@ -785,8 +786,9 @@ void pbrtInit(const Options &opt) {
 
     // General \pbrt Initialization
     SampledSpectrum::Init();
-    ParallelInit();  // Threads must be launched before the profiler is
-                     // initialized.
+    int nThreads = PbrtOptions.nThreads != 0 ? PbrtOptions.nThreads : AvailableCores();
+    ParallelInit(nThreads);  // Threads must be launched before the
+                             // profiler is initialized.
     InitProfiler();
 }
 

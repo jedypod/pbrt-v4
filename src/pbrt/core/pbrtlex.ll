@@ -36,8 +36,8 @@
 
 #include <pbrt/core/pbrt.h>
 
-#include <pbrt/core/api.h>
 #include <pbrt/core/error.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/parser.h>
 #include <pbrt/util/fileutil.h>
 

@@ -33,13 +33,14 @@
 // integrators/ao.cpp*
 #include <pbrt/integrators/ao.h>
 
-#include <pbrt/core/error.h>
-#include <pbrt/core/sampling.h>
-#include <pbrt/core/sampler.h>
-#include <pbrt/core/interaction.h>
-#include <pbrt/core/paramset.h>
 #include <pbrt/core/camera.h>
+#include <pbrt/core/error.h>
 #include <pbrt/core/film.h>
+#include <pbrt/core/interaction.h>
+#include <pbrt/core/options.h>
+#include <pbrt/core/paramset.h>
+#include <pbrt/core/sampler.h>
+#include <pbrt/core/sampling.h>
 #include <pbrt/core/scene.h>
 
 

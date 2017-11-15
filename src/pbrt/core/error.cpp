@@ -33,10 +33,11 @@
 // core/error.cpp*
 #include <pbrt/core/error.h>
 
+#include <pbrt/core/options.h>
 #include <pbrt/core/parser.h>
 #include <pbrt/util/parallel.h>
-#include <pbrt/util/stringprint.h>
 #include <pbrt/util/progressreporter.h>
+#include <pbrt/util/stringprint.h>
 
 #include <mutex>
 #include <stdarg.h>

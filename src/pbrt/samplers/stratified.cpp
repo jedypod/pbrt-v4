@@ -32,6 +32,8 @@
 
 // samplers/stratified.cpp*
 #include <pbrt/samplers/stratified.h>
+
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
 #include <pbrt/core/sampling.h>
 

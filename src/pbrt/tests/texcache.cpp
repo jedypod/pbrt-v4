@@ -35,6 +35,7 @@
 
 #include <pbrt/core/image.h>
 #include <pbrt/core/mipmap.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/pbrt.h>
 #include <pbrt/core/texcache.h>
 #include <pbrt/util/half.h>
@@ -75,7 +76,7 @@ static Image GetImage(PixelFormat format, Point2i res) {
 // then, add it to a texture cache and verify that all texels in all
 // MIP levels exactly match the values in the original MIP chain.
 static void TestFormat(PixelFormat format) {
-    ParallelInit();
+    ParallelInit(8);
 
     std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
     Image image = GetImage(format, {129, 60});
@@ -132,7 +133,7 @@ TEST(Texcache, RGB16) { TestFormat(PixelFormat::RGB16); }
 TEST(Texcache, RGB32) { TestFormat(PixelFormat::RGB32); }
 
 TEST(Texcache, ThreadInsanity) {
-    ParallelInit();
+    ParallelInit(8);
 
     // Create a bunch of images with random sizes and contents.
     std::vector<std::vector<Image>> images;

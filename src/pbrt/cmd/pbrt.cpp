@@ -34,12 +34,13 @@
 // main/pbrt.cpp*
 #include <pbrt/core/pbrt.h>
 
-#include <pbrt/core/api.h>
-#include <pbrt/util/args.h>
-#include <pbrt/core/error.h>
-#include <pbrt/core/parser.h>
-#include <pbrt/util/parallel.h>
 #include <glog/logging.h>
+#include <pbrt/core/api.h>
+#include <pbrt/core/error.h>
+#include <pbrt/core/options.h>
+#include <pbrt/core/parser.h>
+#include <pbrt/util/args.h>
+#include <pbrt/util/parallel.h>
 
 using namespace pbrt;
 

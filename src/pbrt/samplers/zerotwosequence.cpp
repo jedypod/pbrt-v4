@@ -35,6 +35,7 @@
 
 #include <pbrt/core/error.h>
 #include <pbrt/core/lowdiscrepancy.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
 
 namespace pbrt {

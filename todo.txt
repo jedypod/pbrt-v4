@@ -41,16 +41,20 @@ GFX!
 - scattering-sphere-diel is hitting check_rare (just barely though)
   many times in transparent-machines/frame1266 (0.1%!)
 
-- bdpt: estimate variance there as well
+- bdpt: estimate variance there as well (splatting makes this tricky?)
 
-- use alignas for Pixel to avoid the pad member?
+- should we actually report the true average of per pixel estimated
+  varaince in the metadata, not the image-wide value? (consider half black
+  half white image example)
 
-- track per pixel estimated variance
-  - maybe do this in the film, and include VarianceEstimator in FilmTile?
-  - should we actually report the true average of this, not the image-wide
-    value? (consider half black half white image example)
-  - use for efficiency-optimized RR
-  - use to drive adaptive sampling
+- save variance estimate as an extra channel in EXR images
+  - imgtool support to be able to extract that
+
+- move TransportMode to another header than pbrt.h
+
+- Refactor ParallelJob: pull all the static stuff into a separate class
+
+- efficiency-optimized RR with tracked pixel variance
 
 - paramset unit tests, especially shadowing stuff
   ParamSet -> ParameterSet

@@ -39,6 +39,7 @@
 #include <pbrt/core/integrator.h>
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/lightdistrib.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/reflection.h>
 #include <pbrt/core/sampler.h>
 #include <pbrt/core/sampling.h>
@@ -176,7 +177,7 @@ void SamplerIntegrator::Render() {
     Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
                    (sampleExtent.y + tileSize - 1) / tileSize);
     int spp = initialSampler->samplesPerPixel;
-    ProgressReporter reporter(spp * nTiles.x * nTiles.y, "Rendering");
+    ProgressReporter reporter(spp * nTiles.x * nTiles.y, "Rendering", PbrtOptions.quiet);
     int startWave = 0, endWave = 1, waveDelta = 1;
     std::vector<MemoryArena> arenas(MaxThreadIndex());
     std::vector<std::unique_ptr<Sampler>> samplers(MaxThreadIndex());

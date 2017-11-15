@@ -34,6 +34,7 @@
 #include <pbrt/core/texcache.h>
 
 #include <pbrt/core/error.h>
+#include <pbrt/core/options.h>
 #include <pbrt/util/bits.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/stats.h>

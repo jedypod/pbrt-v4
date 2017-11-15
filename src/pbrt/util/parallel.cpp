@@ -46,7 +46,7 @@ namespace pbrt {
 
 class ParallelJob {
   public:
-    static void StartThreads();
+    static void StartThreads(int nThreads);
     static void TerminateThreads();
 
     virtual ~ParallelJob() { DCHECK(removed); }
@@ -57,6 +57,7 @@ class ParallelJob {
 
     virtual bool HaveWork() const = 0;
     bool Finished() const { return !HaveWork() && activeWorkers == 0; }
+    static size_t NumThreads() { return threads.size(); }
 
     static void DoWork(std::unique_lock<std::mutex> &lock);
 
@@ -291,22 +292,26 @@ void ParallelFor2D(const Bounds2i &extent, int chunkSize, std::function<void(Bou
 ///////////////////////////////////////////////////////////////////////////
 
 thread_local int ThreadIndex;
+static bool parallelInitialized = false;
 
-static int AvailableCores() {
-    return std::max(1u, std::thread::hardware_concurrency());
+int AvailableCores() {
+    return std::max<int>(1, std::thread::hardware_concurrency());
 }
 
 int MaxThreadIndex() {
-    return PbrtOptions.nThreads != 0 ? PbrtOptions.nThreads : AvailableCores();
+    return parallelInitialized ? (1 + ParallelJob::NumThreads()) : 1;
 }
 
-void ParallelInit() {
-    ParallelJob::StartThreads();
+void ParallelInit(int nThreads) {
+    CHECK(!parallelInitialized);
+    parallelInitialized = true;
+    if (nThreads <= 0)
+        nThreads = AvailableCores();
+    ParallelJob::StartThreads(nThreads);
 }
 
-void ParallelJob::StartThreads() {
+void ParallelJob::StartThreads(int nThreads) {
     CHECK_EQ(threads.size(), 0);
-    int nThreads = MaxThreadIndex();
     ThreadIndex = 0;
 
     // Create a barrier so that we can be sure all worker threads get past
@@ -325,6 +330,7 @@ void ParallelJob::StartThreads() {
 
 void ParallelCleanup() {
     ParallelJob::TerminateThreads();
+    parallelInitialized = false;
 }
 
 void ParallelJob::TerminateThreads() {

@@ -1,14 +1,17 @@
 
 #include <gtest/gtest.h>
-#include <pbrt/core/pbrt.h>
-#include <pbrt/core/image.h>
+
 #include <pbrt/accelerators/bvh.h>
-#include <pbrt/core/api.h>
 #include <pbrt/cameras/orthographic.h>
 #include <pbrt/cameras/perspective.h>
+#include <pbrt/core/api.h>
 #include <pbrt/core/film.h>
+#include <pbrt/core/image.h>
+#include <pbrt/core/options.h>
+#include <pbrt/core/pbrt.h>
+#include <pbrt/core/scene.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/filters/box.h>
-#include <pbrt/util/geometry.h>
 #include <pbrt/integrators/bdpt.h>
 #include <pbrt/integrators/mlt.h>
 #include <pbrt/integrators/path.h>
@@ -20,13 +23,12 @@
 #include <pbrt/materials/uber.h>
 #include <pbrt/samplers/halton.h>
 #include <pbrt/samplers/random.h>
-#include <pbrt/samplers/stratified.h>
 #include <pbrt/samplers/sobol.h>
+#include <pbrt/samplers/stratified.h>
 #include <pbrt/samplers/zerotwosequence.h>
-#include <pbrt/core/scene.h>
 #include <pbrt/shapes/sphere.h>
-#include <pbrt/core/spectrum.h>
 #include <pbrt/textures/constant.h>
+#include <pbrt/util/geometry.h>
 
 using namespace pbrt;
 

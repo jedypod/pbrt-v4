@@ -33,7 +33,9 @@
 
 // integrators/mlt.cpp*
 #include <pbrt/integrators/mlt.h>
+
 #include <pbrt/integrators/bdpt.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/scene.h>
 #include <pbrt/core/film.h>
 #include <pbrt/core/image.h>
@@ -188,7 +190,7 @@ void MLTIntegrator::Render() {
     std::vector<Float> bootstrapWeights(nBootstrapSamples, 0);
     if (scene.lights.size() > 0) {
         ProgressReporter progress(nBootstrap / 256,
-                                  "Generating bootstrap paths");
+                                  "Generating bootstrap paths", PbrtOptions.quiet);
         std::vector<MemoryArena> bootstrapThreadArenas(MaxThreadIndex());
         int chunkSize = Clamp(nBootstrap / 128, 1, 8192);
         ParallelFor(0, nBootstrap, chunkSize, [&](int64_t start, int64_t end) {
@@ -218,7 +220,7 @@ void MLTIntegrator::Render() {
         (int64_t)mutationsPerPixel * (int64_t)film.GetSampleBounds().Area();
     const int progressFrequency = 32768;
     ProgressReporter progress(nTotalMutations / progressFrequency,
-                              "Rendering");
+                              "Rendering", PbrtOptions.quiet);
     if (scene.lights.size() > 0) {
         ParallelFor(0, nChains, [&](int i) {
             int64_t nChainMutations =

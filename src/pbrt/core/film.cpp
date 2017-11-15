@@ -36,8 +36,9 @@
 
 #include <pbrt/core/error.h>
 #include <pbrt/core/image.h>
-#include <pbrt/util/memory.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
+#include <pbrt/util/memory.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {

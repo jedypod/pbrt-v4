@@ -54,14 +54,15 @@ namespace pbrt {
 static int TerminalWidth();
 
 // ProgressReporter Method Definitions
-ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
+ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title, bool quiet)
     : totalWork(std::max<int64_t>(1, totalWork)),
       title(title),
+      quiet(quiet),
       startTime(std::chrono::system_clock::now()) {
     workDone = 0;
     exitThread = false;
     // Launch thread to periodically update progress bar
-    if (!PbrtOptions.quiet) {
+    if (!quiet) {
         // We need to temporarily disable the profiler before launching
         // the update thread here, through the time the thread calls
         // ProfilerWorkerThreadInit(). Otherwise, there's a potential
@@ -86,7 +87,7 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
 }
 
 ProgressReporter::~ProgressReporter() {
-    if (!PbrtOptions.quiet) {
+    if (!quiet) {
         workDone = totalWork;
         exitThread = true;
         updateThread.join();

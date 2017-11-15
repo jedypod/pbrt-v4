@@ -7,7 +7,7 @@
 using namespace pbrt;
 
 TEST(Parallel, Basics) {
-    ParallelInit();
+    ParallelInit(8);
 
     std::atomic<int> counter{0};
     ParallelFor(0, 1000, [&](int64_t) { ++counter; });
@@ -32,7 +32,7 @@ TEST(Parallel, Basics) {
 }
 
 TEST(Parallel, DoNothing) {
-    ParallelInit();
+    ParallelInit(8);
 
     std::atomic<int> counter{0};
     ParallelFor(0, 0, [&](int64_t) { ++counter; });

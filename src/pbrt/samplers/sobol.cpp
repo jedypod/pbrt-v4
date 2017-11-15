@@ -32,7 +32,9 @@
 
 // samplers/sobol.cpp*
 #include <pbrt/samplers/sobol.h>
+
 #include <pbrt/core/lowdiscrepancy.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
 
 namespace pbrt {

@@ -5,6 +5,8 @@
 #include <functional>
 
 #include <gtest/gtest.h>
+
+#include <pbrt/core/options.h>
 #include <pbrt/core/pbrt.h>
 #include <pbrt/core/microfacet.h>
 #include <pbrt/core/reflection.h>

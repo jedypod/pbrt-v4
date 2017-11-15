@@ -126,9 +126,10 @@ void ForEachWorkerThread(std::function<void(void)> func);
 
 extern thread_local int ThreadIndex;
 
+int AvailableCores();
 int MaxThreadIndex();
 
-void ParallelInit();
+void ParallelInit(int nThreads = -1);
 void ParallelCleanup();
 void MergeWorkerThreadStats();
 

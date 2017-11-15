@@ -34,22 +34,22 @@
 #include <pbrt/integrators/aov.h>
 
 #include <pbrt/core/error.h>
-#include <pbrt/util/fileutil.h>
 #include <pbrt/core/film.h>
 #include <pbrt/core/image.h>
 #include <pbrt/core/interaction.h>
 #include <pbrt/core/lightdistrib.h>
 #include <pbrt/core/lowdiscrepancy.h>
-#include <pbrt/util/parallel.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
-#include <pbrt/util/progressreporter.h>
 #include <pbrt/core/reflection.h>
-#include <pbrt/samplers/halton.h>
-#include <pbrt/util/stats.h>
 #include <pbrt/core/scene.h>
+#include <pbrt/samplers/halton.h>
+#include <pbrt/util/fileutil.h>
+#include <pbrt/util/parallel.h>
+#include <pbrt/util/progressreporter.h>
+#include <pbrt/util/stats.h>
 
 #include <mutex>
-
 
 namespace pbrt {
 
@@ -96,7 +96,8 @@ void AOVIntegrator::Render() {
         std::make_unique<SpatialLightDistribution>(scene);
 
     const int tileSize = 16;
-    ProgressReporter reporter(resolution.x * resolution.y, "Rendering");
+    ProgressReporter reporter(resolution.x * resolution.y, "Rendering",
+                              PbrtOptions.quickRender);
     ParallelFor2D(croppedPixelBounds, tileSize, [&](Bounds2i tileBounds) {
         // Allocate _MemoryArena_ for tile
         MemoryArena arena;

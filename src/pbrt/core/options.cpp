@@ -30,60 +30,12 @@
 
  */
 
-#if defined(_MSC_VER)
-#define NOMINMAX
-#pragma once
-#endif
 
-#ifndef PBRT_UTIL_PROGRESSREPORTER_H
-#define PBRT_UTIL_PROGRESSREPORTER_H
-
-// core/progressreporter.h*
-#include <pbrt/core/pbrt.h>
-
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <thread>
+// core/options.cpp*
+#include <pbrt/core/options.h>
 
 namespace pbrt {
 
-// ProgressReporter Declarations
-class ProgressReporter {
-  public:
-    // ProgressReporter Public Methods
-    ProgressReporter(int64_t totalWork, const std::string &title, bool quiet);
-    ~ProgressReporter();
-    void Update(int64_t num = 1) {
-        if (num == 0 || quiet) return;
-        workDone += num;
-    }
-    Float ElapsedMS() const {
-        std::chrono::system_clock::time_point now =
-            std::chrono::system_clock::now();
-        int64_t elapsedMS =
-            std::chrono::duration_cast<std::chrono::milliseconds>(now -
-                                                                  startTime)
-                .count();
-        return (Float)elapsedMS;
-    }
-    void Done();
+Options PbrtOptions;
 
-  private:
-    // ProgressReporter Private Methods
-    void PrintBar();
-
-    // ProgressReporter Private Data
-    const int64_t totalWork;
-    const std::string title;
-    const bool quiet;
-    const std::chrono::system_clock::time_point startTime;
-    std::atomic<int64_t> workDone;
-    std::atomic<bool> exitThread;
-    std::thread updateThread;
-};
-
-}  // namespace pbrt
-
-#endif  // PBRT_UTIL_PROGRESSREPORTER_H
+} // namespace pbrt

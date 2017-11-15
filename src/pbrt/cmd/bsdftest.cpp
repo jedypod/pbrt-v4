@@ -3,14 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <pbrt/core/api.h>
+#include <pbrt/core/microfacet.h>
+#include <pbrt/core/options.h>
+#include <pbrt/core/paramset.h>
 #include <pbrt/core/pbrt.h>
 #include <pbrt/core/reflection.h>
-#include <pbrt/core/microfacet.h>
 #include <pbrt/core/sampling.h>
-#include <pbrt/util/memory.h>
-#include <pbrt/core/api.h>
-#include <pbrt/core/paramset.h>
 #include <pbrt/shapes/disk.h>
+#include <pbrt/util/memory.h>
 
 using namespace pbrt;
 

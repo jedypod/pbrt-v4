@@ -57,9 +57,8 @@
 #endif
 
 #include <stdint.h>
+
 #if defined(PBRT_IS_MSVC)
-#include <float.h>
-#include <intrin.h>
 #pragma warning(disable : 4305)  // double constant assigned to float
 #pragma warning(disable : 4244)  // int -> float conversion
 #pragma warning(disable : 4843)  // double -> float conversion
@@ -141,18 +140,8 @@ class MemoryArena;
 class Matrix4x4;
 class ParamSet;
 class NamedValues;
-struct Options {
-    int nThreads = 0;
-    int texCacheMB = 96;
-    int texReadMinMS = 0;
-    bool quickRender = false;
-    bool quiet = false;
-    bool cat = false, toPly = false;
-    char *imageFile = nullptr;
-};
-
-extern Options PbrtOptions;
 class TextureParams;
+struct Options;
 
  // TransportMode Declarations
 enum class TransportMode { Radiance, Importance };

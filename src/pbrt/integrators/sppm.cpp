@@ -34,18 +34,19 @@
 // integrators/sppm.cpp*
 #include <pbrt/integrators/sppm.h>
 
-#include <pbrt/core/reflection.h>
-#include <pbrt/util/parallel.h>
-#include <pbrt/core/scene.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/image.h>
-#include <pbrt/core/lightdistrib.h>
-#include <pbrt/core/spectrum.h>
-#include <pbrt/util/rng.h>
-#include <pbrt/core/paramset.h>
-#include <pbrt/util/progressreporter.h>
 #include <pbrt/core/interaction.h>
+#include <pbrt/core/lightdistrib.h>
+#include <pbrt/core/paramset.h>
+#include <pbrt/core/reflection.h>
 #include <pbrt/core/sampling.h>
+#include <pbrt/core/scene.h>
+#include <pbrt/core/spectrum.h>
 #include <pbrt/samplers/halton.h>
+#include <pbrt/util/parallel.h>
+#include <pbrt/util/progressreporter.h>
+#include <pbrt/util/rng.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {
@@ -131,7 +132,8 @@ void SPPMIntegrator::Render() {
     // Compute number of tiles to use for SPPM camera pass
     Vector2i pixelExtent = pixelBounds.Diagonal();
     const int tileSize = 16;
-    ProgressReporter progress(2 * nIterations, "Rendering");
+    ProgressReporter progress(2 * nIterations, "Rendering",
+                              PbrtOptions.quickRender);
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
         std::vector<MemoryArena> perThreadArenas(MaxThreadIndex());

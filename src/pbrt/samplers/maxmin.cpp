@@ -32,6 +32,8 @@
 
 // samplers/maxmin.cpp*
 #include <pbrt/samplers/maxmin.h>
+
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
 
 namespace pbrt {

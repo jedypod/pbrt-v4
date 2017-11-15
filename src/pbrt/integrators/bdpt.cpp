@@ -35,13 +35,14 @@
 
 #include <pbrt/core/error.h>
 #include <pbrt/core/film.h>
-#include <pbrt/filters/box.h>
 #include <pbrt/core/image.h>
 #include <pbrt/core/integrator.h>
 #include <pbrt/core/lightdistrib.h>
+#include <pbrt/core/options.h>
 #include <pbrt/core/paramset.h>
-#include <pbrt/util/progressreporter.h>
 #include <pbrt/core/sampler.h>
+#include <pbrt/filters/box.h>
+#include <pbrt/util/progressreporter.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {
@@ -310,7 +311,7 @@ void BDPTIntegrator::Render() {
     const int nXTiles = (sampleExtent.x + tileSize - 1) / tileSize;
     const int nYTiles = (sampleExtent.y + tileSize - 1) / tileSize;
     int spp = sampler->samplesPerPixel;
-    ProgressReporter reporter(spp * nXTiles * nYTiles, "Rendering");
+    ProgressReporter reporter(spp * nXTiles * nYTiles, "Rendering", PbrtOptions.quiet);
 
     // Allocate buffers for debug visualization
     const int bufferCount = (1 + maxDepth) * (6 + maxDepth) / 2;

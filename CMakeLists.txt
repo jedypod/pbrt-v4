@@ -328,6 +328,7 @@ SET ( PBRT_CORE_SOURCE
   src/pbrt/core/medium.cpp
   src/pbrt/core/microfacet.cpp
   src/pbrt/core/mipmap.cpp
+  src/pbrt/core/options.cpp
   src/pbrt/core/paramset.cpp
   src/pbrt/core/parser.cpp
   src/pbrt/core/primitive.cpp
@@ -357,6 +358,7 @@ SET ( PBRT_CORE_HEADERS
   src/pbrt/core/medium.h
   src/pbrt/core/microfacet.h
   src/pbrt/core/mipmap.h
+  src/pbrt/core/options.h
   src/pbrt/core/paramset.h
   src/pbrt/core/parser.h
   src/pbrt/core/pbrt.h
