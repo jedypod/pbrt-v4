@@ -37,6 +37,7 @@
 #include <pbrt/core/pbrt.h>
 
 #include <cstdint>
+#include <ostream>
 
 namespace pbrt {
 
@@ -129,6 +130,7 @@ class Half {
         o.u |= sign >> 16;
         h = o.u;
     }
+    explicit Half(double d) : Half(float(d)) {}
 
     explicit operator float() const {
         FP16 h;
@@ -152,6 +154,17 @@ class Half {
         o.u |= (h.u & 0x8000) << 16;  // sign bit
         return o.f;
     }
+
+    bool operator==(const Half &v) const {
+        if (Bits() == v.Bits()) return true;
+        return ((Bits() == kHalfNegativeZero && v.Bits() == kHalfPositiveZero) ||
+                (Bits() == kHalfPositiveZero && v.Bits() == kHalfNegativeZero));
+    }
+    bool operator!=(const Half &v) const {
+        return !(*this == v);
+    }
+
+    Half operator-() const { return FromBits(h ^ (1 << 15)); }
 
     uint16_t Bits() const { return h; }
 
@@ -191,6 +204,10 @@ class Half {
     explicit Half(uint16_t h) : h(h) { }
     uint16_t h;
 };
+
+inline std::ostream &operator<<(std::ostream &os, Half h) {
+    return os << float(h);
+}
 
 }  // namespace pbrt
 

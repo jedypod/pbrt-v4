@@ -16,6 +16,14 @@ TEST(Half, Basics) {
     EXPECT_TRUE(Half(0.f / 0.f).IsNaN());
     EXPECT_TRUE(Half(-0.f / 0.f).IsNaN());
     EXPECT_FALSE(Half::FromBits(kHalfPositiveInfinity).IsNaN());
+
+    for (uint32_t bits = 0; bits < 65536; ++bits) {
+        Half h = Half::FromBits(bits);
+        if (h.IsInf() || h.IsNaN())
+            continue;
+        EXPECT_EQ(h, -(-h));
+        EXPECT_EQ(-h, Half(-float(h)));
+    }
 }
 
 TEST(Half, ExactConversions) {
@@ -113,4 +121,22 @@ TEST(Half, NextDown) {
     // NaNs use the maximum exponent and then the sign bit and have a
     // non-zero significand.
     EXPECT_EQ(65536 - (1 << 11), iters);
+}
+
+TEST(Half, Equal) {
+    for (uint32_t bits = 0; bits < 65536; ++bits) {
+        Half h = Half::FromBits(bits);
+        if (h.IsInf() || h.IsNaN())
+            continue;
+        EXPECT_EQ(h, h);
+    }
+
+    // Check that +/- zero behave sensibly.
+    Half hpz(0.f), hnz(-0.f);
+    EXPECT_NE(hpz.Bits(), hnz.Bits());
+    EXPECT_EQ(hpz, hnz);
+    // Smallest representable non-zero half value
+    Half hmin(5.9605e-08f);
+    EXPECT_NE(hpz, hmin);
+    EXPECT_NE(hnz, -hmin);
 }
