@@ -40,7 +40,7 @@ TEST(Half, Randoms) {
     // Choose a bunch of random positive floats and make sure that they
     // convert to reasonable values.
     for (int i = 0; i < 1024; ++i) {
-        float f = rng.UniformFloat() * 512;
+        float f = rng.Uniform<Float>() * 512;
         uint16_t h = Half(f).Bits();
         float fh = Float(Half::FromBits(h));
         if (fh == f) {

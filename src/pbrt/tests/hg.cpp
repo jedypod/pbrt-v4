@@ -13,9 +13,9 @@ TEST(HenyeyGreenstein, SamplingMatch) {
         HenyeyGreenstein hg(g);
         for (int i = 0; i < 100; ++i) {
             Vector3f wo =
-                UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+                UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
             Vector3f wi;
-            Point2f u {rng.UniformFloat(), rng.UniformFloat()};
+            Point2f u {rng.Uniform<Float>(), rng.Uniform<Float>()};
             Float p0 = hg.Sample_p(wo, &wi, u);
             // Phase function is normalized, and the sampling method should be
             // exact.
@@ -31,7 +31,7 @@ TEST(HenyeyGreenstein, SamplingOrientationForward) {
     Vector3f wo(-1, 0, 0);
     int nForward = 0, nBackward = 0;
     for (int i = 0; i < 100; ++i) {
-        Point2f u {rng.UniformFloat(), rng.UniformFloat()};
+        Point2f u {rng.Uniform<Float>(), rng.Uniform<Float>()};
         Vector3f wi;
         hg.Sample_p(wo, &wi, u);
         if (wi.x > 0)
@@ -50,7 +50,7 @@ TEST(HenyeyGreenstein, SamplingOrientationBackward) {
     Vector3f wo(-1, 0, 0);
     int nForward = 0, nBackward = 0;
     for (int i = 0; i < 100; ++i) {
-        Point2f u {rng.UniformFloat(), rng.UniformFloat()};
+        Point2f u {rng.Uniform<Float>(), rng.Uniform<Float>()};
         Vector3f wi;
         hg.Sample_p(wo, &wi, u);
         if (wi.x > 0)
@@ -67,12 +67,12 @@ TEST(HenyeyGreenstein, Normalized) {
     for (float g = -.75; g <= 0.75; g += 0.25) {
         HenyeyGreenstein hg(g);
         Vector3f wo =
-            UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+            UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
         Float sum = 0;
         int nSamples = 100000;
         for (int i = 0; i < nSamples; ++i) {
             Vector3f wi =
-                UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+                UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
             sum += hg.p(wo, wi);
         }
         // Phase function should integrate to 1/4pi.

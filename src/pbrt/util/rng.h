@@ -46,6 +46,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <ostream>
 #include <string>
 
@@ -75,27 +76,24 @@ class RNG {
     RNG();
     RNG(uint64_t sequenceIndex) { SetSequence(sequenceIndex); }
     void SetSequence(uint64_t sequenceIndex);
-    uint32_t UniformUInt32();
-    uint32_t UniformUInt32(uint32_t b) {
-        uint32_t threshold = (~b + 1u) % b;
+
+    template <typename T> T Uniform();
+
+    // TODO: enable_if for integral types only
+    template <typename T> T Uniform(T b) {
+        T threshold = (~b + 1u) % b;
         while (true) {
-            uint32_t r = UniformUInt32();
+            T r = Uniform<T>();
             if (r >= threshold) return r % b;
         }
     }
-    Float UniformFloat() {
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-        return std::min(OneMinusEpsilon,
-                        Float(UniformUInt32() * 2.3283064365386963e-10f));
-#else
-        return std::min(OneMinusEpsilon, Float(UniformUInt32() * 0x1p-32f));
-#endif
-    }
+
+    Float UniformFloat();
+
     template <typename Iterator>
     void Shuffle(Iterator begin, Iterator end) {
         for (Iterator it = end - 1; it > begin; --it)
-            std::iter_swap(it,
-                           begin + UniformUInt32((uint32_t)(it - begin + 1)));
+            std::iter_swap(it, begin + Uniform<size_t>(it - begin + 1));
     }
     void Advance(int64_t idelta) {
         uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
@@ -140,20 +138,77 @@ inline std::ostream &operator<<(std::ostream &os, const RNG &rng) {
 }
 
 inline RNG::RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
-inline void RNG::SetSequence(uint64_t initseq) {
-    state = 0u;
-    inc = (initseq << 1u) | 1u;
-    UniformUInt32();
-    state += PCG32_DEFAULT_STATE;
-    UniformUInt32();
-}
 
-inline uint32_t RNG::UniformUInt32() {
+template <>
+inline uint32_t RNG::Uniform<uint32_t>() {
     uint64_t oldstate = state;
     state = oldstate * PCG32_MULT + inc;
     uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
     uint32_t rot = (uint32_t)(oldstate >> 59u);
     return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31));
+}
+
+template <>
+inline uint64_t RNG::Uniform<uint64_t>() {
+    uint64_t v0 = Uniform<uint32_t>(), v1 = Uniform<uint32_t>();
+    return (v0 << 32) | v1;
+}
+
+template <>
+inline int32_t RNG::Uniform<int32_t>() {
+    // https://stackoverflow.com/a/13208789
+    uint32_t v = Uniform<uint32_t>();
+    if (v <= std::numeric_limits<int32_t>::max())
+        // Safe to type convert directly.
+        return int32_t(v);
+
+    DCHECK_GE(v, std::numeric_limits<int32_t>::min());
+    return int(v - std::numeric_limits<int32_t>::min()) +
+        std::numeric_limits<int32_t>::min();
+}
+
+template <>
+inline int64_t RNG::Uniform<int64_t>() {
+    // https://stackoverflow.com/a/16408789
+    uint64_t v = Uniform<uint64_t>();
+    if (v <= std::numeric_limits<int64_t>::max())
+        // Safe to type convert directly.
+        return int64_t(v);
+
+    DCHECK_GE(v, std::numeric_limits<int64_t>::min());
+    return int(v - std::numeric_limits<int64_t>::min()) +
+        std::numeric_limits<int64_t>::min();
+}
+
+template<>
+inline float RNG::Uniform<float>() {
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min<float>(OneMinusEpsilon,
+                           Uniform<uint32_t>() * 2.3283064365386963e-10f);
+#else
+    return std::min<float>(OneMinusEpsilon, Uniform<uint32_t>() * 0x1p-32f);
+#endif
+}
+
+template<>
+inline double RNG::Uniform<double>() {
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min<double>(OneMinusEpsilon, (Uniform<uint64_t>() *
+                                              5.42101086242752217003726400435e-20));
+#else
+    return std::min<double>(OneMinusEpsilon, Uniform<uint64_t>() * 0x1p-64);
+#endif
+}
+
+template <typename T>
+inline T RNG::Uniform() { return T::unimplemented; }
+
+inline void RNG::SetSequence(uint64_t initseq) {
+    state = 0u;
+    inc = (initseq << 1u) | 1u;
+    Uniform<uint32_t>();
+    state += PCG32_DEFAULT_STATE;
+    Uniform<uint32_t>();
 }
 
 }  // namespace pbrt

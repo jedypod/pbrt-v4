@@ -20,12 +20,12 @@
 using namespace pbrt;
 
 static Float pExp(RNG &rng, Float exp = 8.) {
-    Float logu = Lerp(rng.UniformFloat(), -exp, exp);
+    Float logu = Lerp(rng.Uniform<Float>(), -exp, exp);
     return std::pow(10, logu);
 }
 
 static Float pUnif(RNG &rng, Float range = 10.) {
-    return Lerp(rng.UniformFloat(), -range, range);
+    return Lerp(rng.Uniform<Float>(), -range, range);
 }
 
 TEST(Triangle, Watertight) {
@@ -55,7 +55,7 @@ TEST(Triangle, Watertight) {
                 // Close it up exactly at the end
                 vertices.push_back(vertices[vertices.size() - (nPhi - 1)]);
             else {
-                radius += 5 * rng.UniformFloat();
+                radius += 5 * rng.Uniform<Float>();
                 vertices.push_back(
                     Point3f(0, 0, 0) +
                     radius * SphericalDirection(sinTheta, cosTheta, phi));
@@ -102,13 +102,13 @@ TEST(Triangle, Watertight) {
         RNG rng(i);
         // Choose a random point in sphere of radius 0.5 around the origin.
         Point2f u;
-        u[0] = rng.UniformFloat();
-        u[1] = rng.UniformFloat();
+        u[0] = rng.Uniform<Float>();
+        u[1] = rng.Uniform<Float>();
         Point3f p = Point3f(0, 0, 0) + Float(0.5) * UniformSampleSphere(u);
 
         // Choose a random direction.
-        u[0] = rng.UniformFloat();
-        u[1] = rng.UniformFloat();
+        u[0] = rng.Uniform<Float>();
+        u[1] = rng.Uniform<Float>();
         Ray r(p, UniformSampleSphere(u));
         int nHits = 0;
         for (const auto &tri : tris) {
@@ -119,7 +119,7 @@ TEST(Triangle, Watertight) {
         EXPECT_GE(nHits, 1);
 
         // Now tougher: shoot directly at a vertex.
-        Point3f pVertex = vertices[rng.UniformUInt32(vertices.size())];
+        Point3f pVertex = vertices[rng.Uniform<uint32_t>(vertices.size())];
         r.d = pVertex - r.o;
         nHits = 0;
         for (const auto &tri : tris) {
@@ -163,8 +163,8 @@ TEST(Triangle, Reintersect) {
 
         // Sample a point on the triangle surface to shoot the ray toward.
         Point2f u;
-        u[0] = rng.UniformFloat();
-        u[1] = rng.UniformFloat();
+        u[0] = rng.Uniform<Float>();
+        u[1] = rng.Uniform<Float>();
         Float pdf;
         Interaction pTri = tri->Sample(u, &pdf);
 
@@ -186,8 +186,8 @@ TEST(Triangle, Reintersect) {
         for (int j = 0; j < 10000; ++j) {
             // Random direction leaving the intersection point.
             Point2f u;
-            u[0] = rng.UniformFloat();
-            u[1] = rng.UniformFloat();
+            u[0] = rng.Uniform<Float>();
+            u[1] = rng.Uniform<Float>();
             Vector3f w = UniformSampleSphere(u);
             Ray rOut = isect.SpawnRay(w);
             EXPECT_FALSE(tri->IntersectP(rOut));
@@ -222,8 +222,8 @@ TEST(Triangle, Sampling) {
         // triangle's surface (which makes the Monte Carlo stuff have more
         // variance, thus requiring more samples).
         Point3f pc{pUnif(rng, range), pUnif(rng, range), pUnif(rng, range)};
-        pc[rng.UniformUInt32() % 3] =
-            rng.UniformFloat() > .5 ? (-range - 3) : (range + 3);
+        pc[rng.Uniform<uint32_t>() % 3] =
+            rng.Uniform<Float>() > .5 ? (-range - 3) : (range + 3);
 
         // Compute reference value using Monte Carlo with uniform spherical
         // sampling.
@@ -286,8 +286,8 @@ TEST(Triangle, SolidAngle) {
         // triangle's surface (which makes the Monte Carlo stuff have more
         // variance, thus requiring more samples).
         Point3f pc{pUnif(rng, range), pUnif(rng, range), pUnif(rng, range)};
-        pc[rng.UniformUInt32() % 3] =
-            rng.UniformFloat() > .5 ? (-range - 3) : (range + 3);
+        pc[rng.Uniform<uint32_t>() % 3] =
+            rng.Uniform<Float>() > .5 ? (-range - 3) : (range + 3);
 
         // Compute a reference value using Triangle::Sample()
         const int count = 64 * 1024;
@@ -384,12 +384,12 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
     // Destination: a random point in the shape's bounding box.
     Bounds3f bbox = shape.WorldBound();
     Point3f t;
-    for (int c = 0; c < 3; ++c) t[c] = rng.UniformFloat();
+    for (int c = 0; c < 3; ++c) t[c] = rng.Uniform<Float>();
     Point3f p2 = bbox.Lerp(t);
 
     // Ray to intersect with the shape.
     Ray r(o, p2 - o);
-    if (rng.UniformFloat() < .5) r.d = Normalize(r.d);
+    if (rng.Uniform<Float>() < .5) r.d = Normalize(r.d);
 
     // We should usually (but not always) find an intersection.
     SurfaceInteraction isect;
@@ -400,8 +400,8 @@ static void TestReintersectConvex(Shape &shape, RNG &rng) {
     for (int j = 0; j < 10000; ++j) {
         // Random direction leaving the intersection point.
         Point2f u;
-        u[0] = rng.UniformFloat();
-        u[1] = rng.UniformFloat();
+        u[0] = rng.Uniform<Float>();
+        u[1] = rng.Uniform<Float>();
         Vector3f w = UniformSampleSphere(u);
         // Make sure it's in the same hemisphere as the surface normal.
         w = Faceforward(w, isect.n);
@@ -446,14 +446,14 @@ TEST(ParialSphere, Normal) {
         RNG rng(i);
         auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
-        Float zMin = rng.UniformFloat() < 0.5
+        Float zMin = rng.Uniform<Float>() < 0.5
                          ? -radius
-                         : Lerp(rng.UniformFloat(), -radius, radius);
-        Float zMax = rng.UniformFloat() < 0.5
+                         : Lerp(rng.Uniform<Float>(), -radius, radius);
+        Float zMax = rng.Uniform<Float>() < 0.5
                          ? radius
-                         : Lerp(rng.UniformFloat(), -radius, radius);
+                         : Lerp(rng.Uniform<Float>(), -radius, radius);
         Float phiMax =
-            rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
+            rng.Uniform<Float>() < 0.5 ? 360. : rng.Uniform<Float>() * 360.;
         Sphere sphere(identity, identity, false, radius, zMin, zMax, phiMax, nullptr);
 
         // Ray origin
@@ -463,12 +463,12 @@ TEST(ParialSphere, Normal) {
         // Destination: a random point in the shape's bounding box.
         Bounds3f bbox = sphere.WorldBound();
         Point3f t;
-        for (int c = 0; c < 3; ++c) t[c] = rng.UniformFloat();
+        for (int c = 0; c < 3; ++c) t[c] = rng.Uniform<Float>();
         Point3f p2 = bbox.Lerp(t);
 
         // Ray to intersect with the shape.
         Ray r(o, p2 - o);
-        if (rng.UniformFloat() < .5) r.d = Normalize(r.d);
+        if (rng.Uniform<Float>() < .5) r.d = Normalize(r.d);
 
         // We should usually (but not always) find an intersection.
         SurfaceInteraction isect;
@@ -485,14 +485,14 @@ TEST(PartialSphere, Reintersect) {
         RNG rng(i);
         auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
-        Float zMin = rng.UniformFloat() < 0.5
+        Float zMin = rng.Uniform<Float>() < 0.5
                          ? -radius
-                         : Lerp(rng.UniformFloat(), -radius, radius);
-        Float zMax = rng.UniformFloat() < 0.5
+                         : Lerp(rng.Uniform<Float>(), -radius, radius);
+        Float zMax = rng.Uniform<Float>() < 0.5
                          ? radius
-                         : Lerp(rng.UniformFloat(), -radius, radius);
+                         : Lerp(rng.Uniform<Float>(), -radius, radius);
         Float phiMax =
-            rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
+            rng.Uniform<Float>() < 0.5 ? 360. : rng.Uniform<Float>() * 360.;
         Sphere sphere(identity, identity, false, radius, zMin, zMax, phiMax, nullptr);
 
         TestReintersectConvex(sphere, rng);
@@ -504,10 +504,10 @@ TEST(Cylinder, Reintersect) {
         RNG rng(i);
         auto identity = std::make_shared<const Transform>();
         Float radius = pExp(rng, 4);
-        Float zMin = pExp(rng, 4) * (rng.UniformFloat() < 0.5 ? -1 : 1);
-        Float zMax = pExp(rng, 4) * (rng.UniformFloat() < 0.5 ? -1 : 1);
+        Float zMin = pExp(rng, 4) * (rng.Uniform<Float>() < 0.5 ? -1 : 1);
+        Float zMax = pExp(rng, 4) * (rng.Uniform<Float>() < 0.5 ? -1 : 1);
         Float phiMax =
-            rng.UniformFloat() < 0.5 ? 360. : rng.UniformFloat() * 360.;
+            rng.Uniform<Float>() < 0.5 ? 360. : rng.Uniform<Float>() * 360.;
         Cylinder cyl(identity, identity, false, radius, zMin, zMax, phiMax, nullptr);
 
         TestReintersectConvex(cyl, rng);

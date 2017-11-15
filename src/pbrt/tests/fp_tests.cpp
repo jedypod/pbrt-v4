@@ -12,7 +12,7 @@ using namespace pbrt;
 static float GetFloat(RNG &rng) {
     float f;
     do {
-        f = BitsToFloat(rng.UniformUInt32());
+        f = BitsToFloat(rng.Uniform<uint32_t>());
     } while (std::isnan(f));
     return f;
 }
@@ -20,8 +20,8 @@ static float GetFloat(RNG &rng) {
 static double GetDouble(RNG &rng) {
     double d;
     do {
-        d = BitsToFloat(uint64_t(rng.UniformUInt32()) |
-                        (uint64_t(rng.UniformUInt32()) << 32));
+        d = BitsToFloat(uint64_t(rng.Uniform<uint32_t>()) |
+                        (uint64_t(rng.Uniform<uint32_t>()) << 32));
     } while (std::isnan(d));
     return d;
 }
@@ -69,7 +69,7 @@ TEST(FloatingPoint, NextUpDownDouble) {
 TEST(FloatingPoint, FloatBits) {
     RNG rng(1);
     for (int i = 0; i < 100000; ++i) {
-        uint32_t ui = rng.UniformUInt32();
+        uint32_t ui = rng.Uniform<uint32_t>();
         float f = BitsToFloat(ui);
         if (std::isnan(f)) continue;
 
@@ -80,8 +80,8 @@ TEST(FloatingPoint, FloatBits) {
 TEST(FloatingPoint, DoubleBits) {
     RNG rng(2);
     for (int i = 0; i < 100000; ++i) {
-        uint64_t ui = (uint64_t(rng.UniformUInt32()) |
-                       (uint64_t(rng.UniformUInt32()) << 32));
+        uint64_t ui = (uint64_t(rng.Uniform<uint32_t>()) |
+                       (uint64_t(rng.Uniform<uint32_t>()) << 32));
         double f = BitsToFloat(ui);
 
         if (std::isnan(f)) continue;
@@ -107,41 +107,41 @@ TEST(FloatingPoint, AtomicFloat) {
 
 // Return an exponentially-distributed floating-point value.
 static EFloat getFloat(RNG &rng, Float minExp = -6., Float maxExp = 6.) {
-    Float logu = Lerp(rng.UniformFloat(), minExp, maxExp);
+    Float logu = Lerp(rng.Uniform<Float>(), minExp, maxExp);
     Float val = std::pow(10, logu);
 
     // Choose a random error bound.
     Float err = 0;
-    switch (rng.UniformUInt32(4)) {
+    switch (rng.Uniform<uint32_t>(4)) {
     case 0:
         // no error
         break;
     case 1: {
         // small typical/reasonable error
-        uint32_t ulpError = rng.UniformUInt32(1024);
+        uint32_t ulpError = rng.Uniform<uint32_t>(1024);
         Float offset = BitsToFloat(FloatToBits(val) + ulpError);
         err = std::abs(offset - val);
         break;
     }
     case 2: {
         // bigger ~reasonable error
-        uint32_t ulpError = rng.UniformUInt32(1024 * 1024);
+        uint32_t ulpError = rng.Uniform<uint32_t>(1024 * 1024);
         Float offset = BitsToFloat(FloatToBits(val) + ulpError);
         err = std::abs(offset - val);
         break;
     }
     case 3: {
-        err = (4 * rng.UniformFloat()) * std::abs(val);
+        err = (4 * rng.Uniform<Float>()) * std::abs(val);
     }
     }
-    Float sign = rng.UniformFloat() < .5 ? -1. : 1.;
+    Float sign = rng.Uniform<Float>() < .5 ? -1. : 1.;
     return EFloat(sign * val, err);
 }
 
 // Given an EFloat covering some range, choose a double-precision "precise"
 // value that is in the EFloat's range.
 static double getPrecise(const EFloat &ef, RNG &rng) {
-    switch (rng.UniformUInt32(3)) {
+    switch (rng.Uniform<uint32_t>(3)) {
     // 2/3 of the time, pick a value that is right at the end of the range;
     // this is a maximally difficult / adversarial choice, so should help
     // ferret out any bugs.
@@ -151,7 +151,7 @@ static double getPrecise(const EFloat &ef, RNG &rng) {
         return ef.UpperBound();
     case 2: {
         // Otherwise choose a value uniformly inside the EFloat's range.
-        Float t = rng.UniformFloat();
+        Float t = rng.Uniform<Float>();
         double p = (1 - t) * ef.LowerBound() + t * ef.UpperBound();
         if (p > ef.UpperBound()) p = ef.UpperBound();
         if (p < ef.LowerBound()) p = ef.LowerBound();

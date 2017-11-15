@@ -21,12 +21,12 @@ TEST(Vector, AngleBetween) {
 
     RNG rng;
     for (int i = 0; i < 10000; ++i) {
-        Vector3f a = Normalize(Vector3f(-1 + 2 * rng.UniformFloat(),
-                                        -1 + 2 * rng.UniformFloat(),
-                                        -1 + 2 * rng.UniformFloat()));
-        Vector3f b = Normalize(Vector3f(-1 + 2 * rng.UniformFloat(),
-                                        -1 + 2 * rng.UniformFloat(),
-                                        -1 + 2 * rng.UniformFloat()));
+        Vector3f a = Normalize(Vector3f(-1 + 2 * rng.Uniform<Float>(),
+                                        -1 + 2 * rng.Uniform<Float>(),
+                                        -1 + 2 * rng.Uniform<Float>()));
+        Vector3f b = Normalize(Vector3f(-1 + 2 * rng.Uniform<Float>(),
+                                        -1 + 2 * rng.Uniform<Float>(),
+                                        -1 + 2 * rng.Uniform<Float>()));
         Float v[2] = { SafeACos(Dot(a, b)), AngleBetween(a, b) };
         Float err = std::abs(v[0] - v[1]);
         EXPECT_LT(err, 5e-6) << v[1] << ", a: " << a << ", b: " << b;
@@ -64,7 +64,7 @@ TEST(Vector, CoordinateSystem) {
     // Random vectors
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
-        Point2f u = { rng.UniformFloat(), rng.UniformFloat() };
+        Point2f u = { rng.Uniform<Float>(), rng.Uniform<Float>() };
         Vector3f v = UniformSampleSphere(u);
         CoordinateSystem(v, &a, &b);
         EXPECT_LT(error(v, a, b), 1e-10);

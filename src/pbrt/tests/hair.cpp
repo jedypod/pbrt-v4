@@ -44,12 +44,12 @@ using namespace pbrt;
 TEST(Hair, Reciprocity) {
   RNG rng;
   for (int i = 0; i < 10; ++i) {
-    Hair h(-1 + 2 * rng.UniformFloat(), 1.55,
-           HairBSDF::SigmaAFromConcentration(.3 + 7.7 * rng.UniformFloat()),
-           .1 + .9 * rng.UniformFloat(),
-           .1 + .9 * rng.UniformFloat());
-    Vector3f wi = UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
-    Vector3f wo = UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+    Hair h(-1 + 2 * rng.Uniform<Float>(), 1.55,
+           HairBSDF::SigmaAFromConcentration(.3 + 7.7 * rng.Uniform<Float>()),
+           .1 + .9 * rng.Uniform<Float>(),
+           .1 + .9 * rng.Uniform<Float>());
+    Vector3f wi = UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
+    Vector3f wo = UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
     Spectrum a = h.f(wi, wo) * AbsCosTheta(wo);
     Spectrum b = h.f(wo, wi) * AbsCosTheta(wi);
     EXPECT_EQ(a.y(), b.y()) << h << ", a = " << a << ", b = " << b << ", wi = " << wi
@@ -61,18 +61,18 @@ TEST(Hair, Reciprocity) {
 
 TEST(Hair, WhiteFurnace) {
     RNG rng;
-    Vector3f wo = UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+    Vector3f wo = UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
     for (Float beta_m = .1; beta_m < 1; beta_m += .2) {
         for (Float beta_n = .1; beta_n < 1; beta_n += .2) {
             // Estimate reflected uniform incident radiance from hair
             Spectrum sum = 0.f;
             int count = 300000;
             for (int i = 0; i < count; ++i) {
-                Float h = -1 + 2. * rng.UniformFloat();
+                Float h = -1 + 2. * rng.Uniform<Float>();
                 Spectrum sigma_a = 0.f;
                 HairBSDF hair(h, 1.55, sigma_a, beta_m, beta_n, 0.f);
                 Vector3f wi = UniformSampleSphere(
-                    {rng.UniformFloat(), rng.UniformFloat()});
+                    {rng.Uniform<Float>(), rng.Uniform<Float>()});
                 sum += hair.f(wo, wi) * AbsCosTheta(wi);
             }
             Float avg = sum.y() / (count * UniformSpherePdf());
@@ -83,19 +83,19 @@ TEST(Hair, WhiteFurnace) {
 
 TEST(Hair, WhiteFurnaceSampled) {
     RNG rng;
-    Vector3f wo = UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+    Vector3f wo = UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
     for (Float beta_m = .1; beta_m < 1; beta_m += .2) {
         for (Float beta_n = .1; beta_n < 1; beta_n += .2) {
             Spectrum sum = 0.f;
             int count = 300000;
             for (int i = 0; i < count; ++i) {
-                Float h = -1 + 2. * rng.UniformFloat();
+                Float h = -1 + 2. * rng.Uniform<Float>();
                 Spectrum sigma_a = 0.f;
                 HairBSDF hair(h, 1.55, sigma_a, beta_m, beta_n, 0.f);
 
                 Vector3f wi;
                 Float pdf;
-                Point2f u = {rng.UniformFloat(), rng.UniformFloat()};
+                Point2f u = {rng.Uniform<Float>(), rng.Uniform<Float>()};
                 Spectrum f = hair.Sample_f(wo, &wi, u, &pdf, nullptr);
                 if (pdf > 0) sum += f * AbsCosTheta(wi) / pdf;
             }
@@ -112,14 +112,14 @@ TEST(Hair, SamplingWeights) {
             int count = 10000;
             for (int i = 0; i < count; ++i) {
                 // Check _HairBSDF::Sample\_f()_ sample weight
-                Float h = -1 + 2 * rng.UniformFloat();
+                Float h = -1 + 2 * rng.Uniform<Float>();
                 Spectrum sigma_a = 0;
                 HairBSDF hair(h, 1.55, sigma_a, beta_m, beta_n, 0.f);
                 Vector3f wo = UniformSampleSphere(
-                    {rng.UniformFloat(), rng.UniformFloat()});
+                    {rng.Uniform<Float>(), rng.Uniform<Float>()});
                 Vector3f wi;
                 Float pdf;
-                Point2f u = {rng.UniformFloat(), rng.UniformFloat()};
+                Point2f u = {rng.Uniform<Float>(), rng.Uniform<Float>()};
                 Spectrum f = hair.Sample_f(wo, &wi, u, &pdf, nullptr);
                 if (pdf > 0) {
                     // Verify that hair BSDF sample weight is close to 1 for
@@ -139,17 +139,17 @@ TEST(Hair, SamplingConsistency) {
             const int count = 64 * 1024;
             Spectrum sigma_a = .25;
             Vector3f wo =
-                UniformSampleSphere({rng.UniformFloat(), rng.UniformFloat()});
+                UniformSampleSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
             auto Li = [](const Vector3f &w) -> Spectrum { return w.z * w.z; };
             Spectrum fImportance = 0, fUniform = 0;
             for (int i = 0; i < count; ++i) {
                 // Compute estimates of scattered radiance for hair sampling
                 // test
-                Float h = -1 + 2 * rng.UniformFloat();
+                Float h = -1 + 2 * rng.Uniform<Float>();
                 HairBSDF hair(h, 1.55, sigma_a, beta_m, beta_n, 0.f);
                 Vector3f wi;
                 Float pdf;
-                Point2f u = {rng.UniformFloat(), rng.UniformFloat()};
+                Point2f u = {rng.Uniform<Float>(), rng.Uniform<Float>()};
                 Spectrum f = hair.Sample_f(wo, &wi, u, &pdf, nullptr);
                 if (pdf > 0)
                     fImportance += f * Li(wi) * AbsCosTheta(wi) / (count * pdf);

@@ -621,7 +621,7 @@ void RealisticCamera::TestExitPupilBounds() const {
 
     static RNG rng;
 
-    Float u = rng.UniformFloat();
+    Float u = rng.Uniform<Float>();
     Point3f pFilm(u * filmDiagonal / 2, 0, 0);
 
     Float r = pFilm.x / (filmDiagonal / 2);
@@ -635,7 +635,7 @@ void RealisticCamera::TestExitPupilBounds() const {
     // Now, randomly pick points on the aperture and see if any are outside
     // of pupil bounds...
     for (int i = 0; i < 1000; ++i) {
-        Point2f u2{rng.UniformFloat(), rng.UniformFloat()};
+        Point2f u2{rng.Uniform<Float>(), rng.Uniform<Float>()};
         Point2f pd = ConcentricSampleDisk(u2);
         pd *= RearElementRadius();
 

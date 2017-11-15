@@ -113,7 +113,7 @@ TEST(Math, KahanSum) {
     RNG rng;
     for (int i = 0; i < 16*1024*1024; ++i) {
         // Hard to sum accurately since the values span many magnitudes.
-        float v = std::exp(Lerp(rng.UniformFloat(), -5, 20));
+        float v = std::exp(Lerp(rng.Uniform<Float>(), -5, 20));
         ldSum += v;
         kahanSumD += v;
         doubleSum += v;

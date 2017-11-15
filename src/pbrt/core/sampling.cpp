@@ -50,7 +50,7 @@ void StratifiedSample1D(absl::Span<Float> samples, RNG &rng,
                         bool jitter) {
     Float invNSamples = (Float)1 / samples.size();
     for (size_t i = 0; i < samples.size(); ++i) {
-        Float delta = jitter ? rng.UniformFloat() : 0.5f;
+        Float delta = jitter ? rng.Uniform<Float>() : 0.5f;
         samples[i] = std::min((i + delta) * invNSamples, OneMinusEpsilon);
     }
 }
@@ -62,8 +62,8 @@ void StratifiedSample2D(absl::Span<Point2f> samp, int nx, int ny,
     int offset = 0;
     for (int y = 0; y < ny; ++y)
         for (int x = 0; x < nx; ++x, ++offset) {
-            Float jx = jitter ? rng.UniformFloat() : 0.5f;
-            Float jy = jitter ? rng.UniformFloat() : 0.5f;
+            Float jx = jitter ? rng.Uniform<Float>() : 0.5f;
+            Float jy = jitter ? rng.Uniform<Float>() : 0.5f;
             samp[offset].x = std::min((x + jx) * dx, OneMinusEpsilon);
             samp[offset].y = std::min((y + jy) * dy, OneMinusEpsilon);
         }
@@ -76,14 +76,14 @@ void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng) {
     Float invNSamples = (Float)1 / nSamples;
     for (size_t i = 0; i < nSamples; ++i)
         for (int j = 0; j < nDim; ++j) {
-            Float sj = (i + (rng.UniformFloat())) * invNSamples;
+            Float sj = (i + (rng.Uniform<Float>())) * invNSamples;
             samples[nDim * i + j] = std::min(sj, OneMinusEpsilon);
         }
 
     // Permute LHS samples in each dimension
     for (int i = 0; i < nDim; ++i) {
         for (size_t j = 0; j < nSamples; ++j) {
-            size_t other = j + rng.UniformUInt32(nSamples - j);
+            size_t other = j + rng.Uniform<uint32_t>(nSamples - j);
             std::swap(samples[nDim * j + i], samples[nDim * other + i]);
         }
     }
@@ -92,8 +92,8 @@ void LatinHypercube(absl::Span<Float> samples, int nDim, RNG &rng) {
 Point2f RejectionSampleDisk(RNG &rng) {
     Point2f p;
     do {
-        p.x = 1 - 2 * rng.UniformFloat();
-        p.y = 1 - 2 * rng.UniformFloat();
+        p.x = 1 - 2 * rng.Uniform<Float>();
+        p.y = 1 - 2 * rng.Uniform<Float>();
     } while (p.x * p.x + p.y * p.y > 1);
     return p;
 }

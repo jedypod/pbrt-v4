@@ -94,7 +94,7 @@ absl::Span<const Point2f> MLTSampler::Get2DArray(int n) {
 
 void MLTSampler::StartIteration() {
     currentIteration++;
-    largeStep = rng.UniformFloat() < largeStepProbability;
+    largeStep = rng.Uniform<Float>() < largeStepProbability;
 }
 
 void MLTSampler::Accept() {
@@ -108,20 +108,20 @@ void MLTSampler::EnsureReady(int index) {
 
     // Reset $\VEC{X}_i$ if a large step took place in the meantime
     if (Xi.lastModificationIteration < lastLargeStepIteration) {
-        Xi.value = rng.UniformFloat();
+        Xi.value = rng.Uniform<Float>();
         Xi.lastModificationIteration = lastLargeStepIteration;
     }
 
     // Apply remaining sequence of mutations to _sample_
     Xi.Backup();
     if (largeStep) {
-        Xi.value = rng.UniformFloat();
+        Xi.value = rng.Uniform<Float>();
     } else {
         int64_t nSmall = currentIteration - Xi.lastModificationIteration;
         // Apply _nSmall_ small step mutations
 
         // Sample the standard normal distribution $N(0, 1)$
-        Float normalSample = Sqrt2 * ErfInv(2 * rng.UniformFloat() - 1);
+        Float normalSample = Sqrt2 * ErfInv(2 * rng.Uniform<Float>() - 1);
 
         // Compute the effective standard deviation and apply perturbation to
         // $\VEC{X}_i$
@@ -231,7 +231,7 @@ void MLTIntegrator::Render() {
 
             // Select initial state from the set of bootstrap samples
             RNG rng(i);
-            int bootstrapIndex = bootstrap.SampleDiscrete(rng.UniformFloat());
+            int bootstrapIndex = bootstrap.SampleDiscrete(rng.Uniform<Float>());
             int depth = bootstrapIndex % (maxDepth + 1);
 
             // Initialize local variables for selected state
@@ -257,7 +257,7 @@ void MLTIntegrator::Render() {
                 film.AddSplat(pCurrent, LCurrent * (1 - accept) / LCurrent.y());
 
                 // Accept or reject the proposal
-                if (rng.UniformFloat() < accept) {
+                if (rng.Uniform<Float>() < accept) {
                     pCurrent = pProposed;
                     LCurrent = LProposed;
                     sampler.Accept();

@@ -53,12 +53,12 @@ static Image GetImage(PixelFormat format, Point2i res) {
 
     auto v = [format, &rng]() -> Float {
         if (Is8Bit(format))
-            return rng.UniformFloat();
+            return rng.Uniform<Float>();
         else if (Is16Bit(format))
-            return Lerp(rng.UniformFloat(), -100., 100.);
+            return Lerp(rng.Uniform<Float>(), -100., 100.);
         else {
             EXPECT_TRUE(Is32Bit(format));
-            return Lerp(rng.UniformFloat(), -1e6f, 1e6f);
+            return Lerp(rng.Uniform<Float>(), -1e6f, 1e6f);
         }
     };
 
@@ -140,7 +140,7 @@ TEST(Texcache, ThreadInsanity) {
     std::vector<std::string> filenames;
     RNG rng;
     for (int i = 0; i < 100; ++i) {
-        Point2i res(2 + rng.UniformUInt32(1000), 2 + rng.UniformUInt32(1000));
+        Point2i res(2 + rng.Uniform<uint32_t>(1000), 2 + rng.Uniform<uint32_t>(1000));
         Image im = GetImage(PixelFormat::SRGB8, res);
         // Just do one level; save the time of creating MIP levels...
         std::vector<Image> mips{im};
@@ -166,13 +166,13 @@ TEST(Texcache, ThreadInsanity) {
             RNG rng(chunk);
             for (int i = 0; i < 10000; ++i) {
                 // Choose a random texture and level.
-                int texIndex = rng.UniformUInt32(ids.size());
+                int texIndex = rng.Uniform<uint32_t>(ids.size());
                 int texId = ids[texIndex];
-                int level = rng.UniformUInt32(images[texIndex].size());
+                int level = rng.Uniform<uint32_t>(images[texIndex].size());
                 Point2i res = cache->GetLevelResolution(texId, level);
 
                 // Choose a random point in the texture.
-                Point2i p(rng.UniformUInt32(res[0]), rng.UniformUInt32(res[1]));
+                Point2i p(rng.Uniform<uint32_t>(res[0]), rng.Uniform<uint32_t>(res[1]));
 
                 Spectrum v = cache->Texel<Spectrum>(texId, level, p);
                 EXPECT_EQ(v, images[texIndex][level].GetSpectrum(p));

@@ -49,8 +49,8 @@ TEST(SpotLight, Sampling) {
 
         RNG rng;
         for (int i = 0; i < 100; ++i) {
-            Point2f u1 { rng.UniformFloat(), rng.UniformFloat() };
-            Point2f u2 { rng.UniformFloat(), rng.UniformFloat() };
+            Point2f u1 { rng.Uniform<Float>(), rng.Uniform<Float>() };
+            Point2f u2 { rng.Uniform<Float>(), rng.Uniform<Float>() };
             Ray ray;
             Normal3f n;
             Float pdfPos, pdfDir;

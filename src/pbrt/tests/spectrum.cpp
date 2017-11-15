@@ -213,7 +213,7 @@ TEST(Spectrum, LinearDownsampleIrreg) {
     std::vector<Float> lambdaIrreg, valIrreg;
     lambdaIrreg.push_back(-25);
     for (int i = 0; i < 100; ++i)
-        lambdaIrreg.push_back(lambdaIrreg.back() + rng.UniformFloat());
+        lambdaIrreg.push_back(lambdaIrreg.back() + rng.Uniform<Float>());
     for (size_t i = 0; i < lambdaIrreg.size(); ++i)
         valIrreg.push_back(lambdaIrreg[i] * lambdaIrreg[i]);
 

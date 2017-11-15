@@ -188,7 +188,7 @@ void Shuffle(absl::Span<T> samples, int nDimensions, RNG &rng) {
     CHECK_EQ(0, samples.size() % nDimensions);
     size_t nSamples = samples.size() / nDimensions;
     for (size_t i = 0; i < nSamples; ++i) {
-        size_t other = i + rng.UniformUInt32(nSamples - i);
+        size_t other = i + rng.Uniform<uint32_t>(nSamples - i);
         for (int j = 0; j < nDimensions; ++j)
             std::swap(samples[nDimensions * i + j], samples[nDimensions * other + j]);
     }

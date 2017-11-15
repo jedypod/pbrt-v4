@@ -218,7 +218,7 @@ TEST(Image, CopyRectIn) {
         Bounds2i extent(Point2i(10, 23), Point2i(17, 28));
         std::vector<Float> buf(extent.Area() * nc);
         std::generate(buf.begin(), buf.end(),
-                      [&rng]() { return rng.UniformFloat(); });
+                      [&rng]() { return rng.Uniform<Float>(); });
 
         image.CopyRectIn(extent, buf);
 
@@ -405,7 +405,7 @@ TEST(Image, ToSRGB_LUTAccuracy) {
     double sumErr = 0, maxErr = 0;
     RNG rng;
     for (int i = 0; i < n; ++i) {
-        Float v = (i + rng.UniformFloat()) / n;
+        Float v = (i + rng.Uniform<Float>()) / n;
         Float lut = LinearToSRGB(v);
         Float precise = LinearToSRGBFull(v);
         double err = std::abs(lut - precise);
@@ -454,7 +454,7 @@ TEST(Image, SampleSimple) {
     Distribution2D distrib = zeroOne.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
-        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
         Float pdf;
         Point2f p = distrib.SampleContinuous(u, &pdf);
         // Due to bilerp on lookup, the non-zero range goes out a bit.
@@ -480,7 +480,7 @@ TEST(Image, SampleLinear) {
     Distribution2D distrib = image.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
-        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
         Float pdf;
         Point2f p = distrib.SampleContinuous(u, &pdf);
         Float f = p.x + p.y;
@@ -511,7 +511,7 @@ TEST(Image, SampleSinCos) {
     Distribution2D distrib = image.ComputeSamplingDistribution(2, Norm::L1);
     RNG rng;
     for (int i = 0; i < 1000; ++i) {
-        Point2f u(rng.UniformFloat(), rng.UniformFloat());
+        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
         Float pdf;
         Point2f p = distrib.SampleContinuous(u, &pdf);
         Float fp = f(p);

@@ -100,7 +100,7 @@ TEST(LowDiscrepancy, GeneratorMatrix) {
     // Random / goofball generator matrix
     RNG rng;
     for (int i = 0; i < 32; ++i) {
-        C[i] = rng.UniformUInt32();
+        C[i] = rng.Uniform<uint32_t>();
         Crev[i] = ReverseBits32(C[i]);
     }
     for (int a = 0; a < 1024; ++a) {
@@ -573,7 +573,7 @@ TEST(Sampling, Smoothstep) {
 
     RNG rng;
     for (int i = 0; i < 100; ++i) {
-        Float x = SampleSmoothstep(rng.UniformFloat(), -3, 5);
+        Float x = SampleSmoothstep(rng.Uniform<Float>(), -3, 5);
         Float ratio = Smoothstep(x, -3, 5) / SmoothstepPdf(x, -3, 5);
         // Smoothstep over [-3,5] integrates to 4.
         EXPECT_LT(std::abs(ratio - 4), 1e-5) << ratio;
@@ -583,7 +583,7 @@ TEST(Sampling, Smoothstep) {
     Distribution1D distrib =
         Distribution1D::SampleFunction(ss, 1024, 64*1024, Norm::L1);
     for (int i = 0; i < 100; ++i) {
-        Float u = rng.UniformFloat();
+        Float u = rng.Uniform<Float>();
         Float cx = SampleSmoothstep(u, 0, 1);
         Float cp = SmoothstepPdf(cx, 0, 1);
 
@@ -623,7 +623,7 @@ TEST(Sampling, Linear) {
     Distribution1D distrib =
         Distribution1D::SampleFunction(lin, 1024, 64*1024, Norm::L1);
     for (int i = 0; i < 100; ++i) {
-        Float u = rng.UniformFloat();
+        Float u = rng.Uniform<Float>();
         Float cx = SampleLinear(u, 1, 4);
         Float cp = LinearPdf(cx, 1, 4);
 
@@ -648,7 +648,7 @@ TEST(Sampling, CatmullRom) {
     Distribution1D distrib =
         Distribution1D::SampleFunction(cr, 8192, 1024, Norm::L1);
     for (int i = 0; i < 100; ++i) {
-        Float u = rng.UniformFloat();
+        Float u = rng.Uniform<Float>();
         Float cp;
         Float cx = SampleCatmullRom(nodes, values, cdf, u, nullptr, &cp);
 
@@ -672,7 +672,7 @@ TEST(Sampling, Bilinear) {
         Distribution2D distrib = Distribution2D::SampleFunction(bilerp, 1024, 1024, 16,
                                                                 Norm::L1);
         for (int i = 0; i < 100; ++i) {
-            Point2f u{rng.UniformFloat(), rng.UniformFloat()};
+            Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
             Point2f pb = SampleBilinear(u, {v, 4});
             Float bp = BilinearPdf(pb, {v, 4});
 
@@ -698,7 +698,7 @@ TEST(Sampling, Logistic) {
         Distribution1D distrib =
             Distribution1D::SampleFunction(logistic, 8192, 16, Norm::L1);
         for (int i = 0; i < 100; ++i) {
-            Float u = rng.UniformFloat();
+            Float u = rng.Uniform<Float>();
             Float cx = SampleTrimmedLogistic(u, s, a, b);
             Float cp = TrimmedLogistic(cx, s, a, b);
 
@@ -804,7 +804,7 @@ TEST(Sampling, DynamicDistribution1D) {
         EXPECT_LT(std::abs(pd - pdd), 1e-5) <<
             "u = " << u << "dd = " << dd.ToString();
 
-        vec.push_back(rng.UniformUInt32(8));
+        vec.push_back(rng.Uniform<uint32_t>(8));
     }
 }
 
@@ -821,7 +821,7 @@ TEST(Sampling, VarianceEstimator) {
     int count = 10000;
     for (int i = 0; i < count; ++i)
         // Stratified sampling
-        ve.Add(Lerp((i + rng.UniformFloat()) / count, -1, 1));
+        ve.Add(Lerp((i + rng.Uniform<Float>()) / count, -1, 1));
 
     // f(x) = 0, random variables x_i uniform in [-1,1] ->
     // variance is E[x^2] on [-1,1] == 1/3

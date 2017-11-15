@@ -138,7 +138,7 @@ inline void GrayCodeSample(absl::Span<const uint32_t> C0,
 
 inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
                          absl::Span<Float> samples, RNG &rng) {
-    uint32_t scramble = rng.UniformUInt32();
+    uint32_t scramble = rng.Uniform<uint32_t>();
     // Define _CVanDerCorput_ Generator Matrix
     const uint32_t CVanDerCorput[32] = {
       // clang-format off
@@ -192,8 +192,8 @@ inline void VanDerCorput(int nSamplesPerPixelSample, int nPixelSamples,
 inline void Sobol2D(int nSamplesPerPixelSample, int nPixelSamples,
                     absl::Span<Point2f> samples, RNG &rng) {
     Point2i scramble;
-    scramble[0] = rng.UniformUInt32();
-    scramble[1] = rng.UniformUInt32();
+    scramble[0] = rng.Uniform<uint32_t>();
+    scramble[1] = rng.Uniform<uint32_t>();
 
     // Define 2D Sobol$'$ generator matrices _CSobol[2]_
     const uint32_t CSobol[2][32] = {

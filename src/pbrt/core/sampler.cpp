@@ -96,7 +96,7 @@ Float PixelSampler::Get1D() {
     if (current1DDimension < samples1D.size())
         return samples1D[current1DDimension++][currentPixelSampleIndex];
     else
-        return rng.UniformFloat();
+        return rng.Uniform<Float>();
 }
 
 Point2f PixelSampler::Get2D() {
@@ -105,7 +105,7 @@ Point2f PixelSampler::Get2D() {
     if (current2DDimension < samples2D.size())
         return samples2D[current2DDimension++][currentPixelSampleIndex];
     else
-        return Point2f(rng.UniformFloat(), rng.UniformFloat());
+        return Point2f(rng.Uniform<Float>(), rng.Uniform<Float>());
 }
 
 void PixelSampler::Request1DArray(int n) {

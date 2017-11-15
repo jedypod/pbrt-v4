@@ -9,9 +9,9 @@ using namespace pbrt;
 
 static Transform RandomTransform(RNG &rng) {
     Transform t;
-    auto r = [&rng]() { return -10. + 20. * rng.UniformFloat(); };
+    auto r = [&rng]() { return -10. + 20. * rng.Uniform<Float>(); };
     for (int i = 0; i < 10; ++i) {
-        switch (rng.UniformUInt32(3)) {
+        switch (rng.Uniform<uint32_t>(3)) {
         case 0:
             t = t * Scale(std::abs(r()), std::abs(r()), std::abs(r()));
             break;
@@ -21,7 +21,7 @@ static Transform RandomTransform(RNG &rng) {
         case 2:
             t = t *
                 Rotate(r() * 20., UniformSampleSphere(Point2f(
-                                      rng.UniformFloat(), rng.UniformFloat())));
+                                      rng.Uniform<Float>(), rng.Uniform<Float>())));
             break;
         }
     }
@@ -30,7 +30,7 @@ static Transform RandomTransform(RNG &rng) {
 
 TEST(AnimatedTransform, Randoms) {
     RNG rng;
-    auto r = [&rng]() { return -10. + 20. * rng.UniformFloat(); };
+    auto r = [&rng]() { return -10. + 20. * rng.Uniform<Float>(); };
 
     for (int i = 0; i < 200; ++i) {
         // Generate a pair of random transformation matrices.
@@ -43,7 +43,7 @@ TEST(AnimatedTransform, Randoms) {
             Bounds3f bounds(Point3f(r(), r(), r()), Point3f(r(), r(), r()));
             Bounds3f motionBounds = at.MotionBounds(bounds);
 
-            for (Float t = 0.; t <= 1.; t += 1e-3 * rng.UniformFloat()) {
+            for (Float t = 0.; t <= 1.; t += 1e-3 * rng.Uniform<Float>()) {
                 // Now, interpolate the transformations at a bunch of times
                 // along the time range and then transform the bounding box
                 // with the result.

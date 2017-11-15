@@ -300,7 +300,7 @@ void Gen_Sample_f(BSDF* bsdf, const Vector3f& wo, Vector3f* wi, Float* pdf,
     // only glossy or diffuse reflections (no specular reflections)
     BxDFType inflags = BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE | BSDF_GLOSSY);
     BxDFType outflags;
-    Point2f sample {rng.UniformFloat(), rng.UniformFloat()};
+    Point2f sample {rng.Uniform<Float>(), rng.Uniform<Float>()};
     *f = bsdf->Sample_f(wo, wi, sample, pdf, inflags, &outflags);
 
     // double check bsdf->Pdf() gives us the same answer
@@ -328,8 +328,8 @@ void Gen_Sample_f(BSDF* bsdf, const Vector3f& wo, Vector3f* wi, Float* pdf,
 
 void Gen_CosHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi, Float* pdf,
                        Spectrum* f) {
-    float u1 = rng.UniformFloat();
-    float u2 = rng.UniformFloat();
+    float u1 = rng.Uniform<Float>();
+    float u2 = rng.Uniform<Float>();
     Vector3f wiL = CosineSampleHemisphere(Point2f(u1, u2));
     *wi = bsdf->LocalToWorld(wiL);
     float cosTheta = wiL.z;
@@ -340,8 +340,8 @@ void Gen_CosHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi, Float* pdf,
 
 void Gen_UniformHemisphere(BSDF* bsdf, const Vector3f& wo, Vector3f* wi,
                            Float* pdf, Spectrum* f) {
-    float u1 = rng.UniformFloat();
-    float u2 = rng.UniformFloat();
+    float u1 = rng.Uniform<Float>();
+    float u2 = rng.Uniform<Float>();
     Vector3f wiL = UniformSampleHemisphere(Point2f(u1, u2));
     *wi = bsdf->LocalToWorld(wiL);
     *pdf = UniformHemispherePdf();

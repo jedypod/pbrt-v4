@@ -43,13 +43,13 @@ RandomSampler::RandomSampler(int ns) : Sampler(ns) {}
 Float RandomSampler::Get1D() {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(currentPixelSampleIndex, samplesPerPixel);
-    return rng.UniformFloat();
+    return rng.Uniform<Float>();
 }
 
 Point2f RandomSampler::Get2D() {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(currentPixelSampleIndex, samplesPerPixel);
-    return {rng.UniformFloat(), rng.UniformFloat()};
+    return {rng.Uniform<Float>(), rng.Uniform<Float>()};
 }
 
 std::unique_ptr<Sampler> RandomSampler::Clone() {
@@ -80,7 +80,7 @@ absl::Span<const Float> RandomSampler::Get1DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(array1DOffset, sampleArray1D.size());
     for (int i = 0; i < n; ++i)
-        sampleArray1D[array1DOffset][i] = rng.UniformFloat();
+        sampleArray1D[array1DOffset][i] = rng.Uniform<Float>();
     return sampleArray1D[array1DOffset++];
 }
 
@@ -88,8 +88,8 @@ absl::Span<const Point2f> RandomSampler::Get2DArray(int n) {
     ProfilePhase _(Prof::GetSample);
     CHECK_LT(array2DOffset, sampleArray2D.size());
     for (int i = 0; i < n; ++i) {
-        sampleArray2D[array2DOffset][i].x = rng.UniformFloat();
-        sampleArray2D[array2DOffset][i].y = rng.UniformFloat();
+        sampleArray2D[array2DOffset][i].x = rng.Uniform<Float>();
+        sampleArray2D[array2DOffset][i].y = rng.Uniform<Float>();
     }
     return sampleArray2D[array2DOffset++];
 }
