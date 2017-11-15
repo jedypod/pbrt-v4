@@ -39,10 +39,12 @@
 #define PBRT_UTIL_ARGS_H
 
 #include <pbrt/core/pbrt.h>
-#include <pbrt/util/stringprint.h>
 
 #include <absl/strings/str_split.h>
+#include <absl/types/optional.h>
 #include <absl/types/span.h>
+#include <pbrt/util/stringprint.h>
+
 #include <cctype>
 #include <cstring>
 #include <functional>
@@ -103,6 +105,16 @@ bool initArg(const std::string &str, bool *ptr) {
         return true;
     } else if (normalize(str) == "true") {
         *ptr = true;
+        return true;
+    }
+    return false;
+}
+
+template <typename T>
+bool initArg(const std::string &str, absl::optional<T> *ptr) {
+    T value;
+    if (initArg(str, &value)) {
+        *ptr = value;
         return true;
     }
     return false;

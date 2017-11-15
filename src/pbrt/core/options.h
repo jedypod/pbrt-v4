@@ -54,7 +54,8 @@ struct Options {
     bool quickRender = false;
     bool quiet = false;
     bool cat = false, toPly = false;
-    char *imageFile = nullptr;
+    absl::optional<std::string> imageFile;
+    absl::optional<Bounds2f> cropWindow;
 };
 
 extern Options PbrtOptions;

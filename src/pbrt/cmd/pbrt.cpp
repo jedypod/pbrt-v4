@@ -34,6 +34,8 @@
 // main/pbrt.cpp*
 #include <pbrt/core/pbrt.h>
 
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_split.h>
 #include <glog/logging.h>
 #include <pbrt/core/api.h>
 #include <pbrt/core/error.h>
@@ -50,28 +52,29 @@ static void usage(const std::string &msg = {}) {
 
     fprintf(stderr, R"(usage: pbrt [<options>] <filename.pbrt...>
 Rendering options:
-  --help               Print this help text.
-  --texcachemb <num>   Texture cache size in MB.
-  --nthreads <num>     Use specified number of threads for rendering.
-  --outfile <filename> Write the final image to the given filename.
-  --quick              Automatically reduce a number of quality settings to
-                       render more quickly.
-  --quiet              Suppress all text output other than error messages.
+  --cropwindow <x0,x1,y0,y1> Specify an image crop window.
+  --help                     Print this help text.
+  --nthreads <num>           Use specified number of threads for rendering.
+  --outfile <filename>       Write the final image to the given filename.
+  --quick                    Automatically reduce a number of quality settings
+                             to render more quickly.
+  --quiet                    Suppress all text output other than error messages.
+  --texcachemb <num>         Texture cache size in MB.
 
 Logging options:
-  --logdir <dir>       Specify directory that log files should be written to.
-                       Default: system temp directory (e.g. $TMPDIR or /tmp).
-  --logtostderr        Print all logging messages to stderr.
-  --minloglevel <num>  Log messages at or above this level (0 -> INFO,
-                       1 -> WARNING, 2 -> ERROR, 3-> FATAL). Default: 0.
-  --v <verbosity>      Set VLOG verbosity.
+  --logdir <dir>             Specify directory to write log files to.
+                             Default: system temp dir (e.g. $TMPDIR or /tmp).
+  --logtostderr              Print all logging messages to stderr.
+  --minloglevel <num>        Log messages at or above this level (0 -> INFO,
+                             1 -> WARNING, 2 -> ERROR, 3-> FATAL). Default: 0.
+  --v <verbosity>            Set VLOG verbosity.
 
 Reformatting options:
-  --cat                Print a reformatted version of the input file(s) to
-                       standard output. Does not render an image.
-  --toply              Print a reformatted version of the input file(s) to
-                       standard output and convert all triangle meshes to
-                       PLY files. Does not render an image.
+  --cat                      Print a reformatted version of the input file(s) to
+                             standard output. Does not render an image.
+  --toply                    Print a reformatted version of the input file(s) to
+                             standard output and convert all triangle meshes to
+                             PLY files. Does not render an image.
 )");
 }
 
@@ -96,18 +99,35 @@ int main(int argc, char *argv[]) {
             exit(1);
         };
 
-        if (ParseArg(&argv, "nthreads", &options.nThreads, onError) ||
-            ParseArg(&argv, "texcachemb", &options.texCacheMB, onError) ||
-            ParseArg(&argv, "texreadms", &options.texReadMinMS, onError) ||
-            ParseArg(&argv, "minloglevel", &FLAGS_minloglevel, onError) ||
-            ParseArg(&argv, "v", &FLAGS_v, onError) ||
-            ParseArg(&argv, "outfile", &options.imageFile, onError) ||
-            ParseArg(&argv, "logdir", &FLAGS_log_dir, onError) ||
-            ParseArg(&argv, "quick", &options.quickRender, onError) ||
-            ParseArg(&argv, "quiet", &options.quiet, onError) ||
-            ParseArg(&argv, "cat", &options.cat, onError) ||
-            ParseArg(&argv, "toply", &options.toPly, onError) ||
-            ParseArg(&argv, "logtostderr", &FLAGS_logtostderr, onError)) {
+        std::string cropWindow;
+        if (ParseArg(&argv, "cropwindow", &cropWindow, onError)) {
+            std::vector<std::string> c = absl::StrSplit(cropWindow, ',');
+            if (c.size() != 4) {
+                usage();
+                return 1;
+            }
+            float crop[2][2];
+            if (!absl::SimpleAtof(c[0], &crop[0][0]) ||
+                !absl::SimpleAtof(c[1], &crop[1][0]) ||
+                !absl::SimpleAtof(c[2], &crop[0][1]) ||
+                !absl::SimpleAtof(c[3], &crop[1][1])) {
+                usage();
+                return 1;
+            }
+            options.cropWindow = Bounds2f(Point2f(crop[0][0], crop[0][1]),
+                                          Point2f(crop[1][0], crop[1][1]));
+        } else if (ParseArg(&argv, "cat", &options.cat, onError) ||
+                   ParseArg(&argv, "logdir", &FLAGS_log_dir, onError) ||
+                   ParseArg(&argv, "logtostderr", &FLAGS_logtostderr, onError) ||
+                   ParseArg(&argv, "minloglevel", &FLAGS_minloglevel, onError) ||
+                   ParseArg(&argv, "nthreads", &options.nThreads, onError) ||
+                   ParseArg(&argv, "outfile", &options.imageFile, onError) ||
+                   ParseArg(&argv, "quick", &options.quickRender, onError) ||
+                   ParseArg(&argv, "quiet", &options.quiet, onError) ||
+                   ParseArg(&argv, "texcachemb", &options.texCacheMB, onError) ||
+                   ParseArg(&argv, "texreadms", &options.texReadMinMS, onError) ||
+                   ParseArg(&argv, "toply", &options.toPly, onError) ||
+                   ParseArg(&argv, "v", &FLAGS_v, onError)) {
             // success
         } else if (!strcmp(*argv, "--help") || !strcmp(*argv, "-help") ||
                    !strcmp(*argv, "-h")) {

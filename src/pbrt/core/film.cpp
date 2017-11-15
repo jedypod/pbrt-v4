@@ -235,35 +235,40 @@ Image Film::GetVarianceImage(const Image &spectralImage) {
 }
 
 std::unique_ptr<Film> CreateFilm(const ParamSet &params, std::unique_ptr<Filter> filter) {
-    // Intentionally use GetOneString() rather than GetOneFilename() here
-    // so that the rendered image is left in the working directory, rather
-    // than the directory the scene file lives in.
     std::string filename = params.GetOneString("filename", "");
-    if (PbrtOptions.imageFile != nullptr && std::string(PbrtOptions.imageFile) != "") {
-        if (filename != "") {
+    if (PbrtOptions.imageFile) {
+        if (filename != "")
             Warning(
-                "Output filename supplied on command line, \"%s\", ignored "
-                "due to filename provided in scene description file, \"%s\".",
-                PbrtOptions.imageFile, filename.c_str());
-        } else
-            filename = PbrtOptions.imageFile;
-    }
-    if (filename == "") filename = "pbrt.exr";
+                "Output filename supplied on command line, \"%s\" will override "
+                "filename provided in scene description file, \"%s\".",
+                PbrtOptions.imageFile->c_str(), filename.c_str());
+        filename = *PbrtOptions.imageFile;
+    } else if (filename == "")
+        filename = "pbrt.exr";
 
     int xres = params.GetOneInt("xresolution", 1280);
     int yres = params.GetOneInt("yresolution", 720);
     if (PbrtOptions.quickRender) xres = std::max(1, xres / 4);
     if (PbrtOptions.quickRender) yres = std::max(1, yres / 4);
+
     Bounds2f crop(Point2f(0, 0), Point2f(1, 1));
     absl::Span<const Float> cr = params.GetFloatArray("cropwindow");
-    if (!cr.empty() && cr.size() == 4) {
-        crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
-        crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
-        crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
-        crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
-    } else if (!cr.empty())
-        Error("%d values supplied for \"cropwindow\". Expected 4.",
-              (int)cr.size());
+    if (PbrtOptions.cropWindow) {
+        crop = *PbrtOptions.cropWindow;
+        if (!cr.empty())
+            Warning("Crop window supplied on command line will override "
+                    "crop window specified with Film.");
+    } else if (!cr.empty()) {
+        if (cr.size() == 4) {
+            crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
+            crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
+            crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
+            crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
+        }
+        else
+            Error("%d values supplied for \"cropwindow\". Expected 4.",
+                  (int)cr.size());
+    }
 
     Float scale = params.GetOneFloat("scale", 1.);
     Float diagonal = params.GetOneFloat("diagonal", 35.);
