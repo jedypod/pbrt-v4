@@ -67,3 +67,45 @@ TEST(RNG, OperatorMinus) {
         EXPECT_EQ(0, rb - ra);
     }
 }
+
+TEST(RNG, Int) {
+    RNG rng;
+    int positive = 0, negative = 0, zero = 0;
+    int count = 10000;
+    for (int i = 0; i < count; ++i) {
+        int v = rng.Uniform<int>();
+        if (v < 0) ++negative;
+        else if (v == 0) ++zero;
+        else ++positive;
+    }
+
+    EXPECT_GT(positive, .48 * count);
+    EXPECT_LT(positive, .52 * count);
+    EXPECT_GT(negative, .48 * count);
+    EXPECT_LT(negative, .52 * count);
+    EXPECT_LT(zero, .001 * count);
+}
+
+TEST(RNG, Uint64) {
+    RNG rng;
+    std::array<int, 64> bitCounts = { 0 };
+    int count = 10000;
+    for (int i = 0; i < count; ++i) {
+        uint64_t v = rng.Uniform<uint64_t>();
+        for (int b = 0; b < 64; ++b)
+            if (v & (1ull << b)) ++bitCounts[b];
+    }
+
+    for (int b = 0; b < 64; ++b) {
+        EXPECT_GT(bitCounts[b], .48 * count);
+        EXPECT_LT(bitCounts[b], .52 * count);
+    }
+}
+
+TEST(RNG, Double) {
+    RNG rng;
+    for (int i = 0; i < 10; ++i) {
+        double v = rng.Uniform<double>();
+        EXPECT_NE(v, float(v));
+    }
+}
