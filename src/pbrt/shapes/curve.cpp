@@ -183,26 +183,24 @@ bool Curve::Intersect(const Ray &r, Float *tHit, SurfaceInteraction *isect) cons
     // careful orientation of the ray coordinate ysstem above.
     Float maxWidth = std::max(Lerp(uMin, common->width[0], common->width[1]),
                               Lerp(uMax, common->width[0], common->width[1]));
-    if (std::max(std::max(cp[0].y, cp[1].y), std::max(cp[2].y, cp[3].y)) +
+    if (std::max({cp[0].y, cp[1].y, cp[2].y, cp[3].y}) +
             0.5f * maxWidth < 0 ||
-        std::min(std::min(cp[0].y, cp[1].y), std::min(cp[2].y, cp[3].y)) -
+        std::min({cp[0].y, cp[1].y, cp[2].y, cp[3].y}) -
             0.5f * maxWidth > 0)
         return false;
 
     // Check for non-overlap in x.
-    if (std::max(std::max(cp[0].x, cp[1].x), std::max(cp[2].x, cp[3].x)) +
+    if (std::max({cp[0].x, cp[1].x, cp[2].x, cp[3].x}) +
             0.5f * maxWidth < 0 ||
-        std::min(std::min(cp[0].x, cp[1].x), std::min(cp[2].x, cp[3].x)) -
+        std::min({cp[0].x, cp[1].x, cp[2].x, cp[3].x}) -
             0.5f * maxWidth > 0)
         return false;
 
     // Check for non-overlap in z.
     Float rayLength = Length(ray.d);
     Float zMax = rayLength * ray.tMax;
-    if (std::max(std::max(cp[0].z, cp[1].z), std::max(cp[2].z, cp[3].z)) +
-            0.5f * maxWidth < 0 ||
-        std::min(std::min(cp[0].z, cp[1].z), std::min(cp[2].z, cp[3].z)) -
-            0.5f * maxWidth > zMax)
+    if (std::max({cp[0].z, cp[1].z, cp[2].z, cp[3].z}) + 0.5f * maxWidth < 0 ||
+        std::min({cp[0].z, cp[1].z, cp[2].z, cp[3].z}) - 0.5f * maxWidth > zMax)
         return false;
 
     // Compute refinement depth for curve, _maxDepth_
@@ -258,28 +256,22 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
 
             // As above, check y first, since it most commonly lets us exit
             // out early.
-            if (std::max(std::max(cps[0].y, cps[1].y),
-                         std::max(cps[2].y, cps[3].y)) +
+            if (std::max({cps[0].y, cps[1].y, cps[2].y, cps[3].y}) +
                         0.5 * maxWidth < 0 ||
-                std::min(std::min(cps[0].y, cps[1].y),
-                         std::min(cps[2].y, cps[3].y)) -
+                std::min({cps[0].y, cps[1].y, cps[2].y, cps[3].y}) -
                         0.5 * maxWidth > 0)
                 continue;
 
-            if (std::max(std::max(cps[0].x, cps[1].x),
-                         std::max(cps[2].x, cps[3].x)) +
+            if (std::max({cps[0].x, cps[1].x, cps[2].x, cps[3].x}) +
                         0.5 * maxWidth < 0 ||
-                std::min(std::min(cps[0].x, cps[1].x),
-                         std::min(cps[2].x, cps[3].x)) -
+                std::min({cps[0].x, cps[1].x, cps[2].x, cps[3].x}) -
                         0.5 * maxWidth > 0)
                 continue;
 
             Float zMax = rayLength * ray.tMax;
-            if (std::max(std::max(cps[0].z, cps[1].z),
-                         std::max(cps[2].z, cps[3].z)) +
+            if (std::max({cps[0].z, cps[1].z, cps[2].z, cps[3].z}) +
                         0.5 * maxWidth < 0 ||
-                std::min(std::min(cps[0].z, cps[1].z),
-                         std::min(cps[2].z, cps[3].z)) -
+                std::min({cps[0].z, cps[1].z, cps[2].z, cps[3].z}) -
                         0.5 * maxWidth > zMax)
                 continue;
 

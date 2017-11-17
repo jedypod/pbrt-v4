@@ -244,8 +244,8 @@ T MIPMap::Lookup(const Point2f &st, Float width) const {
 template <typename T>
 T MIPMap::Lookup(const Point2f &st, Vector2f dst0, Vector2f dst1) const {
     if (options.filter != FilterFunction::EWA) {
-        Float width = std::max(std::max(std::abs(dst0[0]), std::abs(dst0[1])),
-                               std::max(std::abs(dst1[0]), std::abs(dst1[1])));
+        Float width = std::max({std::abs(dst0[0]), std::abs(dst0[1]),
+                                std::abs(dst1[0]), std::abs(dst1[1])});
         return Lookup<T>(st, 2 * width);
     }
     ++nEWALookups;

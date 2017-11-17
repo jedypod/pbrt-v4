@@ -346,12 +346,12 @@ inline auto operator*(U s, const Tuple3<C, T> &v) -> C<decltype(T{} * U{})> {
 
 template <template<class> class C, typename T>
 inline T MinComponent(const Tuple3<C, T> &v) {
-    return std::min(v.x, std::min(v.y, v.z));
+    return std::min({v.x, v.y, v.z});
 }
 
 template <template<class> class C, typename T>
 inline T MaxComponent(const Tuple3<C, T> &v) {
-    return std::max(v.x, std::max(v.y, v.z));
+    return std::max({v.x, v.y, v.z});
 }
 
 template <template<class> class C, typename T>

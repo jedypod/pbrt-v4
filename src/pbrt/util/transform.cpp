@@ -358,10 +358,8 @@ class Interval {
         return Interval(low - i.high, high - i.low);
     }
     Interval operator*(const Interval &i) const {
-        return Interval(std::min(std::min(low * i.low, high * i.low),
-                                 std::min(low * i.high, high * i.high)),
-                        std::max(std::max(low * i.low, high * i.low),
-                                 std::max(low * i.high, high * i.high)));
+        return Interval(std::min({low * i.low, high * i.low, low * i.high, high * i.high}),
+                        std::max({low * i.low, high * i.low, low * i.high, high * i.high}));
     }
     Float low, high;
 };

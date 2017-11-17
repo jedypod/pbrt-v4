@@ -119,10 +119,8 @@ class EFloat {
         Float prod[4] = {
             LowerBound() * ef.LowerBound(), UpperBound() * ef.LowerBound(),
             LowerBound() * ef.UpperBound(), UpperBound() * ef.UpperBound()};
-        r.low = NextFloatDown(
-            std::min(std::min(prod[0], prod[1]), std::min(prod[2], prod[3])));
-        r.high = NextFloatUp(
-            std::max(std::max(prod[0], prod[1]), std::max(prod[2], prod[3])));
+        r.low = NextFloatDown(std::min({prod[0], prod[1], prod[2], prod[3]}));
+        r.high = NextFloatUp(std::max({prod[0], prod[1], prod[2], prod[3]}));
         r.Check();
         return r;
     }
@@ -141,10 +139,8 @@ class EFloat {
             Float div[4] = {
                 LowerBound() / ef.LowerBound(), UpperBound() / ef.LowerBound(),
                 LowerBound() / ef.UpperBound(), UpperBound() / ef.UpperBound()};
-            r.low = NextFloatDown(
-                std::min(std::min(div[0], div[1]), std::min(div[2], div[3])));
-            r.high = NextFloatUp(
-                std::max(std::max(div[0], div[1]), std::max(div[2], div[3])));
+            r.low = NextFloatDown(std::min({div[0], div[1], div[2], div[3]}));
+            r.high = NextFloatUp(std::max({div[0], div[1], div[2], div[3]}));
         }
         r.Check();
         return r;
