@@ -278,8 +278,6 @@ bool Curve::recursiveIntersect(const Ray &ray, Float *tHit,
             if (std::max(std::max(cps[0].z, cps[1].z),
                          std::max(cps[2].z, cps[3].z)) +
                         0.5 * maxWidth < 0 ||
-                        0.5 * maxWidth <
-                    0 ||
                 std::min(std::min(cps[0].z, cps[1].z),
                          std::min(cps[2].z, cps[3].z)) -
                         0.5 * maxWidth > zMax)
