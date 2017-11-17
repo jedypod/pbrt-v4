@@ -35,6 +35,9 @@
 #include <pbrt/util/memory.h>
 
 #include <stdlib.h>
+#ifdef PBRT_HAVE_MALLOC_H
+#include <malloc.h>  // for both memalign and _aligned_malloc
+#endif
 
 namespace pbrt {
 

@@ -42,18 +42,16 @@
 #include <pbrt/core/pbrt.h>
 
 #include <pbrt/util/math.h>
+
 #include <absl/types/span.h>
+#include <glog/logging.h>
 
 #include <cstddef>
 #include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
-#include <utility>
-
-#ifdef PBRT_HAVE_MALLOC_H
-#include <malloc.h>  // for memalign
-#endif
+#include <vector>
 
 namespace pbrt {
 
@@ -83,13 +81,11 @@ MemoryArena {
         DCHECK(IsPowerOf2(align));
 
         size_t nAlloc = nRequested + align - 1;
-        if (currentBlockPos + nAlloc > currentAllocSize) {
+        if (currentBlockPos + nAlloc > currentBlock.size) {
             // Add current block to _usedBlocks_ list
-            if (currentBlock) {
-                usedBlocks.push_back(
-                    std::make_pair(currentAllocSize, std::move(currentBlock)));
-                currentBlock = nullptr;
-                currentAllocSize = 0;
+            if (currentBlock.size) {
+                usedBlocks.push_back(std::move(currentBlock));
+                currentBlock = {};
             }
 
             // Get new block of memory for _MemoryArena_
@@ -97,20 +93,18 @@ MemoryArena {
             // Try to get memory block from _availableBlocks_
             for (auto iter = availableBlocks.begin();
                  iter != availableBlocks.end(); ++iter) {
-                if (nAlloc <= iter->first) {
-                    currentAllocSize = iter->first;
-                    currentBlock = std::move(iter->second);
+                if (nAlloc <= iter->size) {
+                    currentBlock = std::move(*iter);
                     availableBlocks.erase(iter);
-                    break;
+                    goto success;
                 }
             }
-            if (!currentBlock) {
-                currentAllocSize = std::max(nAlloc, blockSize);
-                currentBlock = std::make_unique<char[]>(currentAllocSize);
-            }
+            currentBlock = MemoryBlock(std::max(nAlloc, blockSize));
+        success:
             currentBlockPos = 0;
         }
-        void *start = currentBlock.get() + currentBlockPos;
+
+        void *start = currentBlock.ptr.get() + currentBlockPos;
         currentBlockPos += nAlloc;
         void *ptr = std::align(align, nRequested, start, nAlloc);
         CHECK_NOTNULL(ptr);
@@ -132,20 +126,26 @@ MemoryArena {
         availableBlocks.splice(availableBlocks.begin(), usedBlocks);
     }
     size_t TotalAllocated() const {
-        size_t total = currentAllocSize;
-        for (const auto &alloc : usedBlocks) total += alloc.first;
-        for (const auto &alloc : availableBlocks) total += alloc.first;
+        size_t total = currentBlock.size;
+        for (const auto &alloc : usedBlocks) total += alloc.size;
+        for (const auto &alloc : availableBlocks) total += alloc.size;
         return total;
     }
 
   private:
-    MemoryArena(const MemoryArena &) = delete;
-    MemoryArena &operator=(const MemoryArena &) = delete;
+    struct MemoryBlock {
+        MemoryBlock() = default;
+        explicit MemoryBlock(size_t size)
+          : ptr(new char[size]), size(size) {}
+        std::unique_ptr<char[]> ptr;
+        size_t size = 0;
+    };
+
     // MemoryArena Private Data
     const size_t blockSize;
-    size_t currentBlockPos = 0, currentAllocSize = 0;
-    std::unique_ptr<char[]> currentBlock;
-    std::list<std::pair<size_t, std::unique_ptr<char[]>>> usedBlocks, availableBlocks;
+    MemoryBlock currentBlock;
+    size_t currentBlockPos = 0;
+    std::list<MemoryBlock> usedBlocks, availableBlocks;
 };
 
 // Pool of up to a limited number of allocated objects of type T so that they can be
@@ -156,8 +156,6 @@ template <typename T> class MemoryPool {
        : reset(std::move(reset)), maxAlloc(maxAlloc) {}
     ~MemoryPool() {
         CHECK_EQ(nAllocs, pool.size());  // Otherwise they haven't all been returned.
-        for (T *ptr : pool)
-            delete ptr;
     }
 
     T *Alloc() {
@@ -170,7 +168,7 @@ template <typename T> class MemoryPool {
             return new T;
         }
 
-        T *ptr = pool.back();
+        T *ptr = pool.back().release();
         pool.pop_back();
         if (reset) reset(ptr);
         return ptr;
@@ -180,14 +178,16 @@ template <typename T> class MemoryPool {
         std::lock_guard<std::mutex> lock(mutex);
 #ifndef NDEBUG
         // Check for double-free.
-        for (T *other : pool)
-            CHECK_NE(ptr, other);
+        DCHECK(std::find_if(pool.begin(), pool.end(),
+                            [ptr](std::unique_ptr<T> &p) {
+                                return ptr == p.get();
+                            }) == pool.end());
 #endif  // !NDEBUG
 
         if (pool.size() == maxAlloc)
             delete ptr;
         else
-            pool.push_back(ptr);
+            pool.push_back(std::unique_ptr<T>(ptr));
     }
 
  private:
@@ -196,7 +196,7 @@ template <typename T> class MemoryPool {
     // returned by Alloc() so that they can be restored to a default state.
     std::function<void(T *)> reset;
     const int maxAlloc;
-    std::vector<T *> pool;
+    std::vector<std::unique_ptr<T>> pool;
     std::mutex mutex;
 };
 
