@@ -66,23 +66,15 @@ class AtomicFloat {
         return v;
     }
     void Add(Float v) {
-#ifdef PBRT_FLOAT_AS_DOUBLE
-        uint64_t oldBits = bits, newBits;
-#else
-        uint32_t oldBits = bits, newBits;
-#endif
+        FloatBits oldBits = bits, newBits;
         do {
             newBits = FloatToBits(BitsToFloat(oldBits) + v);
         } while (!bits.compare_exchange_weak(oldBits, newBits));
     }
 
   private:
-// AtomicFloat Private Data
-#ifdef PBRT_FLOAT_AS_DOUBLE
-    std::atomic<uint64_t> bits;
-#else
-    std::atomic<uint32_t> bits;
-#endif
+    // AtomicFloat Private Data
+    std::atomic<FloatBits> bits;
 };
 
 void ParallelFor(int64_t start, int64_t end, int chunkSize,

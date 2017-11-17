@@ -128,12 +128,18 @@ class LightDistribution;
 class FixedLightDistribution;
 class Distribution1D;
 class Distribution2D;
+
 //#define PBRT_FLOAT_AS_DOUBLE
 #ifdef PBRT_FLOAT_AS_DOUBLE
 using Float = double;
+using FloatBits = uint64_t;
 #else
 using Float = float;
+using FloatBits = uint32_t;
 #endif  // PBRT_FLOAT_AS_DOUBLE
+static_assert(sizeof(Float) == sizeof(FloatBits),
+              "Float and FloatBits must have the same size");
+
 class RNG;
 class ProgressReporter;
 class MemoryArena;
