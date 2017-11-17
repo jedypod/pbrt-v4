@@ -34,10 +34,13 @@
 // core/parallel.cpp*
 #include <pbrt/util/parallel.h>
 
-#include <pbrt/util/memory.h>
+#include <pbrt/util/bounds.h>
 #include <pbrt/util/stats.h>
 
 #include <absl/synchronization/barrier.h>
+#include <glog/logging.h>
+
+#include <condition_variable>
 #include <list>
 #include <thread>
 #include <vector>
@@ -46,50 +49,130 @@ namespace pbrt {
 
 class ParallelJob {
   public:
-    static void StartThreads(int nThreads);
-    static void TerminateThreads();
-
     virtual ~ParallelJob() { DCHECK(removed); }
 
-    std::unique_lock<std::mutex> AddToJobList();
     // *lock should be locked going in and and unlocked coming out.
     virtual void RunStep(std::unique_lock<std::mutex> *lock) = 0;
-
     virtual bool HaveWork() const = 0;
+
     bool Finished() const { return !HaveWork() && activeWorkers == 0; }
-    static size_t NumThreads() { return threads.size(); }
-
-    static void DoWork(std::unique_lock<std::mutex> &lock);
-
-protected:
-    void RemoveFromJobList();
 
 private:
-    static void workerFunc(int tIndex, absl::Barrier *barrier);
-
-    static ParallelJob *jobList;
-    // Protects jobList
-    static std::mutex jobListMutex;
-    // Signaled both when a new job is added to the list and when a job has
-    // finished.
-    static std::condition_variable jobListCondition;
-
-    static std::vector<std::thread> threads;
-    static bool shutdownThreads;
+    friend class ThreadPool;
 
     ParallelJob *prev = nullptr, *next = nullptr;
     int activeWorkers = 0;
     bool removed = false;
 };
 
-ParallelJob *ParallelJob::jobList = nullptr;
-std::mutex ParallelJob::jobListMutex;
-std::condition_variable ParallelJob::jobListCondition;
+class ThreadPool {
+  public:
+    ThreadPool(int nThreads);
+    ~ThreadPool();
 
-std::vector<std::thread> ParallelJob::threads;
-bool ParallelJob::shutdownThreads = false;
+    size_t size() const { return threads.size(); }
 
-void ParallelJob::DoWork(std::unique_lock<std::mutex> &lock) {
+    std::unique_lock<std::mutex> AddToJobList(ParallelJob *job);
+    void RemoveFromJobList(ParallelJob *job);
+
+    void WorkOrWait(std::unique_lock<std::mutex> &lock);
+
+    void ForEachWorkerThread(std::function<void(void)> func);
+
+  private:
+    void workerFunc(int tIndex, absl::Barrier *barrier);
+
+    ParallelJob *jobList = nullptr;
+    // Protects jobList
+    std::mutex jobListMutex;
+    // Signaled both when a new job is added to the list and when a job has
+    // finished.
+    std::condition_variable jobListCondition;
+
+    std::vector<std::thread> threads;
+    bool shutdownThreads = false;
+};
+
+thread_local int ThreadIndex;
+
+static std::unique_ptr<ThreadPool> threadPool;
+static bool maxThreadIndexCalled = false;
+
+ThreadPool::ThreadPool(int nThreads) {
+    ThreadIndex = 0;
+
+    // Create a barrier so that we can be sure all worker threads get past
+    // their call to ProfilerWorkerThreadInit() before we return from this
+    // function.  In turn, we can be sure that the profiling system isn't
+    // started until after all worker threads have done that.
+    absl::Barrier *barrier = new absl::Barrier(nThreads);
+
+    // Launch one fewer worker thread than the total number we want doing
+    // work, since the main thread helps out, too.
+    for (int i = 0; i < nThreads - 1; ++i)
+        threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1,
+                                      barrier));
+
+    if (barrier->Block()) delete barrier;
+}
+
+ThreadPool::~ThreadPool() {
+    if (threads.empty()) return;
+
+    {
+        std::lock_guard<std::mutex> lock(jobListMutex);
+        shutdownThreads = true;
+        jobListCondition.notify_all();
+    }
+
+    for (std::thread &thread : threads) thread.join();
+}
+
+std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
+    std::unique_lock<std::mutex> lock(jobListMutex);
+    if (jobList) jobList->prev = job;
+    job->next = jobList;
+    jobList = job;
+    jobListCondition.notify_all();
+    return lock;
+}
+
+void ThreadPool::RemoveFromJobList(ParallelJob *job) {
+    DCHECK(!job->removed);
+
+    if (job->prev) {
+        job->prev->next = job->next;
+    } else {
+        DCHECK(jobList == job);
+        jobList = job->next;
+    }
+    if (job->next)
+        job->next->prev = job->prev;
+
+    job->removed = true;
+}
+
+void ThreadPool::workerFunc(int tIndex, absl::Barrier *barrier) {
+    LOG(INFO) << "Started execution in worker thread " << tIndex;
+    ThreadIndex = tIndex;
+
+    // Give the profiler a chance to do per-thread initialization for
+    // the worker thread before the profiling system actually stops running.
+    ProfilerWorkerThreadInit();
+
+    // The main thread sets up a barrier so that it can be sure that all
+    // workers have called ProfilerWorkerThreadInit() before it continues
+    // (and actually starts the profiling system).
+    if (barrier->Block()) delete barrier;
+
+    std::unique_lock<std::mutex> lock(jobListMutex);
+    while (!shutdownThreads)
+        WorkOrWait(lock);
+
+    LOG(INFO) << "Exiting worker thread " << tIndex;
+}
+
+void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> &lock) {
     DCHECK(lock.owns_lock());
 
     ParallelJob *job = jobList;
@@ -97,8 +180,6 @@ void ParallelJob::DoWork(std::unique_lock<std::mutex> &lock) {
         job = job->next;
     if (job) {
         // Run a chunk of loop iterations for _loop_
-        CHECK(job->HaveWork());
-
         job->activeWorkers++;
 
         job->RunStep(&lock);
@@ -114,32 +195,21 @@ void ParallelJob::DoWork(std::unique_lock<std::mutex> &lock) {
     } else
         // Wait for something to change (new work, or this loop being
         // finished).
-        ParallelJob::jobListCondition.wait(lock);
+        jobListCondition.wait(lock);
 }
 
-std::unique_lock<std::mutex> ParallelJob::AddToJobList() {
-    if (threads.size() == 0 && MaxThreadIndex() > 1)
-        LOG(WARNING) << "Threads not launched; job will run serially";
+void ThreadPool::ForEachWorkerThread(std::function<void(void)> func) {
+    absl::Barrier *barrier = new absl::Barrier(threads.size());
 
-    std::unique_lock<std::mutex> lock(jobListMutex);
-    if (jobList) jobList->prev = this;
-    next = jobList;
-    jobList = this;
-    jobListCondition.notify_all();
-    return lock;
+    ParallelFor(0, threads.size(),
+                [barrier,&func](int64_t) {
+                    func();
+                    if (barrier->Block()) delete barrier;
+                });
 }
 
-void ParallelJob::RemoveFromJobList() {
-    if (prev) {
-        prev->next = next;
-    } else {
-        DCHECK(jobList == this);
-        jobList = next;
-    }
-    if (next)
-        next->prev = prev;
-    removed = true;
-}
+///////////////////////////////////////////////////////////////////////////
+// ParallelJob
 
 class ParallelForLoop1D : public ParallelJob {
   public:
@@ -194,7 +264,7 @@ void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
     nextIndex = indexEnd;
 
     if (!HaveWork())
-        RemoveFromJobList();
+        threadPool->RemoveFromJobList(this);
 
     lock->unlock();
 
@@ -221,7 +291,7 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     }
 
     if (!HaveWork())
-        RemoveFromJobList();
+        threadPool->RemoveFromJobList(this);
 
     lock->unlock();
 
@@ -234,26 +304,6 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     ProfilerState = oldState;
 }
 
-void ParallelJob::workerFunc(int tIndex, absl::Barrier *barrier) {
-    LOG(INFO) << "Started execution in worker thread " << tIndex;
-    ThreadIndex = tIndex;
-
-    // Give the profiler a chance to do per-thread initialization for
-    // the worker thread before the profiling system actually stops running.
-    ProfilerWorkerThreadInit();
-
-    // The main thread sets up a barrier so that it can be sure that all
-    // workers have called ProfilerWorkerThreadInit() before it continues
-    // (and actually starts the profiling system).
-    if (barrier->Block()) delete barrier;
-
-    std::unique_lock<std::mutex> lock(jobListMutex);
-    while (!shutdownThreads)
-        DoWork(lock);
-
-    LOG(INFO) << "Exiting worker thread " << tIndex;
-}
-
 void ParallelFor(int64_t start, int64_t end, int chunkSize,
                  std::function<void(int64_t, int64_t)> func) {
     if (end - start < chunkSize) {
@@ -264,14 +314,15 @@ void ParallelFor(int64_t start, int64_t end, int chunkSize,
     // Create and enqueue _ParallelJob_ for this loop
     ParallelForLoop1D loop(start, end, chunkSize, std::move(func),
                            CurrentProfilerState());
-    std::unique_lock<std::mutex> lock = loop.AddToJobList();
+    std::unique_lock<std::mutex> lock = threadPool->AddToJobList(&loop);
 
     // Help out with parallel loop iterations in the current thread
     while (!loop.Finished())
-        ParallelJob::DoWork(lock);
+        threadPool->WorkOrWait(lock);
 }
 
-void ParallelFor2D(const Bounds2i &extent, int chunkSize, std::function<void(Bounds2i)> func) {
+void ParallelFor2D(const Bounds2i &extent, int chunkSize,
+                   std::function<void(Bounds2i)> func) {
     if (extent.Empty())
         return;
 
@@ -282,84 +333,43 @@ void ParallelFor2D(const Bounds2i &extent, int chunkSize, std::function<void(Bou
 
     ParallelForLoop2D loop(extent, chunkSize, std::move(func),
                            CurrentProfilerState());
-    std::unique_lock<std::mutex> lock = loop.AddToJobList();
+    std::unique_lock<std::mutex> lock = threadPool->AddToJobList(&loop);
 
     // Help out with parallel loop iterations in the current thread
     while (!loop.Finished())
-        ParallelJob::DoWork(lock);
+        threadPool->WorkOrWait(lock);
 }
 
 ///////////////////////////////////////////////////////////////////////////
-
-thread_local int ThreadIndex;
-static bool parallelInitialized = false;
 
 int AvailableCores() {
     return std::max<int>(1, std::thread::hardware_concurrency());
 }
 
 int MaxThreadIndex() {
-    return parallelInitialized ? (1 + ParallelJob::NumThreads()) : 1;
+    maxThreadIndexCalled = true;
+    return threadPool ? (1 + threadPool->size()) : 1;
 }
 
 void ParallelInit(int nThreads) {
-    CHECK(!parallelInitialized);
-    parallelInitialized = true;
+    // This is risky: if the caller has allocated per-thread data
+    // structures before calling ParallelInit(), then we may end up having
+    // them accessed with a higher ThreadIndex than the caller expects.
+    CHECK(!maxThreadIndexCalled);
+
+    CHECK(!threadPool);
     if (nThreads <= 0)
         nThreads = AvailableCores();
-    ParallelJob::StartThreads(nThreads);
-}
-
-void ParallelJob::StartThreads(int nThreads) {
-    CHECK_EQ(threads.size(), 0);
-    ThreadIndex = 0;
-
-    // Create a barrier so that we can be sure all worker threads get past
-    // their call to ProfilerWorkerThreadInit() before we return from this
-    // function.  In turn, we can be sure that the profiling system isn't
-    // started until after all worker threads have done that.
-    absl::Barrier *barrier = new absl::Barrier(nThreads);
-
-    // Launch one fewer worker thread than the total number we want doing
-    // work, since the main thread helps out, too.
-    for (int i = 0; i < nThreads - 1; ++i)
-        threads.push_back(std::thread(workerFunc, i + 1, barrier));
-
-    if (barrier->Block()) delete barrier;
+    threadPool = std::make_unique<ThreadPool>(nThreads);
 }
 
 void ParallelCleanup() {
-    ParallelJob::TerminateThreads();
-    parallelInitialized = false;
-}
-
-void ParallelJob::TerminateThreads() {
-    if (threads.empty()) return;
-
-    {
-        std::lock_guard<std::mutex> lock(jobListMutex);
-        shutdownThreads = true;
-        jobListCondition.notify_all();
-    }
-
-    for (std::thread &thread : threads) thread.join();
-    threads.erase(threads.begin(), threads.end());
-    shutdownThreads = false;
+    threadPool.reset();
+    maxThreadIndexCalled = false;
 }
 
 void ForEachWorkerThread(std::function<void(void)> func) {
-    int nThreads = MaxThreadIndex();
-    absl::Barrier *barrier = new absl::Barrier(nThreads);
-
-    ParallelFor(0, nThreads,
-                [barrier,&func](int64_t) {
-                    func();
-                    if (barrier->Block()) delete barrier;
-                });
-}
-
-void MergeWorkerThreadStats() {
-    ForEachWorkerThread(ReportThreadStats);
+    threadPool->ForEachWorkerThread(std::move(func));
 }
 
 }  // namespace pbrt

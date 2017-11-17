@@ -43,12 +43,8 @@
 
 #include <pbrt/util/bounds.h>
 #include <pbrt/util/math.h>
-#include <pbrt/util/geometry.h>
-#include <pbrt/util/stats.h>
-#include <glog/logging.h>
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -96,24 +92,6 @@ inline void ParallelFor2D(const Bounds2i &extent,
     ParallelFor2D(extent, 1, std::move(func));
 }
 
-template <typename T, typename F, typename R> T
-ParallelReduce(int64_t start, int64_t end, int chunkSize, F func, R reduce) {
-    if (start == end) return T{};
-    if (end - start < chunkSize) {
-        return func(start, end);
-    } else {
-        std::mutex mutex;
-        T final;
-        ParallelFor(start, end, chunkSize,
-                    [&](int64_t start, int64_t end) {
-                        T result = func(start, end);
-                        std::lock_guard<std::mutex> lock(mutex);
-                        reduce(final, result);
-                    });
-        return final;
-    }
-}
-
 void ForEachWorkerThread(std::function<void(void)> func);
 
 extern thread_local int ThreadIndex;
@@ -123,7 +101,6 @@ int MaxThreadIndex();
 
 void ParallelInit(int nThreads = -1);
 void ParallelCleanup();
-void MergeWorkerThreadStats();
 
 }  // namespace pbrt
 

@@ -1582,8 +1582,9 @@ void pbrtWorldEnd() {
     ImageTexture<Float>::ClearCache();
     ImageTexture<Spectrum>::ClearCache();
 
-    MergeWorkerThreadStats();
+    ForEachWorkerThread(ReportThreadStats);
     ReportThreadStats();
+
     if (!PbrtOptions.quiet) {
         PrintStats(stdout);
         ReportProfilerResults(stdout);
