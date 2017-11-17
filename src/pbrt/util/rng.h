@@ -88,8 +88,6 @@ class RNG {
         }
     }
 
-    Float UniformFloat();
-
     template <typename Iterator>
     void Shuffle(Iterator begin, Iterator end) {
         for (Iterator it = end - 1; it > begin; --it)
