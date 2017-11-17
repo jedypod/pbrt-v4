@@ -387,7 +387,6 @@ FILE ( GLOB PBRT_SOURCE
   src/pbrt/util/*.cpp
 
   src/ext/gtest/gtest-all.cc
-  src/ext/gtest/gtest_main.cc
   src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
   src/ext/skymodel/ArHosekSkyModel.c

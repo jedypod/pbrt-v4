@@ -76,8 +76,6 @@ static Image GetImage(PixelFormat format, Point2i res) {
 // then, add it to a texture cache and verify that all texels in all
 // MIP levels exactly match the values in the original MIP chain.
 static void TestFormat(PixelFormat format) {
-    ParallelInit(8);
-
     std::unique_ptr<TextureCache> cache = std::make_unique<TextureCache>();
     Image image = GetImage(format, {129, 60});
 
@@ -113,7 +111,6 @@ static void TestFormat(PixelFormat format) {
             }
     }
     EXPECT_EQ(0, remove(filename));
-    ParallelCleanup();
 }
 
 TEST(Texcache, SY8) { TestFormat(PixelFormat::SY8); }
@@ -133,8 +130,6 @@ TEST(Texcache, RGB16) { TestFormat(PixelFormat::RGB16); }
 TEST(Texcache, RGB32) { TestFormat(PixelFormat::RGB32); }
 
 TEST(Texcache, ThreadInsanity) {
-    ParallelInit(8);
-
     // Create a bunch of images with random sizes and contents.
     std::vector<std::vector<Image>> images;
     std::vector<std::string> filenames;
@@ -180,6 +175,4 @@ TEST(Texcache, ThreadInsanity) {
         });
 
     for (const auto &fn : filenames) EXPECT_EQ(0, remove(fn.c_str()));
-
-    ParallelCleanup();
 }

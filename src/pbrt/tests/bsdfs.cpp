@@ -376,9 +376,6 @@ void TestBSDF(void (*createBSDF)(BSDF*, MemoryArena&),
               const char* description) {
     MemoryArena arena;
 
-    Options opt;
-    pbrtInit(opt);
-
     const int thetaRes = CHI2_THETA_RES;
     const int phiRes = CHI2_PHI_RES;
     const int sampleCount = CHI2_SAMPLECOUNT;
@@ -437,8 +434,6 @@ void TestBSDF(void (*createBSDF)(BSDF*, MemoryArena&),
 
     delete[] frequencies;
     delete[] expFrequencies;
-
-    pbrtCleanup();
 }
 
 void createLambertian(BSDF* bsdf, MemoryArena& arena) {

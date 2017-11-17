@@ -423,10 +423,6 @@ std::vector<TestIntegrator> GetIntegrators() {
 struct RenderTest : public testing::TestWithParam<TestIntegrator> {};
 
 TEST_P(RenderTest, RadianceMatches) {
-    Options options;
-    options.quiet = true;
-    pbrtInit(options);
-
     const TestIntegrator &tr = GetParam();
     tr.integrator->Render();
     CheckSceneAverage(inTestDir("test.exr"), tr.scene.expected);
@@ -435,8 +431,6 @@ TEST_P(RenderTest, RadianceMatches) {
     // must delete the Integrator here in order to make sure that its
     // destructor runs. (This is ugly and should be fixed in a better way.)
     delete tr.integrator;
-
-    pbrtCleanup();
 
     EXPECT_EQ(0, remove(inTestDir("test.exr").c_str()));
 }
