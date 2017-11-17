@@ -215,6 +215,10 @@ Image Film::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetSpectrum(pOffset, s);
 
     }
+
+    metadata->pixelBounds = croppedPixelBounds;
+    metadata->fullResolution = fullResolution;
+
     return image;
 }
 
