@@ -60,6 +60,11 @@ class LightDistribution {
     // Returns the PDF for sampling the light |light| at the point |p|.
     virtual Float Pdf(const Point3f &p, const Light *light) const = 0;
 
+    virtual void ReportContribution(const Point3f &p, const Light *light,
+                                    const Spectrum &) const {}
+
+    virtual void AfterWave() {}
+
  protected:
     LightDistribution(const Scene &scene) : scene(scene) {}
 
@@ -123,6 +128,23 @@ class UniformLightDistribution : public FixedLightDistribution {
 class PowerLightDistribution : public FixedLightDistribution {
   public:
     PowerLightDistribution(const Scene &scene);
+};
+
+class AdaptiveLightDistribution : public LightDistribution {
+  public:
+    AdaptiveLightDistribution(const Scene &scene);
+
+    const Light *Sample(const Point3f &p, Float u, Float *pdf) const;
+    Float Pdf(const Point3f &p, const Light *light) const;
+
+    void ReportContribution(const Point3f &p, const Light *light,
+                            const Spectrum &L) const;
+    void AfterWave();
+
+  private:
+    DynamicDistribution1D distrib;
+    mutable std::vector<Float> updatedProbabilities;
+    std::unordered_map<const Light *, size_t> lightToIndex;
 };
 
 // A spatially-varying light distribution that adjusts the probability of

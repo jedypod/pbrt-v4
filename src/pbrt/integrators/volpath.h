@@ -66,6 +66,8 @@ class VolPathIntegrator : public SamplerIntegrator {
     Spectrum Li(const RayDifferential &ray, Sampler &sampler,
                 MemoryArena &arena, int depth) const;
 
+    void AfterWave() { lightDistribution->AfterWave(); }
+
   private:
     // VolPathIntegrator Private Data
     const int maxDepth;

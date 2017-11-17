@@ -115,6 +115,8 @@ Spectrum EstimateLd(const Interaction &it, const Scene &scene,
         }
     }
 
+    lightDistrib.ReportContribution(it.p, light, Ld);
+
     // Sample BSDF with multiple importance sampling
     if (!IsDeltaLight(light->flags)) {
         Spectrum f;
@@ -275,6 +277,8 @@ void SamplerIntegrator::Render() {
         startWave = endWave;
         endWave = std::min(spp, endWave + waveDelta);
         waveDelta = std::min(2 * waveDelta, 64);
+
+        AfterWave();
 
         // Compute variance estimate
         VarianceEstimatorType aggregate;

@@ -66,6 +66,8 @@ std::unique_ptr<LightDistribution> CreateLightSampleDistribution(
         return std::make_unique<ExhaustiveLightDistribution>(scene);
     else if (name == "power")
         return std::make_unique<PowerLightDistribution>(scene);
+    else if (name == "adaptive")
+        return std::make_unique<AdaptiveLightDistribution>(scene);
     else if (name == "spatial")
         return std::make_unique<SpatialLightDistribution>(scene);
     else {
@@ -130,6 +132,99 @@ PowerLightDistribution::PowerLightDistribution(const Scene &scene)
     for (const auto &light : scene.lights)
         lightPower.push_back(light->Phi().y());
     distrib = std::make_unique<Distribution1D>(lightPower);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// AdaptiveLightDistribution
+
+AdaptiveLightDistribution::AdaptiveLightDistribution(const Scene &scene)
+    : LightDistribution(scene),
+      distrib(scene.lights.size()),
+      updatedProbabilities(scene.lights.size(), Float(0)) {
+#if 0
+    for (size_t i = 0; i < scene.lights.size(); ++i) {
+        lightToIndex[scene.lights[i].get()] = i;
+        // FIXME: could e.g. sample Li at center of scene bbox, or ... ?
+        distrib[i] = updatedProbabilities[i] = 1;
+    }
+#else
+    for (size_t i = 0; i < scene.lights.size(); ++i)
+        lightToIndex[scene.lights[i].get()] = i;
+
+    Bounds3f bounds = scene.WorldBound();
+    // Compute the sampling distribution. Sample a number of points inside
+    // voxelBounds using a 3D Halton sequence; at each one, sample each
+    // light source and compute a weight based on Li/pdf for the light's
+    // sample (ignoring visibility between the point in the voxel and the
+    // point on the light source) as an approximation to how much the light
+    // is likely to contribute to illumination in the voxel.
+    int nSamples = 128;
+    for (int i = 0; i < nSamples; ++i) {
+        Point3f po = bounds.Lerp(Point3f(
+            RadicalInverse(0, i), RadicalInverse(1, i), RadicalInverse(2, i)));
+        Interaction intr(po, Normal3f(), Vector3f(), Vector3f(1, 0, 0),
+                         0 /* time */, MediumInterface());
+
+        // Use the next two Halton dimensions to sample a point on the
+        // light source.
+        Point2f u(RadicalInverse(3, i), RadicalInverse(4, i));
+        for (size_t j = 0; j < scene.lights.size(); ++j) {
+            Float pdf;
+            Vector3f wi;
+            VisibilityTester vis;
+            Spectrum Li = scene.lights[j]->Sample_Li(intr, u, &wi, &pdf, &vis);
+            if (pdf > 0 && vis.Unoccluded(scene)) {
+                // Assume 50% lambertian surface...
+                updatedProbabilities[j] += .5 * Li.y() / (Pi * pdf);
+            }
+        }
+    }
+
+    // We don't want to leave any lights with a zero probability; it's
+    // possible that a light contributes to points in the voxel even though
+    // we didn't find such a point when sampling above.  Therefore, compute
+    // a minimum (small) weight and ensure that all lights are given at
+    // least the corresponding probability.
+    Float sumContrib =
+        std::accumulate(updatedProbabilities.begin(), updatedProbabilities.end(), Float(0));
+    Float avgContrib = sumContrib / (nSamples * updatedProbabilities.size());
+    Float minContrib = (avgContrib > 0) ? .001 * avgContrib : 1;
+    for (size_t i = 0; i < updatedProbabilities.size(); ++i)
+        distrib[i] = updatedProbabilities[i] =
+            std::max(updatedProbabilities[i], minContrib);
+#endif
+    distrib.UpdateAll();
+}
+
+const Light *AdaptiveLightDistribution::Sample(const Point3f &p, Float u,
+                                               Float *pdf) const {
+    int lightIndex = distrib.SampleDiscrete(u, pdf);
+    return scene.lights[lightIndex].get();
+}
+
+Float AdaptiveLightDistribution::Pdf(const Point3f &p,
+                                     const Light *light) const {
+    auto iter = lightToIndex.find(light);
+    CHECK(iter != lightToIndex.end());
+    return distrib.Pdf(iter->second);
+}
+
+void AdaptiveLightDistribution::ReportContribution(const Point3f &p,
+                                                   const Light *light,
+                                                   const Spectrum &L) const {
+    const Float gamma = .99;
+    auto iter = lightToIndex.find(light);
+    CHECK(iter != lightToIndex.end());
+    updatedProbabilities[iter->second] =
+        Lerp(gamma, L.y(), updatedProbabilities[iter->second]);
+}
+
+void AdaptiveLightDistribution::AfterWave() {
+    for (size_t i = 0; i < updatedProbabilities.size(); ++i) {
+        LOG(INFO) << "Light " << i << " prob " << updatedProbabilities[i];
+        distrib[i] = updatedProbabilities[i];
+    }
+    distrib.UpdateAll();
 }
 
 ///////////////////////////////////////////////////////////////////////////
