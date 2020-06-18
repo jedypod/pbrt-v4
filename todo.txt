@@ -1,0 +1,333 @@
+
+2020-v4
++ spectral rendering, better handling of color spaces
+  - 8-bit texture maps
++ materials
+  - modernized material system
+  - layered materials
+  - new wenzel measured brdf representation
+  - hair scattering model
++ volume sampling
+  - null scattering path integral
+  - octree
++ many light sampling
+- many MC sampling improvements: spot, proj, gonio lights, rough dielectric
+  - lots of building-block classes
+  - and inversion
+- sampling:
+   - pmj02bn
+   - blue noise stuff
+   - owen scrambling
+- precision improvements
+   - unified Interval
+- path tracing: reuse indirect ray for direct lighting MIS
+- moana optimizations: memory use
+- path regularization and clamping
+- filter importance sampling
+- pybind
+- aovs
+- bilinear patch primitive
+- warp product sampling
+- unit tests
++ GPU!
+
+---------------------
+
+Pre-backport:
+
+- the renderer slows down if tev isn't accepting updates...
+  this is in particular a problem for the last send before exiting..
+  linux has setsockopt SO_SNDTIMEO, but not osx?
+
+- Volume scattering 2.0
+  scattering-heterogeneous-medium is more noisy...
+  power heuristic?  Sqr(pdf[0]) / Sqr(pdf).Average ...
+  in ldsample lights: would be nice to embed this in the octree traversal,
+    get a callback for each sampled scattering event...
+  test scale in mediumFromWorld (old and new)
+  can we do a residual tracking sort of thing to make homogeneous less noisy?
+  RR
+  GridMedium: allow RGB density values?
+  try allowing emissive volumes
+    update sampling/weights so always include, not just at final absorption
+    don't forget simple volpath...
+  review simple volpath and spectral in the new world
+  GPU port
+  bidir (then nuke the old infrastructure...)
+
+- blp per-vertex normal interpolation is borked (cpu, sportscar windshield...)
+
+- GPU
+  - non-deterministic now??!?  fast_math related? new driver?
+  - villa borked with optix11?
+  - does FBMTexture still give a fatal cuda error?
+
+- other c++17 cleanups?
+  try switching out our pmr allocator
+
+- Anders: glossy floor...
+
+- audit optional<> Sampling calls; make sure if one is returned, it's legit
+  (i.e., non-zero value and pdf?) -> then can simplify use in integrators...
+
+- does coordsystransform "camera" actually work?
+
+- option to disable camera-world space rendering
+
+- RealisticCamera: ability to have image to define aperture?
+  (make sure works on GPU!)
+
+- Halton sampler stops getting better (quads scene, MSE measurement)
+
+- light sampler inconsistency with measure-one:
+  - measure-one/b.pbrt test scene
+  - doesn't repro with all-diffuse, doesn't repro with coated diffuse
+    turned into:
+        FresnelHandle fr = scratchBuffer.Alloc<FresnelDielectric>(1.5, true);
+        BxDFHandle lb = scratchBuffer.Alloc<MicrofacetReflectionBxDF>(distrib, fr);
+  - seems tied to a) coated diffuse and b) non-zero roughness
+    -> tied to rough dielectric transmission sampling issues?
+       debug that first before proceeding further
+
+- Interactive / progressive renderer
+  - splat scale for bdpt and mlt (tricky...)
+  - backport to v3
+
+- something is highly borked with rough dielectric interface transmission
+  - note have (commented-out) RoughDielectric tests
+  - f() seems to be returning transmission for directions that should be
+    zero (e.g. wi = wo just with z negated.). PDF also. Sample_f doesn't
+    sample those directions...
+
+- LayeredBxDF::PDF(): think about specular interfaces, also do all 3 sampling strategies
+  for TRT, etc...
+  - Digest that new paper on it
+
+- paper: constructing sobol sequences with better two-dimensional projections
+
+- GPU image diffs / bugs
+  - run through whole test suite on GPU
+  - debug build hits illegal memory access
+    stack overflow issue? inline Camera::GenerateRay()
+  - Measure one goes way different with one wavelength sample
+  - san miguel has 2 nan pixels (in some random AOV channel?)
+  - scattering hetergoneous volume has diffs between 3913201a and 824b361f
+    double check those two(!) ...and then figure out what happened
+    - related to something like the camera not having its medium set, etc?
+  - san miguel: some shadow difference vs CPU, e.g. on chairs...
+  - contemporary bathroom brighter between
+    f083595b74a787e3ac5cd75df77ed29fd5d5e376 (pre general scene rewrite)
+    e9594278c62a7580fd5327281a63923abefb6d6c (post general scene rewrite)
+  - Is there some memory leak as spp increases?
+  - Turning check into assert() (and not defining NDEBUG) hits assert in
+    measure one, frame52: cross product of two long vectors overflows
+  - subsurface
+    - env map light has artifacts (why do more bounces matter?)
+    - gpu subsurf spheres don't match cpu
+      -> try a flat plane scene
+
+- OptiX features
+  - support instancing of non-triangles...
+  - animated shapes
+  - wire up optix curves
+
+- GPU Perf
+  - no -march=native pass through -> FMA borkage in profiles?
+  - Is high max depth inefficient e.g. if all paths are dead but we still
+    keep launching kernels? 
+  - Chase down all of those complaints about unknown stack size
+  - Optix barfs if CHECK is allowed to call LOG_FATAL, like CPU
+    and general GPU path gets noticeably slower
+  - nvprof would be nice but it just doesn't work
+    sudo env LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib ...
+    nsys profile
+  - clock() for rough ray tracing profiling
+  - aov is expensive (~30% of san miguel render time, 40% villa)
+    - would like to inline visiblesurface constructor, but hits nvcc 'unsupported operation'
+  - try sorting materials for GetBSDF pass
+  - can we inline more of the RGBSpectrum, sigmoid polynomial, etc, stuff?
+  - review/improve memory alignement
+  - look at brian c coalescing lib: trove (doesn't seem to help)
+  - Halton: look at int32 vs int64 performance
+  - compensated sum rather than double for film?
+  - should we use cudaResourceTypeLinear or Pitch2D for textures?
+  - is there any undesired host-reading of unified memory going on?
+    is there a way to test this automatically? 
+  - reduce memory used by for GPUPathIntegrator
+    - ~1/3 is SurfaceInteractions...
+
+build etc
+  - nvcc: -Xptxas="-v", cuobjdump --dump-resource-usage
+  - -Xnvlink --disable-warnings
+
+- unit test improvements
+  - camera transform (gets back to orig matrix)
+  - add tests for empty and infinite bounds (esp IntersectP, Union)
+  - add unit tests for pstd
+  - Add test to make sure that PermutationElement is fairly random even given
+    small changes to the seed. (How to measure?)
+  - add more simple volume scattering tests--verious light types, etc.
+    light in medium, light not in medium, camera in/out, etc.
+  - add tests that compare PBD subsurface scattering with fully path traced.
+  - add test with tricky rays: right at disk center, etc
+  - debug LinearDistribution2D tests
+  - double tests: make sure low order bits are fairly random
+
+- layering issues:
+util/transform.h:#include <pbrt/ray.h>
+util/octree_test.cpp:#include <pbrt/ray.h>
+util/transform.cpp:#include <pbrt/interaction.h>
+util/vecmath_test.cpp:#include <pbrt/shapes.h>
+
+- blp: do per-vertex uvs mess up area light sampling (esp inverse stuff for PDF?)
+
+- filament also has good explanation of sony multiscatter GGX and
+  precomputing tables...
+
+- help requests with initial release
+  - windows + cuda issues
+    better nested folders for msvc (SOURCE_GROUP for folders in msvc (cmake...))
+    - v3 has this already in its CMakeLists.txt
+    headers not showing up in msvc
+    hex float constants
+    msvc overrides:
+       /bigobj for cctest
+       compute_75,sm_75
+       (remove PBRT_HAVE_HEX_FP_CONSTANTS)
+    compile-time determination of compute level borked
+    weightedreservoir tests (x2) don't keep constexpr constexpr in lambda capture
+    infinity() in pstd numeric limits
+    gets PBRT_CRTP_USING_WORKAROUND wrong for the interval specializations {Vector,Point}3fi
+    some hex fp constants in samplers.cpp and cuda.cu
+  - update obj2pbrt for new materials
+  - do something with disney material with --upgrade
+  - cmake general style: switch to FindCUDAToolkit?
+  - pybind11
+  - update openexr 2.5.0
+  - update ptex, cf. its 5ccbd8c72f8ef07571958f7d4f7941cafe5da16b, modernize
+    cmake usage
+
+- https://www.slideshare.net/DanielPfeifer1/cmake-48475415 stuff...
+
+- so, uh, wavelength changes after refraction. what does this mean for how
+  spectrum samples are represented?  should it be wavelength???
+  this is tricky since we pass const SampledWavelengths & around...
+  - make lambda mutable, add a method Refract(Float eta) method?
+
+- wtf with point light at camera in measure one??
+
+- 900 MB of unreported memory with villa-sppm...
+
+- SeparableBSSRDFAdapter: review radiance scaling: should we be looking at
+  entering vs exiting? Or should we always be exiting???
+
+- ToString() method review
+
+- Does BDPT need an update for approximate BSDF PDFs?
+
+- look at in-sphere tests with sppm... -> totally borked, in all variations...
+
+- moana crashes: pbrt4 island.pbrt --logtostderr --debugstart 1239,292,446
+  Check failed: si->tHit < 1.001 * tMax (0 vs. 0) 0 vs 0
+
+- DigitPermutation always has (0,1) for permutation for all base==2 digits...
+
+- halton: we don't currently permute first two dimensions (pixel): we
+  should, so that seed is fully used, but need to update the inverse
+  computations to account for that...
+  - semi-related: go hammersley? makes inverse warping easier, thence can
+    permute... (how do we randomize the first dimensino of hammersly, though?)
+
+- want to be using a good progressive blue noise pattern for wavelengths
+  - heitz blue noise stuff
+
+- weird shadow difference on the side door on tt: it's that point light source
+  - first, why is that there?
+  - how come v3 comes out black with that light but v4 doesn't???
+
+- we lose ray differentials with alpha textures...
+  Primitive::Intersect takes a Ray and thence it's hopeless...
+
+- dndu isn't (0,0,0) for ribbon curves...
+
+- (unclamped) bdpt barcelona is much brighter than path. some
+  double-counting thing w.r.t. alpha/shadow alpha, ... ?
+  make a simpler test case, no trees, camera seeing inside better
+
+- figure out disk dpdv borkage
+
+- curve wiggly texture f3-18 bug is from c15c460a39e03d1cf3e04fdc8d9f65e4a2ce19e1 in v3
+
+- increase default integrator max depth? Increases need for good bdpt rr
+  solution though.
+  - all but bdpt?
+  
+- what does an alpha'ed out area light mean, anyway? not visible to eye,
+  visible to e.g. diffuse reflection, what about specular? glossy? for
+  specular, does it make a difference if there's a transparent plane
+  between the viewer and the light? why should it? consistency here is
+  tricky...
+  - seems like it breaks MIS; make a simple test scene with e.g. two
+    abutting quads
+
+- do we actually use tHit at this point? (for anything besides far hit culling)
+
+- BDPT: what do we want for path regularization?
+  - projection-bdpt got noisier... also spheres-env-bdpt
+    are we allowing ourselves to find paths e.g. from the eye that then
+    aren't properly mis weighted?
+
+- regularization
+  cylinder-disk got much noisier
+  also plume-volpath
+  and sportscar
+  sanmiguel has more fireflies  -> mostly near glass??!
+  (but e.g. kitchen and measure one are much better...)
+
+- chase down digital emily fireflies
+
+- scattering-sphere-diel is hitting check_rare (just barely though)
+  many times in transparent-machines/frame1266 (0.1%!)
+
+-----------
+
+v5
+
+- Modern / high performance subdivision + displacement engine?
+
+- is there a cleaner way to specify animated transforms?
+
+- allow overriding materials with object instances; just let
+  transformedprimiive have a material override?
+
+- are there similar things to the polar4 mapping for triangle, sphere,
+  other types of light sources that there's a general concept worth
+  supprorting here?
+
+--
+
+Precision
+
+- possible to repro the InnerProduct() transform bug with pbrt_test
+  reintersection stuff?
+  - in any case, should there try to have more rays coming in from very far
+    away...
+
+- add directed tests around Transform::operator() error propagation (of not
+  there already)
+
+- InnerProduct() in transform operator() gives great bounds, but some
+  reintersections--xform and inverse mismatch? See reverted commit
+  668995e37fde9780d19e2f... (Could be an exercise?)
+  - Look at this with moana...
+
+- look at arvo triangle sampling stuff. Use interval arithmetic?
+
+- exit pupil sampling: sample uniformly on the actual surface of the rear
+  lens element, not the back plane...
+  - parameterization?
+  - note that ray may isect lens before a sampled point: don't want to
+    incorrectly flag that point as in exit pupil if it's actually not visible...
+
+- https://blog.yiningkarlli.com/2019/05/nested-dielectrics.html
+

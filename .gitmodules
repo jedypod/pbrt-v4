@@ -1,0 +1,22 @@
+[submodule "src/ext/zlib"]
+	path = src/ext/zlib
+	url = https://github.com/mitsuba-renderer/zlib
+[submodule "src/ext/ptex"]
+	path = src/ext/ptex
+	url = https://github.com/wdas/ptex.git
+[submodule "src/ext/double-conversion"]
+	path = src/ext/double-conversion
+	url = https://github.com/google/double-conversion
+[submodule "src/ext/pybind11"]
+	path = src/ext/pybind11
+	url = https://github.com/pybind/pybind11
+[submodule "src/ext/stb"]
+	path = src/ext/stb
+	url = https://github.com/nothings/stb.git
+[submodule "src/ext/openexr"]
+	path = src/ext/openexr
+	url = https://github.com/mmp/openexr.git
+	branch = fix-cmake-subdir
+[submodule "src/ext/filesystem"]
+	path = src/ext/filesystem
+	url = https://github.com/wjakob/filesystem.git
