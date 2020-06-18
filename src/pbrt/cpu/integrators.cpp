@@ -228,15 +228,16 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
     // Generate camera ray for current sample
     pstd::optional<CameraRayDifferential> cameraRay =
         camera.GenerateRayDifferential(cameraSample, lambda);
-    // Double check that the ray's direction is normalized.
-    DCHECK_GT(Length(cameraRay->ray.d), .999f);
-    DCHECK_LT(Length(cameraRay->ray.d), 1.001f);
 
     SampledSpectrum L(0.);
     pstd::optional<VisibleSurface> visibleSurface;
     bool initializeVisibleSurface = camera.GetFilm().UsesVisibleSurface();
 
     if (cameraRay) {
+        // Double check that the ray's direction is normalized.
+        DCHECK_GT(Length(cameraRay->ray.d), .999f);
+        DCHECK_LT(Length(cameraRay->ray.d), 1.001f);
+
         Float rayDiffScale =
             std::max<Float>(.125, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
         if (!Options->disablePixelJitter)
@@ -1238,6 +1239,9 @@ SampledSpectrum VolPathIntegrator::Li(
 
             VLOG(2, "Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs->f, bs->pdf, beta);
 
+            // Avoid overflow...
+            rescale(beta, pdfUni, pdfNEE);
+
             DCHECK(std::isinf(beta.y(lambda)) == false);
             ++depth;
             specularBounce = bs->IsSpecular();
@@ -1317,6 +1321,9 @@ SampledSpectrum VolPathIntegrator::Li(
                 ray = RayDifferential(pi.SpawnRay(bs->wi));
             }
         }
+
+        if (!beta)
+            break;
 
         // Possibly terminate the path with Russian roulette
         // Factor out radiance scaling due to refraction in rrBeta.

@@ -368,7 +368,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            DCHECK_RARE(1e-5, Density(ray((t0 + t1) / 2)) > node.maxDensity);
+            DCHECK_RARE(1e-5, Density(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
 
             Float sigma_nt = sigma_t.MaxComponentValue() * node.maxDensity;
 

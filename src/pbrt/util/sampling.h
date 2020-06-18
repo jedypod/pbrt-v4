@@ -255,7 +255,7 @@ inline Float InvertSmoothStepSample(Float x, Float start, Float end) {
 PBRT_CPU_GPU
 inline Float SampleLinear(Float u, Float a, Float b) {
     DCHECK(a >= 0 && b >= 0);
-    if (a == b)
+    if (std::abs(a - b) / (a + b) < 1e-4f)
         return u;
     Float x = (a - std::sqrt(Lerp(u, Sqr(a), Sqr(b)))) / (a - b);
     return std::min(x, OneMinusEpsilon);
