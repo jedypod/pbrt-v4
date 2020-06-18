@@ -4,12 +4,15 @@ pbrt, Version 4 WIP (NVIDIA Internal)
 Getting started
 ---------------
 
-In order to check out all of pbrt's dependencies, make sure to use the
-`--recursive` flag when cloning the repository.
+pbrt uses both submodules and git's "large file storage". Therefore, when
+checking out pbrt:
 
-If you accidentally already cloned pbrt without this flag (or to update the
-pbrt source tree after a new submodule has been added, run the following
-command to also fetch the dependencies:
+* You must have `git lfs` installed on your system.
+* You should use the `--recursive` flag when cloning the repository.
+
+If you accidentally clone pbrt without using ``--recursive`` (or to update
+the pbrt source tree after a new submodule has been added, run the
+following command to also fetch the dependencies:
 ```bash
 $ git submodule update --init --recursive
 ```
