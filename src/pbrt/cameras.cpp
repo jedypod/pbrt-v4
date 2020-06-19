@@ -1479,7 +1479,6 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
                 image.SetChannel({x, y}, 0, windingNumber == 0 ? 0.f : 1.f);
             }
 
-        image.Write("foo.exr");
         return image;
     };
 
@@ -1497,9 +1496,14 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
                     Float r2 = Sqr(uv.x) + Sqr(uv.y);
                     Float sigma2 = 1;
                     Float v = std::max<Float>(0, std::exp(-r2 / sigma2) - std::exp(-1 / sigma2));
-                    v *= 2.5f; // roughly normalize
                     apertureImage->SetChannel({x, y}, 0, v);
                 }
+        } else if (apertureName == "square") {
+            apertureImage = Image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                                  nullptr, alloc);
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    apertureImage->SetChannel({x, y}, 0, 1.f);
         } else if (apertureName == "pentagon") {
             // https://mathworld.wolfram.com/RegularPentagon.html
             Float c1 = (std::sqrt(5.f) - 1) / 4;
@@ -1508,6 +1512,9 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
             Float s2 = std::sqrt(10.f - 2.f * std::sqrt(5.f)) / 4;
             // Vertices in CW order.
             Point2f vert[5] = { Point2f(0, 1), {s1, c1}, {s2, -c2}, {-s2, -c2}, {-s1, c1} };
+            // Scale down slightly
+            for (int i = 0; i < 5; ++i)
+                vert[i] *= .8f;
             apertureImage = rasterize(vert);
         } else if (apertureName == "star") {
             // 5-sided. Vertices are two pentagons--inner and outer radius
@@ -1544,11 +1551,27 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
                 }
             }
         }
+
+        if (apertureImage) {
+            // Normalize it so that brightness matches a circular aperture
+            Float sum = 0;
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    sum += apertureImage->GetChannel({x, y}, 0);
+            Float avg = sum / (apertureImage->Resolution().x *
+                               apertureImage->Resolution().y);
+
+            Float scale = (Pi / 4) / avg;
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    apertureImage->SetChannel({x, y}, 0,
+                                              apertureImage->GetChannel({x, y}, 0) * scale);
+        }
     }
 
     return alloc.new_object<RealisticCamera>(
         worldFromCamera, shutteropen, shutterclose, apertureDiameter, focusDistance,
-        dispersionFactor, *lensData, film, medium, apertureImage, alloc);
+        dispersionFactor, *lensData, film, medium, std::move(apertureImage), alloc);
 }
 
 }  // namespace pbrt
