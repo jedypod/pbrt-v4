@@ -19,6 +19,7 @@
 #include <pbrt/interaction.h>
 #include <pbrt/ray.h>
 #include <pbrt/samplers.h>
+#include <pbrt/util/image.h>
 #include <pbrt/util/scattering.h>
 
 #include <memory>
@@ -304,7 +305,7 @@ class RealisticCamera : public CameraBase {
     RealisticCamera(const CameraTransform &worldFromCamera, Float shutterOpen,
                     Float shutterClose, Float apertureDiameter, Float focusDistance,
                     Float dispersionFactor, std::vector<Float> &lensData, FilmHandle film,
-                    MediumHandle medium, Allocator alloc);
+                    MediumHandle medium, pstd::optional<Image> apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
                                    const CameraTransform &worldFromCamera,
@@ -358,6 +359,7 @@ class RealisticCamera : public CameraBase {
     Float dispersionFactor;
     pstd::vector<LensElementInterface> elementInterfaces;
     pstd::vector<Bounds2f> exitPupilBounds;
+    pstd::optional<Image> apertureImage;
 
     // RealisticCamera Private Methods
     PBRT_CPU_GPU
@@ -373,7 +375,7 @@ class RealisticCamera : public CameraBase {
     Float RearElementRadius() const { return elementInterfaces.back().apertureRadius; }
 
     PBRT_CPU_GPU
-    bool TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
+    Float TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
 
     PBRT_CPU_GPU
     static bool IntersectSphericalElement(Float radius, Float zCenter, const Ray &ray,

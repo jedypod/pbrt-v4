@@ -734,11 +734,13 @@ RealisticCamera::RealisticCamera(const CameraTransform &worldFromCamera,
                                  Float shutterOpen, Float shutterClose,
                                  Float apertureDiameter, Float focusDistance,
                                  Float dispersionFactor, std::vector<Float> &lensData,
-                                 FilmHandle film, MediumHandle medium, Allocator alloc)
+                                 FilmHandle film, MediumHandle medium,
+                                 pstd::optional<Image> apertureImage, Allocator alloc)
     : CameraBase(worldFromCamera, shutterOpen, shutterClose, film, medium),
       dispersionFactor(dispersionFactor),
       elementInterfaces(alloc),
-      exitPupilBounds(alloc) {
+      exitPupilBounds(alloc),
+      apertureImage(std::move(apertureImage)) {
     for (int i = 0; i < (int)lensData.size(); i += 4) {
         if (lensData[i] == 0) {
             if (apertureDiameter > lensData[i + 3]) {
@@ -817,7 +819,8 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
         SampleExitPupil(Point2f(pFilm.x, pFilm.y), sample.pLens, &exitPupilBoundsArea);
     Ray rFilm(pFilm, pRear - pFilm);
     Ray ray;
-    if (!TraceLensesFromFilm(rFilm, &ray, lambda[0])) {
+    Float weight = TraceLensesFromFilm(rFilm, &ray, lambda[0]);
+    if (weight == 0) {
         // CO            ++vignettedRays;
         return {};
     }
@@ -834,8 +837,8 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
     // Return weighting for _RealisticCamera_ ray
     Float cosTheta = Normalize(rFilm.d).z;
     Float cos4Theta = (cosTheta * cosTheta) * (cosTheta * cosTheta);
-    Float weight = (shutterClose - shutterOpen) * (cos4Theta * exitPupilBoundsArea) /
-                   (LensRearZ() * LensRearZ());
+    weight *= (shutterClose - shutterOpen) * (cos4Theta * exitPupilBoundsArea) /
+        (LensRearZ() * LensRearZ());
 
     return CameraRay{ray, SampledSpectrum(weight)};
 }
@@ -860,9 +863,11 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &le
             sinTheta * pLens.x + cosTheta * pLens.y, LensRearZ()};
 }
 
-bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
-                                          Float lambda) const {
+Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
+                                           Float lambda) const {
     Float elementZ = 0;
+    Float weight = 1;
+
     // Transform _rCamera_ from camera to lens system space
     Transform LensFromCamera = Scale(1, 1, -1);
     Ray rLens = LensFromCamera(rCamera);
@@ -892,9 +897,18 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
 
         // Test intersection point against element aperture
         Point3f pHit = rLens(t);
-        Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
-        if (r2 > element.apertureRadius * element.apertureRadius)
-            return false;
+        if (isStop && apertureImage) {
+            Point2f uv((pHit.x / element.apertureRadius + 1) / 2,
+                       (pHit.y / element.apertureRadius + 1) / 2);
+            uv.y = 1 - uv.y;
+            weight = apertureImage->BilerpChannel(uv, 0, WrapMode::Black);
+            if (weight == 0)
+                return 0;
+        } else {
+            Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
+            if (r2 > element.apertureRadius * element.apertureRadius)
+                return 0;
+        }
         rLens.o = pHit;
 
         // Update ray path for element interface interaction
@@ -911,7 +925,7 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
                 eta_t -= offset * dispersionFactor * .02;
             }
             if (!Refract(Normalize(-rLens.d), n, eta_t / eta_i, &w))
-                return false;
+                return 0;
             rLens.d = w;
         }
     }
@@ -920,7 +934,7 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
         const Transform LensToCamera = Scale(1, 1, -1);
         *rOut = LensToCamera(rLens);
     }
-    return true;
+    return weight;
 }
 
 bool RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const {
@@ -945,6 +959,7 @@ bool RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const 
         CHECK_GE(t, 0);
 
         // Test intersection point against element aperture
+        // Don't worry about the aperture image here.
         Point3f pHit = rLens(t);
         Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
         if (r2 > element.apertureRadius * element.apertureRadius)
@@ -1054,7 +1069,7 @@ void RealisticCamera::DrawRayPathFromFilm(const Ray &r, bool arrow,
     static const Transform LensFromCamera = Scale(1, 1, -1);
     Ray ray = LensFromCamera(r);
     printf("{ ");
-    if (!TraceLensesFromFilm(r, nullptr)) {
+    if (TraceLensesFromFilm(r, nullptr) == 0) {
         printf("Dashed, RGBColor[.8, .5, .5]");
     } else
         printf("RGBColor[.5, .5, .8]");
@@ -1194,14 +1209,14 @@ void RealisticCamera::ComputeThickLensApproximation(Float pz[2], Float fz[2]) co
     Ray rScene(Point3f(x, 0, LensFrontZ() + 1), Vector3f(0, 0, -1));
     Ray rFilm;
     if (!TraceLensesFromScene(rScene, &rFilm))
-        LOG_FATAL("Unable to trace ray from scene to film for thick lens "
+        ErrorExit("Unable to trace ray from scene to film for thick lens "
                   "approximation. Is aperture stop extremely small?");
     ComputeCardinalPoints(rScene, rFilm, &pz[0], &fz[0]);
 
     // Compute cardinal points for scene side of lens system
     rFilm = Ray(Point3f(x, 0, LensRearZ() - 1), Vector3f(0, 0, 1));
-    if (!TraceLensesFromFilm(rFilm, &rScene))
-        LOG_FATAL("Unable to trace ray from film to scene for thick lens "
+    if (TraceLensesFromFilm(rFilm, &rScene) == 0)
+        ErrorExit("Unable to trace ray from film to scene for thick lens "
                   "approximation. Is aperture stop extremely small?");
     ComputeCardinalPoints(rFilm, rScene, &pz[1], &fz[1]);
 }
@@ -1218,7 +1233,7 @@ Float RealisticCamera::FocusThickLens(Float focusDistance) {
     Float z = -focusDistance;
     Float c = (pz[1] - z - pz[0]) * (pz[1] - z - 4 * f - pz[0]);
     if (c <= 0)
-        LOG_FATAL("Coefficient must be positive. It looks focusDistance %f "
+        ErrorExit("Coefficient must be positive. It looks focusDistance %f "
                   " is too short for a given lenses configuration",
                   focusDistance);
     Float delta = 0.5f * (pz[1] - z + pz[0] - std::sqrt(c));
@@ -1439,9 +1454,101 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
         return nullptr;
     }
 
+    int builtinRes = 256;
+    auto rasterize = [&](pstd::span<const Point2f> vert) {
+        Image image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                    nullptr, alloc);
+
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x) {
+                Point2f p(-1 + 2 * (x + 0.5f) / image.Resolution().x,
+                           -1 + 2 * (y + 0.5f) / image.Resolution().y);
+                int windingNumber = 0;
+                // Test against edges
+                for (int i = 0; i < vert.size(); ++i) {
+                    int i1 = (i + 1) % vert.size();
+                    Float e = (p[0] - vert[i][0]) * (vert[i1][1] - vert[i][1]) -
+                        (p[1] - vert[i][1]) * (vert[i1][0] - vert[i][0]);
+                    if (vert[i].y <= p.y) {
+                        if (vert[i1].y > p.y && e > 0)
+                            ++windingNumber;
+                    } else if (vert[i1].y <= p.y && e < 0)
+                        --windingNumber;
+                }
+
+                image.SetChannel({x, y}, 0, windingNumber == 0 ? 0.f : 1.f);
+            }
+
+        image.Write("foo.exr");
+        return image;
+    };
+
+    std::string apertureName = ResolveFilename(dict.GetOneString("aperture", ""));
+    pstd::optional<Image> apertureImage;
+    if (!apertureName.empty()) {
+        // built-in diaphragm shapes
+        if (apertureName == "gaussian") {
+            apertureImage = Image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                                  nullptr, alloc);
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x) {
+                    Point2f uv(-1 + 2 * (x + 0.5f) / apertureImage->Resolution().x,
+                               -1 + 2 * (y + 0.5f) / apertureImage->Resolution().y);
+                    Float r2 = Sqr(uv.x) + Sqr(uv.y);
+                    Float sigma2 = 1;
+                    Float v = std::max<Float>(0, std::exp(-r2 / sigma2) - std::exp(-1 / sigma2));
+                    v *= 2.5f; // roughly normalize
+                    apertureImage->SetChannel({x, y}, 0, v);
+                }
+        } else if (apertureName == "pentagon") {
+            // https://mathworld.wolfram.com/RegularPentagon.html
+            Float c1 = (std::sqrt(5.f) - 1) / 4;
+            Float c2 = (std::sqrt(5.f) + 1) / 4;
+            Float s1 = std::sqrt(10.f + 2.f * std::sqrt(5.f)) / 4;
+            Float s2 = std::sqrt(10.f - 2.f * std::sqrt(5.f)) / 4;
+            // Vertices in CW order.
+            Point2f vert[5] = { Point2f(0, 1), {s1, c1}, {s2, -c2}, {-s2, -c2}, {-s1, c1} };
+            apertureImage = rasterize(vert);
+        } else if (apertureName == "star") {
+            // 5-sided. Vertices are two pentagons--inner and outer radius
+            pstd::array<Point2f, 10> vert;
+            for (int i = 0; i < 10; ++i) {
+                // inner radius: https://math.stackexchange.com/a/2136996
+                Float r = (i & 1) ? 1.f :
+                    (std::cos(Radians(72.f)) / std::cos(Radians(36.f)));
+                vert[i] = Point2f(r * std::cos(Pi * i / 5.f),
+                                  r * std::sin(Pi * i / 5.f));
+            }
+            std::reverse(vert.begin(), vert.end());
+            apertureImage = rasterize(vert);
+        } else {
+            auto im = Image::Read(apertureName, alloc);
+            if (im) {
+                apertureImage = std::move(im->image);
+                if (apertureImage->NChannels() > 1) {
+                    pstd::optional<ImageChannelDesc> rgbDesc =
+                        apertureImage->GetChannelDesc({"R", "G", "B"});
+                    if (!rgbDesc)
+                        ErrorExit("%s: didn't find R, G, B channels to average for "
+                                  "aperture image.", apertureName);
+
+                    Image mono(PixelFormat::Float, apertureImage->Resolution(), {"Y"},
+                               nullptr, alloc);
+                    for (int y = 0; y < mono.Resolution().y; ++y)
+                        for (int x = 0; x < mono.Resolution().x; ++x) {
+                            Float avg = apertureImage->GetChannels({x, y}, *rgbDesc).Average();
+                            mono.SetChannel({x, y}, 0, avg);
+                        }
+
+                    apertureImage = std::move(mono);
+                }
+            }
+        }
+    }
+
     return alloc.new_object<RealisticCamera>(
         worldFromCamera, shutteropen, shutterclose, apertureDiameter, focusDistance,
-        dispersionFactor, *lensData, film, medium, alloc);
+        dispersionFactor, *lensData, film, medium, apertureImage, alloc);
 }
 
 }  // namespace pbrt
