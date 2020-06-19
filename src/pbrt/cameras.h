@@ -304,8 +304,9 @@ class RealisticCamera : public CameraBase {
     // RealisticCamera Public Methods
     RealisticCamera(const CameraTransform &worldFromCamera, Float shutterOpen,
                     Float shutterClose, Float apertureDiameter, Float focusDistance,
-                    Float dispersionFactor, std::vector<Float> &lensData, FilmHandle film,
-                    MediumHandle medium, pstd::optional<Image> apertureImage, Allocator alloc);
+                    Float dispersionFactor, std::vector<Float> &lensData, Float scale,
+                    FilmHandle film, MediumHandle medium,
+                    pstd::optional<Image> apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
                                    const CameraTransform &worldFromCamera,
@@ -356,6 +357,7 @@ class RealisticCamera : public CameraBase {
     };
 
     // RealisticCamera Private Data
+    Float scale;
     Float dispersionFactor;
     pstd::vector<LensElementInterface> elementInterfaces;
     pstd::vector<Bounds2f> exitPupilBounds;
@@ -373,6 +375,9 @@ class RealisticCamera : public CameraBase {
     }
     PBRT_CPU_GPU
     Float RearElementRadius() const { return elementInterfaces.back().apertureRadius; }
+
+    PBRT_CPU_GPU
+    Float FilmDiagonal() const { return film.Diagonal() * scale; }
 
     PBRT_CPU_GPU
     Float TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
