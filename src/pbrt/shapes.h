@@ -983,6 +983,7 @@ class alignas(8) Triangle {
                                       std::max<Float>(0.01, AbsDot(rnf, wi[0])),
                                       std::max<Float>(0.01, AbsDot(rnf, wi[2]))};
             u = SampleBilinear(u, w);
+            DCHECK(u[0] >= 0 && u[0] < 1 && u[1] >= 0 && u[1] < 1);
             pdf *= BilinearPDF(u, w);
         }
         Float triPDF;
@@ -1063,7 +1064,7 @@ class alignas(8) Triangle {
     // Returns the solid angle subtended by the triangle w.r.t. the given
     // reference point p.
     PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p) const {
+    Float SolidAngle(const Point3f &p, int = 0 /*nSamples: unused...*/) const {
         // Project the vertices into the unit sphere around p.
         auto mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -1544,7 +1545,8 @@ class alignas(8) BilinearPatch {
     Float PDF(const Interaction &) const;
 
     PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p) const;
+    Float SolidAngle(const Point3f &p, int = 0 /*nSamples: unused...*/) const;
+
     PBRT_CPU_GPU
     DirectionCone NormalBounds() const;
 
@@ -1647,233 +1649,65 @@ class alignas(8) BilinearPatch {
 };
 
 inline Bounds3f ShapeHandle::CameraWorldBound() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->CameraWorldBound();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto cwb = [&](auto ptr) { return ptr->CameraWorldBound(); };
+    return Apply<Bounds3f>(cwb);
 }
 
 inline pstd::optional<ShapeIntersection> ShapeHandle::Intersect(const Ray &ray,
                                                                 Float tMax) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Intersect(ray, tMax);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto intr = [&](auto ptr) { return ptr->Intersect(ray, tMax); };
+    return Apply<pstd::optional<ShapeIntersection>>(intr);
 }
 
 inline bool ShapeHandle::IntersectP(const Ray &ray, Float tMax) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->IntersectP(ray, tMax);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto intr = [&](auto ptr) { return ptr->IntersectP(ray, tMax); };
+    return Apply<bool>(intr);
 }
 
 inline Float ShapeHandle::Area() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Area();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Area();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Area();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Area();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Area();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Area();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto area = [&](auto ptr) { return ptr->Area(); };
+    return Apply<Float>(area);
 }
 
 inline pstd::optional<ShapeSample> ShapeHandle::Sample(const Point2f &u) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Sample(u);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Sample(u);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Sample(u);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Sample(u);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Sample(u);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Sample(u);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample(u); };
+    return Apply<pstd::optional<ShapeSample>>(sample);
 }
 
 inline Float ShapeHandle::PDF(const Interaction &in) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->PDF(in);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->PDF(in);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->PDF(in);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->PDF(in);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->PDF(in);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->PDF(in);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto pdf = [&](auto ptr) { return ptr->PDF(in); };
+    return Apply<Float>(pdf);
 }
 
 inline pstd::optional<ShapeSample> ShapeHandle::Sample(const Interaction &ref,
                                                        const Point2f &u) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Sample(ref, u);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample(ref, u); };
+    return Apply<pstd::optional<ShapeSample>>(sample);
 }
 
 inline Float ShapeHandle::PDF(const Interaction &ref, const Vector3f &wi) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->PDF(ref, wi);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto pdf = [&](auto ptr) { return ptr->PDF(ref, wi); };
+    return Apply<Float>(pdf);
 }
 
 inline Float ShapeHandle::SolidAngle(const Point3f &p, int nSamples) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->SolidAngle(p, nSamples);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->SolidAngle(p, nSamples);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->SolidAngle(p, nSamples);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sa = [&](auto ptr) { return ptr->SolidAngle(p, nSamples); };
+    return Apply<Float>(sa);
 }
 
 inline DirectionCone ShapeHandle::NormalBounds() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->NormalBounds();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->NormalBounds();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->NormalBounds();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->NormalBounds();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->NormalBounds();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->NormalBounds();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto nb = [&](auto ptr) { return ptr->NormalBounds(); };
+    return Apply<DirectionCone>(nb);
 }
 
 inline bool ShapeHandle::OrientationIsReversed() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->OrientationIsReversed();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto oir = [&](auto ptr) { return ptr->OrientationIsReversed(); };
+    return Apply<bool>(oir);
 }
 
 inline bool ShapeHandle::TransformSwapsHandedness() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->TransformSwapsHandedness();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto tsh = [&](auto ptr) { return ptr->TransformSwapsHandedness(); };
+    return Apply<bool>(tsh);
 }
 
 }  // namespace pbrt

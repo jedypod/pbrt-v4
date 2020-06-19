@@ -1392,7 +1392,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     return pdf / Length(Cross(dpdu, dpdv));
 }
 
-Float BilinearPatch::SolidAngle(const Point3f &pref) const {
+Float BilinearPatch::SolidAngle(const Point3f &pref, int /*nSamples: unused...*/) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     auto mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1535,22 +1535,8 @@ std::string ShapeHandle::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->ToString();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->ToString();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->ToString();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->ToString();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->ToString();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->ToString();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto tostr = [&](auto ptr) { return ptr->ToString(); };
+    return Apply<std::string>(tostr);
 }
 
 // Shape Method Definitions
