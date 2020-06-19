@@ -360,11 +360,11 @@ void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
     TransformSet worldFromCamera = Inverse(curTransform);
     namedCoordinateSystems["camera"] = Inverse(cameraFromWorld);
 
-    CameraTransform wfc(AnimatedTransform(worldFromCamera[0], transformStartTime,
-                                          worldFromCamera[1], transformEndTime));
-    cameraFromWorldT = Inverse(wfc.translation);
+    CameraTransform cameraTransform(AnimatedTransform(worldFromCamera[0], transformStartTime,
+                                                      worldFromCamera[1], transformEndTime));
+    renderFromWorld = cameraTransform.RenderFromWorld();
 
-    camera = CameraSceneEntity(name, std::move(dict), loc, wfc,
+    camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
                                graphicsState->currentOutsideMedium);
 }
 
@@ -717,21 +717,21 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
         return;
     }
 
-    class Transform worldFromCameraT = Inverse(cameraFromWorldT);
+    class Transform worldFromRender = Inverse(renderFromWorld);
 
     if (CTMIsAnimated()) {
-        AnimatedTransform animatedWorldFromInstance(
-            GetCTM(0) * worldFromCameraT, transformStartTime,
-            GetCTM(1) * worldFromCameraT, transformEndTime);
+        AnimatedTransform animatedRenderFromInstance(
+            GetCTM(0) * worldFromRender, transformStartTime,
+            GetCTM(1) * worldFromRender, transformEndTime);
 
         instances.push_back(
-            InstanceSceneEntity(name, loc, animatedWorldFromInstance, nullptr));
+            InstanceSceneEntity(name, loc, animatedRenderFromInstance, nullptr));
     } else {
-        const class Transform *worldFromInstance =
-            transformCache.Lookup(GetCTM(0) * worldFromCameraT);
+        const class Transform *renderFromInstance =
+            transformCache.Lookup(GetCTM(0) * worldFromRender);
 
         instances.push_back(
-            InstanceSceneEntity(name, loc, AnimatedTransform(), worldFromInstance));
+            InstanceSceneEntity(name, loc, AnimatedTransform(), renderFromInstance));
     }
 }
 

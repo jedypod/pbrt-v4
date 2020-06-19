@@ -48,7 +48,7 @@ class LightHandle
     static LightHandle Create(const std::string &name,
                               const ParameterDictionary &parameters,
                               const AnimatedTransform &worldFromLight,
-                              const CameraTransform &worldFromCamera,
+                              const CameraTransform &cameraTransform,
                               MediumHandle outsideMedium, const FileLoc *loc,
                               Allocator alloc);
     static LightHandle CreateArea(const std::string &name,

@@ -28,34 +28,12 @@ class CameraRayDifferential;
 class CameraWiSample;
 
 struct CameraSample;
+class CameraTransform;
 
 class PerspectiveCamera;
 class OrthographicCamera;
 class SphericalCamera;
 class RealisticCamera;
-
-class CameraTransform {
-  public:
-    CameraTransform() = default;
-    explicit CameraTransform(const AnimatedTransform &worldFromCamera);
-
-    AnimatedTransform rotation;
-    Transform translation;
-
-    bool HasScale() const { return rotation.HasScale(); }
-
-    Transform GetTransform(Float time) const {
-        return translation * rotation.Interpolate(time);
-    }
-
-    Transform GetInverse(Float time) const { return Inverse(GetTransform(time)); }
-
-    Point3f ApplyInverseTranslation(const Point3f &p) const {
-        return translation.ApplyInverse(p);
-    }
-};
-
-std::string ToString(const CameraTransform &ct);
 
 class CameraHandle : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
                                           SphericalCamera, RealisticCamera> {
@@ -64,10 +42,11 @@ class CameraHandle : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
 
     static CameraHandle Create(const std::string &name,
                                const ParameterDictionary &parameters, MediumHandle medium,
-                               const CameraTransform &worldFromCamera, FilmHandle film,
+                               const CameraTransform &cameraTransform, FilmHandle film,
                                const FileLoc *loc, Allocator alloc);
 
-    pstd::optional<CameraRay> PBRT_CPU_GPU inline GenerateRay(
+    PBRT_CPU_GPU inline
+    pstd::optional<CameraRay> GenerateRay(
         const CameraSample &sample, const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
@@ -78,7 +57,7 @@ class CameraHandle : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
 
     PBRT_CPU_GPU inline Float SampleTime(Float u) const;
 
-    PBRT_CPU_GPU inline const CameraTransform &WorldFromCamera() const;
+    PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
 
     PBRT_CPU_GPU
     SampledSpectrum We(const Ray &ray, const SampledWavelengths &lambda,

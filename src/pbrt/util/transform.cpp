@@ -1176,8 +1176,10 @@ void AnimatedTransform::FindZeros(Float c1, Float c2, Float c3, Float c4, Float 
 }
 
 std::string AnimatedTransform::ToString() const {
-    return StringPrintf("[ AnimatedTransform actuallyAnimated: %s T: [ %s %s ] "
+    return StringPrintf("[ AnimatedTransform startTransform: %s endTransform: %s "
+                        "startTime: %f endTime: %f actuallyAnimated: %s T: [ %s %s ] "
                         "R: [ %s %s ] S: [ %s %s ] hasRotation: %s ]",
+                        startTransform, endTransform, startTime, endTime,
                         actuallyAnimated, T[0], T[1], R[0], R[1], S[0], S[1],
                         hasRotation);
 }

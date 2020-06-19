@@ -747,7 +747,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, const SampledWavelengths
         }
         prevIntr = si->intr;
         if (depth == 0 && visibleSurface != nullptr)
-            *visibleSurface = VisibleSurface(si->intr, camera.WorldFromCamera(), lambda);
+            *visibleSurface = VisibleSurface(si->intr, camera.GetCameraTransform(),
+                                             lambda);
 
         if (regularize && anyNonSpecularBounces) {
             ++regularizedBSDFs;

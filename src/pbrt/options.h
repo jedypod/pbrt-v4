@@ -19,6 +19,8 @@
 
 namespace pbrt {
 
+enum class RenderingCoordinateSystem { Camera, CameraWorld, World };
+
 struct BasicOptions {
     int nThreads = 0;
     int seed = 0;
@@ -28,6 +30,7 @@ struct BasicOptions {
     bool upgrade = false;
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool forceDiffuse = false;
+    RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 
 struct ExtendedOptions : BasicOptions {

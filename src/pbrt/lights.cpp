@@ -5,7 +5,7 @@
 // lights/point.cpp*
 #include <pbrt/lights.h>
 
-#include <pbrt/base/camera.h>
+#include <pbrt/cameras.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/samplers.h>
 #include <pbrt/shapes.h>
@@ -1345,7 +1345,7 @@ void LightHandle::Pdf_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
 
 LightHandle LightHandle::Create(const std::string &name, const ParameterDictionary &dict,
                                 const AnimatedTransform &worldFromLight,
-                                const CameraTransform &worldFromCamera,
+                                const CameraTransform &cameraTransform,
                                 MediumHandle outsideMedium, const FileLoc *loc,
                                 Allocator alloc) {
     LightHandle light = nullptr;
@@ -1406,7 +1406,7 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
 
                 if (!portal.empty()) {
                     for (Point3f &p : portal)
-                        p = worldFromCamera.ApplyInverseTranslation(p);
+                        p = cameraTransform.RenderFromWorld(p);
 
                     light = alloc.new_object<PortalImageInfiniteLight>(
                         worldFromLight, std::move(image), colorSpace, scale, filename,

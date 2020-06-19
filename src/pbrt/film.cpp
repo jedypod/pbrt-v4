@@ -6,6 +6,7 @@
 #include <pbrt/film.h>
 
 #include <pbrt/bsdf.h>
+#include <pbrt/cameras.h>
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
@@ -82,19 +83,19 @@ std::string FilmBase::BaseToString() const {
 }
 
 VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
-                               const CameraTransform &worldFromCamera,
+                               const CameraTransform &cameraTransform,
                                const SampledWavelengths &lambda) {
-    Transform cameraFromWorld = Inverse(worldFromCamera.rotation.Interpolate(si.time));
+    Transform cameraFromRender = cameraTransform.CameraFromRender(si.time);
 
     time = si.time;
-    p = cameraFromWorld(si.p());
-    n = cameraFromWorld(si.n);
-    Vector3f wo = cameraFromWorld(si.wo);
+    p = cameraFromRender(si.p());
+    n = cameraFromRender(si.n);
+    Vector3f wo = cameraFromRender(si.wo);
     n = FaceForward(n, wo);
-    ns = cameraFromWorld(si.shading.n);
+    ns = cameraFromRender(si.shading.n);
     ns = FaceForward(ns, wo);
-    dzdx = cameraFromWorld(si.dpdx).z;
-    dzdy = cameraFromWorld(si.dpdy).z;
+    dzdx = cameraFromRender(si.dpdx).z;
+    dzdy = cameraFromRender(si.dpdy).z;
 
     if (si.bsdf) {
         constexpr int nRhoSamples = 16;

@@ -55,7 +55,7 @@ void CPURender(ParsedScene &parsedScene) {
         findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
     CameraHandle camera = CameraHandle::Create(
         parsedScene.camera.name, parsedScene.camera.parameters, cameraMedium,
-        parsedScene.camera.worldFromCamera, film, &parsedScene.camera.loc, alloc);
+        parsedScene.camera.cameraTransform, film, &parsedScene.camera.loc, alloc);
 
     // Sampler
     SamplerHandle sampler = SamplerHandle::Create(
@@ -87,7 +87,7 @@ void CPURender(ParsedScene &parsedScene) {
         MediumHandle outsideMedium = findMedium(light.medium, &light.loc);
         LightHandle l = LightHandle::Create(
             light.name, light.parameters, light.worldFromObject,
-            parsedScene.camera.worldFromCamera, outsideMedium, &light.loc, alloc);
+            parsedScene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
         lights.push_back(l);
     }
 

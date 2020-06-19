@@ -43,7 +43,7 @@ namespace pbrt {
 struct VisibleSurface {
     VisibleSurface() = default;
     PBRT_CPU_GPU
-    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &worldFromCamera,
+    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &cameraTransform,
                    const SampledWavelengths &lambda);
 
     std::string ToString() const;
