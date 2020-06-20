@@ -129,14 +129,13 @@ STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
                  FilterHandle filter, Float diagonal, const std::string &filename,
                  Float scale, const RGBColorSpace *colorSpace, Float maxSampleLuminance,
-                 bool writeFP16, bool saveVariance, Allocator allocator)
+                 bool writeFP16, Allocator allocator)
     : FilmBase(resolution, pixelBounds, filter, diagonal, filename),
       pixels(pixelBounds, allocator),
       scale(scale),
       colorSpace(colorSpace),
       maxSampleLuminance(maxSampleLuminance),
-      writeFP16(writeFP16),
-      saveVariance(saveVariance) {
+      writeFP16(writeFP16) {
     filterIntegral = filter.Integral();
 
     CHECK(!pixelBounds.IsEmpty());
@@ -185,18 +184,13 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     // Convert image to RGB and compute final pixel values
     LOG_VERBOSE("Converting image to RGB and computing final weighted pixel values");
     PixelFormat format = writeFP16 ? PixelFormat::Half : PixelFormat::Float;
-    std::vector<std::string> channels = {"R", "G", "B"};
-    if (saveVariance)
-        channels.push_back("Variance");
-    Image image(format, Point2i(pixelBounds.Diagonal()), channels);
+    Image image(format, Point2i(pixelBounds.Diagonal()), {"R", "G", "B"});
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         RGB rgb = GetPixelRGB(p, splatScale);
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, {rgb[0], rgb[1], rgb[2]});
-        if (saveVariance)
-            image.SetChannel(pOffset, 3, pixels[p].varianceEstimator.Variance());
     });
 
     metadata->pixelBounds = pixelBounds;
@@ -215,9 +209,8 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
 std::string RGBFilm::ToString() const {
     return StringPrintf("[ RGBFilm %s scale: %f colorSpace: %s maxSampleLuminance: %f "
-                        "writeFP16: %s saveVariance: %s ]",
-                        BaseToString(), scale, *colorSpace, maxSampleLuminance, writeFP16,
-                        saveVariance);
+                        "writeFP16: %s ]",
+                        BaseToString(), scale, *colorSpace, maxSampleLuminance, writeFP16);
 }
 
 RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
@@ -315,10 +308,9 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     Float diagonal = dict.GetOneFloat("diagonal", 35.);
     Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
     bool writeFP16 = dict.GetOneBool("savefp16", true);
-    bool saveVariance = dict.GetOneBool("savevariance", false);
     return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, filter, diagonal,
                                      filename, scale, colorSpace, maxSampleLuminance,
-                                     writeFP16, saveVariance, alloc);
+                                     writeFP16, alloc);
 }
 
 // Film Method Definitions
@@ -363,7 +355,8 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     Pixel &p = pixels[pFilm];
     if (visibleSurface) {
         // Update variance estimates.
-        p.LVarianceEstimator.Add(L.y(lambda));
+        // TODO: store channels independently?
+        p.rgbVarianceEstimator.Add(L.y(lambda));
 
         p.pSum += weight * visibleSurface->p;
 
@@ -442,8 +435,8 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "materialId.R",
                  "materialId.G",
                  "materialId.B",
-                 "LVariance",
-                 "LRelativeVariance"});
+                 "rgbVariance",
+                 "rgbRelativeVariance"});
 
     ImageChannelDesc rgbDesc = *image.GetChannelDesc({"R", "G", "B"});
     ImageChannelDesc pDesc = *image.GetChannelDesc({"Px", "Py", "Pz"});
@@ -452,8 +445,8 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc nsDesc = *image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
     ImageChannelDesc albedoRgbDesc =
         *image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
-    ImageChannelDesc lVarianceDesc =
-        *image.GetChannelDesc({"LVariance", "LRelativeVariance"});
+    ImageChannelDesc varianceDesc =
+        *image.GetChannelDesc({"rgbVariance", "rgbRelativeVariance"});
 
     Float filterIntegral = filter.Integral();
 
@@ -491,9 +484,9 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetChannels(pOffset, dzDesc, {std::abs(dzdx), std::abs(dzdy)});
         image.SetChannels(pOffset, nDesc, {n.x, n.y, n.z});
         image.SetChannels(pOffset, nsDesc, {ns.x, ns.y, ns.z});
-        image.SetChannels(pOffset, lVarianceDesc,
-                          {pixel.LVarianceEstimator.Variance(),
-                           pixel.LVarianceEstimator.RelativeVariance()});
+        image.SetChannels(pOffset, varianceDesc,
+                          {pixel.rgbVarianceEstimator.Variance(),
+                           pixel.rgbVarianceEstimator.RelativeVariance()});
     });
 
     metadata->pixelBounds = pixelBounds;
@@ -503,7 +496,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     Float varianceSum = 0;
     for (Point2i p : pixelBounds) {
         const Pixel &pixel = pixels[p];
-        varianceSum += pixel.LVarianceEstimator.Variance();
+        varianceSum += pixel.rgbVarianceEstimator.Variance();
     }
     metadata->estimatedVariance = varianceSum / pixelBounds.Area();
 

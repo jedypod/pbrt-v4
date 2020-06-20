@@ -94,7 +94,7 @@ class RGBFilm : public FilmBase {
     RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
             Float diagonal, const std::string &filename, Float scale,
             const RGBColorSpace *colorSpace, Float maxSampleLuminance = Infinity,
-            bool writeFP16 = true, bool saveVariance = false, Allocator allocator = {});
+            bool writeFP16 = true, Allocator allocator = {});
 
     static RGBFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
                            const RGBColorSpace *colorSpace, const FileLoc *loc,
@@ -167,7 +167,7 @@ class RGBFilm : public FilmBase {
     Float scale;
     const RGBColorSpace *colorSpace;
     Float maxSampleLuminance;
-    bool writeFP16, saveVariance;
+    bool writeFP16;
     Float filterIntegral;
 };
 
@@ -233,7 +233,7 @@ class GBufferFilm : public FilmBase {
         Float dzdxSum = 0, dzdySum = 0;
         Normal3f nSum, nsSum;
         double albedoSum[3] = {0., 0., 0.};
-        VarianceEstimator<Float> LVarianceEstimator;
+        VarianceEstimator<Float> rgbVarianceEstimator;
         RGB materialRGB;
     };
     Array2D<Pixel> pixels;
