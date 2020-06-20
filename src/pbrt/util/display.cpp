@@ -383,8 +383,9 @@ bool DisplayItem::SendOpenImage(IPCChannel &ipcChannel) {
     return ipcChannel.Send(pstd::MakeSpan(buffer, ptr - buffer));
 }
 
-static std::atomic<bool> exitThread{false}, threadExited{false};
+static std::atomic<bool> exitThread{false};
 static std::mutex mutex;
+static std::thread updateThread;
 static std::vector<DisplayItem> dynamicItems;
 
 static IPCChannel *channel;
@@ -402,7 +403,6 @@ static void updateDynamicItems() {
     std::lock_guard<std::mutex> lock(mutex);
     for (auto &item : dynamicItems)
         item.Display(*channel);
-    threadExited = true;
 
     dynamicItems.clear();
     delete channel;
@@ -413,17 +413,15 @@ void ConnectToDisplayServer(const std::string &host) {
     CHECK(channel == nullptr);
     channel = new IPCChannel(host);
 
-    std::thread updateThread = std::thread(updateDynamicItems);
-    updateThread.detach();
+
+    updateThread = std::thread(updateDynamicItems);
 }
 
 void DisconnectFromDisplayServer() {
     exitThread = true;
-    while (!threadExited)
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
+    updateThread.join();
+    updateThread = std::thread();
     exitThread = false;
-    threadExited = false;
 }
 
 static DisplayItem GetImageDisplayItem(const std::string &title, const Image &image,
