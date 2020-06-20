@@ -1503,7 +1503,7 @@ class alignas(8) BilinearPatch {
                 ns = Normalize(ns);
                 Normal3f n = Normal3f(Normalize(isect.n));
                 Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
-                if (LengthSquared(axis) > .0001f) {
+                if (LengthSquared(axis) > 1e-14) {
                     axis = Normalize(axis);
                     // The shading normal is different enough.
                     //
@@ -1518,6 +1518,10 @@ class alignas(8) BilinearPatch {
                     Transform r = Rotate(sinTheta, cosTheta, axis);
                     Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
 
+                    // Gram-Schmidt to ensure that Dot(sdpdu, ns) is
+                    // basically zero.  (Otherwise a CHECK in the Frame
+                    // constructor can end up hitting...)
+                    sdpdu -= Dot(sdpdu, ns) * Vector3f(ns);
                     isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
                 }
             }
