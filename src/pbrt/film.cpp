@@ -323,8 +323,8 @@ GBufferFilm::GBufferFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
       scale(scale),
       colorSpace(colorSpace),
       maxSampleLuminance(maxSampleLuminance),
-      writeFP16(writeFP16) {
-    // Allocate film image storage
+      writeFP16(writeFP16),
+      filterIntegral(filter.Integral()) {
     CHECK(!pixelBounds.IsEmpty());
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
 }
@@ -447,8 +447,6 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         *image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
     ImageChannelDesc varianceDesc =
         *image.GetChannelDesc({"rgbVariance", "rgbRelativeVariance"});
-
-    Float filterIntegral = filter.Integral();
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
