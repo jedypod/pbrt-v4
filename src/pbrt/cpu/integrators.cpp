@@ -737,8 +737,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, const SampledWavelengths
 
         // Compute scattering functions and skip over medium boundaries
         SurfaceInteraction &isect = si->intr;
-        VLOG(2, "Current intersection: %s", isect);
         isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
+        VLOG(2, "Current intersection: %s", isect);
         BSDF *bsdf = isect.bsdf;
         if (bsdf == nullptr) {
             isect.SkipIntersection(&ray, si->tHit);
