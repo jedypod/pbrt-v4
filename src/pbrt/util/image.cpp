@@ -311,7 +311,9 @@ ImageChannelValues Image::MSE(const ImageChannelDesc &desc, const Image &ref,
     std::vector<double> sumSE(desc.size(), 0.);
 
     pstd::optional<ImageChannelDesc> refDesc = ref.GetChannelDesc(ChannelNames(desc));
-    CHECK((bool)refDesc);
+    if (!refDesc)
+        ErrorExit("Channels not found in image: %s", ChannelNames(desc));
+
     CHECK_EQ(Resolution(), ref.Resolution());
 
     if (mseImage)
