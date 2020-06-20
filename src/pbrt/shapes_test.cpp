@@ -312,7 +312,7 @@ static int TestReintersectConvex(ShapeHandle shape, RNG &rng) {
         o[c] = pExp(rng);
 
     // Destination: a random point in the shape's bounding box.
-    Bounds3f bbox = shape.CameraWorldBound();
+    Bounds3f bbox = shape.Bounds();
     Point3f t;
     for (int c = 0; c < 3; ++c)
         t[c] = rng.Uniform<Float>();
@@ -423,7 +423,7 @@ TEST(ParialSphere, Normal) {
             o[c] = pExp(rng);
 
         // Destination: a random point in the shape's bounding box.
-        Bounds3f bbox = sphere.CameraWorldBound();
+        Bounds3f bbox = sphere.Bounds();
         Point3f t;
         for (int c = 0; c < 3; ++c)
             t[c] = rng.Uniform<Float>();

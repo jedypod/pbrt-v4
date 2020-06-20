@@ -320,8 +320,8 @@ pstd::optional<ShapeIntersection> Integrator::IntersectTr(
 }
 
 std::string Integrator::ToString() const {
-    std::string s = StringPrintf("[ Scene aggregate: %s worldBound: %s lights[%d]: [ ",
-                                 aggregate, cameraWorldBound, lights.size());
+    std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
+                                 aggregate, sceneBounds, lights.size());
     for (const auto &l : lights)
         s += StringPrintf("%s, ", l.ToString());
     s += StringPrintf("] infiniteLights[%d]: [ ", infiniteLights.size());
@@ -1822,7 +1822,7 @@ struct Vertex {
             // Compute planar sampling density for infinite light sources
             Point3f worldCenter;
             Float worldRadius;
-            integrator.CameraWorldBound().BoundingSphere(&worldCenter, &worldRadius);
+            integrator.SceneBounds().BoundingSphere(&worldCenter, &worldRadius);
             pdf = 1 / (Pi * worldRadius * worldRadius);
         } else if (IsOnSurface()) {
             if (type == VertexType::Light)

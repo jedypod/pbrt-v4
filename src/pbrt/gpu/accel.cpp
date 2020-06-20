@@ -480,7 +480,7 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
 
         buildInputs.push_back(buildInput);
 
-        Bounds3f shapeBounds = shapeHandle.CameraWorldBound();
+        Bounds3f shapeBounds = shapeHandle.Bounds();
         OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
                           shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
         shapeAABBs.push_back(aabb);

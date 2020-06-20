@@ -45,7 +45,7 @@ class BVHAccel {
     static BVHAccel *Create(std::vector<PrimitiveHandle> prims,
                             const ParameterDictionary &parameters);
 
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
     bool IntersectP(const Ray &ray, Float tMax) const;
 
@@ -89,7 +89,7 @@ class KdTreeAccel {
     static KdTreeAccel *Create(std::vector<PrimitiveHandle> prims,
                                const ParameterDictionary &parameters);
 
-    Bounds3f CameraWorldBound() const { return bounds; }
+    Bounds3f Bounds() const { return bounds; }
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
     bool IntersectP(const Ray &ray, Float tMax) const;
 

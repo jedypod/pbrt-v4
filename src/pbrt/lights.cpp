@@ -126,7 +126,7 @@ DistantLight::DistantLight(const AnimatedTransform &worldFromLight, SpectrumHand
       Lemit(Lemit) {}
 
 SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
-    return Lemit.Sample(lambda) * Pi * cameraWorldRadius * cameraWorldRadius;
+    return Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
 }
 
 pstd::optional<LightLeSample> DistantLight::Sample_Le(const Point2f &u1,
@@ -138,16 +138,16 @@ pstd::optional<LightLeSample> DistantLight::Sample_Le(const Point2f &u1,
     Vector3f v1, v2;
     CoordinateSystem(w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u1);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
 
     // Set ray origin and direction for infinite light ray
-    Ray ray(pDisk + cameraWorldRadius * w, -w, time);
+    Ray ray(pDisk + sceneRadius * w, -w, time);
     return LightLeSample(Lemit.Sample(lambda), ray,
-                         1 / (Pi * cameraWorldRadius * cameraWorldRadius), 1);
+                         1 / (Pi * sceneRadius * sceneRadius), 1);
 }
 
 void DistantLight::Pdf_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
-    *pdfPos = 1 / (Pi * cameraWorldRadius * cameraWorldRadius);
+    *pdfPos = 1 / (Pi * sceneRadius * sceneRadius);
     *pdfDir = 0;
 }
 
@@ -681,7 +681,7 @@ LightBounds DiffuseAreaLight::Bounds() const {
     // TODO: for animated shapes, we probably need to worry about
     // worldFromLight as in Sample_Li().
     DirectionCone nb = shape.NormalBounds();
-    return LightBounds(shape.CameraWorldBound(), nb.w, phi, SafeACos(nb.cosTheta), Pi / 2,
+    return LightBounds(shape.Bounds(), nb.w, phi, SafeACos(nb.cosTheta), Pi / 2,
                        twoSided);
 }
 
@@ -739,7 +739,7 @@ SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) cons
     // TODO: is there another Pi or so for the hemisphere?
     // pi r^2 for disk
     // 2pi for cosine-weighted sphere
-    return 2 * Pi * Pi * Sqr(cameraWorldRadius) * Lemit.Sample(lambda);
+    return 2 * Pi * Pi * Sqr(sceneRadius) * Lemit.Sample(lambda);
 }
 
 SampledSpectrum UniformInfiniteLight::Le(const Ray &ray,
@@ -754,7 +754,7 @@ pstd::optional<LightLiSample> UniformInfiniteLight::Sample_Li(
     Float pdf = UniformSpherePDF();
     return LightLiSample(
         this, Lemit.Sample(lambda), wi, pdf, ref,
-        Interaction(ref.p() + wi * (2 * cameraWorldRadius), ref.time, &mediumInterface));
+        Interaction(ref.p() + wi * (2 * sceneRadius), ref.time, &mediumInterface));
 }
 
 Float UniformInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -770,10 +770,10 @@ pstd::optional<LightLeSample> UniformInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
     Float pdfDir = UniformSpherePDF();
 
     return LightLeSample(Lemit.Sample(lambda), ray, pdfPos, pdfDir);
@@ -781,7 +781,7 @@ pstd::optional<LightLeSample> UniformInfiniteLight::Sample_Le(
 
 void UniformInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfDir = UniformSpherePDF();
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 }
 
 std::string UniformInfiniteLight::ToString() const {
@@ -865,7 +865,7 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
     }
     // Integrating over the sphere, so 4pi for that.  Then one more for Pi
     // r^2 for the area of the disk receiving illumination...
-    return 4 * Pi * Pi * Sqr(cameraWorldRadius) * scale * sumL / (width * height);
+    return 4 * Pi * Pi * Sqr(sceneRadius) * scale * sumL / (width * height);
 }
 
 Float ImageInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -892,12 +892,12 @@ pstd::optional<LightLeSample> ImageInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
     // Compute _ImageInfiniteLight_ ray PDFs
     Float pdfDir = mapPDF / (4 * Pi);
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
     SampledSpectrum L = scale * lookupSpectrum(uv, lambda);
     return LightLeSample(L, ray, pdfPos, pdfDir);
 }
@@ -906,7 +906,7 @@ void ImageInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) co
     Vector3f wl = -worldFromLight.ApplyInverse(ray.d, ray.time);
     Float mapPDF = distribution.PDF(EquiAreaSphereToSquare(wl));
     *pdfDir = mapPDF / (4 * Pi);
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 }
 
 std::string ImageInfiniteLight::ToString() const {
@@ -1068,7 +1068,7 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::Sample_Li(
 
     return LightLiSample(
         this, L, wi, pdf, ref,
-        Interaction(ref.p() + wi * (2 * cameraWorldRadius), ref.time, &mediumInterface));
+        Interaction(ref.p() + wi * (2 * sceneRadius), ref.time, &mediumInterface));
 }
 
 Float PortalImageInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -1120,10 +1120,10 @@ pstd::optional<LightLeSample> PortalImageInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 #endif
 
     SampledSpectrum L = ImageLookup(uv, lambda);
@@ -1150,7 +1150,7 @@ void PortalImageInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos,
     Normal3f n = Normal3f(portalFrame.z);
     *pdfPos = 1 / (Area() * AbsDot(n, w));
 #else
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 #endif
 
     *pdfDir = pdf / duv_dw;
@@ -1307,8 +1307,8 @@ SampledSpectrum LightHandle::Phi(const SampledWavelengths &lambda) const {
     return ApplyCPU<SampledSpectrum>(phi);
 }
 
-void LightHandle::Preprocess(const Bounds3f &worldBounds) {
-    auto preprocess = [&](auto ptr) { return ptr->Preprocess(worldBounds); };
+void LightHandle::Preprocess(const Bounds3f &sceneBounds) {
+    auto preprocess = [&](auto ptr) { return ptr->Preprocess(sceneBounds); };
     return ApplyCPU<void>(preprocess);
 }
 

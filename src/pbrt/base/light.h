@@ -71,7 +71,7 @@ class LightHandle
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
-    void Preprocess(const Bounds3f &cameraWorldBound);
+    void Preprocess(const Bounds3f &sceneBounds);
 
     PBRT_CPU_GPU inline Float Pdf_Li(
         const Interaction &ref, const Vector3f &wi,

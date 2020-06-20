@@ -276,7 +276,7 @@ class PointLight : public LightBase {
     }
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
-    void Preprocess(const Bounds3f &cameraWorldBound) {}
+    void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
     Float Pdf_Li(const Interaction &, const Vector3f &, LightSamplingMode mode) const {
@@ -316,15 +316,15 @@ class DistantLight : public LightBase {
                                 const RGBColorSpace *colorSpace, const FileLoc *loc,
                                 Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {
-        cameraWorldBound.BoundingSphere(&cameraWorldCenter, &cameraWorldRadius);
+    void Preprocess(const Bounds3f &sceneBounds) {
+        sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> Sample_Li(const Interaction &ref, const Point2f &u,
                                             const SampledWavelengths &lambda,
                                             LightSamplingMode mode) const {
         Vector3f wi = Normalize(worldFromLight(Vector3f(0, 0, 1), ref.time));
-        Point3f pOutside = ref.p() + wi * (2 * cameraWorldRadius);
+        Point3f pOutside = ref.p() + wi * (2 * sceneRadius);
         return LightLiSample(this, Lemit.Sample(lambda), wi, 1, ref,
                              Interaction(pOutside, ref.time, &mediumInterface));
     }
@@ -355,8 +355,8 @@ class DistantLight : public LightBase {
   private:
     // DistantLight Private Data
     SpectrumHandle Lemit;
-    Point3f cameraWorldCenter;
-    Float cameraWorldRadius;
+    Point3f sceneCenter;
+    Float sceneRadius;
 };
 
 // ProjectionLight Declarations
@@ -373,7 +373,7 @@ class ProjectionLight : public LightBase {
                                    const ParameterDictionary &parameters,
                                    const FileLoc *loc, Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {}
+    void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> Sample_Li(const Interaction &ref, const Point2f &u,
@@ -430,7 +430,7 @@ class GoniometricLight : public LightBase {
                                     const RGBColorSpace *colorSpace, const FileLoc *loc,
                                     Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {}
+    void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> Sample_Li(const Interaction &ref, const Point2f &u,
@@ -489,7 +489,7 @@ class DiffuseAreaLight : public LightBase {
                                     const RGBColorSpace *colorSpace, const FileLoc *loc,
                                     Allocator alloc, const ShapeHandle shape);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {}
+    void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
     SampledSpectrum L(const Interaction &intr, const Vector3f &w,
@@ -604,8 +604,8 @@ class UniformInfiniteLight : public LightBase {
     UniformInfiniteLight(const AnimatedTransform &worldFromLight, SpectrumHandle Lemit,
                          Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {
-        cameraWorldBound.BoundingSphere(&cameraWorldCenter, &cameraWorldRadius);
+    void Preprocess(const Bounds3f &sceneBounds) {
+        sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
@@ -638,8 +638,8 @@ class UniformInfiniteLight : public LightBase {
   private:
     // UniformInfiniteLight Private Data
     SpectrumHandle Lemit;
-    Point3f cameraWorldCenter;
-    Float cameraWorldRadius;
+    Point3f sceneCenter;
+    Float sceneRadius;
 };
 
 class ImageInfiniteLight : public LightBase {
@@ -648,8 +648,8 @@ class ImageInfiniteLight : public LightBase {
     ImageInfiniteLight(const AnimatedTransform &worldFromLight, Image image,
                        const RGBColorSpace *imageColorSpace, Float scale,
                        const std::string &imageFile, Allocator alloc);
-    void Preprocess(const Bounds3f &cameraWorldBound) {
-        cameraWorldBound.BoundingSphere(&cameraWorldCenter, &cameraWorldRadius);
+    void Preprocess(const Bounds3f &sceneBounds) {
+        sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
@@ -686,7 +686,7 @@ class ImageInfiniteLight : public LightBase {
         L *= scale;
 
         return LightLiSample(this, L, wi, pdf, ref,
-                             Interaction(ref.p() + wi * (2 * cameraWorldRadius), ref.time,
+                             Interaction(ref.p() + wi * (2 * sceneRadius), ref.time,
                                          &mediumInterface));
     }
 
@@ -724,8 +724,8 @@ class ImageInfiniteLight : public LightBase {
     const RGBColorSpace *imageColorSpace;
     Float scale;
     WrapMode2D wrapMode;
-    Point3f cameraWorldCenter;
-    Float cameraWorldRadius;
+    Point3f sceneCenter;
+    Float sceneRadius;
     PiecewiseConstant2D distribution, compensatedDistribution;
 };
 
@@ -736,8 +736,8 @@ class PortalImageInfiniteLight : public LightBase {
                              const std::string &imageFile, std::vector<Point3f> portal,
                              Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {
-        cameraWorldBound.BoundingSphere(&cameraWorldCenter, &cameraWorldRadius);
+    void Preprocess(const Bounds3f &sceneBounds) {
+        sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
@@ -821,8 +821,8 @@ class PortalImageInfiniteLight : public LightBase {
     Frame portalFrame;
     pstd::array<Point3f, 4> portal;
     SATPiecewiseConstant2D distribution;
-    Point3f cameraWorldCenter;
-    Float cameraWorldRadius;
+    Point3f sceneCenter;
+    Float sceneRadius;
 };
 
 // SpotLight Declarations
@@ -837,7 +837,7 @@ class SpotLight : public LightBase {
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc);
 
-    void Preprocess(const Bounds3f &cameraWorldBound) {}
+    void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> Sample_Li(const Interaction &ref, const Point2f &u,

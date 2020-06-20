@@ -139,7 +139,7 @@ BVHAccel::BVHAccel(std::vector<PrimitiveHandle> p, int maxPrimsInNode,
     // Initialize _primitiveInfo_ array for primitives
     std::vector<BVHPrimitiveInfo> primitiveInfo(primitives.size());
     for (size_t i = 0; i < primitives.size(); ++i)
-        primitiveInfo[i] = {i, primitives[i].CameraWorldBound()};
+        primitiveInfo[i] = {i, primitives[i].Bounds()};
 
     // Build BVH tree for primitives using _primitiveInfo_
     // These need to survive until we've built the compact BVH...
@@ -176,7 +176,7 @@ BVHAccel::BVHAccel(std::vector<PrimitiveHandle> p, int maxPrimsInNode,
     CHECK_EQ(totalNodes.load(), offset);
 }
 
-Bounds3f BVHAccel::CameraWorldBound() const {
+Bounds3f BVHAccel::Bounds() const {
     CHECK(nodes != nullptr);
     return nodes[0].bounds;
 }
@@ -791,7 +791,7 @@ KdTreeAccel::KdTreeAccel(std::vector<PrimitiveHandle> p, int isectCost, int trav
     std::vector<Bounds3f> primBounds;
     primBounds.reserve(primitives.size());
     for (PrimitiveHandle &prim : primitives) {
-        Bounds3f b = prim.CameraWorldBound();
+        Bounds3f b = prim.Bounds();
         bounds = Union(bounds, b);
         primBounds.push_back(b);
     }

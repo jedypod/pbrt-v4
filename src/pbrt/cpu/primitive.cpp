@@ -20,20 +20,20 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Primitives", primitiveMemory);
 
-Bounds3f PrimitiveHandle::CameraWorldBound() const {
+Bounds3f PrimitiveHandle::Bounds() const {
     switch (Tag()) {
     case TypeIndex<SimplePrimitive>():
-        return Cast<SimplePrimitive>()->CameraWorldBound();
+        return Cast<SimplePrimitive>()->Bounds();
     case TypeIndex<GeometricPrimitive>():
-        return Cast<GeometricPrimitive>()->CameraWorldBound();
+        return Cast<GeometricPrimitive>()->Bounds();
     case TypeIndex<TransformedPrimitive>():
-        return Cast<TransformedPrimitive>()->CameraWorldBound();
+        return Cast<TransformedPrimitive>()->Bounds();
     case TypeIndex<AnimatedPrimitive>():
-        return Cast<AnimatedPrimitive>()->CameraWorldBound();
+        return Cast<AnimatedPrimitive>()->Bounds();
     case TypeIndex<BVHAccel>():
-        return Cast<BVHAccel>()->CameraWorldBound();
+        return Cast<BVHAccel>()->Bounds();
     case TypeIndex<KdTreeAccel>():
-        return Cast<KdTreeAccel>()->CameraWorldBound();
+        return Cast<KdTreeAccel>()->Bounds();
     default:
         LOG_FATAL("Unhandled primitive type: %d", Tag());
         return {};
@@ -83,57 +83,57 @@ bool PrimitiveHandle::IntersectP(const Ray &r, Float tMax) const {
 
 // TransformedPrimitive Method Definitions
 TransformedPrimitive::TransformedPrimitive(PrimitiveHandle primitive,
-                                           const Transform *cameraWorldFromPrimitive)
-    : primitive(primitive), cameraWorldFromPrimitive(cameraWorldFromPrimitive) {
+                                           const Transform *renderFromPrimitive)
+    : primitive(primitive), renderFromPrimitive(renderFromPrimitive) {
     primitiveMemory += sizeof(*this);
 }
 
 pstd::optional<ShapeIntersection> TransformedPrimitive::Intersect(const Ray &r,
                                                                   Float tMax) const {
-    // Compute _ray_ after transformation by _cameraWorldFromPrimitive_
-    Ray ray = cameraWorldFromPrimitive->ApplyInverse(r, &tMax);
+    // Compute _ray_ after transformation by _renderFromPrimitive_
+    Ray ray = renderFromPrimitive->ApplyInverse(r, &tMax);
     pstd::optional<ShapeIntersection> si = primitive.Intersect(ray, tMax);
     if (!si)
         return {};
     CHECK_LT(si->tHit, 1.001 * tMax);
 
-    // Transform instance's intersection data to world space
-    si->intr = (*cameraWorldFromPrimitive)(si->intr);
+    // Transform instance's intersection data to render space
+    si->intr = (*renderFromPrimitive)(si->intr);
     CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0);
     return si;
 }
 
 bool TransformedPrimitive::IntersectP(const Ray &r, Float tMax) const {
-    Ray ray = cameraWorldFromPrimitive->ApplyInverse(r, &tMax);
+    Ray ray = renderFromPrimitive->ApplyInverse(r, &tMax);
     return primitive.IntersectP(ray, tMax);
 }
 
 // AnimatedPrimitive Method Definitions
 AnimatedPrimitive::AnimatedPrimitive(PrimitiveHandle p,
-                                     const AnimatedTransform &cameraWorldFromPrimitive)
-    : primitive(p), cameraWorldFromPrimitive(cameraWorldFromPrimitive) {
+                                     const AnimatedTransform &renderFromPrimitive)
+    : primitive(p), renderFromPrimitive(renderFromPrimitive) {
     primitiveMemory += sizeof(*this);
-    CHECK(cameraWorldFromPrimitive.IsAnimated());
+    CHECK(renderFromPrimitive.IsAnimated());
 }
 
 pstd::optional<ShapeIntersection> AnimatedPrimitive::Intersect(const Ray &r,
                                                                Float tMax) const {
-    // Compute _ray_ after transformation by _cameraWorldFromPrimitive_
-    Transform interpCameraWorldFromPrimitive =
-        cameraWorldFromPrimitive.Interpolate(r.time);
-    Ray ray = interpCameraWorldFromPrimitive.ApplyInverse(r, &tMax);
+    // Compute _ray_ after transformation by _renderFromPrimitive_
+    Transform interpRenderFromPrimitive =
+        renderFromPrimitive.Interpolate(r.time);
+    Ray ray = interpRenderFromPrimitive.ApplyInverse(r, &tMax);
     pstd::optional<ShapeIntersection> si = primitive.Intersect(ray, tMax);
     if (!si)
         return {};
 
-    // Transform instance's intersection data to world space
-    si->intr = interpCameraWorldFromPrimitive(si->intr);
+    // Transform instance's intersection data to render space
+    si->intr = interpRenderFromPrimitive(si->intr);
     CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0);
     return si;
 }
 
 bool AnimatedPrimitive::IntersectP(const Ray &r, Float tMax) const {
-    Ray ray = cameraWorldFromPrimitive.ApplyInverse(r, &tMax);
+    Ray ray = renderFromPrimitive.ApplyInverse(r, &tMax);
     return primitive.IntersectP(ray, tMax);
 }
 
@@ -150,8 +150,8 @@ GeometricPrimitive::GeometricPrimitive(ShapeHandle shape, MaterialHandle materia
     primitiveMemory += sizeof(*this);
 }
 
-Bounds3f GeometricPrimitive::CameraWorldBound() const {
-    return shape.CameraWorldBound();
+Bounds3f GeometricPrimitive::Bounds() const {
+    return shape.Bounds();
 }
 
 bool GeometricPrimitive::IntersectP(const Ray &r, Float tMax) const {
@@ -204,8 +204,8 @@ SimplePrimitive::SimplePrimitive(ShapeHandle shape, MaterialHandle material)
     primitiveMemory += sizeof(*this);
 }
 
-Bounds3f SimplePrimitive::CameraWorldBound() const {
-    return shape.CameraWorldBound();
+Bounds3f SimplePrimitive::Bounds() const {
+    return shape.Bounds();
 }
 
 bool SimplePrimitive::IntersectP(const Ray &r, Float tMax) const {

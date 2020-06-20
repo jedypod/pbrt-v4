@@ -38,7 +38,7 @@ class PrimitiveHandle
   public:
     using TaggedPointer::TaggedPointer;
 
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &r,
                                                 Float tMax = Infinity) const;
     bool IntersectP(const Ray &r, Float tMax = Infinity) const;
@@ -48,7 +48,7 @@ class PrimitiveHandle
 class alignas(8) GeometricPrimitive {
   public:
     // GeometricPrimitive Public Methods
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
     GeometricPrimitive(ShapeHandle shape, MaterialHandle material, LightHandle areaLight,
@@ -70,7 +70,7 @@ class alignas(8) GeometricPrimitive {
 class alignas(8) SimplePrimitive {
   public:
     // SimplePrimitive Public Methods
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
     SimplePrimitive(ShapeHandle shape, MaterialHandle material);
@@ -86,17 +86,17 @@ class alignas(8) TransformedPrimitive {
   public:
     // TransformedPrimitive Public Methods
     TransformedPrimitive(PrimitiveHandle primitive,
-                         const Transform *cameraWorldFromPrimitive);
+                         const Transform *renderFromPrimitive);
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
-    Bounds3f CameraWorldBound() const {
-        return (*cameraWorldFromPrimitive)(primitive.CameraWorldBound());
+    Bounds3f Bounds() const {
+        return (*renderFromPrimitive)(primitive.Bounds());
     }
 
   private:
     // TransformedPrimitive Private Data
     PrimitiveHandle primitive;
-    const Transform *cameraWorldFromPrimitive;
+    const Transform *renderFromPrimitive;
 };
 
 // AnimatedPrimitive Declarations
@@ -104,17 +104,17 @@ class alignas(8) AnimatedPrimitive {
   public:
     // AnimatedPrimitive Public Methods
     AnimatedPrimitive(PrimitiveHandle primitive,
-                      const AnimatedTransform &cameraWorldFromPrimitive);
+                      const AnimatedTransform &renderFromPrimitive);
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
-    Bounds3f CameraWorldBound() const {
-        return cameraWorldFromPrimitive.MotionBounds(primitive.CameraWorldBound());
+    Bounds3f Bounds() const {
+        return renderFromPrimitive.MotionBounds(primitive.Bounds());
     }
 
   private:
     // AnimatedPrimitive Private Data
     PrimitiveHandle primitive;
-    AnimatedTransform cameraWorldFromPrimitive;
+    AnimatedTransform renderFromPrimitive;
 };
 
 }  // namespace pbrt
