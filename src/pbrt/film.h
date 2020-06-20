@@ -200,7 +200,7 @@ class GBufferFilm : public FilmBase {
     PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
         const Pixel &pixel = pixels[p];
-        RGB rgb(pixel.LSum[0], pixel.LSum[1], pixel.LSum[2]);
+        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
 
         // Normalize pixel with weight sum
         Float weightSum = pixel.weightSum;
@@ -226,7 +226,7 @@ class GBufferFilm : public FilmBase {
     // GBufferFilm Private Data
     struct Pixel {
         Pixel() = default;
-        double LSum[3] = {0., 0., 0.};
+        double rgbSum[3] = {0., 0., 0.};
         double weightSum = 0.;
         AtomicDouble splatRGB[3];
         Point3f pSum;

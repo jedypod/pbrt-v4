@@ -378,7 +378,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
         addRGB(albedo, p.albedoSum);
     }
 
-    addRGB(L, p.LSum);
+    addRGB(L, p.rgbSum);
     p.weightSum += weight;
 }
 
@@ -459,7 +459,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
-        RGB Lrgb(pixel.LSum[0], pixel.LSum[1], pixel.LSum[2]);
+        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
         RGB albedoRgb(pixel.albedoSum[0], pixel.albedoSum[1], pixel.albedoSum[2]);
 
         // Normalize pixel with weight sum
@@ -467,7 +467,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         Point3f pt = pixel.pSum;
         Float dzdx = pixel.dzdxSum, dzdy = pixel.dzdySum;
         if (weightSum != 0) {
-            Lrgb /= weightSum;
+            rgb /= weightSum;
             albedoRgb /= weightSum;
             pt /= weightSum;
             dzdx /= weightSum;
@@ -476,10 +476,10 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
         // Add splat value at pixel
         for (int c = 0; c < 3; ++c)
-            Lrgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
+            rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
-        image.SetChannels(pOffset, rgbDesc, {Lrgb[0], Lrgb[1], Lrgb[2]});
+        image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
         image.SetChannels(pOffset, albedoRgbDesc,
                           {albedoRgb[0], albedoRgb[1], albedoRgb[2]});
 
