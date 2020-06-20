@@ -150,22 +150,12 @@ inline int64_t RNG::Uniform<int64_t>() {
 
 template <>
 inline float RNG::Uniform<float>() {
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-    return std::min<float>(OneMinusEpsilon,
-                           Uniform<uint32_t>() * 2.3283064365386963e-10f);
-#else
     return std::min<float>(OneMinusEpsilon, Uniform<uint32_t>() * 0x1p-32f);
-#endif
 }
 
 template <>
 inline double RNG::Uniform<double>() {
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-    return std::min<double>(OneMinusEpsilon,
-                            (Uniform<uint64_t>() * 5.42101086242752217003726400435e-20));
-#else
     return std::min<double>(OneMinusEpsilon, Uniform<uint64_t>() * 0x1p-64);
-#endif
 }
 
 template <typename T>

@@ -149,11 +149,7 @@ Float RadicalInverse(int baseIndex, uint64_t a) {
     switch (baseIndex) {
     case 0:
         // Compute base-2 radical inverse
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-        return ReverseBits64(a) * 5.4210108624275222e-20;
-#else
         return ReverseBits64(a) * 0x1p-64;
-#endif
     case 1:
         return RadicalInverseSpecialized<3>(a);
     case 2:

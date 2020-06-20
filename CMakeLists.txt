@@ -239,13 +239,6 @@ ENDIF ()
 INCLUDE (CheckCXXSourceCompiles)
 INCLUDE (CheckCXXSourceRuns)
 
-CHECK_CXX_SOURCE_COMPILES (
-  "int main() { float x = 0x1p-32f; }"
-  HAVE_HEX_FP_CONSTANTS )
-IF ( HAVE_HEX_FP_CONSTANTS )
-  ADD_DEFINITIONS ( -D PBRT_HAVE_HEX_FP_CONSTANTS )
-ENDIF ()
-
 CHECK_CXX_SOURCE_COMPILES ( "
 #include <fcntl.h>
 #include <sys/mman.h>

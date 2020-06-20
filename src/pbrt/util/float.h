@@ -42,13 +42,8 @@ namespace pbrt {
 
 #else
 
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-static const double DoubleOneMinusEpsilon = 0.99999999999999989;
-static const float FloatOneMinusEpsilon = 0.99999994;
-#else
 static const double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
 static const float FloatOneMinusEpsilon = 0x1.fffffep-1;
-#endif
 
 #ifdef PBRT_FLOAT_IS_DOUBLE
 static const double OneMinusEpsilon = DoubleOneMinusEpsilon;
