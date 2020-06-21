@@ -189,16 +189,20 @@ class optional {
   private:
 #ifdef __NVCC__
     // Work-around NVCC bug
+    PBRT_CPU_GPU
     T *ptr() {
         return reinterpret_cast<T *>(&optionalValue);
     }
+    PBRT_CPU_GPU
     const T *ptr() const {
         return reinterpret_cast<const T *>(&optionalValue);
     }
 #else
+    PBRT_CPU_GPU
     T *ptr() {
         return std::launder(reinterpret_cast<T *>(&optionalValue));
     }
+    PBRT_CPU_GPU
     const T *ptr() const {
         return std::launder(reinterpret_cast<const T *>(&optionalValue));
     }
