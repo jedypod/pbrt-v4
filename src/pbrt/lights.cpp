@@ -676,7 +676,7 @@ LightBounds DiffuseAreaLight::Bounds() const {
     } else
         phi = Lemit.MaxValue();
 
-    phi *= (twoSided ? 2 : 1) * area * Pi;
+    phi *= scale * (twoSided ? 2 : 1) * area * Pi;
 
     // TODO: for animated shapes, we probably need to worry about
     // worldFromLight as in Sample_Li().
