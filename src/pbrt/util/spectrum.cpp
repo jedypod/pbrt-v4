@@ -40,17 +40,17 @@ std::string SpectrumHandle::ToString() const {
         return "(nullptr)";
 
     auto tostr = [&](auto ptr) { return ptr->ToString(); };
-    return Apply<std::string>(tostr);
+    return ApplyCPU<std::string>(tostr);
 }
 
 std::string SpectrumHandle::ParameterType() const {
     auto pt = [&](auto ptr) { return ptr->ParameterType(); };
-    return Apply<std::string>(pt);
+    return ApplyCPU<std::string>(pt);
 }
 
 std::string SpectrumHandle::ParameterString() const {
     auto ps = [&](auto ptr) { return ptr->ParameterString(); };
-    return Apply<std::string>(ps);
+    return ApplyCPU<std::string>(ps);
 }
 
 Float SpectrumToY(SpectrumHandle s) {

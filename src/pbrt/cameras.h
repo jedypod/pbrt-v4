@@ -33,40 +33,55 @@ class CameraTransform {
     CameraTransform() = default;
     explicit CameraTransform(const AnimatedTransform &worldFromCamera);
 
+    PBRT_CPU_GPU
     bool CameraFromRenderHasScale() const {
         return renderFromCamera.HasScale();
     }
 
+    PBRT_CPU_GPU
     Point3f RenderFromCamera(const Point3f &p, Float time) const {
         return renderFromCamera(p, time);
     }
+
+    PBRT_CPU_GPU
     Vector3f RenderFromCamera(const Vector3f &v, Float time) const {
         return renderFromCamera(v, time);
     }
+
+    PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const { return renderFromCamera(r); }
+
+    PBRT_CPU_GPU
     RayDifferential RenderFromCamera(const RayDifferential &r) const {
         return renderFromCamera(r);
     }
 
+    PBRT_CPU_GPU
     Point3f CameraFromRender(const Point3f &p, Float time) const {
         return renderFromCamera.ApplyInverse(p, time);
     }
+
+    PBRT_CPU_GPU
     Vector3f CameraFromRender(const Vector3f &v, Float time) const {
         return renderFromCamera.ApplyInverse(v, time);
     }
 
+    PBRT_CPU_GPU
     Point3f RenderFromWorld(const Point3f &p) const {
         return worldFromRender.ApplyInverse(p);
     }
 
+    PBRT_CPU_GPU
     Transform RenderFromWorld() const {
         return Inverse(worldFromRender);
     }
 
+    PBRT_CPU_GPU
     Transform CameraFromRender(Float time) const {
         return Inverse(renderFromCamera.Interpolate(time));
     }
 
+    PBRT_CPU_GPU
     Transform CameraFromWorld(Float time) const {
         return Inverse(worldFromRender * renderFromCamera.Interpolate(time));
     }

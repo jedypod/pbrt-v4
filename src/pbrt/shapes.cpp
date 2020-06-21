@@ -1536,7 +1536,7 @@ std::string ShapeHandle::ToString() const {
         return "(nullptr)";
 
     auto tostr = [&](auto ptr) { return ptr->ToString(); };
-    return Apply<std::string>(tostr);
+    return ApplyCPU<std::string>(tostr);
 }
 
 // Shape Method Definitions

@@ -22,18 +22,18 @@ STAT_MEMORY_COUNTER("Memory/Primitives", primitiveMemory);
 
 Bounds3f PrimitiveHandle::Bounds() const {
     auto bounds = [&](auto ptr) { return ptr->Bounds(); };
-    return Apply<Bounds3f>(bounds);
+    return ApplyCPU<Bounds3f>(bounds);
 }
 
 pstd::optional<ShapeIntersection> PrimitiveHandle::Intersect(const Ray &r,
                                                              Float tMax) const {
     auto isect = [&](auto ptr) { return ptr->Intersect(r, tMax); };
-    return Apply<pstd::optional<ShapeIntersection>>(isect);
+    return ApplyCPU<pstd::optional<ShapeIntersection>>(isect);
 }
 
 bool PrimitiveHandle::IntersectP(const Ray &r, Float tMax) const {
     auto isectp = [&](auto ptr) { return ptr->IntersectP(r, tMax); };
-    return Apply<bool>(isectp);
+    return ApplyCPU<bool>(isectp);
 }
 
 // TransformedPrimitive Method Definitions
