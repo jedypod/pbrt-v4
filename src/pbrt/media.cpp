@@ -221,22 +221,18 @@ GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigm
       sigma_s_spec(sigma_s, alloc),
       phase(g),
       g(g),
-      nx(nx),
-      ny(ny),
-      nz(nz),
       mediumFromWorld(Inverse(worldFromMedium)),
       worldFromMedium(worldFromMedium),
-      density(d.begin(), d.end(), alloc),
+      densityGrid(d, nx, ny, nz, alloc),
       treeBufferResource(256 * 1024, alloc.resource()) {
-    CHECK_EQ(nx * ny * nz, density.size());
-    densityBytes += density.size() * sizeof(Float);
+    densityBytes += densityGrid.BytesAllocated();
 
     // Create densityOctree. For starters, make the full thing. (Probably
     // not the best approach).
     const int maxDepth = 6;
     Bounds3f bounds(Point3f(0, 0, 0), Point3f(1, 1, 1));
     Allocator treeAllocator(&treeBufferResource);
-    buildOctree(&densityOctree, treeAllocator, bounds, maxDepth);
+    buildOctree(&densityOctree, nx, ny, nz, treeAllocator, bounds, maxDepth);
 
     // Want world-space bounds, but not including the rotation, so that the bbox
     // doesn't expand
@@ -282,8 +278,8 @@ void GridDensityMedium::simplifyOctree(OctreeNode *node, const Bounds3f &bounds,
     }
 }
 
-void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
-                                    const Bounds3f &bounds, int depth) {
+void GridDensityMedium::buildOctree(OctreeNode *node, int nx, int ny, int nz,
+                                    Allocator alloc, const Bounds3f &bounds, int depth) {
     node->bounds = bounds;
     if (depth == 0) {
         // leaf
@@ -299,7 +295,7 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         for (int z = pi[0].z; z <= pi[1].z; ++z)
             for (int y = pi[0].y; y <= pi[1].y; ++y)
                 for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                    Float d = D(Point3i(x, y, z));
+                    Float d = densityGrid.Lookup(Point3i(x, y, z));
                     minDensity = std::min(minDensity, d);
                     maxDensity = std::max(maxDensity, d);
                 }
@@ -312,7 +308,8 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
     node->children = alloc.new_object<pstd::array<OctreeNode *, 8>>();
     for (int i = 0; i < 8; ++i) {
         node->child(i) = alloc.new_object<OctreeNode>();
-        buildOctree(node->child(i), alloc, OctreeChildBounds(bounds, i), depth - 1);
+        buildOctree(node->child(i), nx, ny, nz, alloc, OctreeChildBounds(bounds, i),
+                    depth - 1);
     }
 
     node->minDensity = node->child(0)->minDensity;
@@ -350,7 +347,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
     Point3f p = ray(t);
     Float Tn = Exp(-sigma_nt * (t - tMin));
 
-    Float density = Density(p);
+    Float density = densityGrid.Lookup(p);
     sigma_a *= density;
     sigma_s *= density;
 
@@ -368,7 +365,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            DCHECK_RARE(1e-5, Density(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
+            DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
 
             Float sigma_nt = sigma_t.MaxComponentValue() * node.maxDensity;
 
@@ -391,7 +388,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
             Point3f p = ray(t);
             Float Tn = FastExp(-sigma_nt * (t - t0));
 
-            Float density = Density(p);
+            Float density = densityGrid.Lookup(p);
 
             static bool doRGB = getenv("RGB");
             if (doRGB) {
@@ -476,10 +473,9 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
 
 std::string GridDensityMedium::ToString() const {
     Float maxDensity = densityOctree.maxDensity;
-    return StringPrintf("[ GridDensityMedium sigma_a: %s sigma_s: %s "
-                        " nx: %d ny: %d nz: %d mediumFromWorld: %s root maxDensity: %f ]",
-                        sigma_a_spec, sigma_s_spec, nx, ny, nz, mediumFromWorld,
-                        maxDensity);
+    return StringPrintf("[ GridDensityMedium sigma_a: %s sigma_s: %s mediumFromWorld: %s "
+                        "root maxDensity: %f ]",
+                        sigma_a_spec, sigma_s_spec, mediumFromWorld, maxDensity);
 }
 
 MediumHandle MediumHandle::Create(const std::string &name,

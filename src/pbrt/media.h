@@ -168,31 +168,6 @@ class alignas(8) GridDensityMedium {
                                      Allocator alloc);
 
     PBRT_CPU_GPU
-    Float D(const Point3i &p) const {
-        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
-        if (!InsideExclusive(p, sampleBounds))
-            return 0;
-        return density[(p.z * ny + p.y) * nx + p.x];
-    }
-
-    PBRT_CPU_GPU
-    Float Density(const Point3f &p) const {
-        // Compute voxel coordinates and offsets for _p_
-        Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
-        Point3i pi = (Point3i)Floor(pSamples);
-        Vector3f d = pSamples - (Point3f)pi;
-
-        // Trilinearly interpolate density values to compute local density
-        Float d00 = Lerp(d.x, D(pi), D(pi + Vector3i(1, 0, 0)));
-        Float d10 = Lerp(d.x, D(pi + Vector3i(0, 1, 0)), D(pi + Vector3i(1, 1, 0)));
-        Float d01 = Lerp(d.x, D(pi + Vector3i(0, 0, 1)), D(pi + Vector3i(1, 0, 1)));
-        Float d11 = Lerp(d.x, D(pi + Vector3i(0, 1, 1)), D(pi + Vector3i(1, 1, 1)));
-        Float d0 = Lerp(d.y, d00, d10);
-        Float d1 = Lerp(d.y, d01, d11);
-        return Lerp(d.z, d0, d1);
-    }
-
-    PBRT_CPU_GPU
     MediumSample Sample(const Ray &rWorld, Float raytMax, RNG &rng,
                         const SampledWavelengths &lambda,
                         ScratchBuffer &scratchBuffer) const {
@@ -220,7 +195,7 @@ class alignas(8) GridDensityMedium {
                     // Empty--skip it!
                     return OctreeTraversal::Continue;
 
-                DCHECK_RARE(1e-5, Density(ray((t + t1) / 2)) > node.maxDensity);
+                DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t + t1) / 2)) > node.maxDensity);
                 while (true) {
                     // CO                ++nSampleSteps;
                     t +=
@@ -234,7 +209,7 @@ class alignas(8) GridDensityMedium {
                         // Nothing before the geom intersection; get out of here
                         return OctreeTraversal::Abort;
 
-                    if (Density(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
+                    if (densityGrid.Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
                         // Populate _mi_ with medium interaction information and
                         // return
                         PhaseFunctionHandle phase =
@@ -309,7 +284,7 @@ class alignas(8) GridDensityMedium {
                                    // past hit point. stop
                                    return OctreeTraversal::Abort;
 
-                               Float density = Density(ray(t)) - node.minDensity;
+                               Float density = densityGrid.Lookup(ray(t)) - node.minDensity;
                                CHECK_RARE(1e-9, density < 0);
                                density = std::max<Float>(density, 0);
 
@@ -362,8 +337,10 @@ class alignas(8) GridDensityMedium {
         }
     };
 
-    void buildOctree(OctreeNode *node, Allocator alloc, const Bounds3f &bounds,
-                     int depth);
+
+
+    void buildOctree(OctreeNode *node,  int nx, int ny, int nz, Allocator alloc,
+                     const Bounds3f &bounds, int depth);
     void simplifyOctree(OctreeNode *node, const Bounds3f &bounds, Float SE,
                         Float sigma_t);
 
@@ -371,9 +348,8 @@ class alignas(8) GridDensityMedium {
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     HenyeyGreensteinPhaseFunction phase;
     Float g;
-    int nx, ny, nz;
     Transform mediumFromWorld, worldFromMedium;
-    pstd::vector<Float> density;
+    SampledGrid<Float> densityGrid;
     OctreeNode densityOctree;
     pstd::pmr::monotonic_buffer_resource treeBufferResource;
 };
