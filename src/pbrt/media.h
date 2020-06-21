@@ -337,10 +337,7 @@ class alignas(8) GridDensityMedium {
         }
     };
 
-
-
-    void buildOctree(OctreeNode *node,  int nx, int ny, int nz, Allocator alloc,
-                     const Bounds3f &bounds, int depth);
+    void buildOctree(OctreeNode *node, Allocator alloc, const Bounds3f &bounds, int depth);
     void simplifyOctree(OctreeNode *node, const Bounds3f &bounds, Float SE,
                         Float sigma_t);
 

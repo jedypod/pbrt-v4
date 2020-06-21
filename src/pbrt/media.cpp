@@ -232,7 +232,7 @@ GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigm
     const int maxDepth = 6;
     Bounds3f bounds(Point3f(0, 0, 0), Point3f(1, 1, 1));
     Allocator treeAllocator(&treeBufferResource);
-    buildOctree(&densityOctree, nx, ny, nz, treeAllocator, bounds, maxDepth);
+    buildOctree(&densityOctree, treeAllocator, bounds, maxDepth);
 
     // Want world-space bounds, but not including the rotation, so that the bbox
     // doesn't expand
@@ -278,38 +278,19 @@ void GridDensityMedium::simplifyOctree(OctreeNode *node, const Bounds3f &bounds,
     }
 }
 
-void GridDensityMedium::buildOctree(OctreeNode *node, int nx, int ny, int nz,
-                                    Allocator alloc, const Bounds3f &bounds, int depth) {
-    node->bounds = bounds;
+void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
+                                    const Bounds3f &bounds, int depth) {
     if (depth == 0) {
         // leaf
-        Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                                 bounds.pMin.z * nz - .5f),
-                         Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                                 bounds.pMax.z * nz - .5f)};
-        Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-                         Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
-                             Point3i(nx - 1, ny - 1, nz - 1))};
-
-        Float minDensity = Infinity, maxDensity = 0;
-        for (int z = pi[0].z; z <= pi[1].z; ++z)
-            for (int y = pi[0].y; y <= pi[1].y; ++y)
-                for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                    Float d = densityGrid.Lookup(Point3i(x, y, z));
-                    minDensity = std::min(minDensity, d);
-                    maxDensity = std::max(maxDensity, d);
-                }
-
-        node->minDensity = minDensity;
-        node->maxDensity = maxDensity;
+        node->maxDensity = densityGrid.MaximumValue(bounds);
+        CHECK_GE(node->maxDensity, 0);
         return;
     }
 
     node->children = alloc.new_object<pstd::array<OctreeNode *, 8>>();
     for (int i = 0; i < 8; ++i) {
         node->child(i) = alloc.new_object<OctreeNode>();
-        buildOctree(node->child(i), nx, ny, nz, alloc, OctreeChildBounds(bounds, i),
-                    depth - 1);
+        buildOctree(node->child(i), alloc, OctreeChildBounds(bounds, i), depth - 1);
     }
 
     node->minDensity = node->child(0)->minDensity;
