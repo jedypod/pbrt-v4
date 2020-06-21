@@ -499,14 +499,9 @@ class alignas(8) FBmTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(const TextureEvalContext &ctx) const {
-#ifdef PBRT_IS_GPU_CODE
-        LOG_FATAL("FBmTexture not currently supported with GPU renderer.");
-        return 0;
-#else
         Vector3f dpdx, dpdy;
         Point3f P = mapping.Map(ctx, &dpdx, &dpdy);
         return FBm(P, dpdx, dpdy, omega, octaves);
-#endif
     }
 
     static FBmTexture *Create(const Transform &worldFromTexture,
