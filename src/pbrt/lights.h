@@ -648,6 +648,7 @@ class ImageInfiniteLight : public LightBase {
     ImageInfiniteLight(const AnimatedTransform &worldFromLight, Image image,
                        const RGBColorSpace *imageColorSpace, Float scale,
                        const std::string &imageFile, Allocator alloc);
+
     void Preprocess(const Bounds3f &sceneBounds) {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
@@ -658,7 +659,7 @@ class ImageInfiniteLight : public LightBase {
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
         Vector3f wl = Normalize(worldFromLight.ApplyInverse(ray.d, ray.time));
         Point2f st = EquiAreaSphereToSquare(wl);
-        return scale * lookupSpectrum(st, lambda);
+        return LookupLe(st, lambda);
     }
 
     PBRT_CPU_GPU
@@ -681,9 +682,7 @@ class ImageInfiniteLight : public LightBase {
         Float pdf = mapPDF / (4 * Pi);
 
         // Return radiance value for infinite light direction
-        SampledSpectrum L = lookupSpectrum(uv, lambda);
-
-        L *= scale;
+        SampledSpectrum L = LookupLe(uv, lambda);
 
         return LightLiSample(this, L, wi, pdf, ref,
                              Interaction(ref.p() + wi * (2 * sceneRadius), ref.time,
@@ -711,11 +710,11 @@ class ImageInfiniteLight : public LightBase {
 
   private:
     PBRT_CPU_GPU
-    SampledSpectrum lookupSpectrum(Point2f st, const SampledWavelengths &lambda) const {
+    SampledSpectrum LookupLe(Point2f st, const SampledWavelengths &lambda) const {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = image.LookupNearestChannel(st, c, wrapMode);
-        return RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+        return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
     }
 
     // ImageInfiniteLight Private Data

@@ -898,8 +898,7 @@ pstd::optional<LightLeSample> ImageInfiniteLight::Sample_Le(
     // Compute _ImageInfiniteLight_ ray PDFs
     Float pdfDir = mapPDF / (4 * Pi);
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
-    SampledSpectrum L = scale * lookupSpectrum(uv, lambda);
-    return LightLeSample(L, ray, pdfPos, pdfDir);
+    return LightLeSample(LookupLe(uv, lambda), ray, pdfPos, pdfDir);
 }
 
 void ImageInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
