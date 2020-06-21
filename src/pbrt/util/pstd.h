@@ -167,12 +167,12 @@ class optional {
     PBRT_CPU_GPU
     T &value() {
         CHECK(set);
-        return *std::launder(ptr());
+        return *ptr();
     }
     PBRT_CPU_GPU
     const T &value() const {
         CHECK(set);
-        return *std::launder(ptr());
+        return *ptr();
     }
 
     PBRT_CPU_GPU
@@ -187,12 +187,22 @@ class optional {
     bool has_value() const { return set; }
 
   private:
+#ifdef __NVCC__
+    // Work-around NVCC bug
+    T *ptr() {
+        return reinterpret_cast<T *>(&optionalValue);
+    }
+    const T *ptr() const {
+        return reinterpret_cast<const T *>(&optionalValue);
+    }
+#else
     T *ptr() {
         return std::launder(reinterpret_cast<T *>(&optionalValue));
     }
     const T *ptr() const {
         return std::launder(reinterpret_cast<const T *>(&optionalValue));
     }
+#endif
 
     std::aligned_storage_t<sizeof(T), alignof(T)> optionalValue;
     bool set = false;
