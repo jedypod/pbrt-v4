@@ -204,15 +204,8 @@ pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &
     }
 }
 
-SampledSpectrum BlackbodySpectrum::Sample(const SampledWavelengths &lambda) const {
-    SampledSpectrum s;
-    for (int i = 0; i < NSpectrumSamples; ++i)
-        s[i] = scale * Blackbody(lambda[i], T);
-    return s;
-}
-
 std::string BlackbodySpectrum::ToString() const {
-    return StringPrintf("[ BlackbodySpectrum %f ]", T);
+    return StringPrintf("[ BlackbodySpectrum T: %f scale: %f ]", T, scale);
 }
 
 std::string BlackbodySpectrum::ParameterType() const {
@@ -220,7 +213,7 @@ std::string BlackbodySpectrum::ParameterType() const {
 }
 
 std::string BlackbodySpectrum::ParameterString() const {
-    return StringPrintf("%f", T);
+    return StringPrintf("%f %f", T, scale);
 }
 
 SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {

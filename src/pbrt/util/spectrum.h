@@ -347,25 +347,34 @@ class alignas(8) SampledSpectrum {
 
 class alignas(8) BlackbodySpectrum {
   public:
-    BlackbodySpectrum(Float T) : T(T) {
+    BlackbodySpectrum(Float T, Float scale)
+        : T(T), scale(scale) {
         // Normalize _Le_ based on maximum blackbody radiance
         Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
-        scale = 1 / Blackbody(lambdaMax, T);
+        normalizationFactor = 1 / Blackbody(lambdaMax, T);
     }
 
     PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return scale * Blackbody(lambda, T); }
-    PBRT_CPU_GPU
-    SampledSpectrum Sample(const SampledWavelengths &lambda) const;
+    Float operator()(Float lambda) const {
+        return scale * Blackbody(lambda, T) * normalizationFactor;
+    }
 
     PBRT_CPU_GPU
-    Float MaxValue() const { return 1; }
+    SampledSpectrum Sample(const SampledWavelengths &lambda) const {
+        SampledSpectrum s;
+        for (int i = 0; i < NSpectrumSamples; ++i)
+            s[i] = scale * Blackbody(lambda[i], T) * normalizationFactor;
+        return s;
+    }
+
+    PBRT_CPU_GPU
+    Float MaxValue() const { return scale; }
 
     std::string ToString() const;
     std::string ParameterType() const;
     std::string ParameterString() const;
 
-    Float T, scale;
+    Float T, scale, normalizationFactor;
 };
 
 class alignas(8) ConstantSpectrum {

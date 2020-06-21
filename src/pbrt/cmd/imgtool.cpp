@@ -1723,7 +1723,7 @@ int whitebalance(int argc, char *argv[]) {
         }
         ccMatrix = colorSpace->ColorCorrectionMatrixForXYZ(SpectrumToXYZ(illum));
     } else if (temperature > 0) {
-        BlackbodySpectrum bb(temperature);
+        BlackbodySpectrum bb(temperature, 1.f);
         ccMatrix = colorSpace->ColorCorrectionMatrixForXYZ(SpectrumToXYZ(&bb));
     } else
         ccMatrix = colorSpace->ColorCorrectionMatrixForxy(xy[0], xy[1]);

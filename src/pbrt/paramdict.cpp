@@ -400,9 +400,9 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
             });
     else if (param.type == "blackbody")
         return returnArray<SpectrumHandle>(
-            param.numbers, param, 1,
+            param.numbers, param, 2,
             [this, &alloc](const double *v, const FileLoc *loc) -> SpectrumHandle {
-                return alloc.new_object<BlackbodySpectrum>(v[0]);
+                return alloc.new_object<BlackbodySpectrum>(v[0], v[1]);
             });
     else if (param.type == "spectrum" && !param.numbers.empty()) {
         if (param.numbers.size() % 2 != 0)
