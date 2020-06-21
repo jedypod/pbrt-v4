@@ -21,64 +21,19 @@ namespace pbrt {
 STAT_MEMORY_COUNTER("Memory/Primitives", primitiveMemory);
 
 Bounds3f PrimitiveHandle::Bounds() const {
-    switch (Tag()) {
-    case TypeIndex<SimplePrimitive>():
-        return Cast<SimplePrimitive>()->Bounds();
-    case TypeIndex<GeometricPrimitive>():
-        return Cast<GeometricPrimitive>()->Bounds();
-    case TypeIndex<TransformedPrimitive>():
-        return Cast<TransformedPrimitive>()->Bounds();
-    case TypeIndex<AnimatedPrimitive>():
-        return Cast<AnimatedPrimitive>()->Bounds();
-    case TypeIndex<BVHAccel>():
-        return Cast<BVHAccel>()->Bounds();
-    case TypeIndex<KdTreeAccel>():
-        return Cast<KdTreeAccel>()->Bounds();
-    default:
-        LOG_FATAL("Unhandled primitive type: %d", Tag());
-        return {};
-    }
+    auto bounds = [&](auto ptr) { return ptr->Bounds(); };
+    return Apply<Bounds3f>(bounds);
 }
 
 pstd::optional<ShapeIntersection> PrimitiveHandle::Intersect(const Ray &r,
                                                              Float tMax) const {
-    switch (Tag()) {
-    case TypeIndex<SimplePrimitive>():
-        return Cast<SimplePrimitive>()->Intersect(r, tMax);
-    case TypeIndex<GeometricPrimitive>():
-        return Cast<GeometricPrimitive>()->Intersect(r, tMax);
-    case TypeIndex<TransformedPrimitive>():
-        return Cast<TransformedPrimitive>()->Intersect(r, tMax);
-    case TypeIndex<AnimatedPrimitive>():
-        return Cast<AnimatedPrimitive>()->Intersect(r, tMax);
-    case TypeIndex<BVHAccel>():
-        return Cast<BVHAccel>()->Intersect(r, tMax);
-    case TypeIndex<KdTreeAccel>():
-        return Cast<KdTreeAccel>()->Intersect(r, tMax);
-    default:
-        LOG_FATAL("Unhandled primitive type");
-        return {};
-    }
+    auto isect = [&](auto ptr) { return ptr->Intersect(r, tMax); };
+    return Apply<pstd::optional<ShapeIntersection>>(isect);
 }
 
 bool PrimitiveHandle::IntersectP(const Ray &r, Float tMax) const {
-    switch (Tag()) {
-    case TypeIndex<SimplePrimitive>():
-        return Cast<SimplePrimitive>()->IntersectP(r, tMax);
-    case TypeIndex<GeometricPrimitive>():
-        return Cast<GeometricPrimitive>()->IntersectP(r, tMax);
-    case TypeIndex<TransformedPrimitive>():
-        return Cast<TransformedPrimitive>()->IntersectP(r, tMax);
-    case TypeIndex<AnimatedPrimitive>():
-        return Cast<AnimatedPrimitive>()->IntersectP(r, tMax);
-    case TypeIndex<BVHAccel>():
-        return Cast<BVHAccel>()->IntersectP(r, tMax);
-    case TypeIndex<KdTreeAccel>():
-        return Cast<KdTreeAccel>()->IntersectP(r, tMax);
-    default:
-        LOG_FATAL("Unhandled primitive type");
-        return {};
-    }
+    auto isectp = [&](auto ptr) { return ptr->IntersectP(r, tMax); };
+    return Apply<bool>(isectp);
 }
 
 // TransformedPrimitive Method Definitions

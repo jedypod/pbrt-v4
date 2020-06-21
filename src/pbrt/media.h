@@ -355,76 +355,40 @@ class alignas(8) GridDensityMedium {
 };
 
 inline Float PhaseFunctionHandle::p(const Vector3f &wo, const Vector3f &wi) const {
-    switch (Tag()) {
-    case TypeIndex<HenyeyGreensteinPhaseFunction>():
-        return Cast<HenyeyGreensteinPhaseFunction>()->p(wo, wi);
-    default:
-        LOG_FATAL("Unhandled phase function");
-        return {};
-    }
+    auto p = [&](auto ptr) { return ptr->p(wo, wi); };
+    return Apply<Float>(p);
 }
 
 inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
     const Vector3f &wo, const Point2f &u) const {
-    switch (Tag()) {
-    case TypeIndex<HenyeyGreensteinPhaseFunction>():
-        return Cast<HenyeyGreensteinPhaseFunction>()->Sample_p(wo, u);
-    default:
-        LOG_FATAL("Unhandled phase function");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample_p(wo, u); };
+    return Apply<pstd::optional<PhaseFunctionSample>>(sample);
 }
 
 inline Float PhaseFunctionHandle::PDF(const Vector3f &wo, const Vector3f &wi) const {
-    switch (Tag()) {
-    case TypeIndex<HenyeyGreensteinPhaseFunction>():
-        return Cast<HenyeyGreensteinPhaseFunction>()->PDF(wo, wi);
-    default:
-        LOG_FATAL("Unhandled phase function");
-        return {};
-    }
+    auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
+    return Apply<Float>(pdf);
 }
 
 inline SampledSpectrum MediumHandle::Tr(const Ray &ray, Float tMax,
                                         const SampledWavelengths &lambda,
                                         RNG &rng) const {
-    switch (Tag()) {
-    case TypeIndex<HomogeneousMedium>():
-        return Cast<HomogeneousMedium>()->Tr(ray, tMax, lambda, rng);
-    case TypeIndex<GridDensityMedium>():
-        return Cast<GridDensityMedium>()->Tr(ray, tMax, lambda, rng);
-    default:
-        LOG_FATAL("Unhandled medium");
-        return {};
-    }
+    auto tr = [&](auto ptr) { return ptr->Tr(ray, tMax, lambda, rng); };
+    return Apply<SampledSpectrum>(tr);
 }
 
 inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,
                                          const SampledWavelengths &lambda,
                                          ScratchBuffer &scratchBuffer) const {
-    switch (Tag()) {
-    case TypeIndex<HomogeneousMedium>():
-        return Cast<HomogeneousMedium>()->Sample(ray, tMax, rng, lambda, scratchBuffer);
-    case TypeIndex<GridDensityMedium>():
-        return Cast<GridDensityMedium>()->Sample(ray, tMax, rng, lambda, scratchBuffer);
-    default:
-        LOG_FATAL("Unhandled medium");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample(ray, tMax, rng, lambda, scratchBuffer); };
+    return Apply<MediumSample>(sample);
 }
 
 inline pstd::optional<NewMediumSample> MediumHandle::SampleTn(
     const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
-    switch (Tag()) {
-    case TypeIndex<HomogeneousMedium>():
-        return Cast<HomogeneousMedium>()->SampleTn(ray, tMax, u, lambda, scratchBuffer);
-    case TypeIndex<GridDensityMedium>():
-        return Cast<GridDensityMedium>()->SampleTn(ray, tMax, u, lambda, scratchBuffer);
-    default:
-        LOG_FATAL("Unhandled medium");
-        return {};
-    }
+    auto sampletn = [&](auto ptr) { return ptr->SampleTn(ray, tMax, u, lambda, scratchBuffer); };
+    return Apply<pstd::optional<NewMediumSample>>(sampletn);
 }
 
 }  // namespace pbrt
