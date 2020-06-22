@@ -192,17 +192,11 @@ std::string XYZ::ToString() const {
 }
 
 std::string ColorEncodingHandle::ToString() const {
-    switch (Tag()) {
-    case TypeIndex<LinearColorEncoding>():
-        return Cast<LinearColorEncoding>()->ToString();
-    case TypeIndex<sRGBColorEncoding>():
-        return Cast<sRGBColorEncoding>()->ToString();
-    case TypeIndex<GammaColorEncoding>():
-        return Cast<GammaColorEncoding>()->ToString();
-    default:
-        LOG_FATAL("Unhandled color encoding");
-        return {};
-    }
+    if (!ptr())
+        return "(nullptr)";
+
+    auto ts = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(ts);
 }
 
 const ColorEncodingHandle ColorEncodingHandle::Linear = new LinearColorEncoding;

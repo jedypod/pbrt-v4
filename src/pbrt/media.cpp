@@ -33,13 +33,8 @@ std::string PhaseFunctionHandle::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
-    switch (Tag()) {
-    case TypeIndex<HenyeyGreensteinPhaseFunction>():
-        return Cast<HenyeyGreensteinPhaseFunction>()->ToString();
-    default:
-        LOG_FATAL("Unhandled phase function");
-        return {};
-    }
+    auto ts = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(ts);
 }
 
 std::string NewMediumSample::ToString() const {

@@ -455,49 +455,19 @@ class GammaColorEncoding {
 
 inline void ColorEncodingHandle::ToLinear(pstd::span<const uint8_t> vin,
                                           pstd::span<Float> vout) const {
-    switch (Tag()) {
-    case TypeIndex<LinearColorEncoding>():
-        Cast<LinearColorEncoding>()->ToLinear(vin, vout);
-        break;
-    case TypeIndex<sRGBColorEncoding>():
-        Cast<sRGBColorEncoding>()->ToLinear(vin, vout);
-        break;
-    case TypeIndex<GammaColorEncoding>():
-        Cast<GammaColorEncoding>()->ToLinear(vin, vout);
-        break;
-    default:
-        LOG_FATAL("Unhandled color encoding");
-    }
+    auto tolin = [&](auto ptr) { return ptr->ToLinear(vin, vout); };
+    return Apply<void>(tolin);
 }
 
 inline Float ColorEncodingHandle::ToFloatLinear(Float v) const {
-    switch (Tag()) {
-    case TypeIndex<LinearColorEncoding>():
-        return Cast<LinearColorEncoding>()->ToFloatLinear(v);
-    case TypeIndex<sRGBColorEncoding>():
-        return Cast<sRGBColorEncoding>()->ToFloatLinear(v);
-    case TypeIndex<GammaColorEncoding>():
-        return Cast<GammaColorEncoding>()->ToFloatLinear(v);
-    default:
-        LOG_FATAL("Unhandled color encoding");
-    }
+    auto tfl = [&](auto ptr) { return ptr->ToFloatLinear(v); };
+    return Apply<Float>(tfl);
 }
 
 inline void ColorEncodingHandle::FromLinear(pstd::span<const Float> vin,
                                             pstd::span<uint8_t> vout) const {
-    switch (Tag()) {
-    case TypeIndex<LinearColorEncoding>():
-        Cast<LinearColorEncoding>()->FromLinear(vin, vout);
-        break;
-    case TypeIndex<sRGBColorEncoding>():
-        Cast<sRGBColorEncoding>()->FromLinear(vin, vout);
-        break;
-    case TypeIndex<GammaColorEncoding>():
-        Cast<GammaColorEncoding>()->FromLinear(vin, vout);
-        break;
-    default:
-        LOG_FATAL("Unhandled color encoding");
-    }
+    auto fl = [&](auto ptr) { return ptr->FromLinear(vin, vout); };
+    return Apply<void>(fl);
 }
 
 PBRT_CPU_GPU
