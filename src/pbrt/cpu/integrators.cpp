@@ -978,7 +978,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
                 if (mode == 0)
                     // absorbed; done
-                    return L;
+                    return L + mediumSample->Le;
                 else if (mode == 1) {
                     if (numScatters++ >= maxDepth)
                         return L;
@@ -1086,6 +1086,9 @@ SampledSpectrum VolPathIntegrator::Li(
                 const SampledSpectrum &sigma_a = mediumSample->sigma_a;
                 const SampledSpectrum &sigma_s = mediumSample->sigma_s;
                 Float Tn = mediumSample->Tn;
+
+                if (depth < maxDepth)
+                    L += mediumSample->Le * sigma_a / mediumSample->sigma_nt;
 
                 Float pAbsorb = sigma_a[0] / mediumSample->sigma_nt;
                 Float pScatter = sigma_s[0] / mediumSample->sigma_nt;

@@ -302,7 +302,11 @@ void CPURender(ParsedScene &parsedScene) {
                 "\"bdpt\", or \"mlt\".",
                 parsedScene.integrator.name);
 
-    if (lights.empty() && parsedScene.integrator.name != "ambientocclusion" &&
+    bool haveLights = !lights.empty();
+    for (const auto &m : media)
+        haveLights |= m.second.IsEmissive();
+
+    if (!haveLights && parsedScene.integrator.name != "ambientocclusion" &&
         parsedScene.integrator.name != "aov")
         Warning("No light sources defined in scene; rendering a black image.");
 

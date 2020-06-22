@@ -81,6 +81,8 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> 
         const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
         ScratchBuffer *scratchBuffer /* optional */) const;
 
+    bool IsEmissive() const;
+
     std::string ToString() const;
 };
 

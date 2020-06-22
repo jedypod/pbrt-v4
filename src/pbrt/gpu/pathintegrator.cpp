@@ -147,7 +147,10 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
     for (LightHandle light : allLights)
         light.Preprocess(accel->Bounds());
 
-    if (allLights.size() == 0)
+    bool haveLights = !lights.empty();
+    for (const auto &m : media)
+        haveLights |= m.second.IsEmissive();
+    if (!haveLights)
         ErrorExit("No light sources specified");
 
     std::string lightSamplerName =
