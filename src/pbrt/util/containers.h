@@ -868,6 +868,8 @@ class TypedIndexSpan {
 template <typename T>
 class SampledGrid {
 public:
+    SampledGrid() = default;
+    SampledGrid(Allocator alloc) : values(alloc) { }
     SampledGrid(pstd::span<const T> v, int nx, int ny, int nz,
                 Allocator alloc)
         : values(v.begin(), v.end(), alloc), nx(nx), ny(ny), nz(nz) {
