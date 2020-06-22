@@ -736,6 +736,7 @@ SET ( PBRT_TEST_SOURCE
   src/pbrt/util/sampling_test.cpp
   src/pbrt/util/spectrum_test.cpp
   src/pbrt/util/splines_test.cpp
+  src/pbrt/util/taggedptr_test.cpp
   src/pbrt/util/transform_test.cpp
   src/pbrt/util/vecmath_test.cpp
   )
