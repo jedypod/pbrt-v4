@@ -77,7 +77,7 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> 
                                             const SampledWavelengths &lambda,
                                             ScratchBuffer &scratchBuffer) const;
 
-    PBRT_CPU_GPU inline pstd::optional<NewMediumSample> SampleTn(
+    PBRT_CPU_GPU inline pstd::optional<NewMediumSample> SampleTmaj(
         const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
         ScratchBuffer *scratchBuffer /* optional */) const;
 

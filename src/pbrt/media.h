@@ -70,13 +70,14 @@ struct MediumSample {
 struct NewMediumSample {
     MediumInteraction intr;
     Float t;
-    SampledSpectrum sigma_a, sigma_s, Le;
-    Float sigma_nt, Tn;
+    SampledSpectrum sigma_a, sigma_s;
+    Float sigma_maj, Tmaj;
+    SampledSpectrum Le;
 
     PBRT_CPU_GPU
     SampledSpectrum sigma_n() const {
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = SampledSpectrum(sigma_nt) - sigma_t;
+        SampledSpectrum sigma_n = SampledSpectrum(sigma_maj) - sigma_t;
         CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
         return ClampZero(sigma_n);
     }
@@ -143,7 +144,7 @@ class alignas(8) HomogeneousMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTn(const Ray &ray, Float tMax, Float u,
+    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
                                              const SampledWavelengths &lambda,
                                              ScratchBuffer *scratchBuffer) const;
 
@@ -307,7 +308,7 @@ class alignas(8) GridDensityMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTn(const Ray &ray, Float tMax, Float u,
+    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
                                              const SampledWavelengths &lambda,
                                              ScratchBuffer *scratchBuffer) const;
 
@@ -382,10 +383,11 @@ inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,
     return Apply<MediumSample>(sample);
 }
 
-inline pstd::optional<NewMediumSample> MediumHandle::SampleTn(
+inline pstd::optional<NewMediumSample> MediumHandle::SampleTmaj(
     const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
-    auto sampletn = [&](auto ptr) { return ptr->SampleTn(ray, tMax, u, lambda, scratchBuffer); };
+    auto sampletn = [&](auto ptr) { return ptr->SampleTmaj(ray, tMax, u, lambda,
+                                                           scratchBuffer); };
     return Apply<pstd::optional<NewMediumSample>>(sampletn);
 }
 

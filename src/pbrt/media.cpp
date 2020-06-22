@@ -39,8 +39,8 @@ std::string PhaseFunctionHandle::ToString() const {
 
 std::string NewMediumSample::ToString() const {
     return StringPrintf("[ NewMediumSample intr: %s t: %f sigma_a: %s sigma_s: %s "
-                        "Le: %s sigma_nt: %f Tn: %f ]",
-                        intr, t, sigma_a, sigma_s, Le, sigma_nt, Tn);
+                        "sigma_maj: %f Le: %s, Tmaj: %f ]",
+                        intr, t, sigma_a, sigma_s, sigma_maj, Le, Tmaj);
 }
 
 // Media Definitions
@@ -143,7 +143,7 @@ std::string MediumHandle::ToString() const {
 }
 
 // HomogeneousMedium Method Definitions
-pstd::optional<NewMediumSample> HomogeneousMedium::SampleTn(
+pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
     const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
     // So t corresponds to distance...
@@ -153,17 +153,17 @@ pstd::optional<NewMediumSample> HomogeneousMedium::SampleTn(
     SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
-    Float sigma_nt = sigma_t.MaxComponentValue();
+    Float sigma_maj = sigma_t.MaxComponentValue();
 
-    Float t = SampleExponential(u, sigma_nt);
+    Float t = SampleExponential(u, sigma_maj);
     if (t >= tMax)
         return {};
 
-    Float Tn = FastExp(-t * sigma_nt);
+    Float Tmaj = FastExp(-t * sigma_maj);
 
     SampledSpectrum Le = Le_spec.Sample(lambda);
     MediumInteraction intr(rayp(t), -rayp.d, ray.time, this, &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, Le, sigma_nt, Tn};
+    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le};
 }
 
 HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &dict,
@@ -300,7 +300,7 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
 }
 
-pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
+pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
     const Ray &rWorld, Float raytMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
     raytMax *= Length(rWorld.d);
@@ -318,14 +318,14 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
     SampledSpectrum sigma_t = sigma_a + sigma_s;
 
 #if 0
-    Float sigma_nt = sigma_t.MaxComponentValue() * densityOctree.maxDensity;
+    Float sigma_maj = sigma_t.MaxComponentValue() * densityOctree.maxDensity;
     // Simple, octree-free...
-    Float t = tMin + SampleExponential(u, sigma_nt);
+    Float t = tMin + SampleExponential(u, sigma_maj);
     if (t >= tMax)
         return {};
 
     Point3f p = ray(t);
-    Float Tn = Exp(-sigma_nt * (t - tMin));
+    Float Tmaj = Exp(-sigma_maj * (t - tMin));
 
     Float density = densityGrid.Lookup(p);
     sigma_a *= density;
@@ -333,7 +333,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
     MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time, this,
                            &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, Le(p, lambda), sigma_nt, Tn};
+    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le(p, lambda)};
 
 #else  // SIMPLE - no octree
     pstd::optional<NewMediumSample> mediumSample;
@@ -347,17 +347,17 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
             DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
 
-            Float sigma_nt = sigma_t.MaxComponentValue() * node.maxDensity;
+            Float sigma_maj = sigma_t.MaxComponentValue() * node.maxDensity;
 
             // At what u value do we hit the the cell exit point?
-            Float uEnd = InvertExponentialSample(t1 - t0, sigma_nt);
+            Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj);
             if (u >= uEnd) {
                 // exit this cell w/o a scattering event
                 u = (u - uEnd) / (1 - uEnd);
                 return OctreeTraversal::Continue;
             }
 
-            Float t = t0 + SampleExponential(u, sigma_nt);
+            Float t = t0 + SampleExponential(u, sigma_maj);
             CHECK_RARE(1e-5, t > t1);
 
             if (t >= tMax)  // raytMax)
@@ -366,7 +366,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
             // Scattering event (of some sort)
             Point3f p = ray(t);
-            Float Tn = FastExp(-sigma_nt * (t - t0));
+            Float Tmaj = FastExp(-sigma_maj * (t - t0));
 
             Float density = densityGrid.Lookup(p);
 
@@ -387,8 +387,8 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
             MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
                                    this, &phase);
-            mediumSample = NewMediumSample{intr, t, sigma_a, sigma_s, Le(p, lambda),
-                                           sigma_nt, Tn};
+            mediumSample = NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj,
+                                           Le(p, lambda)};
             return OctreeTraversal::Abort;
         });
 
