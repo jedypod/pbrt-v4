@@ -93,44 +93,6 @@ class alignas(8) HomogeneousMedium {
                                      const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    MediumSample Sample(const Ray &ray, Float tMax, RNG &rng,
-                        const SampledWavelengths &lambda,
-                        ScratchBuffer &scratchBuffer) const {
-        MediumSample mediumSample;
-
-        // Sample a channel and distance along the ray
-        SampledSpectrum sigma_t = sigma_a_spec.Sample(lambda) +
-            sigma_s_spec.Sample(lambda);
-        int channel = rng.Uniform<int>(NSpectrumSamples);
-        if (sigma_t[channel] == 0) {
-            mediumSample.Tr = SampledSpectrum(1);
-            return mediumSample;
-        }
-        Float dist = -std::log(1 - rng.Uniform<Float>()) / sigma_t[channel];
-        Float t = std::min(dist / Length(ray.d), tMax);
-        bool sampledMedium = t < tMax;
-        if (sampledMedium)
-            mediumSample.intr =
-                MediumInteraction(ray(t), -ray.d, ray.time, this,
-                                  scratchBuffer.Alloc<HenyeyGreensteinPhaseFunction>(g));
-
-        // Compute the transmittance and sampling density
-        SampledSpectrum Tr = Exp(-sigma_t * std::min(t, MaxFloat) * Length(ray.d));
-
-        // Return weighting factor for scattering from homogeneous medium
-        SampledSpectrum density = sampledMedium ? (sigma_t * Tr) : Tr;
-        Float pdf = density.Average();
-        if (pdf == 0) {
-            CHECK(!Tr);
-            pdf = 1;
-        }
-
-        mediumSample.Tr =
-            sampledMedium ? (Tr * sigma_s_spec.Sample(lambda) / pdf) : (Tr / pdf);
-        return mediumSample;
-    }
-
-    PBRT_CPU_GPU
     NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
                                const SampledWavelengths &lambda,
                                ScratchBuffer *scratchBuffer) const;
@@ -160,63 +122,6 @@ class alignas(8) GridDensityMedium {
     static GridDensityMedium *Create(const ParameterDictionary &parameters,
                                      const Transform &worldFromMedium, const FileLoc *loc,
                                      Allocator alloc);
-
-    PBRT_CPU_GPU
-    MediumSample Sample(const Ray &rWorld, Float raytMax, RNG &rng,
-                        const SampledWavelengths &lambda,
-                        ScratchBuffer &scratchBuffer) const {
-        raytMax *= Length(rWorld.d);
-        Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
-        // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium
-        // bounds
-        const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
-        Float tMin, tMax;
-        if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
-            return MediumSample{SampledSpectrum(1.f)};
-
-        // Run delta-tracking iterations to sample a medium interaction
-        bool foundInteraction = false;
-        // For now...
-        Float sigma_t = sigma_a_spec.MaxValue() + sigma_s_spec.MaxValue();
-        MediumSample mediumSample;
-
-        TraverseOctree(
-            &densityOctree, ray.o, ray.d, raytMax,
-            [&](const OctreeNode &node, Float t, Float t1) {
-                if (node.maxDensity == 0)
-                    // Empty--skip it!
-                    return OctreeTraversal::Continue;
-
-                DCHECK_RARE(1e-5, densityGrid->Lookup(ray((t + t1) / 2)) > node.maxDensity);
-                while (true) {
-                    t +=
-                        -std::log(1 - rng.Uniform<Float>()) / (sigma_t * node.maxDensity);
-
-                    if (t >= t1)
-                        // exited this cell w/o a scattering event
-                        return OctreeTraversal::Continue;
-
-                    if (t >= tMax)
-                        // Nothing before the geom intersection; get out of here
-                        return OctreeTraversal::Abort;
-
-                    if (densityGrid->Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
-                        // Populate _mi_ with medium interaction information and
-                        // return
-                        PhaseFunctionHandle phase =
-                            scratchBuffer.Alloc<HenyeyGreensteinPhaseFunction>(g);
-                        mediumSample.intr = MediumInteraction(rWorld(t), -rWorld.d,
-                                                              rWorld.time, this, phase);
-                        foundInteraction = true;
-                        return OctreeTraversal::Abort;
-                    }
-                }
-            });
-
-        mediumSample.Tr = foundInteraction ? sigma_s_spec.Sample(lambda) / sigma_t
-                                           : SampledSpectrum(1.f);
-        return mediumSample;
-    }
 
     PBRT_CPU_GPU
     NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
@@ -282,13 +187,6 @@ inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
 inline Float PhaseFunctionHandle::PDF(const Vector3f &wo, const Vector3f &wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Apply<Float>(pdf);
-}
-
-inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,
-                                         const SampledWavelengths &lambda,
-                                         ScratchBuffer &scratchBuffer) const {
-    auto sample = [&](auto ptr) { return ptr->Sample(ray, tMax, rng, lambda, scratchBuffer); };
-    return Apply<MediumSample>(sample);
 }
 
 inline NewMediumSample MediumHandle::SampleTmaj(const Ray &ray, Float tMax, Float u,

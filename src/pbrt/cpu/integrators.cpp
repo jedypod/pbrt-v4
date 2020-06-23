@@ -1962,96 +1962,136 @@ int RandomWalk(const Integrator &integrator, const SampledWavelengths &lambda,
     // Declare variables for forward and reverse probability densities
     Float pdfFwd = pdf, pdfRev = 0;
     while (true) {
+    nextBounce:
         // Attempt to create the next subpath vertex in _path_
-        MediumInteraction mi;
-
         VLOG(2, "Random walk. Bounces %d, beta %s, pdfFwd %f, pdfRef %f", bounces, beta,
              pdfFwd, pdfRev);
-        // Trace a ray and sample the medium, if any
-        pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
-        MediumSample mediumSample;
-        if (ray.medium) {
-            mediumSample = ray.medium.Sample(ray, si ? si->tHit : Infinity,
-                                             sampler.GetRNG(), lambda, scratchBuffer);
-            beta *= mediumSample.Tr;
-        }
+
         if (!beta)
             break;
+
+        // Trace a ray and sample the medium, if any
         Vertex &vertex = path[bounces], &prev = path[bounces - 1];
-        if (mediumSample.intr) {
-            MediumInteraction &mi = *mediumSample.intr;
-            // Record medium interaction in _path_ and compute forward density
-            vertex = Vertex::CreateMedium(mi, beta, pdfFwd, prev);
-            if (++bounces >= maxDepth)
-                break;
+        pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
+        Float tMax = si ? si->tHit : Infinity;
+        NewMediumSample mediumSample;
+        if (ray.medium) {
+            while (true) {
+                mediumSample = ray.medium.SampleTmaj(ray, tMax, sampler.Get1D(),
+                                                     lambda, &scratchBuffer);
 
-            // Sample direction and compute reverse density at preceding vertex
-            pstd::optional<PhaseFunctionSample> ps =
-                mi.phase.Sample_p(-ray.d, sampler.Get2D());
-            if (!ps || ps->pdf == 0)
-                break;
-            pdfFwd = pdfRev = ps->pdf;
-            beta *= ps->p / pdfFwd;
-            ray = mi.SpawnRay(ps->wi);
-            anyNonSpecularBounces = true;
-        } else {
-            // Handle surface interaction for path generation
-            if (!si) {
-                // Capture escaped rays when tracing from the camera
-                if (mode == TransportMode::Radiance) {
-                    vertex = Vertex::CreateLight(EndpointInteraction(ray), beta, pdfFwd);
-                    ++bounces;
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                if (!mediumSample.intr) {
+                    beta *= Tmaj / Tmaj.Average();
+                    break; // onward to the surface path...
+                } else {
+                    const MediumInteraction &intr = *mediumSample.intr;
+                    const SampledSpectrum &sigma_a = intr.sigma_a;
+                    const SampledSpectrum &sigma_s = intr.sigma_s;
+
+                    Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = sigma_s[0] / intr.sigma_maj[0];
+                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                    CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
+
+                    Float um = sampler.Get1D();
+                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
+
+                    if (mode == 0) {
+                        // absorption; done
+                        return bounces;
+                    } else if (mode == 1) {
+                        // scatter
+                        beta *= Tmaj * sigma_s / (Tmaj * sigma_s).Average();
+
+                        // Record medium interaction in _path_ and compute forward density
+                        vertex = Vertex::CreateMedium(intr, beta, pdfFwd, prev);
+                        if (++bounces >= maxDepth)
+                            return bounces;
+
+                        // Sample direction and compute reverse density at preceding vertex
+                        pstd::optional<PhaseFunctionSample> ps =
+                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                        if (!ps || ps->pdf == 0)
+                            return bounces;
+                        pdfFwd = pdfRev = ps->pdf;
+                        beta *= ps->p / pdfFwd;
+                        ray = intr.SpawnRay(ps->wi);
+                        anyNonSpecularBounces = true;
+
+                        // Compute reverse area density at preceding vertex
+                        prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
+                        goto nextBounce;
+                    } else {
+                        // null scatter
+                        SampledSpectrum sigma_n = intr.sigma_n();
+
+                        beta *= Tmaj * sigma_n / (Tmaj * sigma_n).Average();
+
+                        tMax -= mediumSample.t;
+                        ray = intr.SpawnRay(ray.d);
+                    }
                 }
-                break;
             }
-
-            // Compute scattering functions for _mode_ and skip over medium
-            // boundaries
-            SurfaceInteraction &isect = si->intr;
-            isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
-            if (isect.bsdf == nullptr) {
-                isect.SkipIntersection(&ray, si->tHit);
-                continue;
-            }
-
-            if (regularize && anyNonSpecularBounces) {
-                ++regularizedBSDFs;
-                isect.bsdf->Regularize(scratchBuffer);
-            }
-            ++totalBSDFs;
-
-            // Initialize _vertex_ with surface intersection information
-            vertex = Vertex::CreateSurface(isect, beta, pdfFwd, prev);
-            if (++bounces >= maxDepth)
-                break;
-
-            // Sample BSDF at current vertex and compute reverse probability
-            Vector3f wo = isect.wo;
-            Float u = sampler.Get1D();
-            pstd::optional<BSDFSample> bs =
-                isect.bsdf->Sample_f(wo, u, sampler.Get2D(), mode);
-            if (!bs)
-                break;
-            pdfFwd = bs->pdf;
-            anyNonSpecularBounces |= !bs->IsSpecular();
-            VLOG(2, "Random walk sampled dir %s, f: %s, pdfFwd %f", bs->wi, bs->f,
-                 pdfFwd);
-            beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-            VLOG(2, "Random walk beta now %s", beta);
-            // TODO: confirm. I believe that ~mode is right. Interestingly,
-            // it makes no difference in the test suite either way.
-            pdfRev = isect.bsdf->PDF(bs->wi, wo, ~mode);
-            if (bs->IsSpecular()) {
-                vertex.delta = true;
-                pdfRev = pdfFwd = 0;
-            }
-            VLOG(2, "Random walk beta after shading normal correction %s", beta);
-            ray = isect.SpawnRay(ray, bs->wi, bs->flags);
         }
+
+        // Handle surface interaction for path generation
+        if (!si) {
+            // Capture escaped rays when tracing from the camera
+            if (mode == TransportMode::Radiance) {
+                vertex = Vertex::CreateLight(EndpointInteraction(ray), beta, pdfFwd);
+                ++bounces;
+            }
+            break;
+        }
+
+        // Compute scattering functions for _mode_ and skip over medium
+        // boundaries
+        SurfaceInteraction &isect = si->intr;
+        isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
+        if (isect.bsdf == nullptr) {
+            isect.SkipIntersection(&ray, si->tHit);
+            continue;
+        }
+
+        if (regularize && anyNonSpecularBounces) {
+            ++regularizedBSDFs;
+            isect.bsdf->Regularize(scratchBuffer);
+        }
+        ++totalBSDFs;
+
+        // Initialize _vertex_ with surface intersection information
+        vertex = Vertex::CreateSurface(isect, beta, pdfFwd, prev);
+        if (++bounces >= maxDepth)
+            break;
+
+        // Sample BSDF at current vertex and compute reverse probability
+        Vector3f wo = isect.wo;
+        Float u = sampler.Get1D();
+        pstd::optional<BSDFSample> bs =
+            isect.bsdf->Sample_f(wo, u, sampler.Get2D(), mode);
+        if (!bs)
+            break;
+        pdfFwd = bs->pdf;
+        anyNonSpecularBounces |= !bs->IsSpecular();
+        VLOG(2, "Random walk sampled dir %s, f: %s, pdfFwd %f", bs->wi, bs->f,
+             pdfFwd);
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+        VLOG(2, "Random walk beta now %s", beta);
+        // TODO: confirm. I believe that ~mode is right. Interestingly,
+        // it makes no difference in the test suite either way.
+        pdfRev = isect.bsdf->PDF(bs->wi, wo, ~mode);
+        if (bs->IsSpecular()) {
+            vertex.delta = true;
+            pdfRev = pdfFwd = 0;
+        }
+        VLOG(2, "Random walk beta after shading normal correction %s", beta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags);
 
         // Compute reverse area density at preceding vertex
         prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
     }
+
     return bounces;
 }
 

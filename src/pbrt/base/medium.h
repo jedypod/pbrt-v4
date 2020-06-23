@@ -58,10 +58,6 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> 
                                const Transform &worldFromMedium, const FileLoc *loc,
                                Allocator alloc);
 
-    PBRT_CPU_GPU inline MediumSample Sample(const Ray &ray, Float tMax, RNG &rng,
-                                            const SampledWavelengths &lambda,
-                                            ScratchBuffer &scratchBuffer) const;
-
     PBRT_CPU_GPU inline NewMediumSample SampleTmaj(
         const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
         ScratchBuffer *scratchBuffer /* optional */) const;
