@@ -166,39 +166,39 @@ pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
     return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le};
 }
 
-HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &dict,
+HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = dict.GetOneString("preset", "");
+    std::string preset = parameters.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
     if (sig_a == nullptr) {
-        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    SpectrumHandle Le = dict.GetOneSpectrum("Le", nullptr, SpectrumType::General,
+    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
                                             alloc);
     if (Le == nullptr)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
 
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
     if (scale != 1) {
         sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
         sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
     }
 
-    Float g = dict.GetOneFloat("g", 0.0f);
+    Float g = parameters.GetOneFloat("g", 0.0f);
 
     return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, Le, g, alloc);
 }
@@ -437,55 +437,55 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
 #endif  // !SIMPLE - no octree
 }
 
-GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
+GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
                                              const Transform &worldFromMedium,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = dict.GetOneString("preset", "");
+    std::string preset = parameters.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
 
     if (sig_a == nullptr) {
-        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
     if (scale != 1) {
         sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
         sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
     }
 
-    Float g = dict.GetOneFloat("g", 0.0f);
+    Float g = parameters.GetOneFloat("g", 0.0f);
 
-    std::vector<Float> density = dict.GetFloatArray("density");
-    std::vector<RGB> rgbDensity = dict.GetRGBArray("density");
+    std::vector<Float> density = parameters.GetFloatArray("density");
+    std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
     if (density.empty() && rgbDensity.empty())
         ErrorExit(loc, "No \"density\" values provided for heterogeneous medium.");
     if (!density.empty() && !rgbDensity.empty())
         ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
 
-    int nx = dict.GetOneInt("nx", 1);
-    int ny = dict.GetOneInt("ny", 1);
-    int nz = dict.GetOneInt("nz", 1);
-    Point3f p0 = dict.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-    Point3f p1 = dict.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+    int nx = parameters.GetOneInt("nx", 1);
+    int ny = parameters.GetOneInt("ny", 1);
+    int nz = parameters.GetOneInt("nz", 1);
+    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
     size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
     if (nDensity != nx * ny * nz)
         ErrorExit(loc, "GridDensityMedium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
-    const RGBColorSpace *colorSpace = dict.ColorSpace();
+    const RGBColorSpace *colorSpace = parameters.ColorSpace();
 
     pstd::optional<SampledGrid<Float>> densityGrid;
     pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
@@ -494,13 +494,13 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
     else
         rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
 
-    SpectrumHandle Le = dict.GetOneSpectrum("Le", nullptr, SpectrumType::General,
+    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
                                             alloc);
     if (Le == nullptr)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
 
     SampledGrid<Float> LeGrid(alloc);
-    std::vector<Float> LeScale = dict.GetFloatArray("Lescale");
+    std::vector<Float> LeScale = parameters.GetFloatArray("Lescale");
     if (LeScale.empty())
         LeGrid = SampledGrid<Float>({1.f}, 1, 1, 1, alloc);
     else {
@@ -527,21 +527,21 @@ std::string GridDensityMedium::ToString() const {
 }
 
 MediumHandle MediumHandle::Create(const std::string &name,
-                                  const ParameterDictionary &dict,
+                                  const ParameterDictionary &parameters,
                                   const Transform &worldFromMedium, const FileLoc *loc,
                                   Allocator alloc) {
     MediumHandle m = nullptr;
     if (name == "homogeneous")
-        m = HomogeneousMedium::Create(dict, loc, alloc);
+        m = HomogeneousMedium::Create(parameters, loc, alloc);
     else if (name == "heterogeneous")
-        m = GridDensityMedium::Create(dict, worldFromMedium, loc, alloc);
+        m = GridDensityMedium::Create(parameters, worldFromMedium, loc, alloc);
     else
         ErrorExit(loc, "%s: medium unknown.", name);
 
     if (!m)
         ErrorExit(loc, "%s: unable to create medium.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return m;
 }
 

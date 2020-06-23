@@ -35,11 +35,11 @@ std::string DielectricMaterial::ToString() const {
                         displacement, uRoughness, vRoughness, etaF, etaS, remapRoughness);
 }
 
-DielectricMaterial *DielectricMaterial::Create(const TextureParameterDictionary &dict,
+DielectricMaterial *DielectricMaterial::Create(const TextureParameterDictionary &parameters,
                                                const FileLoc *loc, Allocator alloc) {
-    FloatTextureHandle etaF = dict.GetFloatTextureOrNull("eta", alloc);
+    FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
-        dict.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
+        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
     if (etaF && etaS) {
         Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
                      "were provided. Ignoring the \"float\" one.");
@@ -48,15 +48,16 @@ DielectricMaterial *DielectricMaterial::Create(const TextureParameterDictionary 
     if (!etaF && !etaS)
         etaF = alloc.new_object<FloatConstantTexture>(1.5);
 
-    FloatTextureHandle uRoughness = dict.GetFloatTextureOrNull("uroughness", alloc);
-    FloatTextureHandle vRoughness = dict.GetFloatTextureOrNull("vroughness", alloc);
+    FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
+    FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
     if (!uRoughness)
-        uRoughness = dict.GetFloatTexture("roughness", 0.f, alloc);
+        uRoughness = parameters.GetFloatTexture("roughness", 0.f, alloc);
     if (!vRoughness)
-        vRoughness = dict.GetFloatTexture("roughness", 0.f, alloc);
+        vRoughness = parameters.GetFloatTexture("roughness", 0.f, alloc);
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = dict.GetOneBool("remaproughness", true);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
+    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, etaF, etaS,
                                                 displacement, remapRoughness);
 }
@@ -68,10 +69,10 @@ std::string ThinDielectricMaterial::ToString() const {
 }
 
 ThinDielectricMaterial *ThinDielectricMaterial::Create(
-    const TextureParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
-    FloatTextureHandle etaF = dict.GetFloatTextureOrNull("eta", alloc);
+    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
-        dict.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
+        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
     if (etaF && etaS) {
         Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
                      "were provided. Ignoring the \"float\" one.");
@@ -80,7 +81,8 @@ ThinDielectricMaterial *ThinDielectricMaterial::Create(
     if (!etaF && !etaS)
         etaF = alloc.new_object<FloatConstantTexture>(1.5);
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
 
     return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement);
 }
@@ -93,14 +95,14 @@ std::string HairMaterial::ToString() const {
                         alpha);
 }
 
-HairMaterial *HairMaterial::Create(const TextureParameterDictionary &dict,
+HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
                                    const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle sigma_a =
-        dict.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
+        parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
     SpectrumTextureHandle color =
-        dict.GetSpectrumTextureOrNull("color", SpectrumType::Reflectance, alloc);
-    FloatTextureHandle eumelanin = dict.GetFloatTextureOrNull("eumelanin", alloc);
-    FloatTextureHandle pheomelanin = dict.GetFloatTextureOrNull("pheomelanin", alloc);
+        parameters.GetSpectrumTextureOrNull("color", SpectrumType::Reflectance, alloc);
+    FloatTextureHandle eumelanin = parameters.GetFloatTextureOrNull("eumelanin", alloc);
+    FloatTextureHandle pheomelanin = parameters.GetFloatTextureOrNull("pheomelanin", alloc);
     if (sigma_a) {
         if (color)
             Warning(loc, R"(Ignoring "color" parameter since "sigma_a" was provided.)");
@@ -132,10 +134,10 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &dict,
             alloc.new_object<RGBSpectrum>(HairBxDF::SigmaAFromConcentration(1.3, 0.)));
     }
 
-    FloatTextureHandle eta = dict.GetFloatTexture("eta", 1.55f, alloc);
-    FloatTextureHandle beta_m = dict.GetFloatTexture("beta_m", 0.3f, alloc);
-    FloatTextureHandle beta_n = dict.GetFloatTexture("beta_n", 0.3f, alloc);
-    FloatTextureHandle alpha = dict.GetFloatTexture("alpha", 2.f, alloc);
+    FloatTextureHandle eta = parameters.GetFloatTexture("eta", 1.55f, alloc);
+    FloatTextureHandle beta_m = parameters.GetFloatTexture("beta_m", 0.3f, alloc);
+    FloatTextureHandle beta_n = parameters.GetFloatTexture("beta_n", 0.3f, alloc);
+    FloatTextureHandle alpha = parameters.GetFloatTexture("alpha", 2.f, alloc);
 
     return alloc.new_object<HairMaterial>(sigma_a, color, eumelanin, pheomelanin, eta,
                                           beta_m, beta_n, alpha);
@@ -147,15 +149,16 @@ std::string DiffuseMaterial::ToString() const {
                         displacement, reflectance, sigma);
 }
 
-DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &dict,
+DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle reflectance =
-        dict.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
+        parameters.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
     if (!reflectance)
         reflectance = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.5f));
-    FloatTextureHandle sigma = dict.GetFloatTexture("sigma", 0.f, alloc);
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
+    FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
     return alloc.new_object<DiffuseMaterial>(reflectance, sigma, displacement);
 }
 
@@ -167,22 +170,23 @@ std::string ConductorMaterial::ToString() const {
         displacement, eta, k, uRoughness, vRoughness, remapRoughness);
 }
 
-ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &dict,
+ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle eta =
-        dict.GetSpectrumTexture("eta", SPDs::MetalCuEta(), SpectrumType::General, alloc);
+        parameters.GetSpectrumTexture("eta", SPDs::MetalCuEta(), SpectrumType::General, alloc);
     SpectrumTextureHandle k =
-        dict.GetSpectrumTexture("k", SPDs::MetalCuK(), SpectrumType::General, alloc);
+        parameters.GetSpectrumTexture("k", SPDs::MetalCuK(), SpectrumType::General, alloc);
 
-    FloatTextureHandle uRoughness = dict.GetFloatTextureOrNull("uroughness", alloc);
-    FloatTextureHandle vRoughness = dict.GetFloatTextureOrNull("vroughness", alloc);
+    FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
+    FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
     if (!uRoughness)
-        uRoughness = dict.GetFloatTexture("roughness", .01f, alloc);
+        uRoughness = parameters.GetFloatTexture("roughness", .01f, alloc);
     if (!vRoughness)
-        vRoughness = dict.GetFloatTexture("roughness", .01f, alloc);
+        vRoughness = parameters.GetFloatTexture("roughness", .01f, alloc);
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = dict.GetOneBool("remaproughness", true);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
+    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     return alloc.new_object<ConductorMaterial>(eta, k, uRoughness, vRoughness,
                                                displacement, remapRoughness);
 }
@@ -198,31 +202,32 @@ std::string CoatedDiffuseMaterial::ToString() const {
 }
 
 CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
-    const TextureParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle reflectance =
-        dict.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
+        parameters.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
     if (!reflectance)
         reflectance = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.5f));
 
-    FloatTextureHandle uRoughness = dict.GetFloatTextureOrNull("uroughness", alloc);
-    FloatTextureHandle vRoughness = dict.GetFloatTextureOrNull("vroughness", alloc);
+    FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
+    FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
     if (!uRoughness)
-        uRoughness = dict.GetFloatTexture("roughness", 0., alloc);
+        uRoughness = parameters.GetFloatTexture("roughness", 0., alloc);
     if (!vRoughness)
-        vRoughness = dict.GetFloatTexture("roughness", 0., alloc);
+        vRoughness = parameters.GetFloatTexture("roughness", 0., alloc);
 
-    FloatTextureHandle thickness = dict.GetFloatTexture("thickness", .01, alloc);
-    FloatTextureHandle eta = dict.GetFloatTexture("eta", 1.5, alloc);
+    FloatTextureHandle thickness = parameters.GetFloatTexture("thickness", .01, alloc);
+    FloatTextureHandle eta = parameters.GetFloatTexture("eta", 1.5, alloc);
 
     LayeredBxDFConfig config;
-    config.maxDepth = dict.GetOneInt("maxdepth", config.maxDepth);
-    config.nSamples = dict.GetOneInt("nsamples", config.nSamples);
-    config.twoSided = dict.GetOneBool("twosided", config.twoSided);
-    config.deterministic = dict.GetOneBool("deterministic", config.deterministic);
+    config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
+    config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
+    config.twoSided = parameters.GetOneBool("twosided", config.twoSided);
+    config.deterministic = parameters.GetOneBool("deterministic", config.deterministic);
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = dict.GetOneBool("remaproughness", true);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
+    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     return alloc.new_object<CoatedDiffuseMaterial>(reflectance, uRoughness, vRoughness,
                                                    thickness, eta, displacement,
                                                    remapRoughness, config);
@@ -237,25 +242,26 @@ std::string LayeredMaterial::ToString() const {
         config.twoSided);
 }
 
-LayeredMaterial *LayeredMaterial::Create(const TextureParameterDictionary &dict,
+LayeredMaterial *LayeredMaterial::Create(const TextureParameterDictionary &parameters,
                                          MaterialHandle top, MaterialHandle base,
                                          const FileLoc *loc, Allocator alloc) {
     LayeredBxDFConfig config;
-    config.maxDepth = dict.GetOneInt("maxdepth", config.maxDepth);
-    config.nSamples = dict.GetOneInt("nsamples", config.nSamples);
-    config.twoSided = dict.GetOneBool("twosided", config.twoSided);
-    config.deterministic = dict.GetOneBool("deterministic", config.deterministic);
+    config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
+    config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
+    config.twoSided = parameters.GetOneBool("twosided", config.twoSided);
+    config.deterministic = parameters.GetOneBool("deterministic", config.deterministic);
 
-    FloatTextureHandle thickness = dict.GetFloatTexture("thickness", 1, alloc);
-    FloatTextureHandle g = dict.GetFloatTexture("g", 0, alloc);
+    FloatTextureHandle thickness = parameters.GetFloatTexture("thickness", 1, alloc);
+    FloatTextureHandle g = parameters.GetFloatTexture("g", 0, alloc);
 
     SpectrumTextureHandle albedo =
-        dict.GetSpectrumTexture("albedo", nullptr, SpectrumType::Reflectance, alloc);
+        parameters.GetSpectrumTexture("albedo", nullptr, SpectrumType::Reflectance, alloc);
     if (!albedo)
         albedo = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.5f));
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
 
     return alloc.new_object<LayeredMaterial>(top, base, thickness, albedo, g,
                                              displacement, config);
@@ -271,14 +277,14 @@ std::string SubsurfaceMaterial::ToString() const {
                         uRoughness, vRoughness, eta, remapRoughness);
 }
 
-SubsurfaceMaterial *SubsurfaceMaterial::Create(const TextureParameterDictionary &dict,
+SubsurfaceMaterial *SubsurfaceMaterial::Create(const TextureParameterDictionary &parameters,
                                                const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle sigma_a, sigma_s, reflectance, mfp;
 
-    Float g = dict.GetOneFloat("g", 0.0f);
+    Float g = parameters.GetOneFloat("g", 0.0f);
 
     // 4, mutually-exclusive, ways to specify the subsurface properties...
-    std::string name = dict.GetOneString("name", "");
+    std::string name = parameters.GetOneString("name", "");
     if (!name.empty()) {
         // 1. By name
         SpectrumHandle sig_a, sig_s;
@@ -292,8 +298,8 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(const TextureParameterDictionary 
         sigma_s = alloc.new_object<SpectrumConstantTexture>(sig_s);
     } else {
         // 2. sigma_a and sigma_s directly specified
-        sigma_a = dict.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
-        sigma_s = dict.GetSpectrumTextureOrNull("sigma_s", SpectrumType::General, alloc);
+        sigma_a = parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
+        sigma_s = parameters.GetSpectrumTextureOrNull("sigma_s", SpectrumType::General, alloc);
         if (sigma_a && !sigma_s)
             ErrorExit(loc, "Provided \"sigma_a\" parameter without \"sigma_s\".");
         if (sigma_s && !sigma_a)
@@ -301,10 +307,10 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(const TextureParameterDictionary 
 
         if (!sigma_a && !sigma_s) {
             // 3. RGB/Spectrum, reflectance
-            reflectance = dict.GetSpectrumTextureOrNull("reflectance",
+            reflectance = parameters.GetSpectrumTextureOrNull("reflectance",
                                                         SpectrumType::Reflectance, alloc);
             if (reflectance)
-                mfp = dict.GetSpectrumTexture("mfp", SPDs::One(), SpectrumType::General,
+                mfp = parameters.GetSpectrumTexture("mfp", SPDs::One(), SpectrumType::General,
                                               alloc);
             else {
                 // 4. nothing specified -- use defaults
@@ -318,18 +324,19 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(const TextureParameterDictionary 
         }
     }
 
-    Float scale = dict.GetOneFloat("scale", 1.f);
-    Float eta = dict.GetOneFloat("eta", 1.33f);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
+    Float eta = parameters.GetOneFloat("eta", 1.33f);
 
-    FloatTextureHandle uRoughness = dict.GetFloatTextureOrNull("uroughness", alloc);
-    FloatTextureHandle vRoughness = dict.GetFloatTextureOrNull("vroughness", alloc);
+    FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
+    FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
     if (!uRoughness)
-        uRoughness = dict.GetFloatTexture("roughness", 0.f, alloc);
+        uRoughness = parameters.GetFloatTexture("roughness", 0.f, alloc);
     if (!vRoughness)
-        vRoughness = dict.GetFloatTexture("roughness", 0.f, alloc);
+        vRoughness = parameters.GetFloatTexture("roughness", 0.f, alloc);
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = dict.GetOneBool("remaproughness", true);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
+    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     return alloc.new_object<SubsurfaceMaterial>(scale, sigma_a, sigma_s, reflectance, mfp,
                                                 g, eta, uRoughness, vRoughness,
                                                 displacement, remapRoughness, alloc);
@@ -343,23 +350,24 @@ std::string DiffuseTransmissionMaterial::ToString() const {
 }
 
 DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
-    const TextureParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle reflectance =
-        dict.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
+        parameters.GetSpectrumTexture("reflectance", nullptr, SpectrumType::Reflectance, alloc);
     if (!reflectance)
         reflectance = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.25f));
 
-    SpectrumTextureHandle transmittance = dict.GetSpectrumTexture(
+    SpectrumTextureHandle transmittance = parameters.GetSpectrumTexture(
         "transmittance", nullptr, SpectrumType::Reflectance, alloc);
     if (!transmittance)
         transmittance = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.25f));
 
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = dict.GetOneBool("remaproughness", true);
-    FloatTextureHandle sigma = dict.GetFloatTexture("sigma", 0.f, alloc);
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
+    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
+    FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
     return alloc.new_object<DiffuseTransmissionMaterial>(reflectance, transmittance,
                                                          sigma, displacement, scale);
 }
@@ -374,14 +382,15 @@ std::string MeasuredMaterial::ToString() const {
     return StringPrintf("[ MeasuredMaterial displacement: %s ]", displacement);
 }
 
-MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &dict,
+MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &parameters,
                                            const FileLoc *loc, Allocator alloc) {
-    std::string filename = ResolveFilename(dict.GetOneString("brdffile", ""));
+    std::string filename = ResolveFilename(parameters.GetOneString("brdffile", ""));
     if (filename.empty()) {
         Error("Filename must be provided for MeasuredMaterial");
         return nullptr;
     }
-    FloatTextureHandle displacement = dict.GetFloatTextureOrNull("displacement", alloc);
+    FloatTextureHandle displacement =
+        parameters.GetFloatTextureOrNull("displacement", alloc);
     return alloc.new_object<MeasuredMaterial>(filename, displacement, alloc);
 }
 
@@ -396,26 +405,26 @@ std::string MaterialHandle::ToString() const {
 STAT_COUNTER("Scene/Materials", nMaterialsCreated);
 
 MaterialHandle MaterialHandle::Create(
-    const std::string &name, const TextureParameterDictionary &dict,
+    const std::string &name, const TextureParameterDictionary &parameters,
     /*const */ std::map<std::string, MaterialHandle> &namedMaterials, const FileLoc *loc,
     Allocator alloc) {
     MaterialHandle material;
     if (name.empty() || name == "none")
         return nullptr;
     else if (name == "diffuse")
-        material = DiffuseMaterial::Create(dict, loc, alloc);
+        material = DiffuseMaterial::Create(parameters, loc, alloc);
     else if (name == "coateddiffuse")
-        material = CoatedDiffuseMaterial::Create(dict, loc, alloc);
+        material = CoatedDiffuseMaterial::Create(parameters, loc, alloc);
     else if (name == "diffusetransmission")
-        material = DiffuseTransmissionMaterial::Create(dict, loc, alloc);
+        material = DiffuseTransmissionMaterial::Create(parameters, loc, alloc);
     else if (name == "dielectric")
-        material = DielectricMaterial::Create(dict, loc, alloc);
+        material = DielectricMaterial::Create(parameters, loc, alloc);
     else if (name == "thindielectric")
-        material = ThinDielectricMaterial::Create(dict, loc, alloc);
+        material = ThinDielectricMaterial::Create(parameters, loc, alloc);
     else if (name == "hair")
-        material = HairMaterial::Create(dict, loc, alloc);
+        material = HairMaterial::Create(parameters, loc, alloc);
     else if (name == "layered") {
-        std::string topName = dict.GetOneString("topmaterial", "");
+        std::string topName = parameters.GetOneString("topmaterial", "");
         if (topName.empty())
             ErrorExit(loc, "Must specifiy \"topmaterial\" parameter.");
         else if (namedMaterials.find(topName) == namedMaterials.end())
@@ -423,7 +432,7 @@ MaterialHandle MaterialHandle::Create(
 
         MaterialHandle top = namedMaterials[topName];
 
-        std::string baseName = dict.GetOneString("basematerial", "");
+        std::string baseName = parameters.GetOneString("basematerial", "");
         if (baseName.empty())
             ErrorExit(loc, "Must specifiy \"basematerial\" parameter.");
         else if (namedMaterials.find(baseName) == namedMaterials.end())
@@ -431,20 +440,20 @@ MaterialHandle MaterialHandle::Create(
 
         MaterialHandle base = namedMaterials[baseName];
 
-        return LayeredMaterial::Create(dict, top, base, loc, alloc);
+        return LayeredMaterial::Create(parameters, top, base, loc, alloc);
     } else if (name == "conductor")
-        material = ConductorMaterial::Create(dict, loc, alloc);
+        material = ConductorMaterial::Create(parameters, loc, alloc);
     else if (name == "measured")
-        material = MeasuredMaterial::Create(dict, loc, alloc);
+        material = MeasuredMaterial::Create(parameters, loc, alloc);
     else if (name == "subsurface") {
-        material = SubsurfaceMaterial::Create(dict, loc, alloc);
+        material = SubsurfaceMaterial::Create(parameters, loc, alloc);
     } else
         ErrorExit(loc, "%s: material type unknown.", name);
 
     if (!material)
         ErrorExit(loc, "%s: unable to create material.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     ++nMaterialsCreated;
     return material;
 }

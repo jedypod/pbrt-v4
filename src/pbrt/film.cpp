@@ -213,10 +213,10 @@ std::string RGBFilm::ToString() const {
                         BaseToString(), scale, *colorSpace, maxSampleLuminance, writeFP16);
 }
 
-RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
+RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle filter,
                          const RGBColorSpace *colorSpace, const FileLoc *loc,
                          Allocator alloc) {
-    std::string filename = dict.GetOneString("filename", "");
+    std::string filename = parameters.GetOneString("filename", "");
     if (Options->imageFile) {
         if (!filename.empty())
             Warning(loc,
@@ -228,15 +228,15 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     } else if (filename.empty())
         filename = "pbrt.exr";
 
-    Point2i fullResolution(dict.GetOneInt("xresolution", 1280),
-                           dict.GetOneInt("yresolution", 720));
+    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
+                           parameters.GetOneInt("yresolution", 720));
     if (Options->quickRender) {
         fullResolution.x = std::max(1, fullResolution.x / 4);
         fullResolution.y = std::max(1, fullResolution.y / 4);
     }
 
     Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = dict.GetIntArray("pixelbounds");
+    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
     if (Options->pixelBounds) {
         Bounds2i newBounds = *Options->pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
@@ -260,7 +260,7 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
         }
     }
 
-    std::vector<Float> cr = dict.GetFloatArray("cropwindow");
+    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
         // Compute film image bounds
@@ -304,10 +304,10 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     if (pixelBounds.IsEmpty())
         ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
-    Float scale = dict.GetOneFloat("scale", 1.);
-    Float diagonal = dict.GetOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
-    bool writeFP16 = dict.GetOneBool("savefp16", true);
+    Float scale = parameters.GetOneFloat("scale", 1.);
+    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
+    Float maxSampleLuminance = parameters.GetOneFloat("maxsampleluminance", Infinity);
+    bool writeFP16 = parameters.GetOneBool("savefp16", true);
     return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, filter, diagonal,
                                      filename, scale, colorSpace, maxSampleLuminance,
                                      writeFP16, alloc);
@@ -507,10 +507,10 @@ std::string GBufferFilm::ToString() const {
                         BaseToString(), *colorSpace, maxSampleLuminance, writeFP16);
 }
 
-GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
-                                 const RGBColorSpace *colorSpace, const FileLoc *loc,
-                                 Allocator alloc) {
-    std::string filename = dict.GetOneString("filename", "");
+GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
+                                 FilterHandle filter, const RGBColorSpace *colorSpace,
+                                 const FileLoc *loc, Allocator alloc) {
+    std::string filename = parameters.GetOneString("filename", "");
     if (Options->imageFile) {
         if (!filename.empty())
             Warning(loc,
@@ -522,15 +522,15 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
     } else if (filename.empty())
         filename = "pbrt.exr";
 
-    Point2i fullResolution(dict.GetOneInt("xresolution", 1280),
-                           dict.GetOneInt("yresolution", 720));
+    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
+                           parameters.GetOneInt("yresolution", 720));
     if (Options->quickRender) {
         fullResolution.x = std::max(1, fullResolution.x / 4);
         fullResolution.y = std::max(1, fullResolution.y / 4);
     }
 
     Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = dict.GetIntArray("pixelbounds");
+    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
     if (Options->pixelBounds) {
         Bounds2i newBounds = *Options->pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
@@ -554,7 +554,7 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
         }
     }
 
-    std::vector<Float> cr = dict.GetFloatArray("cropwindow");
+    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
         // Compute film image bounds
@@ -598,29 +598,31 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
     if (pixelBounds.IsEmpty())
         ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
-    Float diagonal = dict.GetOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
-    Float scale = dict.GetOneFloat("scale", 1.);
-    bool writeFP16 = dict.GetOneBool("savefp16", true);
+    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
+    Float maxSampleLuminance = parameters.GetOneFloat("maxsampleluminance", Infinity);
+    Float scale = parameters.GetOneFloat("scale", 1.);
+    bool writeFP16 = parameters.GetOneBool("savefp16", true);
     return alloc.new_object<GBufferFilm>(fullResolution, pixelBounds, filter, diagonal,
                                          filename, scale, colorSpace, maxSampleLuminance,
                                          writeFP16, alloc);
 }
 
-FilmHandle FilmHandle::Create(const std::string &name, const ParameterDictionary &dict,
+FilmHandle FilmHandle::Create(const std::string &name,
+                              const ParameterDictionary &parameters,
                               const FileLoc *loc, FilterHandle filter, Allocator alloc) {
     FilmHandle film;
     if (name == "rgb")
-        film = RGBFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
+        film = RGBFilm::Create(parameters, filter, parameters.ColorSpace(), loc, alloc);
     else if (name == "gbuffer")
-        film = GBufferFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
+        film = GBufferFilm::Create(parameters, filter, parameters.ColorSpace(), loc,
+                                   alloc);
     else
         ErrorExit(loc, "%s: film type unknown.", name);
 
     if (!film)
         ErrorExit(loc, "%s: unable to create film.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return film;
 }
 

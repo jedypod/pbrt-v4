@@ -101,16 +101,16 @@ std::string PointLight::ToString() const {
 }
 
 PointLight *PointLight::Create(const AnimatedTransform &worldFromLight,
-                               MediumHandle medium, const ParameterDictionary &dict,
+                               MediumHandle medium, const ParameterDictionary &parameters,
                                const RGBColorSpace *colorSpace, const FileLoc *loc,
                                Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform tf = Translate(Vector3f(from.x, from.y, from.z));
     AnimatedTransform worldFromLightAnim(
         worldFromLight.startTransform * tf, worldFromLight.startTime,
@@ -156,17 +156,18 @@ std::string DistantLight::ToString() const {
 }
 
 DistantLight *DistantLight::Create(const AnimatedTransform &worldFromLight,
-                                   const ParameterDictionary &dict,
+                                   const ParameterDictionary &parameters,
                                    const RGBColorSpace *colorSpace, const FileLoc *loc,
                                    Allocator alloc) {
     SpectrumHandle L =
-        dict.GetOneSpectrum("L", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("L", &colorSpace->illuminant, SpectrumType::General,
+                                  alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         L = alloc.new_object<ScaledSpectrum>(sc, L);
 
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
-    Point3f to = dict.GetOnePoint3f("to", Point3f(0, 0, 1));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
 
     Vector3f w = Normalize(from - to);
     Vector3f v1, v2;
@@ -366,12 +367,12 @@ std::string ProjectionLight::ToString() const {
 
 ProjectionLight *ProjectionLight::Create(const AnimatedTransform &worldFromLight,
                                          MediumHandle medium,
-                                         const ParameterDictionary &dict,
+                                         const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc) {
-    Float scale = dict.GetOneFloat("scale", 1);
-    Float fov = dict.GetOneFloat("fov", 90.);
+    Float scale = parameters.GetOneFloat("scale", 1);
+    Float fov = parameters.GetOneFloat("fov", 90.);
 
-    std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string texname = ResolveFilename(parameters.GetOneString("imagefile", ""));
     if (texname.empty())
         ErrorExit(loc, "Must provide \"imagefile\" to \"projection\" light source");
 
@@ -490,19 +491,19 @@ std::string GoniometricLight::ToString() const {
 
 GoniometricLight *GoniometricLight::Create(const AnimatedTransform &worldFromLight,
                                            MediumHandle medium,
-                                           const ParameterDictionary &dict,
+                                           const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
     Image image(alloc);
     const RGBColorSpace *imageColorSpace = nullptr;
 
-    std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string texname = ResolveFilename(parameters.GetOneString("imagefile", ""));
     if (!texname.empty()) {
         pstd::optional<ImageAndMetadata> imageAndMetadata = Image::Read(texname, alloc);
         if (imageAndMetadata) {
@@ -694,15 +695,15 @@ std::string DiffuseAreaLight::ToString() const {
 
 DiffuseAreaLight *DiffuseAreaLight::Create(const AnimatedTransform &worldFromLight,
                                            MediumHandle medium,
-                                           const ParameterDictionary &dict,
+                                           const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc,
                                            const ShapeHandle shape) {
-    SpectrumHandle L = dict.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
-    Float scale = dict.GetOneFloat("scale", 1);
-    bool twoSided = dict.GetOneBool("twosided", false);
+    SpectrumHandle L = parameters.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
+    Float scale = parameters.GetOneFloat("scale", 1);
+    bool twoSided = parameters.GetOneBool("twosided", false);
 
-    std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
     pstd::optional<Image> image;
     const RGBColorSpace *imageColorSpace = nullptr;
     if (!filename.empty()) {
@@ -1276,20 +1277,20 @@ std::string SpotLight::ToString() const {
 }
 
 SpotLight *SpotLight::Create(const AnimatedTransform &worldFromLight, MediumHandle medium,
-                             const ParameterDictionary &dict,
+                             const ParameterDictionary &parameters,
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
-    Float coneangle = dict.GetOneFloat("coneangle", 30.);
-    Float conedelta = dict.GetOneFloat("conedeltaangle", 5.);
+    Float coneangle = parameters.GetOneFloat("coneangle", 30.);
+    Float conedelta = parameters.GetOneFloat("conedeltaangle", 5.);
     // Compute spotlight world to light transformation
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
-    Point3f to = dict.GetOnePoint3f("to", Point3f(0, 0, 1));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
 
     Transform dirToZ = (Transform)Frame::FromZ(Normalize(to - from));
     Transform t = Translate(Vector3f(from.x, from.y, from.z)) * Inverse(dirToZ);
@@ -1342,32 +1343,34 @@ void LightHandle::Pdf_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
     return Apply<void>(pdf);
 }
 
-LightHandle LightHandle::Create(const std::string &name, const ParameterDictionary &dict,
+LightHandle LightHandle::Create(const std::string &name, const ParameterDictionary &parameters,
                                 const AnimatedTransform &worldFromLight,
                                 const CameraTransform &cameraTransform,
                                 MediumHandle outsideMedium, const FileLoc *loc,
                                 Allocator alloc) {
     LightHandle light = nullptr;
     if (name == "point")
-        light = PointLight::Create(worldFromLight, outsideMedium, dict, dict.ColorSpace(),
-                                   loc, alloc);
+        light = PointLight::Create(worldFromLight, outsideMedium, parameters,
+                                   parameters.ColorSpace(), loc, alloc);
     else if (name == "spot")
-        light = SpotLight::Create(worldFromLight, outsideMedium, dict, dict.ColorSpace(),
-                                  loc, alloc);
+        light = SpotLight::Create(worldFromLight, outsideMedium, parameters,
+                                  parameters.ColorSpace(), loc, alloc);
     else if (name == "goniometric")
-        light = GoniometricLight::Create(worldFromLight, outsideMedium, dict,
-                                         dict.ColorSpace(), loc, alloc);
+        light = GoniometricLight::Create(worldFromLight, outsideMedium, parameters,
+                                         parameters.ColorSpace(), loc, alloc);
     else if (name == "projection")
-        light = ProjectionLight::Create(worldFromLight, outsideMedium, dict, loc, alloc);
+        light = ProjectionLight::Create(worldFromLight, outsideMedium, parameters, loc,
+                                        alloc);
     else if (name == "distant")
-        light = DistantLight::Create(worldFromLight, dict, dict.ColorSpace(), loc, alloc);
+        light = DistantLight::Create(worldFromLight, parameters, parameters.ColorSpace(),
+                                     loc, alloc);
     else if (name == "infinite") {
-        const RGBColorSpace *colorSpace = dict.ColorSpace();
+        const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<SpectrumHandle> L =
-            dict.GetSpectrumArray("L", SpectrumType::General, alloc);
-        Float scale = dict.GetOneFloat("scale", 1);
-        std::vector<Point3f> portal = dict.GetPoint3fArray("portal");
-        std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+            parameters.GetSpectrumArray("L", SpectrumType::General, alloc);
+        Float scale = parameters.GetOneFloat("scale", 1);
+        std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
+        std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
 
         if (L.empty() && filename.empty())
             // Default: color space's std illuminant
@@ -1422,27 +1425,28 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
     if (!light)
         ErrorExit(loc, "%s: unable to create light.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return light;
 }
 
 LightHandle LightHandle::CreateArea(const std::string &name,
-                                    const ParameterDictionary &dict,
+                                    const ParameterDictionary &parameters,
                                     const AnimatedTransform &worldFromLight,
                                     const MediumInterface &mediumInterface,
                                     const ShapeHandle shape, const FileLoc *loc,
                                     Allocator alloc) {
     LightHandle area = nullptr;
     if (name == "diffuse")
-        area = DiffuseAreaLight::Create(worldFromLight, mediumInterface.outside, dict,
-                                        dict.ColorSpace(), loc, alloc, shape);
+        area = DiffuseAreaLight::Create(worldFromLight, mediumInterface.outside,
+                                        parameters, parameters.ColorSpace(), loc, alloc,
+                                        shape);
     else
         ErrorExit(loc, "%s: area light type unknown.", name);
 
     if (!area)
         ErrorExit(loc, "%s: unable to create area light.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return area;
 }
 

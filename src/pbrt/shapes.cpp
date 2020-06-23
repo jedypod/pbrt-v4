@@ -74,12 +74,12 @@ std::string Sphere::ToString() const {
 
 Sphere *Sphere::Create(const Transform *renderFromObject,
                        const Transform *objectFromRender, bool reverseOrientation,
-                       const ParameterDictionary &dict, const FileLoc *loc,
+                       const ParameterDictionary &parameters, const FileLoc *loc,
                        Allocator alloc) {
-    Float radius = dict.GetOneFloat("radius", 1.f);
-    Float zmin = dict.GetOneFloat("zmin", -radius);
-    Float zmax = dict.GetOneFloat("zmax", radius);
-    Float phimax = dict.GetOneFloat("phimax", 360.f);
+    Float radius = parameters.GetOneFloat("radius", 1.f);
+    Float zmin = parameters.GetOneFloat("zmin", -radius);
+    Float zmax = parameters.GetOneFloat("zmax", radius);
+    Float phimax = parameters.GetOneFloat("phimax", 360.f);
     return alloc.new_object<Sphere>(renderFromObject, objectFromRender,
                                     reverseOrientation, radius, zmin, zmax, phimax);
 }
@@ -107,11 +107,11 @@ std::string Disk::ToString() const {
 
 Disk *Disk::Create(const Transform *renderFromObject,
                    const Transform *objectFromRender, bool reverseOrientation,
-                   const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
-    Float height = dict.GetOneFloat("height", 0.);
-    Float radius = dict.GetOneFloat("radius", 1);
-    Float innerRadius = dict.GetOneFloat("innerradius", 0);
-    Float phimax = dict.GetOneFloat("phimax", 360);
+                   const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    Float height = parameters.GetOneFloat("height", 0.);
+    Float radius = parameters.GetOneFloat("radius", 1);
+    Float innerRadius = parameters.GetOneFloat("innerradius", 0);
+    Float phimax = parameters.GetOneFloat("phimax", 360);
     return alloc.new_object<Disk>(renderFromObject, objectFromRender,
                                   reverseOrientation, height, radius, innerRadius,
                                   phimax);
@@ -135,12 +135,12 @@ std::string Cylinder::ToString() const {
 
 Cylinder *Cylinder::Create(const Transform *renderFromObject,
                            const Transform *objectFromRender,
-                           bool reverseOrientation, const ParameterDictionary &dict,
+                           bool reverseOrientation, const ParameterDictionary &parameters,
                            const FileLoc *loc, Allocator alloc) {
-    Float radius = dict.GetOneFloat("radius", 1);
-    Float zmin = dict.GetOneFloat("zmin", -1);
-    Float zmax = dict.GetOneFloat("zmax", 1);
-    Float phimax = dict.GetOneFloat("phimax", 360);
+    Float radius = parameters.GetOneFloat("radius", 1);
+    Float zmin = parameters.GetOneFloat("zmin", -1);
+    Float zmax = parameters.GetOneFloat("zmax", 1);
+    Float phimax = parameters.GetOneFloat("phimax", 360);
     return alloc.new_object<Cylinder>(renderFromObject, objectFromRender,
                                       reverseOrientation, radius, zmin, zmax, phimax);
 }
@@ -385,11 +385,11 @@ std::string Triangle::ToString() const {
 
 TriangleMesh *Triangle::CreateMesh(const Transform *renderFromObject,
                                    bool reverseOrientation,
-                                   const ParameterDictionary &dict, const FileLoc *loc,
+                                   const ParameterDictionary &parameters, const FileLoc *loc,
                                    Allocator alloc) {
-    std::vector<int> vi = dict.GetIntArray("indices");
-    std::vector<Point3f> P = dict.GetPoint3fArray("P");
-    std::vector<Point2f> uvs = dict.GetPoint2fArray("uv");
+    std::vector<int> vi = parameters.GetIntArray("indices");
+    std::vector<Point3f> P = parameters.GetPoint3fArray("P");
+    std::vector<Point2f> uvs = parameters.GetPoint2fArray("uv");
 
     if (vi.empty()) {
         if (P.size() == 3)
@@ -419,13 +419,13 @@ TriangleMesh *Triangle::CreateMesh(const Transform *renderFromObject,
         uvs = {};
     }
 
-    std::vector<Vector3f> S = dict.GetVector3fArray("S");
+    std::vector<Vector3f> S = parameters.GetVector3fArray("S");
     if (!S.empty() && S.size() != P.size()) {
         Error(loc, "Number of \"S\"s for triangle mesh must match \"P\"s. "
                    "Discarding \"S\"s.");
         S = {};
     }
-    std::vector<Normal3f> N = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> N = parameters.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error(loc, "Number of \"N\"s for triangle mesh must match \"P\"s. "
                    "Discarding \"N\"s.");
@@ -441,7 +441,7 @@ TriangleMesh *Triangle::CreateMesh(const Transform *renderFromObject,
             return {};
         }
 
-    std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
+    std::vector<int> faceIndices = parameters.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
         Error(loc,
               "Number of face indices %d does not match number of triangles %d. "
@@ -816,20 +816,20 @@ std::string Curve::ToString() const {
 pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
                                         const Transform *objectFromRender,
                                         bool reverseOrientation,
-                                        const ParameterDictionary &dict,
+                                        const ParameterDictionary &parameters,
                                         const FileLoc *loc, Allocator alloc) {
-    Float width = dict.GetOneFloat("width", 1.f);
-    Float width0 = dict.GetOneFloat("width0", width);
-    Float width1 = dict.GetOneFloat("width1", width);
+    Float width = parameters.GetOneFloat("width", 1.f);
+    Float width0 = parameters.GetOneFloat("width0", width);
+    Float width1 = parameters.GetOneFloat("width1", width);
 
-    int degree = dict.GetOneInt("degree", 3);
+    int degree = parameters.GetOneInt("degree", 3);
     if (degree != 2 && degree != 3) {
         Error(loc, "Invalid degree %d: only degree 2 and 3 curves are supported.",
               degree);
         return {};
     }
 
-    std::string basis = dict.GetOneString("basis", "bezier");
+    std::string basis = parameters.GetOneString("basis", "bezier");
     if (basis != "bezier" && basis != "bspline") {
         Error(loc,
               "Invalid basis \"%s\": only \"bezier\" and \"bspline\" are "
@@ -839,7 +839,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
     }
 
     int nSegments;
-    std::vector<Point3f> cp = dict.GetPoint3fArray("P");
+    std::vector<Point3f> cp = parameters.GetPoint3fArray("P");
     if (basis == "bezier") {
         // After the first segment, which uses degree+1 control points,
         // subsequent segments reuse the last control point of the previous
@@ -864,7 +864,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
     }
 
     CurveType type;
-    std::string curveType = dict.GetOneString("type", "flat");
+    std::string curveType = parameters.GetOneString("type", "flat");
     if (curveType == "flat")
         type = CurveType::Flat;
     else if (curveType == "ribbon")
@@ -876,7 +876,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
         type = CurveType::Cylinder;
     }
 
-    std::vector<Normal3f> n = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> n = parameters.GetNormal3fArray("N");
     if (!n.empty()) {
         if (type != CurveType::Ribbon) {
             Warning("Curve normals are only used with \"ribbon\" type curves.");
@@ -895,7 +895,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
         return {};
     }
 
-    int sd = dict.GetOneInt("splitdepth", 3);
+    int sd = parameters.GetOneInt("splitdepth", 3);
 
     if (type == CurveType::Ribbon && n.empty()) {
         Error(loc, "Must provide normals \"N\" at curve endpoints with ribbon "
@@ -962,11 +962,11 @@ std::string BilinearIntersection::ToString() const {
 
 BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
                                              bool reverseOrientation,
-                                             const ParameterDictionary &dict,
+                                             const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
-    std::vector<int> vertexIndices = dict.GetIntArray("indices");
-    std::vector<Point3f> P = dict.GetPoint3fArray("P");
-    std::vector<Point2f> uv = dict.GetPoint2fArray("uv");
+    std::vector<int> vertexIndices = parameters.GetIntArray("indices");
+    std::vector<Point3f> P = parameters.GetPoint3fArray("P");
+    std::vector<Point2f> uv = parameters.GetPoint2fArray("uv");
 
     if (vertexIndices.empty()) {
         if (P.size() == 4)
@@ -998,7 +998,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
         uv = {};
     }
 
-    std::vector<Normal3f> N = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> N = parameters.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error(loc, "Number of \"N\"s for bilinear patch mesh must match \"P\"s. "
                    "Discarding \"N\"s.");
@@ -1015,7 +1015,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
             return {};
         }
 
-    std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
+    std::vector<int> faceIndices = parameters.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vertexIndices.size() / 4) {
         Error(loc,
               "Number of face indices %d does not match number of bilinear "
@@ -1028,7 +1028,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
     // Grab this before the vertexIndices are std::moved...
     size_t nBlps = vertexIndices.size() / 4;
 
-    std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
     PiecewiseConstant2D *imageDist = nullptr;
     if (!filename.empty()) {
         auto im = Image::Read(filename, alloc);
@@ -1451,38 +1451,39 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
                                               const Transform *renderFromObject,
                                               const Transform *objectFromRender,
                                               bool reverseOrientation,
-                                              const ParameterDictionary &dict,
+                                              const ParameterDictionary &parameters,
                                               const FileLoc *loc, Allocator alloc) {
     pstd::vector<ShapeHandle> shapes(alloc);
     if (name == "sphere") {
         shapes = {Sphere::Create(renderFromObject, objectFromRender,
-                                 reverseOrientation, dict, loc, alloc)};
+                                 reverseOrientation, parameters, loc, alloc)};
         ++nSpheres;
     }
     // Create remaining single _Shape_ types
     else if (name == "cylinder") {
         shapes = {Cylinder::Create(renderFromObject, objectFromRender,
-                                   reverseOrientation, dict, loc, alloc)};
+                                   reverseOrientation, parameters, loc, alloc)};
         ++nCylinders;
     } else if (name == "disk") {
         shapes = {Disk::Create(renderFromObject, objectFromRender,
-                               reverseOrientation, dict, loc, alloc)};
+                               reverseOrientation, parameters, loc, alloc)};
         ++nDisks;
     } else if (name == "bilinearmesh") {
         BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(
-            renderFromObject, reverseOrientation, dict, loc, alloc);
+            renderFromObject, reverseOrientation, parameters, loc, alloc);
         shapes = BilinearPatch::CreatePatches(mesh, alloc);
     }
     // Create multiple-_Shape_ types
     else if (name == "curve")
         shapes = Curve::Create(renderFromObject, objectFromRender,
-                               reverseOrientation, dict, loc, alloc);
+                               reverseOrientation, parameters, loc, alloc);
     else if (name == "trianglemesh") {
         TriangleMesh *mesh = Triangle::CreateMesh(renderFromObject,
-                                                  reverseOrientation, dict, loc, alloc);
+                                                  reverseOrientation, parameters, loc,
+                                                  alloc);
         shapes = Triangle::CreateTriangles(mesh, alloc);
     } else if (name == "plymesh") {
-        std::string filename = ResolveFilename(dict.GetOneString("plyfile", ""));
+        std::string filename = ResolveFilename(parameters.GetOneString("plyfile", ""));
         pstd::optional<TriQuadMesh> plyMesh = TriQuadMesh::ReadPLY(filename);
         if (!plyMesh)
             return {};
@@ -1505,18 +1506,18 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
             shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
         }
     } else if (name == "loopsubdiv") {
-        int nLevels = dict.GetOneInt("levels", 3);
-        std::vector<int> vertexIndices = dict.GetIntArray("indices");
+        int nLevels = parameters.GetOneInt("levels", 3);
+        std::vector<int> vertexIndices = parameters.GetIntArray("indices");
         if (vertexIndices.empty())
             ErrorExit(loc, "Vertex indices \"indices\" not provided for "
                            "LoopSubdiv shape.");
 
-        std::vector<Point3f> P = dict.GetPoint3fArray("P");
+        std::vector<Point3f> P = parameters.GetPoint3fArray("P");
         if (P.empty())
             ErrorExit(loc, "Vertex positions \"P\" not provided for LoopSubdiv shape.");
 
         // don't actually use this for now...
-        std::string scheme = dict.GetOneString("scheme", "loop");
+        std::string scheme = parameters.GetOneString("scheme", "loop");
 
         TriangleMesh *mesh = LoopSubdivide(renderFromObject, reverseOrientation,
                                            nLevels, vertexIndices, P, alloc);
