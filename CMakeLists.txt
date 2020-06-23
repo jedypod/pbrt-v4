@@ -4,13 +4,13 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-PROJECT ( PBRT-V4 LANGUAGES CXX C )
+project(PBRT-V4 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # For sanitizers
-SET (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 # Configuration options
 
@@ -18,12 +18,6 @@ OPTION(PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
 OPTION(PBRT_BUILD_PYBIND "Build pybind libraries" OFF)
 OPTION(PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU architecture of system pbrt was built on" ON)
 SET(PBRT_OPTIX7_PATH "" CACHE STRING "Path to OptiX 7 SDK")
-
-IF (PBRT_FLOAT_AS_DOUBLE)
-  ADD_DEFINITIONS ( -D PBRT_FLOAT_AS_DOUBLE )
-ENDIF()
-
-ENABLE_TESTING()
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Release' as none was specified.")
@@ -69,11 +63,19 @@ CHECK_EXT("stb" "stb/tools" 1034f5)
 CHECK_EXT("zlib" "zlib/doc" 54d591e)
 
 IF(CMAKE_BUILD_TYPE MATCHES Release)
-  ADD_DEFINITIONS (-DNDEBUG)
+  ADD_DEFINITIONS(-D NDEBUG)
 ENDIF()
 # To build a release build with CHECKs enabled, comment-out the above
 # 3 lines and un-comment out this one:
 # SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+#######################################
+## ext
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/ext)
+
+#########################################
+## CUDA / OptiX
 
 include(CheckLanguage)
 CHECK_LANGUAGE(CUDA)
@@ -87,8 +89,9 @@ if (CMAKE_CUDA_COMPILER)
         message(WARNING "Found CUDA but PBRT_OPTIX7_PATH is not set. Disabling GPU compilation.")
     else()
         enable_language(CUDA)
-        ADD_DEFINITIONS( -D PBRT_BUILD_GPU_RENDERER )
+        set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_BUILD_GPU_RENDERER)
         set(PBRT_CUDA_ENABLED ON)
+#FIXME
         INCLUDE_DIRECTORIES(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
 
         # http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
@@ -127,6 +130,7 @@ if (CMAKE_CUDA_COMPILER)
         SET(PBRT_CUDA_LIB cuda)
 
         # optix
+#FIXME
         INCLUDE_DIRECTORIES(${PBRT_OPTIX7_PATH}/include)
 
         # from Ingo's configure_optix.cmake (Apache licensed)
@@ -161,6 +165,12 @@ else()
     message(STATUS "CUDA not found")
 endif()
 
+IF (PBRT_FLOAT_AS_DOUBLE)
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_FLOAT_AS_DOUBLE)
+ENDIF()
+
+ENABLE_TESTING()
+
 FIND_PACKAGE ( Sanitizers )
 FIND_PACKAGE ( Threads )
 
@@ -182,19 +192,19 @@ INCLUDE(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=gnu++17" COMPILER_SUPPORTS_STD_GNU17)
 CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_STD_CXX17)
 IF (COMPILER_SUPPORTS_STD_GNU17)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++17")
+  list(APPEND PBRT_CXX_FLAGS -std=gnu++17)
 ELSEIF (COMPILER_SUPPORTS_STD_CXX17)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+  list(APPEND PBRT_CXX_FLAGS -std=c++17)
 ENDIF()
 
 CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 IF (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+  list(APPEND PBRT_CXX_FLAGS -march=native)
 ENDIF()
 # TODO: how to specify this on wondows?
 
 IF(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+  list(APPEND PBRT_CXX_FLAGS -std=c++17)
 
   FIND_PROGRAM(XIAR xiar)
   IF(XIAR)
@@ -213,23 +223,23 @@ IF(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(FP_MODEL "precise" CACHE STRING "The floating point model to compile with.")
   set_property(CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
 
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fp-model ${FP_MODEL}")
+  list(APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
 ENDIF()
 
 IF(MSVC)
   ADD_DEFINITIONS (/D _CRT_SECURE_NO_WARNINGS)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4305") # double constant assigned to float
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4244") # int -> float conversion
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4843") # double -> float conversion
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267") # size_t -> int conversion
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4838") # double -> int conversion
+  list(APPEND PBRT_CXX_FLAGS /wd4305) # double constant assigned to float
+  list(APPEND PBRT_CXX_FLAGS /wd4244) # int -> float conversion
+  list(APPEND PBRT_CXX_FLAGS /wd4843) # double -> float conversion
+  list(APPEND PBRT_CXX_FLAGS /wd4267) # size_t -> int conversion
+  list(APPEND PBRT_CXX_FLAGS /wd4838) # double -> int conversion
 ENDIF()
 
 INCLUDE (CheckIncludeFiles)
 
 CHECK_INCLUDE_FILES ( memory.h HAVE_MEMORY_H )
 IF ( HAVE_MEMORY_H )
-  ADD_DEFINITIONS ( -D PBRT_HAVE_MEMORY_H )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE_MEMORY_H)
 ENDIF ()
 
 ###########################################################################
@@ -254,7 +264,7 @@ int main() {
 }
 " HAVE_MMAP )
 if ( HAVE_MMAP )
-  ADD_DEFINITIONS ( -D PBRT_HAVE_MMAP )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE_MMAP)
 ENDIF ()
 
 CHECK_CXX_SOURCE_COMPILES ( "
@@ -271,7 +281,7 @@ class Vector2 : public Tuple2<Vector2, T> {
 int main() { Vector2<float> v; }
 " CRTP_USING_IS_SANE )
 IF (NOT CRTP_USING_IS_SANE)
-  ADD_DEFINITIONS ( -D PBRT_CRTP_USING_WORKAROUND )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_CRTP_USING_WORKAROUND)
 ENDIF()
 
 CHECK_CXX_SOURCE_COMPILES ( "
@@ -282,24 +292,24 @@ int main() {
     return 0;
 } " HAS_BITSCAN )
 IF ( HAS_BITSCAN )
-  ADD_DEFINITIONS ( -D PBRT_HAS_INTRIN_H )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAS_INTRIN_H)
 ENDIF()
 
 ########################################
 # os/compiler-specific stuff
 
 IF ( CMAKE_SYSTEM_NAME STREQUAL Windows )
-  ADD_DEFINITIONS ( -D PBRT_IS_WINDOWS )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_WINDOWS)
 ELSEIF ( CMAKE_SYSTEM_NAME STREQUAL Darwin )
-  ADD_DEFINITIONS ( -D PBRT_IS_OSX )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_OSX)
 ELSEIF (CMAKE_SYSTEM_NAME STREQUAL Linux )
-  ADD_DEFINITIONS ( -D PBRT_IS_LINUX )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_LINUX)
   # -rdynamic so we can get backtrace symbols...
   # --no-as-needed so libprofiler sticks around
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic -Wl,--no-as-needed")
 ELSE()
-  MESSAGE ( SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME )
-ENDIF ()
+  MESSAGE(SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME)
+ENDIF()
 
 ########################################
 # noinline
@@ -315,11 +325,11 @@ int main() { }"
 HAVE_ATTRIBUTE_NOINLINE )
 
 IF ( HAVE_ATTRIBUTE_NOINLINE )
-  ADD_DEFINITIONS ( -D "PBRT_NOINLINE=__attribute__\\(\\(noinline\\)\\)" )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} "PBRT_NOINLINE=__attribute__((noinline))")
 ELSEIF ( HAVE_DECLSPEC_NOINLINE )
-  ADD_DEFINITIONS ( -D "PBRT_NOINLINE=__declspec(noinline)" )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} "PBRT_NOINLINE=__declspec(noinline)")
 ELSE ()
-  ADD_DEFINITIONS ( -D PBRT_NOINLINE )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_NOINLINE)
 ENDIF ()
 
 ########################################
@@ -337,18 +347,10 @@ int main() {
   posix_memalign(&ptr, 32, 1024);
 } " HAVE_POSIX_MEMALIGN )
 
-CHECK_CXX_SOURCE_COMPILES ( "
-#include <malloc.h>
-int main() {
-    void *ptr = memalign(32, 1024);
-} " HAVE_MEMALIGN )
-
 IF ( HAVE__ALIGNED_MALLOC )
-  ADD_DEFINITIONS ( -D PBRT_HAVE__ALIGNED_MALLOC )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE__ALIGNED_MALLOC)
 ELSEIF ( HAVE_POSIX_MEMALIGN )
-  ADD_DEFINITIONS ( -D PBRT_HAVE_POSIX_MEMALIGN )
-ELSEIF ( HAVE_MEMALIGN )
-  ADD_DEFINITIONS ( -D PBRTHAVE_MEMALIGN )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE_POSIX_MEMALIGN)
 ELSE ()
   MESSAGE ( SEND_ERROR "Unable to find a way to allocate aligned memory" )
 ENDIF ()
@@ -364,117 +366,11 @@ int main() { }
 " INT64_IS_OWN_TYPE)
 
 IF (INT64_IS_OWN_TYPE)
-  ADD_DEFINITIONS( -D PBRT_INT64_IS_OWN_TYPE )
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_INT64_IS_OWN_TYPE)
 ENDIF()
-
-###########################################################################
-# stb
-
-INCLUDE_DIRECTORIES(
-  src/ext/stb
-)
-
-###########################################################################
-# filesystem
-
-INCLUDE_DIRECTORIES(
-  src/ext/filesystem
-)
-
-###########################################################################
-# trove
-
-INCLUDE_DIRECTORIES(
-  src/ext/trove
-)
-
-###########################################################################
-# zlib
-
-FIND_PACKAGE ( ZLIB )
-IF(NOT ZLIB_FOUND)
-  # Build zlib
-  SET(ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
-  SET(ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
-  ADD_SUBDIRECTORY(src/ext/zlib)
-
-  SET(ZLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/zlib")
-  SET(ZLIB_LIBRARY zlibstatic)
-  SET_PROPERTY(TARGET zlibstatic PROPERTY FOLDER "ext")
-  INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR} "${CMAKE_CURRENT_BINARY_DIR}/src/ext/zlib")
-ENDIF()
-INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIRS})
-
-###########################################################################
-# OpenEXR
-
-SET(ILMBASE_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
-SET(OPENEXR_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
-SET(OPENEXR_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
-SET(ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
-SET(PYILMBASE_ENABLE             OFF CACHE BOOL " " FORCE)
-SET(OPENEXR_VIEWERS_ENABLE       OFF CACHE BOOL " " FORCE)
-
-ADD_SUBDIRECTORY(src/ext/openexr)
-
-SET_PROPERTY(TARGET IexMath eLut toFloat b44ExpLogTable dwaLookups IlmThread Half Iex Imath IlmImf PROPERTY FOLDER "ext/OpenEXR")
-
-INCLUDE_DIRECTORIES (
-  src/ext/openexr/IlmBase/Imath
-  src/ext/openexr/IlmBase/Half
-  src/ext/openexr/IlmBase/Iex
-  src/ext/openexr/OpenEXR/IlmImf
-  ${CMAKE_BINARY_DIR}/src/ext/openexr/IlmBase/config
-  ${CMAKE_BINARY_DIR}/src/ext/openexr/OpenEXR/config
-)
-
-IF(WIN32)
-  SET(OPENEXR_LIBS IlmImf Imath Half ${ZLIB_LIBRARY})
-ELSE()
-  SET(OPENEXR_LIBS IlmImf Imath Half)
-ENDIF()
-
-###########################################################################
-# ptex
-
-SET(PTEX_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
-
-SET(CMAKE_MACOSX_RPATH 1)
-IF ( WIN32 )
-  ADD_DEFINITIONS ( /D PTEX_STATIC)
-ENDIF ()
-
-ADD_SUBDIRECTORY(src/ext/ptex)
-
-SET_PROPERTY(TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLDER "ext/ptex")
-
-INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
-
-###########################################################################
-# double-conversion
-
-ADD_SUBDIRECTORY(src/ext/double-conversion)
-INCLUDE_DIRECTORIES(src/ext/double-conversion)
-
-SET_PROPERTY(TARGET double-conversion PROPERTY FOLDER "ext")
-
-###########################################################################
-# pybind11
-
-if (PBRT_BUILD_PYBIND)
-  find_package(PythonLibs)
-
-  if (PYTHONLIBS_FOUND)
-    ADD_SUBDIRECTORY(src/ext/pybind11)
-    include_directories(src/ext/pybind11)
-  endif ()
-endif ()
 
 ###########################################################################
 # On to pbrt...
-
-INCLUDE_DIRECTORIES ( src )
-INCLUDE_DIRECTORIES ( src/ext )
 
 SET ( PBRT_SOURCE
   src/pbrt/bsdf.cpp
@@ -616,7 +512,10 @@ endif()
 ###########################################################################
 # pbrt libraries and executables
 
-ADD_LIBRARY ( pbrt_lib STATIC
+######################
+# pbrt_lib
+
+add_library (pbrt_lib STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_rec2020.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_srgb.cpp
@@ -629,15 +528,32 @@ ADD_LIBRARY ( pbrt_lib STATIC
   src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
   )
+add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
+
+target_compile_definitions (pbrt_lib PUBLIC ${PBRT_DEFINITIONS})
+
+TARGET_INCLUDE_DIRECTORIES (pbrt_lib PUBLIC
+  src
+  src/ext
+  ${STB_INCLUDE}
+  ${OPENEXR_INCLUDE}
+  ${ZLIB_INCLUDE}
+  ${FILESYSTEM_INCLUDE}
+  ${PTEX_INCLUDE}
+  ${DOUBLE_CONVERSION_INCLUDE}
+)
+
+target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
+
 ADD_SANITIZERS ( pbrt_lib )
 
-IF (WIN32)
+IF(WIN32)
   # Avoid a name clash when building on Visual Studio
-  SET_TARGET_PROPERTIES ( pbrt_lib PROPERTIES OUTPUT_NAME libpbrt )
+  set_target_properties(pbrt_lib PROPERTIES OUTPUT_NAME libpbrt)
 ENDIF()
 
-if (PBRT_CUDA_ENABLED)
-  SET_PROPERTY ( TARGET pbrt_lib PROPERTY CUDA_SEPARABLE_COMPILATION ON )
+if(PBRT_CUDA_ENABLED)
+  set_property(TARGET pbrt_lib PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
 SET(ALL_PBRT_LIBS
@@ -650,16 +566,23 @@ SET(ALL_PBRT_LIBS
   ${PBRT_CUDA_LIB}
 )
 
-IF (WIN32)
-  SET(ALL_PBRT_LIBS ${ALL_PBTR_LIBS} wsock32 ws2_32)
-ENDIF()
-
-if (PROFILE_LIB)
-  SET(ALL_PBRT_LIBS ${ALL_PBRT_LIBS} ${PROFILE_LIB})
+if(WIN32)
+  set(ALL_PBRT_LIBS ${ALL_PBTR_LIBS} wsock32 ws2_32)
 endif()
 
-ADD_EXECUTABLE( rgb2spec_opt src/pbrt/cmd/rgb2spec_opt.cpp )
-TARGET_LINK_LIBRARIES (rgb2spec_opt ${CMAKE_THREAD_LIBS_INIT})
+if(PROFILE_LIB)
+  set(ALL_PBRT_LIBS ${ALL_PBRT_LIBS} ${PROFILE_LIB})
+endif()
+
+######################
+## rgb2spec_opt
+
+add_executable(rgb2spec_opt src/pbrt/cmd/rgb2spec_opt.cpp)
+add_executable(pbrt::rgb2spec_opt ALIAS rgb2spec_opt)
+
+target_compile_definitions(rgb2spec_opt PUBLIC ${PBRT_DEFINITIONS})
+target_compile_options(rgb2spec_opt PUBLIC ${PBRT_CXX_FLAGS})
+target_link_libraries(rgb2spec_opt ${CMAKE_THREAD_LIBS_INIT})
 
 ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
     COMMAND rgb2spec_opt 64 ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp ACES2065_1 
@@ -673,41 +596,55 @@ ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_srgb.cpp
     COMMAND rgb2spec_opt 64 ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_srgb.cpp sRGB
     DEPENDS rgb2spec_opt)
 
+######################
 # Main renderer
-ADD_EXECUTABLE ( pbrt_exe src/pbrt/cmd/pbrt.cpp )
-ADD_SANITIZERS ( pbrt_exe )
-SET_TARGET_PROPERTIES ( pbrt_exe PROPERTIES OUTPUT_NAME pbrt )
-TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} )
 
-# Tools
-ADD_EXECUTABLE ( imgtool src/pbrt/cmd/imgtool.cpp src/ext/skymodel/ArHosekSkyModel.c )
-ADD_SANITIZERS ( imgtool )
-TARGET_LINK_LIBRARIES ( imgtool ${ALL_PBRT_LIBS} )
+add_executable(pbrt_exe src/pbrt/cmd/pbrt.cpp)
 
-ADD_EXECUTABLE ( obj2pbrt src/pbrt/cmd/obj2pbrt.cpp )
-ADD_SANITIZERS ( obj2pbrt )
+target_compile_definitions(pbrt_exe PUBLIC ${PBRT_DEFINITIONS})
+target_compile_options(pbrt_exe PUBLIC ${PBRT_CXX_FLAGS})
 
-ADD_EXECUTABLE ( cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp )
-ADD_SANITIZERS ( cyhair2pbrt )
+set_target_properties(pbrt_exe PROPERTIES OUTPUT_NAME pbrt)
+target_link_libraries(pbrt_exe ${ALL_PBRT_LIBS})
 
-if (PBRT_BUILD_PYBIND AND PYTHONLIBS_FOUND)
-  pybind11_add_module(pbrt
-          src/pbrt/core/pybind.cpp
-          src/pbrt/geometry/geometry_pybind.cpp
-          src/pbrt/sampling/lowdiscrepancy_pybind.cpp
-          src/pbrt/sampling/sampling_pybind.cpp
-          src/pbrt/sampling/sobol_pybind.cpp
-          src/pbrt/samplers/samplers_pybind.cpp
-          src/pbrt/shapes/shapes_pybind.cpp
-          src/pbrt/spectrum/spectrum_pybind.cpp
-          src/pbrt/util/util_pybind.cpp
-  )
-  target_link_libraries(pbrt PUBLIC ${ALL_PBRT_LIBS} )
-endif ()
+add_sanitizers(pbrt_exe)
 
-# Unit test
+######################
+# imgtool
 
-SET ( PBRT_TEST_SOURCE
+add_executable(imgtool src/pbrt/cmd/imgtool.cpp)
+add_library(sky_lib STATIC src/ext/skymodel/arhosekskymodel.c)
+
+target_compile_definitions(imgtool PUBLIC ${PBRT_DEFINITIONS})
+target_compile_options(imgtool PUBLIC ${PBRT_CXX_FLAGS})
+target_link_libraries(imgtool ${ALL_PBRT_LIBS} sky_lib)
+
+add_sanitizers(imgtool)
+
+######################
+# obj2pbrt
+
+add_executable(obj2pbrt src/pbrt/cmd/obj2pbrt.cpp)
+
+target_compile_definitions(obj2pbrt PUBLIC ${PBRT_DEFINITIONS})
+target_compile_options(obj2pbrt PUBLIC ${PBRT_CXX_FLAGS})
+
+add_sanitizers(obj2pbrt)
+
+######################
+# cyhair2pbrt
+
+add_executable(cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
+
+target_compile_definitions(cyhair2pbrt PUBLIC ${PBRT_DEFINITIONS})
+target_compile_options(cyhair2pbrt PUBLIC ${PBRT_CXX_FLAGS})
+
+add_sanitizers(cyhair2pbrt)
+
+##################
+# Unit tests
+
+set(PBRT_TEST_SOURCE
   src/pbrt/bsdfs_test.cpp
   src/pbrt/filters_test.cpp
   src/pbrt/lights_test.cpp
@@ -741,16 +678,18 @@ SET ( PBRT_TEST_SOURCE
   src/pbrt/util/vecmath_test.cpp
   )
 
-# FIXME HACK FOR NOW
-ADD_EXECUTABLE ( pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE} )
-ADD_SANITIZERS ( pbrt_test )
-TARGET_LINK_LIBRARIES ( pbrt_test ${ALL_PBRT_LIBS} )
+add_executable (pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE})
 
-ADD_TEST ( pbrt_unit_test pbrt_test )
+target_link_libraries (pbrt_test ${ALL_PBRT_LIBS})
+target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
+
+add_sanitizers (pbrt_test)
+
+add_test (pbrt_unit_test pbrt_test)
 
 # Installation
 
-INSTALL ( TARGETS
+install (TARGETS
   pbrt_exe
   imgtool
   obj2pbrt
@@ -759,7 +698,7 @@ INSTALL ( TARGETS
   bin
   )
 
-INSTALL ( TARGETS
+install (TARGETS
   pbrt_lib
   DESTINATION
   lib
