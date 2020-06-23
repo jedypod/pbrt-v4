@@ -360,11 +360,11 @@ void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
     TransformSet worldFromCamera = Inverse(curTransform);
     namedCoordinateSystems["camera"] = Inverse(cameraFromWorld);
 
-    CameraTransform wfc(AnimatedTransform(worldFromCamera[0], transformStartTime,
-                                          worldFromCamera[1], transformEndTime));
-    cameraFromWorldT = Inverse(wfc.translation);
+    CameraTransform cameraTransform(AnimatedTransform(worldFromCamera[0], transformStartTime,
+                                                      worldFromCamera[1], transformEndTime));
+    renderFromWorld = cameraTransform.RenderFromWorld();
 
-    camera = CameraSceneEntity(name, std::move(dict), loc, wfc,
+    camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
                                graphicsState->currentOutsideMedium);
 }
 
@@ -717,21 +717,21 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
         return;
     }
 
-    class Transform worldFromCameraT = Inverse(cameraFromWorldT);
+    class Transform worldFromRender = Inverse(renderFromWorld);
 
     if (CTMIsAnimated()) {
-        AnimatedTransform animatedWorldFromInstance(
-            GetCTM(0) * worldFromCameraT, transformStartTime,
-            GetCTM(1) * worldFromCameraT, transformEndTime);
+        AnimatedTransform animatedRenderFromInstance(
+            GetCTM(0) * worldFromRender, transformStartTime,
+            GetCTM(1) * worldFromRender, transformEndTime);
 
         instances.push_back(
-            InstanceSceneEntity(name, loc, animatedWorldFromInstance, nullptr));
+            InstanceSceneEntity(name, loc, animatedRenderFromInstance, nullptr));
     } else {
-        const class Transform *worldFromInstance =
-            transformCache.Lookup(GetCTM(0) * worldFromCameraT);
+        const class Transform *renderFromInstance =
+            transformCache.Lookup(GetCTM(0) * worldFromRender);
 
         instances.push_back(
-            InstanceSceneEntity(name, loc, AnimatedTransform(), worldFromInstance));
+            InstanceSceneEntity(name, loc, AnimatedTransform(), renderFromInstance));
     }
 }
 
@@ -1550,37 +1550,6 @@ static bool upgradeRGBToScale(ParameterDictionary *dict, const char *name,
     return true;
 }
 
-static std::string upgradeBlackbody(const FormattingScene &scene,
-                                    ParameterDictionary *dict, Float *totalScale) {
-    std::string extra;
-    for (const char *name : {"L", "I"}) {
-        std::vector<SpectrumHandle> spec =
-            dict->GetSpectrumArray(name, SpectrumType::General, {});
-        if (spec.empty())
-            continue;
-
-        BlackbodySpectrum *bb = spec[0].CastOrNullptr<BlackbodySpectrum>();
-        if (bb == nullptr)
-            continue;
-
-        if (spec.size() == 1)
-            // Already been upgraded
-            continue;
-
-        // In pbrt-v3, the second parameter value is the scale factor. Pull it
-        // out and incorporate it in the light's "scale" parameter value.
-        const BlackbodySpectrum *bscale = spec[1].CastOrNullptr<BlackbodySpectrum>();
-        Float scale = dict->GetOneFloat("scale", 1);
-        dict->RemoveFloat("scale");
-        *totalScale *= scale * bscale->T;
-
-        dict->RemoveSpectrum(name);
-        extra += scene.indent(1) + StringPrintf("\"blackbody %s\" [ %f ]\n", name, bb->T);
-    }
-
-    return extra;
-}
-
 static std::string upgradeMapname(const FormattingScene &scene,
                                   ParameterDictionary *dict) {
     std::string n = dict->GetOneString("mapname", "");
@@ -1607,7 +1576,6 @@ void FormattingScene::LightSource(const std::string &name, ParsedParameterVector
                               "Please modify your scene file manually.");
             return;
         }
-        extra += upgradeBlackbody(*this, &dict, &totalScale);
         dict.RemoveInt("nsamples");
 
         if (dict.GetOneString("mapname", "").empty() == false) {
@@ -1657,7 +1625,6 @@ void FormattingScene::AreaLightSource(const std::string &name,
             return;
         }
 
-        extra += upgradeBlackbody(*this, &dict, &totalScale);
         if (name == "area")
             Printf("%sAreaLightSource \"diffuse\"\n", indent());
         else

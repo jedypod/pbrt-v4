@@ -67,6 +67,9 @@ class BilinearPatchMesh {
 struct TriQuadMesh {
     static pstd::optional<TriQuadMesh> ReadPLY(const std::string &filename);
 
+    void ConvertToOnlyTriangles();
+    std::string ToString() const;
+
     std::vector<Point3f> p;
     std::vector<Normal3f> n;
     std::vector<Point2f> uv;

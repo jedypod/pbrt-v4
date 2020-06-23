@@ -43,7 +43,7 @@ namespace pbrt {
 struct VisibleSurface {
     VisibleSurface() = default;
     PBRT_CPU_GPU
-    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &worldFromCamera,
+    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &cameraTransform,
                    const SampledWavelengths &lambda);
 
     std::string ToString() const;
@@ -94,7 +94,7 @@ class RGBFilm : public FilmBase {
     RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
             Float diagonal, const std::string &filename, Float scale,
             const RGBColorSpace *colorSpace, Float maxSampleLuminance = Infinity,
-            bool writeFP16 = true, bool saveVariance = false, Allocator allocator = {});
+            bool writeFP16 = true, Allocator allocator = {});
 
     static RGBFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
                            const RGBColorSpace *colorSpace, const FileLoc *loc,
@@ -167,7 +167,7 @@ class RGBFilm : public FilmBase {
     Float scale;
     const RGBColorSpace *colorSpace;
     Float maxSampleLuminance;
-    bool writeFP16, saveVariance;
+    bool writeFP16;
     Float filterIntegral;
 };
 
@@ -200,7 +200,7 @@ class GBufferFilm : public FilmBase {
     PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
         const Pixel &pixel = pixels[p];
-        RGB rgb(pixel.LSum[0], pixel.LSum[1], pixel.LSum[2]);
+        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
 
         // Normalize pixel with weight sum
         Float weightSum = pixel.weightSum;
@@ -226,14 +226,14 @@ class GBufferFilm : public FilmBase {
     // GBufferFilm Private Data
     struct Pixel {
         Pixel() = default;
-        double LSum[3] = {0., 0., 0.};
+        double rgbSum[3] = {0., 0., 0.};
         double weightSum = 0.;
         AtomicDouble splatRGB[3];
         Point3f pSum;
         Float dzdxSum = 0, dzdySum = 0;
         Normal3f nSum, nsSum;
         double albedoSum[3] = {0., 0., 0.};
-        VarianceEstimator<Float> LVarianceEstimator;
+        VarianceEstimator<Float> rgbVarianceEstimator;
         RGB materialRGB;
     };
     Array2D<Pixel> pixels;

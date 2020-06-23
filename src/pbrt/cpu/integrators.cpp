@@ -228,15 +228,16 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
     // Generate camera ray for current sample
     pstd::optional<CameraRayDifferential> cameraRay =
         camera.GenerateRayDifferential(cameraSample, lambda);
-    // Double check that the ray's direction is normalized.
-    DCHECK_GT(Length(cameraRay->ray.d), .999f);
-    DCHECK_LT(Length(cameraRay->ray.d), 1.001f);
 
     SampledSpectrum L(0.);
     pstd::optional<VisibleSurface> visibleSurface;
     bool initializeVisibleSurface = camera.GetFilm().UsesVisibleSurface();
 
     if (cameraRay) {
+        // Double check that the ray's direction is normalized.
+        DCHECK_GT(Length(cameraRay->ray.d), .999f);
+        DCHECK_LT(Length(cameraRay->ray.d), 1.001f);
+
         Float rayDiffScale =
             std::max<Float>(.125, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
         if (!Options->disablePixelJitter)
@@ -297,30 +298,9 @@ bool Integrator::IntersectP(const Ray &ray, Float tMax) const {
         return false;
 }
 
-pstd::optional<ShapeIntersection> Integrator::IntersectTr(
-    Ray ray, Float tMax, RNG &rng, const SampledWavelengths &lambda,
-    SampledSpectrum *Tr) const {
-    *Tr = SampledSpectrum(1.f);
-    while (true) {
-        pstd::optional<ShapeIntersection> si = Intersect(ray, tMax);
-        // Accumulate beam transmittance for ray segment
-        if (ray.medium != nullptr)
-            *Tr *= ray.medium.Tr(ray, si ? si->tHit : tMax, lambda, rng);
-
-        // Initialize next ray segment or terminate transmittance computation
-        if (!si)
-            return {};
-        if (si->intr.material)
-            return si;
-
-        ray = si->intr.SpawnRay(ray.d);
-        tMax -= si->tHit;
-    }
-}
-
 std::string Integrator::ToString() const {
-    std::string s = StringPrintf("[ Scene aggregate: %s worldBound: %s lights[%d]: [ ",
-                                 aggregate, cameraWorldBound, lights.size());
+    std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
+                                 aggregate, sceneBounds, lights.size());
     for (const auto &l : lights)
         s += StringPrintf("%s, ", l.ToString());
     s += StringPrintf("] infiniteLights[%d]: [ ", infiniteLights.size());
@@ -331,8 +311,16 @@ std::string Integrator::ToString() const {
 
 SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
                                const SampledWavelengths &lambda, RNG &rng) const {
+    auto rescale = [](SampledSpectrum &Tr, SampledSpectrum &pdf) {
+        if (Tr.MaxComponentValue() > 0x1p24f ||
+            pdf.MaxComponentValue() > 0x1p24f) {
+            Tr /= 0x1p24f;
+            pdf /= 0x1p24f;
+        }
+    };
+
     Ray ray = p0.SpawnRayTo(p1);
-    SampledSpectrum Tr(1.f);
+    SampledSpectrum Tr(1.f), pdf(1.f);
     if (LengthSquared(ray.d) == 0)
         return Tr;
 
@@ -343,8 +331,33 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             return SampledSpectrum(0.0f);
 
         // Update transmittance for current ray segment
-        if (ray.medium != nullptr)
-            Tr *= ray.medium.Tr(ray, si ? si->tHit : 1 - ShadowEpsilon, lambda, rng);
+        if (ray.medium != nullptr) {
+            Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
+            ray.d = pExit - ray.o;
+
+            while (ray.o != pExit) {
+                Float u = rng.Uniform<Float>();
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, 1.f, u, lambda, nullptr);
+                if (!mediumSample.intr)
+                    break;
+
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                const MediumInteraction &intr = *mediumSample.intr;
+                SampledSpectrum sigma_n = intr.sigma_n();
+
+                // ratio-tracking: only evaluate null scattering
+                Tr *= Tmaj * sigma_n;
+                pdf *= Tmaj * intr.sigma_maj;
+
+                if (!Tr)
+                    return SampledSpectrum(0.f);
+
+                ray = intr.SpawnRayTo(pExit);
+
+                rescale(Tr, pdf);
+            }
+        }
 
         // Generate next ray segment or return final transmittance
         if (!si)
@@ -352,7 +365,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
         ray = si->intr.SpawnRayTo(p1);
     }
     VLOG(2, "Tr from %s to %s = %s", p0.pi, p1.pi, Tr);
-    return Tr;
+    return Tr / pdf.Average();
 }
 
 // WhittedIntegrator Method Definitions
@@ -736,8 +749,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, const SampledWavelengths
 
         // Compute scattering functions and skip over medium boundaries
         SurfaceInteraction &isect = si->intr;
-        VLOG(2, "Current intersection: %s", isect);
         isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
+        VLOG(2, "Current intersection: %s", isect);
         BSDF *bsdf = isect.bsdf;
         if (bsdf == nullptr) {
             isect.SkipIntersection(&ray, si->tHit);
@@ -746,7 +759,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, const SampledWavelengths
         }
         prevIntr = si->intr;
         if (depth == 0 && visibleSurface != nullptr)
-            *visibleSurface = VisibleSurface(si->intr, camera.WorldFromCamera(), lambda);
+            *visibleSurface = VisibleSurface(si->intr, camera.GetCameraTransform(),
+                                             lambda);
 
         if (regularize && anyNonSpecularBounces) {
             ++regularizedBSDFs;
@@ -944,6 +958,8 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
     SampledSpectrum L(0.f), beta(1.f);
     int numScatters = 0;
 
+    lambda.TerminateSecondaryWavelengths();
+
     while (true) {
     restart:
         // Intersect _ray_ with scene and store intersection in _isect_
@@ -954,42 +970,37 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
 
             while (tMax > 0) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                pstd::optional<NewMediumSample> mediumSample =
-                    ray.medium.SampleTn(ray, tMax, u, lambda, &scratchBuffer);
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, tMax, u, lambda, &scratchBuffer);
 
-                // Handle an interaction with a medium
-                if (!mediumSample)
+                if (!mediumSample.intr)
                     break;
 
-                const MediumInteraction &intr = mediumSample->intr;
-                const SampledSpectrum &sigma_a = mediumSample->sigma_a;
-                const SampledSpectrum &sigma_s = mediumSample->sigma_s;
-                Float Tn = mediumSample->Tn;
+                const MediumInteraction &intr = *mediumSample.intr;
+                const SampledSpectrum &sigma_a = intr.sigma_a;
+                const SampledSpectrum &sigma_s = intr.sigma_s;
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
-                Float pAbsorb = sigma_a[0] / mediumSample->sigma_nt;
-                Float pScatter = sigma_s[0] / mediumSample->sigma_nt;
+                Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                Float pScatter = sigma_s[0] / intr.sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
-                // Sample Tn samples proportional to Tn (assuming monochromatic),
-                // so it cancels modulo a sigma_nt factor, but then that is
-                // cancelled in pa/ps/pn divided by that...
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
                 if (mode == 0)
                     // absorbed; done
-                    return L;
+                    return L + intr.Le;
                 else if (mode == 1) {
                     if (numScatters++ >= maxDepth)
                         return L;
 
                     Vector3f wi = SampleUniformSphere(sampler.Get2D());
-                    beta *= mediumSample->intr.phase.p(-ray.d, wi) /
-                        UniformSpherePDF();
+                    beta *= intr.phase.p(-ray.d, wi) / UniformSpherePDF();
                     ray = intr.SpawnRay(wi);
                     goto restart;
                 } else {
                     // null
                     ray = intr.SpawnRay(ray.d);
-                    tMax -= mediumSample->t;
+                    tMax -= mediumSample.t;
                 }
             }
         }
@@ -1071,34 +1082,41 @@ SampledSpectrum VolPathIntegrator::Li(
             Float tMax = si ? si->tHit : Infinity;
             while (!scattered) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                pstd::optional<NewMediumSample> mediumSample =
-                    ray.medium.SampleTn(ray, tMax, u, lambda, &scratchBuffer);
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, tMax, u, lambda, &scratchBuffer);
 
                 // Handle an interaction with a medium or a surface
-                if (!mediumSample)
+                if (!mediumSample.intr) {
+                    // FIXME: review this, esp the pdf...
+                    beta *= mediumSample.Tmaj;
+                    pdfUni *= mediumSample.Tmaj;
                     break;
+                }
 
                 ++volumeInteractions;
 
-                const MediumInteraction &intr = mediumSample->intr;
-                const SampledSpectrum &sigma_a = mediumSample->sigma_a;
-                const SampledSpectrum &sigma_s = mediumSample->sigma_s;
-                Float Tn = mediumSample->Tn;
+                const MediumInteraction &intr = *mediumSample.intr;
+                const SampledSpectrum &sigma_a = intr.sigma_a;
+                const SampledSpectrum &sigma_s = intr.sigma_s;
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
-                Float pAbsorb = sigma_a[0] / mediumSample->sigma_nt;
-                Float pScatter = sigma_s[0] / mediumSample->sigma_nt;
+                if (depth < maxDepth)
+                    L += intr.Le * sigma_a / intr.sigma_maj[0];
+
+                Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                Float pScatter = sigma_s[0] / intr.sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
                 CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
 
                 Float um = sampler.GetRNG().Uniform<Float>();
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
                 VLOG(2, "Scatter mode %d at point %s, sample %s", mode, intr.p(),
-                     *mediumSample);
+                     mediumSample);
 
                 if (mode == 0) {
                     // absorption; done
-                    // beta *= Tn * sigma_a;
-                    // pdfUni *= Tn * sigma_a;
+                    // beta *= Tmaj * sigma_a;
+                    // pdfUni *= Tmaj * sigma_a;
                     ReportValue(pathLength, depth);
                     return L;
                 } else if (mode == 1) {
@@ -1108,8 +1126,8 @@ SampledSpectrum VolPathIntegrator::Li(
                     }
 
                     // scatter
-                    beta *= Tn * sigma_s;
-                    pdfUni *= Tn * sigma_s;
+                    beta *= Tmaj * sigma_s;
+                    pdfUni *= Tmaj * sigma_s;
 
                     // direct lighting
                     L += SampleLd(intr, lambda, sampler, beta, pdfUni);
@@ -1133,13 +1151,13 @@ SampledSpectrum VolPathIntegrator::Li(
                     anyNonSpecularBounces = true;
                 } else {
                     // null scatter
-                    SampledSpectrum sigma_n = mediumSample->sigma_n();
+                    SampledSpectrum sigma_n = intr.sigma_n();
 
-                    beta *= Tn * sigma_n;
-                    pdfUni *= Tn * sigma_n;
-                    pdfNEE *= Tn * mediumSample->sigma_nt;
+                    beta *= Tmaj * sigma_n;
+                    pdfUni *= Tmaj * sigma_n;
+                    pdfNEE *= Tmaj * intr.sigma_maj;
 
-                    tMax -= mediumSample->t;
+                    tMax -= mediumSample.t;
                     ray = intr.SpawnRay(ray.d);
                 }
 
@@ -1238,6 +1256,9 @@ SampledSpectrum VolPathIntegrator::Li(
 
             VLOG(2, "Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs->f, bs->pdf, beta);
 
+            // Avoid overflow...
+            rescale(beta, pdfUni, pdfNEE);
+
             DCHECK(std::isinf(beta.y(lambda)) == false);
             ++depth;
             specularBounce = bs->IsSpecular();
@@ -1317,6 +1338,9 @@ SampledSpectrum VolPathIntegrator::Li(
                 ray = RayDifferential(pi.SpawnRay(bs->wi));
             }
         }
+
+        if (!beta)
+            break;
 
         // Possibly terminate the path with Russian roulette
         // Factor out radiance scaling due to refraction in rrBeta.
@@ -1405,23 +1429,24 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr,
 
             while (lightRay.o != pExit) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                pstd::optional<NewMediumSample> mediumSample =
-                    lightRay.medium.SampleTn(lightRay, 1.f, u, lambda, nullptr);
-                if (!mediumSample)
+                MediumSample mediumSample =
+                    lightRay.medium.Sample_Tmaj(lightRay, 1.f, u, lambda, nullptr);
+                if (!mediumSample.intr)
                     break;
 
-                Float Tn = mediumSample->Tn;
-                SampledSpectrum sigma_n = mediumSample->sigma_n();
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                const MediumInteraction &intr = *mediumSample.intr;
+                SampledSpectrum sigma_n = intr.sigma_n();
 
                 // ratio-tracking: only evaluate null scattering
-                betaLight *= Tn * sigma_n;
-                pdfLight *= Tn * mediumSample->sigma_nt;
-                pdfUni *= Tn * sigma_n;
+                betaLight *= Tmaj * sigma_n;
+                pdfLight *= Tmaj * intr.sigma_maj;
+                pdfUni *= Tmaj * sigma_n;
 
                 if (!betaLight)
                     return SampledSpectrum(0.f);
 
-                lightRay = mediumSample->intr.SpawnRayTo(pExit);
+                lightRay = intr.SpawnRayTo(pExit);
 
                 rescale(betaLight, pdfLight, pdfUni);
             }
@@ -1814,7 +1839,7 @@ struct Vertex {
             // Compute planar sampling density for infinite light sources
             Point3f worldCenter;
             Float worldRadius;
-            integrator.CameraWorldBound().BoundingSphere(&worldCenter, &worldRadius);
+            integrator.SceneBounds().BoundingSphere(&worldCenter, &worldRadius);
             pdf = 1 / (Pi * worldRadius * worldRadius);
         } else if (IsOnSurface()) {
             if (type == VertexType::Light)
@@ -1937,96 +1962,136 @@ int RandomWalk(const Integrator &integrator, const SampledWavelengths &lambda,
     // Declare variables for forward and reverse probability densities
     Float pdfFwd = pdf, pdfRev = 0;
     while (true) {
+    nextBounce:
         // Attempt to create the next subpath vertex in _path_
-        MediumInteraction mi;
-
         VLOG(2, "Random walk. Bounces %d, beta %s, pdfFwd %f, pdfRef %f", bounces, beta,
              pdfFwd, pdfRev);
-        // Trace a ray and sample the medium, if any
-        pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
-        MediumSample mediumSample;
-        if (ray.medium) {
-            mediumSample = ray.medium.Sample(ray, si ? si->tHit : Infinity,
-                                             sampler.GetRNG(), lambda, scratchBuffer);
-            beta *= mediumSample.Tr;
-        }
+
         if (!beta)
             break;
+
+        // Trace a ray and sample the medium, if any
         Vertex &vertex = path[bounces], &prev = path[bounces - 1];
-        if (mediumSample.intr) {
-            MediumInteraction &mi = *mediumSample.intr;
-            // Record medium interaction in _path_ and compute forward density
-            vertex = Vertex::CreateMedium(mi, beta, pdfFwd, prev);
-            if (++bounces >= maxDepth)
-                break;
+        pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
+        Float tMax = si ? si->tHit : Infinity;
+        MediumSample mediumSample;
+        if (ray.medium) {
+            while (true) {
+                mediumSample = ray.medium.Sample_Tmaj(ray, tMax, sampler.Get1D(),
+                                                     lambda, &scratchBuffer);
 
-            // Sample direction and compute reverse density at preceding vertex
-            pstd::optional<PhaseFunctionSample> ps =
-                mi.phase.Sample_p(-ray.d, sampler.Get2D());
-            if (!ps || ps->pdf == 0)
-                break;
-            pdfFwd = pdfRev = ps->pdf;
-            beta *= ps->p / pdfFwd;
-            ray = mi.SpawnRay(ps->wi);
-            anyNonSpecularBounces = true;
-        } else {
-            // Handle surface interaction for path generation
-            if (!si) {
-                // Capture escaped rays when tracing from the camera
-                if (mode == TransportMode::Radiance) {
-                    vertex = Vertex::CreateLight(EndpointInteraction(ray), beta, pdfFwd);
-                    ++bounces;
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                if (!mediumSample.intr) {
+                    beta *= Tmaj / Tmaj.Average();
+                    break; // onward to the surface path...
+                } else {
+                    const MediumInteraction &intr = *mediumSample.intr;
+                    const SampledSpectrum &sigma_a = intr.sigma_a;
+                    const SampledSpectrum &sigma_s = intr.sigma_s;
+
+                    Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = sigma_s[0] / intr.sigma_maj[0];
+                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                    CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
+
+                    Float um = sampler.Get1D();
+                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
+
+                    if (mode == 0) {
+                        // absorption; done
+                        return bounces;
+                    } else if (mode == 1) {
+                        // scatter
+                        beta *= Tmaj * sigma_s / (Tmaj * sigma_s).Average();
+
+                        // Record medium interaction in _path_ and compute forward density
+                        vertex = Vertex::CreateMedium(intr, beta, pdfFwd, prev);
+                        if (++bounces >= maxDepth)
+                            return bounces;
+
+                        // Sample direction and compute reverse density at preceding vertex
+                        pstd::optional<PhaseFunctionSample> ps =
+                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                        if (!ps || ps->pdf == 0)
+                            return bounces;
+                        pdfFwd = pdfRev = ps->pdf;
+                        beta *= ps->p / pdfFwd;
+                        ray = intr.SpawnRay(ps->wi);
+                        anyNonSpecularBounces = true;
+
+                        // Compute reverse area density at preceding vertex
+                        prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
+                        goto nextBounce;
+                    } else {
+                        // null scatter
+                        SampledSpectrum sigma_n = intr.sigma_n();
+
+                        beta *= Tmaj * sigma_n / (Tmaj * sigma_n).Average();
+
+                        tMax -= mediumSample.t;
+                        ray = intr.SpawnRay(ray.d);
+                    }
                 }
-                break;
             }
-
-            // Compute scattering functions for _mode_ and skip over medium
-            // boundaries
-            SurfaceInteraction &isect = si->intr;
-            isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
-            if (isect.bsdf == nullptr) {
-                isect.SkipIntersection(&ray, si->tHit);
-                continue;
-            }
-
-            if (regularize && anyNonSpecularBounces) {
-                ++regularizedBSDFs;
-                isect.bsdf->Regularize(scratchBuffer);
-            }
-            ++totalBSDFs;
-
-            // Initialize _vertex_ with surface intersection information
-            vertex = Vertex::CreateSurface(isect, beta, pdfFwd, prev);
-            if (++bounces >= maxDepth)
-                break;
-
-            // Sample BSDF at current vertex and compute reverse probability
-            Vector3f wo = isect.wo;
-            Float u = sampler.Get1D();
-            pstd::optional<BSDFSample> bs =
-                isect.bsdf->Sample_f(wo, u, sampler.Get2D(), mode);
-            if (!bs)
-                break;
-            pdfFwd = bs->pdf;
-            anyNonSpecularBounces |= !bs->IsSpecular();
-            VLOG(2, "Random walk sampled dir %s, f: %s, pdfFwd %f", bs->wi, bs->f,
-                 pdfFwd);
-            beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-            VLOG(2, "Random walk beta now %s", beta);
-            // TODO: confirm. I believe that ~mode is right. Interestingly,
-            // it makes no difference in the test suite either way.
-            pdfRev = isect.bsdf->PDF(bs->wi, wo, ~mode);
-            if (bs->IsSpecular()) {
-                vertex.delta = true;
-                pdfRev = pdfFwd = 0;
-            }
-            VLOG(2, "Random walk beta after shading normal correction %s", beta);
-            ray = isect.SpawnRay(ray, bs->wi, bs->flags);
         }
+
+        // Handle surface interaction for path generation
+        if (!si) {
+            // Capture escaped rays when tracing from the camera
+            if (mode == TransportMode::Radiance) {
+                vertex = Vertex::CreateLight(EndpointInteraction(ray), beta, pdfFwd);
+                ++bounces;
+            }
+            break;
+        }
+
+        // Compute scattering functions for _mode_ and skip over medium
+        // boundaries
+        SurfaceInteraction &isect = si->intr;
+        isect.ComputeScatteringFunctions(ray, lambda, camera, scratchBuffer, sampler);
+        if (isect.bsdf == nullptr) {
+            isect.SkipIntersection(&ray, si->tHit);
+            continue;
+        }
+
+        if (regularize && anyNonSpecularBounces) {
+            ++regularizedBSDFs;
+            isect.bsdf->Regularize(scratchBuffer);
+        }
+        ++totalBSDFs;
+
+        // Initialize _vertex_ with surface intersection information
+        vertex = Vertex::CreateSurface(isect, beta, pdfFwd, prev);
+        if (++bounces >= maxDepth)
+            break;
+
+        // Sample BSDF at current vertex and compute reverse probability
+        Vector3f wo = isect.wo;
+        Float u = sampler.Get1D();
+        pstd::optional<BSDFSample> bs =
+            isect.bsdf->Sample_f(wo, u, sampler.Get2D(), mode);
+        if (!bs)
+            break;
+        pdfFwd = bs->pdf;
+        anyNonSpecularBounces |= !bs->IsSpecular();
+        VLOG(2, "Random walk sampled dir %s, f: %s, pdfFwd %f", bs->wi, bs->f,
+             pdfFwd);
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+        VLOG(2, "Random walk beta now %s", beta);
+        // TODO: confirm. I believe that ~mode is right. Interestingly,
+        // it makes no difference in the test suite either way.
+        pdfRev = isect.bsdf->PDF(bs->wi, wo, ~mode);
+        if (bs->IsSpecular()) {
+            vertex.delta = true;
+            pdfRev = pdfFwd = 0;
+        }
+        VLOG(2, "Random walk beta after shading normal correction %s", beta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags);
 
         // Compute reverse area density at preceding vertex
         prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
     }
+
     return bounces;
 }
 

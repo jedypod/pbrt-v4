@@ -347,25 +347,34 @@ class alignas(8) SampledSpectrum {
 
 class alignas(8) BlackbodySpectrum {
   public:
-    BlackbodySpectrum(Float T) : T(T) {
+    BlackbodySpectrum(Float T, Float scale)
+        : T(T), scale(scale) {
         // Normalize _Le_ based on maximum blackbody radiance
         Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
-        scale = 1 / Blackbody(lambdaMax, T);
+        normalizationFactor = 1 / Blackbody(lambdaMax, T);
     }
 
     PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return scale * Blackbody(lambda, T); }
-    PBRT_CPU_GPU
-    SampledSpectrum Sample(const SampledWavelengths &lambda) const;
+    Float operator()(Float lambda) const {
+        return scale * Blackbody(lambda, T) * normalizationFactor;
+    }
 
     PBRT_CPU_GPU
-    Float MaxValue() const { return 1; }
+    SampledSpectrum Sample(const SampledWavelengths &lambda) const {
+        SampledSpectrum s;
+        for (int i = 0; i < NSpectrumSamples; ++i)
+            s[i] = scale * Blackbody(lambda[i], T) * normalizationFactor;
+        return s;
+    }
+
+    PBRT_CPU_GPU
+    Float MaxValue() const { return scale; }
 
     std::string ToString() const;
     std::string ParameterType() const;
     std::string ParameterString() const;
 
-    Float T, scale;
+    Float T, scale, normalizationFactor;
 };
 
 class alignas(8) ConstantSpectrum {
@@ -709,75 +718,18 @@ std::string FindMatchingNamed(SpectrumHandle s);
 }  // namespace SPDs
 
 inline Float SpectrumHandle::operator()(Float lambda) const {
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return (*Cast<BlackbodySpectrum>())(lambda);
-    case TypeIndex<ConstantSpectrum>():
-        return (*Cast<ConstantSpectrum>())(lambda);
-    case TypeIndex<ProductSpectrum>():
-        return (*Cast<ProductSpectrum>())(lambda);
-    case TypeIndex<ScaledSpectrum>():
-        return (*Cast<ScaledSpectrum>())(lambda);
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return (*Cast<PiecewiseLinearSpectrum>())(lambda);
-    case TypeIndex<DenselySampledSpectrum>():
-        return (*Cast<DenselySampledSpectrum>())(lambda);
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return (*Cast<RGBReflectanceSpectrum>())(lambda);
-    case TypeIndex<RGBSpectrum>():
-        return (*Cast<RGBSpectrum>())(lambda);
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto op = [&](auto ptr) { return (*ptr)(lambda); };
+    return Apply<Float>(op);
 }
 
 inline SampledSpectrum SpectrumHandle::Sample(const SampledWavelengths &lambda) const {
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return Cast<BlackbodySpectrum>()->Sample(lambda);
-    case TypeIndex<ConstantSpectrum>():
-        return Cast<ConstantSpectrum>()->Sample(lambda);
-    case TypeIndex<ProductSpectrum>():
-        return Cast<ProductSpectrum>()->Sample(lambda);
-    case TypeIndex<ScaledSpectrum>():
-        return Cast<ScaledSpectrum>()->Sample(lambda);
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return Cast<PiecewiseLinearSpectrum>()->Sample(lambda);
-    case TypeIndex<DenselySampledSpectrum>():
-        return Cast<DenselySampledSpectrum>()->Sample(lambda);
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return Cast<RGBReflectanceSpectrum>()->Sample(lambda);
-    case TypeIndex<RGBSpectrum>():
-        return Cast<RGBSpectrum>()->Sample(lambda);
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto samp = [&](auto ptr) { return ptr->Sample(lambda); };
+    return Apply<SampledSpectrum>(samp);
 }
 
 inline Float SpectrumHandle::MaxValue() const {
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return Cast<BlackbodySpectrum>()->MaxValue();
-    case TypeIndex<ConstantSpectrum>():
-        return Cast<ConstantSpectrum>()->MaxValue();
-    case TypeIndex<ProductSpectrum>():
-        return Cast<ProductSpectrum>()->MaxValue();
-    case TypeIndex<ScaledSpectrum>():
-        return Cast<ScaledSpectrum>()->MaxValue();
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return Cast<PiecewiseLinearSpectrum>()->MaxValue();
-    case TypeIndex<DenselySampledSpectrum>():
-        return Cast<DenselySampledSpectrum>()->MaxValue();
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return Cast<RGBReflectanceSpectrum>()->MaxValue();
-    case TypeIndex<RGBSpectrum>():
-        return Cast<RGBSpectrum>()->MaxValue();
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto max = [&](auto ptr) { return ptr->MaxValue(); };
+    return Apply<Float>(max);
 }
 
 }  // namespace pbrt

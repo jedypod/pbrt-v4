@@ -5,7 +5,7 @@
 // lights/point.cpp*
 #include <pbrt/lights.h>
 
-#include <pbrt/base/camera.h>
+#include <pbrt/cameras.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/samplers.h>
 #include <pbrt/shapes.h>
@@ -101,16 +101,16 @@ std::string PointLight::ToString() const {
 }
 
 PointLight *PointLight::Create(const AnimatedTransform &worldFromLight,
-                               MediumHandle medium, const ParameterDictionary &dict,
+                               MediumHandle medium, const ParameterDictionary &parameters,
                                const RGBColorSpace *colorSpace, const FileLoc *loc,
                                Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform tf = Translate(Vector3f(from.x, from.y, from.z));
     AnimatedTransform worldFromLightAnim(
         worldFromLight.startTransform * tf, worldFromLight.startTime,
@@ -126,7 +126,7 @@ DistantLight::DistantLight(const AnimatedTransform &worldFromLight, SpectrumHand
       Lemit(Lemit) {}
 
 SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
-    return Lemit.Sample(lambda) * Pi * cameraWorldRadius * cameraWorldRadius;
+    return Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
 }
 
 pstd::optional<LightLeSample> DistantLight::Sample_Le(const Point2f &u1,
@@ -138,16 +138,16 @@ pstd::optional<LightLeSample> DistantLight::Sample_Le(const Point2f &u1,
     Vector3f v1, v2;
     CoordinateSystem(w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u1);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
 
     // Set ray origin and direction for infinite light ray
-    Ray ray(pDisk + cameraWorldRadius * w, -w, time);
+    Ray ray(pDisk + sceneRadius * w, -w, time);
     return LightLeSample(Lemit.Sample(lambda), ray,
-                         1 / (Pi * cameraWorldRadius * cameraWorldRadius), 1);
+                         1 / (Pi * sceneRadius * sceneRadius), 1);
 }
 
 void DistantLight::Pdf_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
-    *pdfPos = 1 / (Pi * cameraWorldRadius * cameraWorldRadius);
+    *pdfPos = 1 / (Pi * sceneRadius * sceneRadius);
     *pdfDir = 0;
 }
 
@@ -156,17 +156,18 @@ std::string DistantLight::ToString() const {
 }
 
 DistantLight *DistantLight::Create(const AnimatedTransform &worldFromLight,
-                                   const ParameterDictionary &dict,
+                                   const ParameterDictionary &parameters,
                                    const RGBColorSpace *colorSpace, const FileLoc *loc,
                                    Allocator alloc) {
     SpectrumHandle L =
-        dict.GetOneSpectrum("L", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("L", &colorSpace->illuminant, SpectrumType::General,
+                                  alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         L = alloc.new_object<ScaledSpectrum>(sc, L);
 
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
-    Point3f to = dict.GetOnePoint3f("to", Point3f(0, 0, 1));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
 
     Vector3f w = Normalize(from - to);
     Vector3f v1, v2;
@@ -366,12 +367,12 @@ std::string ProjectionLight::ToString() const {
 
 ProjectionLight *ProjectionLight::Create(const AnimatedTransform &worldFromLight,
                                          MediumHandle medium,
-                                         const ParameterDictionary &dict,
+                                         const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc) {
-    Float scale = dict.GetOneFloat("scale", 1);
-    Float fov = dict.GetOneFloat("fov", 90.);
+    Float scale = parameters.GetOneFloat("scale", 1);
+    Float fov = parameters.GetOneFloat("fov", 90.);
 
-    std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string texname = ResolveFilename(parameters.GetOneString("imagefile", ""));
     if (texname.empty())
         ErrorExit(loc, "Must provide \"imagefile\" to \"projection\" light source");
 
@@ -490,19 +491,19 @@ std::string GoniometricLight::ToString() const {
 
 GoniometricLight *GoniometricLight::Create(const AnimatedTransform &worldFromLight,
                                            MediumHandle medium,
-                                           const ParameterDictionary &dict,
+                                           const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
     Image image(alloc);
     const RGBColorSpace *imageColorSpace = nullptr;
 
-    std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string texname = ResolveFilename(parameters.GetOneString("imagefile", ""));
     if (!texname.empty()) {
         pstd::optional<ImageAndMetadata> imageAndMetadata = Image::Read(texname, alloc);
         if (imageAndMetadata) {
@@ -676,12 +677,12 @@ LightBounds DiffuseAreaLight::Bounds() const {
     } else
         phi = Lemit.MaxValue();
 
-    phi *= (twoSided ? 2 : 1) * area * Pi;
+    phi *= scale * (twoSided ? 2 : 1) * area * Pi;
 
     // TODO: for animated shapes, we probably need to worry about
     // worldFromLight as in Sample_Li().
     DirectionCone nb = shape.NormalBounds();
-    return LightBounds(shape.CameraWorldBound(), nb.w, phi, SafeACos(nb.cosTheta), Pi / 2,
+    return LightBounds(shape.Bounds(), nb.w, phi, SafeACos(nb.cosTheta), Pi / 2,
                        twoSided);
 }
 
@@ -694,15 +695,15 @@ std::string DiffuseAreaLight::ToString() const {
 
 DiffuseAreaLight *DiffuseAreaLight::Create(const AnimatedTransform &worldFromLight,
                                            MediumHandle medium,
-                                           const ParameterDictionary &dict,
+                                           const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc,
                                            const ShapeHandle shape) {
-    SpectrumHandle L = dict.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
-    Float scale = dict.GetOneFloat("scale", 1);
-    bool twoSided = dict.GetOneBool("twosided", false);
+    SpectrumHandle L = parameters.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
+    Float scale = parameters.GetOneFloat("scale", 1);
+    bool twoSided = parameters.GetOneBool("twosided", false);
 
-    std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
     pstd::optional<Image> image;
     const RGBColorSpace *imageColorSpace = nullptr;
     if (!filename.empty()) {
@@ -739,7 +740,7 @@ SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) cons
     // TODO: is there another Pi or so for the hemisphere?
     // pi r^2 for disk
     // 2pi for cosine-weighted sphere
-    return 2 * Pi * Pi * Sqr(cameraWorldRadius) * Lemit.Sample(lambda);
+    return 2 * Pi * Pi * Sqr(sceneRadius) * Lemit.Sample(lambda);
 }
 
 SampledSpectrum UniformInfiniteLight::Le(const Ray &ray,
@@ -754,7 +755,7 @@ pstd::optional<LightLiSample> UniformInfiniteLight::Sample_Li(
     Float pdf = UniformSpherePDF();
     return LightLiSample(
         this, Lemit.Sample(lambda), wi, pdf, ref,
-        Interaction(ref.p() + wi * (2 * cameraWorldRadius), ref.time, &mediumInterface));
+        Interaction(ref.p() + wi * (2 * sceneRadius), ref.time, &mediumInterface));
 }
 
 Float UniformInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -770,10 +771,10 @@ pstd::optional<LightLeSample> UniformInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
     Float pdfDir = UniformSpherePDF();
 
     return LightLeSample(Lemit.Sample(lambda), ray, pdfPos, pdfDir);
@@ -781,7 +782,7 @@ pstd::optional<LightLeSample> UniformInfiniteLight::Sample_Le(
 
 void UniformInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfDir = UniformSpherePDF();
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 }
 
 std::string UniformInfiniteLight::ToString() const {
@@ -865,7 +866,7 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
     }
     // Integrating over the sphere, so 4pi for that.  Then one more for Pi
     // r^2 for the area of the disk receiving illumination...
-    return 4 * Pi * Pi * Sqr(cameraWorldRadius) * scale * sumL / (width * height);
+    return 4 * Pi * Pi * Sqr(sceneRadius) * scale * sumL / (width * height);
 }
 
 Float ImageInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -892,21 +893,20 @@ pstd::optional<LightLeSample> ImageInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
     // Compute _ImageInfiniteLight_ ray PDFs
     Float pdfDir = mapPDF / (4 * Pi);
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
-    SampledSpectrum L = scale * lookupSpectrum(uv, lambda);
-    return LightLeSample(L, ray, pdfPos, pdfDir);
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
+    return LightLeSample(LookupLe(uv, lambda), ray, pdfPos, pdfDir);
 }
 
 void ImageInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     Vector3f wl = -worldFromLight.ApplyInverse(ray.d, ray.time);
     Float mapPDF = distribution.PDF(EquiAreaSphereToSquare(wl));
     *pdfDir = mapPDF / (4 * Pi);
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 }
 
 std::string ImageInfiniteLight::ToString() const {
@@ -1068,7 +1068,7 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::Sample_Li(
 
     return LightLiSample(
         this, L, wi, pdf, ref,
-        Interaction(ref.p() + wi * (2 * cameraWorldRadius), ref.time, &mediumInterface));
+        Interaction(ref.p() + wi * (2 * sceneRadius), ref.time, &mediumInterface));
 }
 
 Float PortalImageInfiniteLight::Pdf_Li(const Interaction &ref, const Vector3f &w,
@@ -1120,10 +1120,10 @@ pstd::optional<LightLeSample> PortalImageInfiniteLight::Sample_Le(
     Vector3f v1, v2;
     CoordinateSystem(-w, &v1, &v2);
     Point2f cd = SampleUniformDiskConcentric(u2);
-    Point3f pDisk = cameraWorldCenter + cameraWorldRadius * (cd.x * v1 + cd.y * v2);
-    Ray ray(pDisk + cameraWorldRadius * -w, w, time);
+    Point3f pDisk = sceneCenter + sceneRadius * (cd.x * v1 + cd.y * v2);
+    Ray ray(pDisk + sceneRadius * -w, w, time);
 
-    Float pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 #endif
 
     SampledSpectrum L = ImageLookup(uv, lambda);
@@ -1150,7 +1150,7 @@ void PortalImageInfiniteLight::Pdf_Le(const Ray &ray, Float *pdfPos,
     Normal3f n = Normal3f(portalFrame.z);
     *pdfPos = 1 / (Area() * AbsDot(n, w));
 #else
-    *pdfPos = 1 / (Pi * Sqr(cameraWorldRadius));
+    *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 #endif
 
     *pdfDir = pdf / duv_dw;
@@ -1277,20 +1277,20 @@ std::string SpotLight::ToString() const {
 }
 
 SpotLight *SpotLight::Create(const AnimatedTransform &worldFromLight, MediumHandle medium,
-                             const ParameterDictionary &dict,
+                             const ParameterDictionary &parameters,
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc) {
     SpectrumHandle I =
-        dict.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
-    Float sc = dict.GetOneFloat("scale", 1);
+        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+    Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
-    Float coneangle = dict.GetOneFloat("coneangle", 30.);
-    Float conedelta = dict.GetOneFloat("conedeltaangle", 5.);
+    Float coneangle = parameters.GetOneFloat("coneangle", 30.);
+    Float conedelta = parameters.GetOneFloat("conedeltaangle", 5.);
     // Compute spotlight world to light transformation
-    Point3f from = dict.GetOnePoint3f("from", Point3f(0, 0, 0));
-    Point3f to = dict.GetOnePoint3f("to", Point3f(0, 0, 1));
+    Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
+    Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
 
     Transform dirToZ = (Transform)Frame::FromZ(Normalize(to - from));
     Transform t = Translate(Vector3f(from.x, from.y, from.z)) * Inverse(dirToZ);
@@ -1307,8 +1307,8 @@ SampledSpectrum LightHandle::Phi(const SampledWavelengths &lambda) const {
     return ApplyCPU<SampledSpectrum>(phi);
 }
 
-void LightHandle::Preprocess(const Bounds3f &worldBounds) {
-    auto preprocess = [&](auto ptr) { return ptr->Preprocess(worldBounds); };
+void LightHandle::Preprocess(const Bounds3f &sceneBounds) {
+    auto preprocess = [&](auto ptr) { return ptr->Preprocess(sceneBounds); };
     return ApplyCPU<void>(preprocess);
 }
 
@@ -1343,32 +1343,34 @@ void LightHandle::Pdf_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
     return Apply<void>(pdf);
 }
 
-LightHandle LightHandle::Create(const std::string &name, const ParameterDictionary &dict,
+LightHandle LightHandle::Create(const std::string &name, const ParameterDictionary &parameters,
                                 const AnimatedTransform &worldFromLight,
-                                const CameraTransform &worldFromCamera,
+                                const CameraTransform &cameraTransform,
                                 MediumHandle outsideMedium, const FileLoc *loc,
                                 Allocator alloc) {
     LightHandle light = nullptr;
     if (name == "point")
-        light = PointLight::Create(worldFromLight, outsideMedium, dict, dict.ColorSpace(),
-                                   loc, alloc);
+        light = PointLight::Create(worldFromLight, outsideMedium, parameters,
+                                   parameters.ColorSpace(), loc, alloc);
     else if (name == "spot")
-        light = SpotLight::Create(worldFromLight, outsideMedium, dict, dict.ColorSpace(),
-                                  loc, alloc);
+        light = SpotLight::Create(worldFromLight, outsideMedium, parameters,
+                                  parameters.ColorSpace(), loc, alloc);
     else if (name == "goniometric")
-        light = GoniometricLight::Create(worldFromLight, outsideMedium, dict,
-                                         dict.ColorSpace(), loc, alloc);
+        light = GoniometricLight::Create(worldFromLight, outsideMedium, parameters,
+                                         parameters.ColorSpace(), loc, alloc);
     else if (name == "projection")
-        light = ProjectionLight::Create(worldFromLight, outsideMedium, dict, loc, alloc);
+        light = ProjectionLight::Create(worldFromLight, outsideMedium, parameters, loc,
+                                        alloc);
     else if (name == "distant")
-        light = DistantLight::Create(worldFromLight, dict, dict.ColorSpace(), loc, alloc);
+        light = DistantLight::Create(worldFromLight, parameters, parameters.ColorSpace(),
+                                     loc, alloc);
     else if (name == "infinite") {
-        const RGBColorSpace *colorSpace = dict.ColorSpace();
+        const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<SpectrumHandle> L =
-            dict.GetSpectrumArray("L", SpectrumType::General, alloc);
-        Float scale = dict.GetOneFloat("scale", 1);
-        std::vector<Point3f> portal = dict.GetPoint3fArray("portal");
-        std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+            parameters.GetSpectrumArray("L", SpectrumType::General, alloc);
+        Float scale = parameters.GetOneFloat("scale", 1);
+        std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
+        std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
 
         if (L.empty() && filename.empty())
             // Default: color space's std illuminant
@@ -1406,7 +1408,7 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
 
                 if (!portal.empty()) {
                     for (Point3f &p : portal)
-                        p = worldFromCamera.ApplyInverseTranslation(p);
+                        p = cameraTransform.RenderFromWorld(p);
 
                     light = alloc.new_object<PortalImageInfiniteLight>(
                         worldFromLight, std::move(image), colorSpace, scale, filename,
@@ -1423,27 +1425,28 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
     if (!light)
         ErrorExit(loc, "%s: unable to create light.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return light;
 }
 
 LightHandle LightHandle::CreateArea(const std::string &name,
-                                    const ParameterDictionary &dict,
+                                    const ParameterDictionary &parameters,
                                     const AnimatedTransform &worldFromLight,
                                     const MediumInterface &mediumInterface,
                                     const ShapeHandle shape, const FileLoc *loc,
                                     Allocator alloc) {
     LightHandle area = nullptr;
     if (name == "diffuse")
-        area = DiffuseAreaLight::Create(worldFromLight, mediumInterface.outside, dict,
-                                        dict.ColorSpace(), loc, alloc, shape);
+        area = DiffuseAreaLight::Create(worldFromLight, mediumInterface.outside,
+                                        parameters, parameters.ColorSpace(), loc, alloc,
+                                        shape);
     else
         ErrorExit(loc, "%s: area light type unknown.", name);
 
     if (!area)
         ErrorExit(loc, "%s: unable to create area light.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return area;
 }
 

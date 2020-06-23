@@ -242,31 +242,12 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
                 if (!plyMesh)
                     return;
 
-                std::vector<int> indices = std::move(plyMesh->triIndices);
-                if (plyMesh->quadIndices.size()) {
-                    // Convert quads back to pairs of triangles..
-                    LOG_VERBOSE("Converting %d PLY quads to tris",
-                                plyMesh->quadIndices.size());
-                    indices.reserve(indices.size() + 3 * plyMesh->quadIndices.size() / 2);
+                plyMesh->ConvertToOnlyTriangles();
 
-                    for (size_t i = 0; i < plyMesh->quadIndices.size(); i += 4) {
-                        indices.push_back(
-                            plyMesh->quadIndices[i]);  // 0, 1, 2 of original
-                        indices.push_back(plyMesh->quadIndices[i + 1]);
-                        indices.push_back(plyMesh->quadIndices[i + 3]);
-
-                        indices.push_back(
-                            plyMesh->quadIndices[i]);  // 0, 2, 3 of original
-                        indices.push_back(plyMesh->quadIndices[i + 3]);
-                        indices.push_back(plyMesh->quadIndices[i + 2]);
-                    }
-                }
-
-                std::vector<Vector3f>
-                    s;  // can't pass {} for default through new_object...
                 mesh = alloc.new_object<TriangleMesh>(
-                    *shape.worldFromObject, shape.reverseOrientation, indices, plyMesh->p,
-                    s, plyMesh->n, plyMesh->uv, plyMesh->faceIndices);
+                    *shape.worldFromObject, shape.reverseOrientation, plyMesh->triIndices,
+                    plyMesh->p, std::vector<Vector3f>(), plyMesh->n, plyMesh->uv,
+                    plyMesh->faceIndices);
             }
 
             Bounds3f bounds;
@@ -480,7 +461,7 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
 
         buildInputs.push_back(buildInput);
 
-        Bounds3f shapeBounds = shapeHandle.CameraWorldBound();
+        Bounds3f shapeBounds = shapeHandle.Bounds();
         OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
                           shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
         shapeAABBs.push_back(aabb);

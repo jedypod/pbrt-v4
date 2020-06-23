@@ -6,6 +6,7 @@
 #include <pbrt/film.h>
 
 #include <pbrt/bsdf.h>
+#include <pbrt/cameras.h>
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
@@ -82,19 +83,19 @@ std::string FilmBase::BaseToString() const {
 }
 
 VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
-                               const CameraTransform &worldFromCamera,
+                               const CameraTransform &cameraTransform,
                                const SampledWavelengths &lambda) {
-    Transform cameraFromWorld = Inverse(worldFromCamera.rotation.Interpolate(si.time));
+    Transform cameraFromRender = cameraTransform.CameraFromRender(si.time);
 
     time = si.time;
-    p = cameraFromWorld(si.p());
-    n = cameraFromWorld(si.n);
-    Vector3f wo = cameraFromWorld(si.wo);
+    p = cameraFromRender(si.p());
+    n = cameraFromRender(si.n);
+    Vector3f wo = cameraFromRender(si.wo);
     n = FaceForward(n, wo);
-    ns = cameraFromWorld(si.shading.n);
+    ns = cameraFromRender(si.shading.n);
     ns = FaceForward(ns, wo);
-    dzdx = cameraFromWorld(si.dpdx).z;
-    dzdy = cameraFromWorld(si.dpdy).z;
+    dzdx = cameraFromRender(si.dpdx).z;
+    dzdy = cameraFromRender(si.dpdy).z;
 
     if (si.bsdf) {
         constexpr int nRhoSamples = 16;
@@ -128,14 +129,13 @@ STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
                  FilterHandle filter, Float diagonal, const std::string &filename,
                  Float scale, const RGBColorSpace *colorSpace, Float maxSampleLuminance,
-                 bool writeFP16, bool saveVariance, Allocator allocator)
+                 bool writeFP16, Allocator allocator)
     : FilmBase(resolution, pixelBounds, filter, diagonal, filename),
       pixels(pixelBounds, allocator),
       scale(scale),
       colorSpace(colorSpace),
       maxSampleLuminance(maxSampleLuminance),
-      writeFP16(writeFP16),
-      saveVariance(saveVariance) {
+      writeFP16(writeFP16) {
     filterIntegral = filter.Integral();
 
     CHECK(!pixelBounds.IsEmpty());
@@ -184,18 +184,13 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     // Convert image to RGB and compute final pixel values
     LOG_VERBOSE("Converting image to RGB and computing final weighted pixel values");
     PixelFormat format = writeFP16 ? PixelFormat::Half : PixelFormat::Float;
-    std::vector<std::string> channels = {"R", "G", "B"};
-    if (saveVariance)
-        channels.push_back("Variance");
-    Image image(format, Point2i(pixelBounds.Diagonal()), channels);
+    Image image(format, Point2i(pixelBounds.Diagonal()), {"R", "G", "B"});
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         RGB rgb = GetPixelRGB(p, splatScale);
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, {rgb[0], rgb[1], rgb[2]});
-        if (saveVariance)
-            image.SetChannel(pOffset, 3, pixels[p].varianceEstimator.Variance());
     });
 
     metadata->pixelBounds = pixelBounds;
@@ -214,15 +209,14 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
 std::string RGBFilm::ToString() const {
     return StringPrintf("[ RGBFilm %s scale: %f colorSpace: %s maxSampleLuminance: %f "
-                        "writeFP16: %s saveVariance: %s ]",
-                        BaseToString(), scale, *colorSpace, maxSampleLuminance, writeFP16,
-                        saveVariance);
+                        "writeFP16: %s ]",
+                        BaseToString(), scale, *colorSpace, maxSampleLuminance, writeFP16);
 }
 
-RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
+RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle filter,
                          const RGBColorSpace *colorSpace, const FileLoc *loc,
                          Allocator alloc) {
-    std::string filename = dict.GetOneString("filename", "");
+    std::string filename = parameters.GetOneString("filename", "");
     if (Options->imageFile) {
         if (!filename.empty())
             Warning(loc,
@@ -234,15 +228,15 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     } else if (filename.empty())
         filename = "pbrt.exr";
 
-    Point2i fullResolution(dict.GetOneInt("xresolution", 1280),
-                           dict.GetOneInt("yresolution", 720));
+    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
+                           parameters.GetOneInt("yresolution", 720));
     if (Options->quickRender) {
         fullResolution.x = std::max(1, fullResolution.x / 4);
         fullResolution.y = std::max(1, fullResolution.y / 4);
     }
 
     Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = dict.GetIntArray("pixelbounds");
+    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
     if (Options->pixelBounds) {
         Bounds2i newBounds = *Options->pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
@@ -266,7 +260,7 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
         }
     }
 
-    std::vector<Float> cr = dict.GetFloatArray("cropwindow");
+    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
         // Compute film image bounds
@@ -310,14 +304,13 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     if (pixelBounds.IsEmpty())
         ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
-    Float scale = dict.GetOneFloat("scale", 1.);
-    Float diagonal = dict.GetOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
-    bool writeFP16 = dict.GetOneBool("savefp16", true);
-    bool saveVariance = dict.GetOneBool("savevariance", false);
+    Float scale = parameters.GetOneFloat("scale", 1.);
+    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
+    Float maxSampleLuminance = parameters.GetOneFloat("maxsampleluminance", Infinity);
+    bool writeFP16 = parameters.GetOneBool("savefp16", true);
     return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, filter, diagonal,
                                      filename, scale, colorSpace, maxSampleLuminance,
-                                     writeFP16, saveVariance, alloc);
+                                     writeFP16, alloc);
 }
 
 // Film Method Definitions
@@ -330,8 +323,8 @@ GBufferFilm::GBufferFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
       scale(scale),
       colorSpace(colorSpace),
       maxSampleLuminance(maxSampleLuminance),
-      writeFP16(writeFP16) {
-    // Allocate film image storage
+      writeFP16(writeFP16),
+      filterIntegral(filter.Integral()) {
     CHECK(!pixelBounds.IsEmpty());
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
 }
@@ -362,7 +355,8 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     Pixel &p = pixels[pFilm];
     if (visibleSurface) {
         // Update variance estimates.
-        p.LVarianceEstimator.Add(L.y(lambda));
+        // TODO: store channels independently?
+        p.rgbVarianceEstimator.Add(L.y(lambda));
 
         p.pSum += weight * visibleSurface->p;
 
@@ -377,7 +371,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
         addRGB(albedo, p.albedoSum);
     }
 
-    addRGB(L, p.LSum);
+    addRGB(L, p.rgbSum);
     p.weightSum += weight;
 }
 
@@ -441,8 +435,8 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "materialId.R",
                  "materialId.G",
                  "materialId.B",
-                 "LVariance",
-                 "LRelativeVariance"});
+                 "rgbVariance",
+                 "rgbRelativeVariance"});
 
     ImageChannelDesc rgbDesc = *image.GetChannelDesc({"R", "G", "B"});
     ImageChannelDesc pDesc = *image.GetChannelDesc({"Px", "Py", "Pz"});
@@ -451,14 +445,12 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc nsDesc = *image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
     ImageChannelDesc albedoRgbDesc =
         *image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
-    ImageChannelDesc lVarianceDesc =
-        *image.GetChannelDesc({"LVariance", "LRelativeVariance"});
-
-    Float filterIntegral = filter.Integral();
+    ImageChannelDesc varianceDesc =
+        *image.GetChannelDesc({"rgbVariance", "rgbRelativeVariance"});
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
-        RGB Lrgb(pixel.LSum[0], pixel.LSum[1], pixel.LSum[2]);
+        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
         RGB albedoRgb(pixel.albedoSum[0], pixel.albedoSum[1], pixel.albedoSum[2]);
 
         // Normalize pixel with weight sum
@@ -466,7 +458,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         Point3f pt = pixel.pSum;
         Float dzdx = pixel.dzdxSum, dzdy = pixel.dzdySum;
         if (weightSum != 0) {
-            Lrgb /= weightSum;
+            rgb /= weightSum;
             albedoRgb /= weightSum;
             pt /= weightSum;
             dzdx /= weightSum;
@@ -475,10 +467,10 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
         // Add splat value at pixel
         for (int c = 0; c < 3; ++c)
-            Lrgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
+            rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
-        image.SetChannels(pOffset, rgbDesc, {Lrgb[0], Lrgb[1], Lrgb[2]});
+        image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
         image.SetChannels(pOffset, albedoRgbDesc,
                           {albedoRgb[0], albedoRgb[1], albedoRgb[2]});
 
@@ -490,9 +482,9 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetChannels(pOffset, dzDesc, {std::abs(dzdx), std::abs(dzdy)});
         image.SetChannels(pOffset, nDesc, {n.x, n.y, n.z});
         image.SetChannels(pOffset, nsDesc, {ns.x, ns.y, ns.z});
-        image.SetChannels(pOffset, lVarianceDesc,
-                          {pixel.LVarianceEstimator.Variance(),
-                           pixel.LVarianceEstimator.RelativeVariance()});
+        image.SetChannels(pOffset, varianceDesc,
+                          {pixel.rgbVarianceEstimator.Variance(),
+                           pixel.rgbVarianceEstimator.RelativeVariance()});
     });
 
     metadata->pixelBounds = pixelBounds;
@@ -502,7 +494,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     Float varianceSum = 0;
     for (Point2i p : pixelBounds) {
         const Pixel &pixel = pixels[p];
-        varianceSum += pixel.LVarianceEstimator.Variance();
+        varianceSum += pixel.rgbVarianceEstimator.Variance();
     }
     metadata->estimatedVariance = varianceSum / pixelBounds.Area();
 
@@ -515,10 +507,10 @@ std::string GBufferFilm::ToString() const {
                         BaseToString(), *colorSpace, maxSampleLuminance, writeFP16);
 }
 
-GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
-                                 const RGBColorSpace *colorSpace, const FileLoc *loc,
-                                 Allocator alloc) {
-    std::string filename = dict.GetOneString("filename", "");
+GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
+                                 FilterHandle filter, const RGBColorSpace *colorSpace,
+                                 const FileLoc *loc, Allocator alloc) {
+    std::string filename = parameters.GetOneString("filename", "");
     if (Options->imageFile) {
         if (!filename.empty())
             Warning(loc,
@@ -530,15 +522,15 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
     } else if (filename.empty())
         filename = "pbrt.exr";
 
-    Point2i fullResolution(dict.GetOneInt("xresolution", 1280),
-                           dict.GetOneInt("yresolution", 720));
+    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
+                           parameters.GetOneInt("yresolution", 720));
     if (Options->quickRender) {
         fullResolution.x = std::max(1, fullResolution.x / 4);
         fullResolution.y = std::max(1, fullResolution.y / 4);
     }
 
     Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = dict.GetIntArray("pixelbounds");
+    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
     if (Options->pixelBounds) {
         Bounds2i newBounds = *Options->pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
@@ -562,7 +554,7 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
         }
     }
 
-    std::vector<Float> cr = dict.GetFloatArray("cropwindow");
+    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
         // Compute film image bounds
@@ -606,29 +598,31 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &dict, FilterHandle f
     if (pixelBounds.IsEmpty())
         ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
-    Float diagonal = dict.GetOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
-    Float scale = dict.GetOneFloat("scale", 1.);
-    bool writeFP16 = dict.GetOneBool("savefp16", true);
+    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
+    Float maxSampleLuminance = parameters.GetOneFloat("maxsampleluminance", Infinity);
+    Float scale = parameters.GetOneFloat("scale", 1.);
+    bool writeFP16 = parameters.GetOneBool("savefp16", true);
     return alloc.new_object<GBufferFilm>(fullResolution, pixelBounds, filter, diagonal,
                                          filename, scale, colorSpace, maxSampleLuminance,
                                          writeFP16, alloc);
 }
 
-FilmHandle FilmHandle::Create(const std::string &name, const ParameterDictionary &dict,
+FilmHandle FilmHandle::Create(const std::string &name,
+                              const ParameterDictionary &parameters,
                               const FileLoc *loc, FilterHandle filter, Allocator alloc) {
     FilmHandle film;
     if (name == "rgb")
-        film = RGBFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
+        film = RGBFilm::Create(parameters, filter, parameters.ColorSpace(), loc, alloc);
     else if (name == "gbuffer")
-        film = GBufferFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
+        film = GBufferFilm::Create(parameters, filter, parameters.ColorSpace(), loc,
+                                   alloc);
     else
         ErrorExit(loc, "%s: film type unknown.", name);
 
     if (!film)
         ErrorExit(loc, "%s: unable to create film.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return film;
 }
 

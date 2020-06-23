@@ -41,7 +41,7 @@ class ShapeHandle
                                             const ParameterDictionary &parameters,
                                             const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU inline Bounds3f CameraWorldBound() const;
+    PBRT_CPU_GPU inline Bounds3f Bounds() const;
 
     PBRT_CPU_GPU inline pstd::optional<ShapeIntersection> Intersect(
         const Ray &ray, Float tMax = Infinity) const;

@@ -48,7 +48,7 @@ void GPUPathIntegrator::InitializeVisibleSurface() {
 
             if (intersection.material)
                 visibleSurfaces[pixelIndex] =
-                    VisibleSurface(intersection, camera.WorldFromCamera(), lambda);
+                    VisibleSurface(intersection, camera.GetCameraTransform(), lambda);
         });
 }
 

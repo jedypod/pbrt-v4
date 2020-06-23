@@ -9,6 +9,7 @@
 #include <pbrt/bsdf.h>
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
+#include <pbrt/options.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
@@ -23,9 +24,9 @@
 
 namespace pbrt {
 
-std::string ToString(const CameraTransform &ct) {
-    return StringPrintf("[ CameraTransform rotation: %s translation: %s ]", ct.rotation,
-                        ct.translation);
+std::string CameraTransform::ToString() const {
+    return StringPrintf("[ CameraTransform renderFromCamera: %s worldFromRender: %s ]",
+                        renderFromCamera, worldFromRender);
 }
 
 CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
@@ -33,10 +34,38 @@ CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
                        worldFromCamera(Point3f(0, 0, 0), worldFromCamera.endTime)) /
                       2;
 
-    translation = Translate(Vector3f(pCamera));
-    rotation = AnimatedTransform(
-        Inverse(translation) * worldFromCamera.startTransform, worldFromCamera.startTime,
-        Inverse(translation) * worldFromCamera.endTransform, worldFromCamera.endTime);
+    switch (Options->renderingSpace) {
+    case RenderingCoordinateSystem::Camera:
+        worldFromRender = worldFromCamera.startTransform;
+        if (worldFromCamera.IsAnimated())
+            // We could always do this in theory, but if there's a big
+            // translation from the origin then the numeric error can lead
+            // to something substantially far from the identity matrix we
+            // expect.
+            renderFromCamera = AnimatedTransform(
+                 Transform(), worldFromCamera.startTime,
+                 Inverse(worldFromRender) * worldFromCamera.endTransform,
+                 worldFromCamera.endTime);
+        else
+            renderFromCamera = AnimatedTransform();
+        break;
+    case RenderingCoordinateSystem::CameraWorld: {
+        worldFromRender = Translate(Vector3f(pCamera));
+        Transform renderFromWorld = Translate(-Vector3f(pCamera));
+        renderFromCamera = AnimatedTransform(
+            renderFromWorld * worldFromCamera.startTransform,
+            worldFromCamera.startTime,
+            renderFromWorld * worldFromCamera.endTransform,
+            worldFromCamera.endTime);
+        break;
+    }
+    case RenderingCoordinateSystem::World:
+        worldFromRender = Transform();
+        renderFromCamera = worldFromCamera;
+        break;
+    default:
+        LOG_FATAL("Unhandled rendering coordinate space");
+    }
 }
 
 // Camera Method Definitions
@@ -81,14 +110,14 @@ std::string CameraHandle::ToString() const {
     return ApplyCPU<std::string>(ts);
 }
 
-CameraBase::CameraBase(const CameraTransform &worldFromCamera, Float shutterOpen,
+CameraBase::CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
                        Float shutterClose, FilmHandle film, MediumHandle medium)
-    : worldFromCamera(worldFromCamera),
+    : cameraTransform(cameraTransform),
       shutterOpen(shutterOpen),
       shutterClose(shutterClose),
       film(film),
       medium(medium) {
-    if (worldFromCamera.HasScale())
+    if (cameraTransform.CameraFromRenderHasScale())
         Warning("Scaling detected in world-to-camera transformation!\n"
                 "The system has numerous assumptions, implicit and explicit,\n"
                 "that this transform will have no scale factors in it.\n"
@@ -138,7 +167,8 @@ pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
 }
 
 void CameraBase::InitMetadata(ImageMetadata *metadata) const {
-    metadata->cameraFromWorld = worldFromCamera.GetInverse(shutterOpen).GetMatrix();
+    metadata->cameraFromWorld =
+        cameraTransform.CameraFromWorld(shutterOpen).GetMatrix();
 }
 
 void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
@@ -161,10 +191,10 @@ void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
             continue;
 
         RayDifferential &ray = crd->ray;
-        Vector3f dox = CameraFromWorld(ray.rxOrigin - ray.o, ray.time);
+        Vector3f dox = CameraFromRender(ray.rxOrigin - ray.o, ray.time);
         if (Length(dox) < Length(minPosDifferentialX))
             minPosDifferentialX = dox;
-        Vector3f doy = CameraFromWorld(ray.ryOrigin - ray.o, ray.time);
+        Vector3f doy = CameraFromRender(ray.ryOrigin - ray.o, ray.time);
         if (Length(doy) < Length(minPosDifferentialY))
             minPosDifferentialY = doy;
 
@@ -190,7 +220,7 @@ void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
 }
 
 void CameraBase::ApproximatedPdxy(const SurfaceInteraction &si) const {
-    Point3f pc = CameraFromWorld(si.p(), si.time);
+    Point3f pc = CameraFromRender(si.p(), si.time);
     Float dist = Distance(pc, Point3f(0, 0, 0));
 
     Frame f = Frame::FromZ(si.n);
@@ -206,10 +236,10 @@ void CameraBase::ApproximatedPdxy(const SurfaceInteraction &si) const {
 }
 
 std::string CameraBase::ToString() const {
-    return StringPrintf("worldFromCamera: %s shutterOpen: %f shutterClose: %f film: %s "
+    return StringPrintf("cameraTransform: %s shutterOpen: %f shutterClose: %f film: %s "
                         "medium: %s minPosDifferentialX: %s minPosDifferentialY: %s "
                         "minDirDifferentialX: %s minDirDifferentialY: %s ",
-                        worldFromCamera, shutterOpen, shutterClose, film,
+                        cameraTransform, shutterOpen, shutterClose, film,
                         medium ? medium.ToString().c_str() : "(nullptr)",
                         minPosDifferentialX, minPosDifferentialY, minDirDifferentialX,
                         minDirDifferentialY);
@@ -220,13 +250,13 @@ std::string CameraSample::ToString() const {
                         weight);
 }
 
-ProjectiveCamera::ProjectiveCamera(const CameraTransform &worldFromCamera,
+ProjectiveCamera::ProjectiveCamera(const CameraTransform &cameraTransform,
                                    const Transform &screenFromCamera,
                                    const Bounds2f &screenWindow, Float shutterOpen,
                                    Float shutterClose, Float lensRadius,
                                    Float focalDistance, FilmHandle film,
                                    MediumHandle medium)
-    : CameraBase(worldFromCamera, shutterOpen, shutterClose, film, medium),
+    : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
       screenFromCamera(screenFromCamera),
       lensRadius(lensRadius),
       focalDistance(focalDistance) {
@@ -242,7 +272,8 @@ ProjectiveCamera::ProjectiveCamera(const CameraTransform &worldFromCamera,
 }
 
 void ProjectiveCamera::InitMetadata(ImageMetadata *metadata) const {
-    metadata->cameraFromWorld = worldFromCamera.GetInverse(shutterOpen).GetMatrix();
+    metadata->cameraFromWorld =
+        cameraTransform.CameraFromWorld(shutterOpen).GetMatrix();
 
     // TODO: double check this
     Transform NDCFromWorld = Translate(Vector3f(0.5, 0.5, 0.5)) * Scale(0.5, 0.5, 0.5) *
@@ -262,27 +293,31 @@ std::string ProjectiveCamera::BaseToString() const {
 }
 
 CameraHandle CameraHandle::Create(const std::string &name,
-                                  const ParameterDictionary &dict, MediumHandle medium,
-                                  const CameraTransform &worldFromCamera, FilmHandle film,
+                                  const ParameterDictionary &parameters, MediumHandle medium,
+                                  const CameraTransform &cameraTransform, FilmHandle film,
                                   const FileLoc *loc, Allocator alloc) {
     CameraHandle camera;
     if (name == "perspective")
         camera =
-            PerspectiveCamera::Create(dict, worldFromCamera, film, medium, loc, alloc);
+            PerspectiveCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                      alloc);
     else if (name == "orthographic")
         camera =
-            OrthographicCamera::Create(dict, worldFromCamera, film, medium, loc, alloc);
+            OrthographicCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                       alloc);
     else if (name == "realistic")
-        camera = RealisticCamera::Create(dict, worldFromCamera, film, medium, loc, alloc);
+        camera = RealisticCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                         alloc);
     else if (name == "spherical")
-        camera = SphericalCamera::Create(dict, worldFromCamera, film, medium, loc, alloc);
+        camera = SphericalCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                         alloc);
     else
         ErrorExit(loc, "%s: camera type unknown.", name);
 
     if (!camera)
         ErrorExit(loc, "%s: unable to create camera.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return camera;
 }
 
@@ -306,7 +341,7 @@ pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
         ray.o = Point3f(pLens.x, pLens.y, 0);
         ray.d = Normalize(pFocus - ray.o);
     }
-    return CameraRay{WorldFromCamera(ray)};
+    return CameraRay{RenderFromCamera(ray)};
 }
 
 pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferential(
@@ -353,7 +388,7 @@ pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferentia
         ray.rxDirection = ray.ryDirection = ray.d;
     }
     ray.hasDifferentials = true;
-    return CameraRayDifferential{WorldFromCamera(ray)};
+    return CameraRayDifferential{RenderFromCamera(ray)};
 }
 
 std::string OrthographicCamera::ToString() const {
@@ -361,22 +396,22 @@ std::string OrthographicCamera::ToString() const {
                         BaseToString(), dxCamera, dyCamera);
 }
 
-OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &dict,
-                                               const CameraTransform &worldFromCamera,
+OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parameters,
+                                               const CameraTransform &cameraTransform,
                                                FilmHandle film, MediumHandle medium,
                                                const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e6f);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6f);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -390,7 +425,7 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -400,18 +435,18 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &dict,
         } else
             Error("\"screenwindow\" should have four values");
     }
-    return alloc.new_object<OrthographicCamera>(worldFromCamera, screen, shutteropen,
+    return alloc.new_object<OrthographicCamera>(cameraTransform, screen, shutteropen,
                                                 shutterclose, lensradius, focaldistance,
                                                 film, medium);
 }
 
 // PerspectiveCamera Method Definitions
-PerspectiveCamera::PerspectiveCamera(const CameraTransform &worldFromCamera,
+PerspectiveCamera::PerspectiveCamera(const CameraTransform &cameraTransform,
                                      const Bounds2f &screenWindow, Float shutterOpen,
                                      Float shutterClose, Float lensRadius,
                                      Float focalDistance, Float fov, FilmHandle film,
                                      MediumHandle medium)
-    : ProjectiveCamera(worldFromCamera, Perspective(fov, 1e-2f, 1000.f), screenWindow,
+    : ProjectiveCamera(cameraTransform, Perspective(fov, 1e-2f, 1000.f), screenWindow,
                        shutterOpen, shutterClose, lensRadius, focalDistance, film,
                        medium) {
     // Compute differential changes in origin for perspective camera rays
@@ -456,7 +491,7 @@ pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
         ray.o = Point3f(pLens.x, pLens.y, 0);
         ray.d = Normalize(pFocus - ray.o);
     }
-    return CameraRay{WorldFromCamera(ray)};
+    return CameraRay{RenderFromCamera(ray)};
 }
 
 pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential(
@@ -503,19 +538,19 @@ pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential
         ray.ryDirection = Normalize(Vector3f(pCamera) + dyCamera);
     }
     ray.hasDifferentials = true;
-    return CameraRayDifferential{WorldFromCamera(ray)};
+    return CameraRayDifferential{RenderFromCamera(ray)};
 }
 
 SampledSpectrum PerspectiveCamera::We(const Ray &ray, const SampledWavelengths &lambda,
                                       Point2f *pRaster2) const {
     // XXX Interpolate camera matrix and check if $\w{}$ is forward-facing
-    Float cosTheta = Dot(ray.d, WorldFromCamera(Vector3f(0, 0, 1), ray.time));
+    Float cosTheta = Dot(ray.d, RenderFromCamera(Vector3f(0, 0, 1), ray.time));
     if (cosTheta <= cosTotalWidth)
         return SampledSpectrum(0.);
 
     // Map ray $(\p{}, \w{})$ onto the raster grid
     Point3f pFocus = ray((lensRadius > 0 ? focalDistance : 1) / cosTheta);
-    Point3f pCamera = CameraFromWorld(pFocus, ray.time);
+    Point3f pCamera = CameraFromRender(pFocus, ray.time);
     Point3f pRaster = cameraFromRaster.ApplyInverse(pCamera);
 
     // Return raster position if requested
@@ -536,7 +571,7 @@ SampledSpectrum PerspectiveCamera::We(const Ray &ray, const SampledWavelengths &
 
 void PerspectiveCamera::Pdf_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     // Interpolate camera matrix and fail if $\w{}$ is not forward-facing
-    Float cosTheta = Dot(ray.d, WorldFromCamera(Vector3f(0, 0, 1), ray.time));
+    Float cosTheta = Dot(ray.d, RenderFromCamera(Vector3f(0, 0, 1), ray.time));
     if (cosTheta <= cosTotalWidth) {
         *pdfPos = *pdfDir = 0;
         return;
@@ -544,7 +579,7 @@ void PerspectiveCamera::Pdf_We(const Ray &ray, Float *pdfPos, Float *pdfDir) con
 
     // Map ray $(\p{}, \w{})$ onto the raster grid
     Point3f pFocus = ray((lensRadius > 0 ? focalDistance : 1) / cosTheta);
-    Point3f pCamera = CameraFromWorld(pFocus, ray.time);
+    Point3f pCamera = CameraFromRender(pFocus, ray.time);
     Point3f pRaster = cameraFromRaster.ApplyInverse(pCamera);
 
     // Return zero probability for out of bounds points
@@ -564,9 +599,9 @@ pstd::optional<CameraWiSample> PerspectiveCamera::Sample_Wi(
     const Interaction &ref, const Point2f &u, const SampledWavelengths &lambda) const {
     // Uniformly sample a lens interaction _lensIntr_
     Point2f pLens = lensRadius * SampleUniformDiskConcentric(u);
-    Point3f pLensWorld = WorldFromCamera(Point3f(pLens.x, pLens.y, 0), ref.time);
-    Normal3f n = Normal3f(WorldFromCamera(Vector3f(0, 0, 1), ref.time));
-    Interaction lensIntr(pLensWorld, n, ref.time, medium);
+    Point3f pLensRender = RenderFromCamera(Point3f(pLens.x, pLens.y, 0), ref.time);
+    Normal3f n = Normal3f(RenderFromCamera(Vector3f(0, 0, 1), ref.time));
+    Interaction lensIntr(pLensRender, n, ref.time, medium);
 
     // Populate arguments and compute the importance value
     Vector3f wi = lensIntr.p() - ref.p();
@@ -592,22 +627,22 @@ std::string PerspectiveCamera::ToString() const {
                         BaseToString(), dxCamera, dyCamera, A, cosTotalWidth);
 }
 
-PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
-                                             const CameraTransform &worldFromCamera,
+PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &parameters,
+                                             const CameraTransform &cameraTransform,
                                              FilmHandle film, MediumHandle medium,
                                              const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e6);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -621,7 +656,7 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -631,8 +666,8 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
         } else
             Error(loc, "\"screenwindow\" should have four values");
     }
-    Float fov = dict.GetOneFloat("fov", 90.);
-    return alloc.new_object<PerspectiveCamera>(worldFromCamera, screen, shutteropen,
+    Float fov = parameters.GetOneFloat("fov", 90.);
+    return alloc.new_object<PerspectiveCamera>(cameraTransform, screen, shutteropen,
                                                shutterclose, lensradius, focaldistance,
                                                fov, film, medium);
 }
@@ -655,25 +690,25 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(
     pstd::swap(dir.y, dir.z);
 
     Ray ray(Point3f(0, 0, 0), dir, SampleTime(sample.time), medium);
-    return CameraRay{WorldFromCamera(ray)};
+    return CameraRay{RenderFromCamera(ray)};
 }
 
-SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
-                                         const CameraTransform &worldFromCamera,
+SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
+                                         const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e30f);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e30f);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -687,7 +722,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -700,7 +735,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
     (void)lensradius;     // don't need this
     (void)focaldistance;  // don't need this
 
-    std::string m = dict.GetOneString("mapping", "equiarea");
+    std::string m = parameters.GetOneString("mapping", "equiarea");
     Mapping mapping;
     if (m == "equiarea")
         mapping = EquiArea;
@@ -712,7 +747,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
                   "\"equiarea\" or \"equirect\".)",
                   m);
 
-    return alloc.new_object<SphericalCamera>(worldFromCamera, shutteropen, shutterclose,
+    return alloc.new_object<SphericalCamera>(cameraTransform, shutteropen, shutterclose,
                                              film, medium, mapping);
 }
 
@@ -730,28 +765,37 @@ std::string RealisticCamera::LensElementInterface::ToString() const {
                         curvatureRadius, thickness, eta, apertureRadius);
 }
 
-RealisticCamera::RealisticCamera(const CameraTransform &worldFromCamera,
+RealisticCamera::RealisticCamera(const CameraTransform &cameraTransform,
                                  Float shutterOpen, Float shutterClose,
-                                 Float apertureDiameter, Float focusDistance,
+                                 Float setApertureDiameter, Float focusDistance,
                                  Float dispersionFactor, std::vector<Float> &lensData,
-                                 FilmHandle film, MediumHandle medium, Allocator alloc)
-    : CameraBase(worldFromCamera, shutterOpen, shutterClose, film, medium),
+                                 Float scale, FilmHandle film, MediumHandle medium,
+                                 pstd::optional<Image> apertureImage, Allocator alloc)
+    : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
+      scale(scale),
       dispersionFactor(dispersionFactor),
       elementInterfaces(alloc),
-      exitPupilBounds(alloc) {
+      exitPupilBounds(alloc),
+      apertureImage(std::move(apertureImage)) {
     for (int i = 0; i < (int)lensData.size(); i += 4) {
-        if (lensData[i] == 0) {
-            if (apertureDiameter > lensData[i + 3]) {
+        Float curvatureRadius = scale * lensData[i];
+        Float thickness = scale * lensData[i + 1];
+        Float eta  = lensData[i + 2];
+        Float apertureDiameter  = scale * lensData[i + 3];
+
+        if (curvatureRadius == 0) {
+            // It's the aperture stop
+            if (setApertureDiameter > apertureDiameter) {
                 Warning("Specified aperture diameter %f is greater than maximum "
                         "possible %f.  Clamping it.",
-                        apertureDiameter, lensData[i + 3]);
+                        setApertureDiameter, apertureDiameter);
             } else {
-                lensData[i + 3] = apertureDiameter;
+                apertureDiameter = setApertureDiameter;
             }
         }
         elementInterfaces.push_back(LensElementInterface(
-            {lensData[i] * (Float).001, lensData[i + 1] * (Float).001, lensData[i + 2],
-             lensData[i + 3] * Float(.001) / Float(2.)}));
+            {curvatureRadius * (Float).001, thickness * (Float).001, eta,
+             apertureDiameter * Float(.001) / 2}));
     }
 
     // Compute lens--film distance for given focus distance
@@ -765,8 +809,8 @@ RealisticCamera::RealisticCamera(const CameraTransform &worldFromCamera,
     int nSamples = 64;
     exitPupilBounds.resize(nSamples);
     ParallelFor(0, nSamples, [&](int i) {
-        Float r0 = (Float)i / nSamples * film.Diagonal() / 2;
-        Float r1 = (Float)(i + 1) / nSamples * film.Diagonal() / 2;
+        Float r0 = (Float)i / nSamples * FilmDiagonal() / 2;
+        Float r1 = (Float)(i + 1) / nSamples * FilmDiagonal() / 2;
         exitPupilBounds[i] = BoundExitPupil(r0, r1);
     });
 
@@ -801,7 +845,7 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
     // Find point on film, _pFilm_, corresponding to _sample.pFilm_
     // Compute Film's physical extent
     Float aspect = (Float)film.FullResolution().y / (Float)film.FullResolution().x;
-    Float diagonal = film.Diagonal();
+    Float diagonal = FilmDiagonal();
     Float x = std::sqrt(diagonal * diagonal / (1 + aspect * aspect));
     Float y = aspect * x;
     Bounds2f physicalExtent(Point2f(-x / 2, -y / 2), Point2f(x / 2, y / 2));
@@ -817,7 +861,8 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
         SampleExitPupil(Point2f(pFilm.x, pFilm.y), sample.pLens, &exitPupilBoundsArea);
     Ray rFilm(pFilm, pRear - pFilm);
     Ray ray;
-    if (!TraceLensesFromFilm(rFilm, &ray, lambda[0])) {
+    Float weight = TraceLensesFromFilm(rFilm, &ray, lambda[0]);
+    if (weight == 0) {
         // CO            ++vignettedRays;
         return {};
     }
@@ -825,7 +870,7 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
     // Finish initialization of _RealisticCamera_ ray
     ray.time = SampleTime(sample.time);
     ray.medium = medium;
-    ray = WorldFromCamera(ray);
+    ray = RenderFromCamera(ray);
     ray.d = Normalize(ray.d);
 
     if (dispersionFactor != 0)
@@ -834,8 +879,8 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(
     // Return weighting for _RealisticCamera_ ray
     Float cosTheta = Normalize(rFilm.d).z;
     Float cos4Theta = (cosTheta * cosTheta) * (cosTheta * cosTheta);
-    Float weight = (shutterClose - shutterOpen) * (cos4Theta * exitPupilBoundsArea) /
-                   (LensRearZ() * LensRearZ());
+    weight *= (shutterClose - shutterOpen) * (cos4Theta * exitPupilBoundsArea) /
+        (LensRearZ() * LensRearZ());
 
     return CameraRay{ray, SampledSpectrum(weight)};
 }
@@ -844,7 +889,7 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &le
                                          Float *sampleBoundsArea) const {
     // Find exit pupil bound for sample distance from film center
     Float rFilm = std::sqrt(pFilm.x * pFilm.x + pFilm.y * pFilm.y);
-    int rIndex = rFilm / (film.Diagonal() / 2) * exitPupilBounds.size();
+    int rIndex = rFilm / (FilmDiagonal() / 2) * exitPupilBounds.size();
     rIndex = std::min<int>(exitPupilBounds.size() - 1, rIndex);
     Bounds2f pupilBounds = exitPupilBounds[rIndex];
     if (sampleBoundsArea != nullptr)
@@ -860,9 +905,11 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &le
             sinTheta * pLens.x + cosTheta * pLens.y, LensRearZ()};
 }
 
-bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
-                                          Float lambda) const {
+Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
+                                           Float lambda) const {
     Float elementZ = 0;
+    Float weight = 1;
+
     // Transform _rCamera_ from camera to lens system space
     Transform LensFromCamera = Scale(1, 1, -1);
     Ray rLens = LensFromCamera(rCamera);
@@ -892,9 +939,18 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
 
         // Test intersection point against element aperture
         Point3f pHit = rLens(t);
-        Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
-        if (r2 > element.apertureRadius * element.apertureRadius)
-            return false;
+        if (isStop && apertureImage) {
+            Point2f uv((pHit.x / element.apertureRadius + 1) / 2,
+                       (pHit.y / element.apertureRadius + 1) / 2);
+            uv.y = 1 - uv.y;
+            weight = apertureImage->BilerpChannel(uv, 0, WrapMode::Black);
+            if (weight == 0)
+                return 0;
+        } else {
+            Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
+            if (r2 > element.apertureRadius * element.apertureRadius)
+                return 0;
+        }
         rLens.o = pHit;
 
         // Update ray path for element interface interaction
@@ -911,7 +967,7 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
                 eta_t -= offset * dispersionFactor * .02;
             }
             if (!Refract(Normalize(-rLens.d), n, eta_t / eta_i, &w))
-                return false;
+                return 0;
             rLens.d = w;
         }
     }
@@ -920,7 +976,7 @@ bool RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
         const Transform LensToCamera = Scale(1, 1, -1);
         *rOut = LensToCamera(rLens);
     }
-    return true;
+    return weight;
 }
 
 bool RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const {
@@ -945,6 +1001,7 @@ bool RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const 
         CHECK_GE(t, 0);
 
         // Test intersection point against element aperture
+        // Don't worry about the aperture image here.
         Point3f pHit = rLens(t);
         Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
         if (r2 > element.apertureRadius * element.apertureRadius)
@@ -1054,7 +1111,7 @@ void RealisticCamera::DrawRayPathFromFilm(const Ray &r, bool arrow,
     static const Transform LensFromCamera = Scale(1, 1, -1);
     Ray ray = LensFromCamera(r);
     printf("{ ");
-    if (!TraceLensesFromFilm(r, nullptr)) {
+    if (TraceLensesFromFilm(r, nullptr) == 0) {
         printf("Dashed, RGBColor[.8, .5, .5]");
     } else
         printf("RGBColor[.5, .5, .8]");
@@ -1188,20 +1245,20 @@ void RealisticCamera::ComputeCardinalPoints(const Ray &rIn, const Ray &rOut, Flo
 
 void RealisticCamera::ComputeThickLensApproximation(Float pz[2], Float fz[2]) const {
     // Find height $x$ from optical axis for parallel rays
-    Float x = .001 * film.Diagonal();
+    Float x = .001 * FilmDiagonal();
 
     // Compute cardinal points for film side of lens system
     Ray rScene(Point3f(x, 0, LensFrontZ() + 1), Vector3f(0, 0, -1));
     Ray rFilm;
     if (!TraceLensesFromScene(rScene, &rFilm))
-        LOG_FATAL("Unable to trace ray from scene to film for thick lens "
+        ErrorExit("Unable to trace ray from scene to film for thick lens "
                   "approximation. Is aperture stop extremely small?");
     ComputeCardinalPoints(rScene, rFilm, &pz[0], &fz[0]);
 
     // Compute cardinal points for scene side of lens system
     rFilm = Ray(Point3f(x, 0, LensRearZ() - 1), Vector3f(0, 0, 1));
-    if (!TraceLensesFromFilm(rFilm, &rScene))
-        LOG_FATAL("Unable to trace ray from film to scene for thick lens "
+    if (TraceLensesFromFilm(rFilm, &rScene) == 0)
+        ErrorExit("Unable to trace ray from film to scene for thick lens "
                   "approximation. Is aperture stop extremely small?");
     ComputeCardinalPoints(rFilm, rScene, &pz[1], &fz[1]);
 }
@@ -1218,7 +1275,7 @@ Float RealisticCamera::FocusThickLens(Float focusDistance) {
     Float z = -focusDistance;
     Float c = (pz[1] - z - pz[0]) * (pz[1] - z - 4 * f - pz[0]);
     if (c <= 0)
-        LOG_FATAL("Coefficient must be positive. It looks focusDistance %f "
+        ErrorExit("Coefficient must be positive. It looks focusDistance %f "
                   " is too short for a given lenses configuration",
                   focusDistance);
     Float delta = 0.5f * (pz[1] - z + pz[0] - std::sqrt(c));
@@ -1248,7 +1305,7 @@ Float RealisticCamera::FocusBinarySearch(Float focusDistance) {
 
 Float RealisticCamera::FocusDistance(Float filmDistance) {
     // Find offset ray from film center through lens
-    Bounds2f bounds = BoundExitPupil(0, .001 * film.Diagonal());
+    Bounds2f bounds = BoundExitPupil(0, .001 * FilmDiagonal());
 
     const pstd::array<Float, 3> scaleFactors = {0.1f, 0.01f, 0.001f};
     Float lu = 0.0f;
@@ -1351,7 +1408,7 @@ void RealisticCamera::RenderExitPupil(Float sx, Float sy, const char *filename) 
 }
 
 void RealisticCamera::TestExitPupilBounds() const {
-    Float filmDiagonal = film.Diagonal();
+    Float filmDiagonal = FilmDiagonal();
 
     static RNG rng;
 
@@ -1403,12 +1460,12 @@ std::string RealisticCamera::ToString() const {
                         exitPupilBounds);
 }
 
-RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
-                                         const CameraTransform &worldFromCamera,
+RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
+                                         const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
@@ -1416,10 +1473,11 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
     }
 
     // Realistic camera-specific parameters
-    std::string lensFile = ResolveFilename(dict.GetOneString("lensfile", ""));
-    Float apertureDiameter = dict.GetOneFloat("aperturediameter", 1.0);
-    Float focusDistance = dict.GetOneFloat("focusdistance", 10.0);
-    Float dispersionFactor = dict.GetOneFloat("dispersionfactor", 0.);
+    std::string lensFile = ResolveFilename(parameters.GetOneString("lensfile", ""));
+    Float apertureDiameter = parameters.GetOneFloat("aperturediameter", 1.0);
+    Float focusDistance = parameters.GetOneFloat("focusdistance", 10.0);
+    Float dispersionFactor = parameters.GetOneFloat("dispersionfactor", 0.);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
 
     if (lensFile.empty()) {
         Error(loc, "No lens description file supplied!");
@@ -1439,9 +1497,125 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
         return nullptr;
     }
 
+    int builtinRes = 256;
+    auto rasterize = [&](pstd::span<const Point2f> vert) {
+        Image image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                    nullptr, alloc);
+
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x) {
+                Point2f p(-1 + 2 * (x + 0.5f) / image.Resolution().x,
+                           -1 + 2 * (y + 0.5f) / image.Resolution().y);
+                int windingNumber = 0;
+                // Test against edges
+                for (int i = 0; i < vert.size(); ++i) {
+                    int i1 = (i + 1) % vert.size();
+                    Float e = (p[0] - vert[i][0]) * (vert[i1][1] - vert[i][1]) -
+                        (p[1] - vert[i][1]) * (vert[i1][0] - vert[i][0]);
+                    if (vert[i].y <= p.y) {
+                        if (vert[i1].y > p.y && e > 0)
+                            ++windingNumber;
+                    } else if (vert[i1].y <= p.y && e < 0)
+                        --windingNumber;
+                }
+
+                image.SetChannel({x, y}, 0, windingNumber == 0 ? 0.f : 1.f);
+            }
+
+        return image;
+    };
+
+    std::string apertureName = ResolveFilename(parameters.GetOneString("aperture", ""));
+    pstd::optional<Image> apertureImage;
+    if (!apertureName.empty()) {
+        // built-in diaphragm shapes
+        if (apertureName == "gaussian") {
+            apertureImage = Image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                                  nullptr, alloc);
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x) {
+                    Point2f uv(-1 + 2 * (x + 0.5f) / apertureImage->Resolution().x,
+                               -1 + 2 * (y + 0.5f) / apertureImage->Resolution().y);
+                    Float r2 = Sqr(uv.x) + Sqr(uv.y);
+                    Float sigma2 = 1;
+                    Float v = std::max<Float>(0, std::exp(-r2 / sigma2) - std::exp(-1 / sigma2));
+                    apertureImage->SetChannel({x, y}, 0, v);
+                }
+        } else if (apertureName == "square") {
+            apertureImage = Image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
+                                  nullptr, alloc);
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    apertureImage->SetChannel({x, y}, 0, 1.f);
+        } else if (apertureName == "pentagon") {
+            // https://mathworld.wolfram.com/RegularPentagon.html
+            Float c1 = (std::sqrt(5.f) - 1) / 4;
+            Float c2 = (std::sqrt(5.f) + 1) / 4;
+            Float s1 = std::sqrt(10.f + 2.f * std::sqrt(5.f)) / 4;
+            Float s2 = std::sqrt(10.f - 2.f * std::sqrt(5.f)) / 4;
+            // Vertices in CW order.
+            Point2f vert[5] = { Point2f(0, 1), {s1, c1}, {s2, -c2}, {-s2, -c2}, {-s1, c1} };
+            // Scale down slightly
+            for (int i = 0; i < 5; ++i)
+                vert[i] *= .8f;
+            apertureImage = rasterize(vert);
+        } else if (apertureName == "star") {
+            // 5-sided. Vertices are two pentagons--inner and outer radius
+            pstd::array<Point2f, 10> vert;
+            for (int i = 0; i < 10; ++i) {
+                // inner radius: https://math.stackexchange.com/a/2136996
+                Float r = (i & 1) ? 1.f :
+                    (std::cos(Radians(72.f)) / std::cos(Radians(36.f)));
+                vert[i] = Point2f(r * std::cos(Pi * i / 5.f),
+                                  r * std::sin(Pi * i / 5.f));
+            }
+            std::reverse(vert.begin(), vert.end());
+            apertureImage = rasterize(vert);
+        } else {
+            auto im = Image::Read(apertureName, alloc);
+            if (im) {
+                apertureImage = std::move(im->image);
+                if (apertureImage->NChannels() > 1) {
+                    pstd::optional<ImageChannelDesc> rgbDesc =
+                        apertureImage->GetChannelDesc({"R", "G", "B"});
+                    if (!rgbDesc)
+                        ErrorExit("%s: didn't find R, G, B channels to average for "
+                                  "aperture image.", apertureName);
+
+                    Image mono(PixelFormat::Float, apertureImage->Resolution(), {"Y"},
+                               nullptr, alloc);
+                    for (int y = 0; y < mono.Resolution().y; ++y)
+                        for (int x = 0; x < mono.Resolution().x; ++x) {
+                            Float avg = apertureImage->GetChannels({x, y}, *rgbDesc).Average();
+                            mono.SetChannel({x, y}, 0, avg);
+                        }
+
+                    apertureImage = std::move(mono);
+                }
+            }
+        }
+
+        if (apertureImage) {
+            // Normalize it so that brightness matches a circular aperture
+            Float sum = 0;
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    sum += apertureImage->GetChannel({x, y}, 0);
+            Float avg = sum / (apertureImage->Resolution().x *
+                               apertureImage->Resolution().y);
+
+            Float scale = (Pi / 4) / avg;
+            for (int y = 0; y < apertureImage->Resolution().y; ++y)
+                for (int x = 0; x < apertureImage->Resolution().x; ++x)
+                    apertureImage->SetChannel({x, y}, 0,
+                                              apertureImage->GetChannel({x, y}, 0) * scale);
+        }
+    }
+
     return alloc.new_object<RealisticCamera>(
-        worldFromCamera, shutteropen, shutterclose, apertureDiameter, focusDistance,
-        dispersionFactor, *lensData, film, medium, alloc);
+        cameraTransform, shutteropen, shutterclose, apertureDiameter, focusDistance,
+        dispersionFactor, *lensData, scale, film, medium, std::move(apertureImage),
+        alloc);
 }
 
 }  // namespace pbrt

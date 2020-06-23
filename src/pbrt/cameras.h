@@ -19,6 +19,7 @@
 #include <pbrt/interaction.h>
 #include <pbrt/ray.h>
 #include <pbrt/samplers.h>
+#include <pbrt/util/image.h>
 #include <pbrt/util/scattering.h>
 
 #include <memory>
@@ -26,6 +27,71 @@
 #include <vector>
 
 namespace pbrt {
+
+class CameraTransform {
+  public:
+    CameraTransform() = default;
+    explicit CameraTransform(const AnimatedTransform &worldFromCamera);
+
+    PBRT_CPU_GPU
+    bool CameraFromRenderHasScale() const {
+        return renderFromCamera.HasScale();
+    }
+
+    PBRT_CPU_GPU
+    Point3f RenderFromCamera(const Point3f &p, Float time) const {
+        return renderFromCamera(p, time);
+    }
+
+    PBRT_CPU_GPU
+    Vector3f RenderFromCamera(const Vector3f &v, Float time) const {
+        return renderFromCamera(v, time);
+    }
+
+    PBRT_CPU_GPU
+    Ray RenderFromCamera(const Ray &r) const { return renderFromCamera(r); }
+
+    PBRT_CPU_GPU
+    RayDifferential RenderFromCamera(const RayDifferential &r) const {
+        return renderFromCamera(r);
+    }
+
+    PBRT_CPU_GPU
+    Point3f CameraFromRender(const Point3f &p, Float time) const {
+        return renderFromCamera.ApplyInverse(p, time);
+    }
+
+    PBRT_CPU_GPU
+    Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+        return renderFromCamera.ApplyInverse(v, time);
+    }
+
+    PBRT_CPU_GPU
+    Point3f RenderFromWorld(const Point3f &p) const {
+        return worldFromRender.ApplyInverse(p);
+    }
+
+    PBRT_CPU_GPU
+    Transform RenderFromWorld() const {
+        return Inverse(worldFromRender);
+    }
+
+    PBRT_CPU_GPU
+    Transform CameraFromRender(Float time) const {
+        return Inverse(renderFromCamera.Interpolate(time));
+    }
+
+    PBRT_CPU_GPU
+    Transform CameraFromWorld(Float time) const {
+        return Inverse(worldFromRender * renderFromCamera.Interpolate(time));
+    }
+
+    std::string ToString() const;
+
+private:
+    AnimatedTransform renderFromCamera;
+    Transform worldFromRender;
+};
 
 class CameraWiSample {
   public:
@@ -64,49 +130,52 @@ class CameraBase {
         return Lerp(u, shutterOpen, shutterClose);
     }
 
-    PBRT_CPU_GPU inline const CameraTransform &WorldFromCamera() const {
-        return worldFromCamera;
+    PBRT_CPU_GPU inline
+    const CameraTransform &GetCameraTransform() const {
+        return cameraTransform;
     }
 
     void InitMetadata(ImageMetadata *metadata) const;
 
   protected:
     // Camera Public Data
-    CameraTransform worldFromCamera;
+    CameraTransform cameraTransform;
     Float shutterOpen, shutterClose;
     FilmHandle film;
     MediumHandle medium;
 
     PBRT_CPU_GPU
-    Ray WorldFromCamera(const Ray &r) const { return worldFromCamera.rotation(r); }
-
-    PBRT_CPU_GPU
-    RayDifferential WorldFromCamera(const RayDifferential &r) const {
-        return worldFromCamera.rotation(r);
+    Ray RenderFromCamera(const Ray &r) const {
+        return cameraTransform.RenderFromCamera(r);
     }
 
     PBRT_CPU_GPU
-    Vector3f WorldFromCamera(const Vector3f &v, Float time) const {
-        return worldFromCamera.rotation(v, time);
+    RayDifferential RenderFromCamera(const RayDifferential &r) const {
+        return cameraTransform.RenderFromCamera(r);
     }
 
     PBRT_CPU_GPU
-    Point3f WorldFromCamera(const Point3f &p, Float time) const {
-        return worldFromCamera.rotation(p, time);
+    Vector3f RenderFromCamera(const Vector3f &v, Float time) const {
+        return cameraTransform.RenderFromCamera(v, time);
     }
 
     PBRT_CPU_GPU
-    Vector3f CameraFromWorld(const Vector3f &v, Float time) const {
-        return worldFromCamera.rotation.ApplyInverse(v, time);
+    Point3f RenderFromCamera(const Point3f &p, Float time) const {
+        return cameraTransform.RenderFromCamera(p, time);
     }
 
     PBRT_CPU_GPU
-    Point3f CameraFromWorld(const Point3f &p, Float time) const {
-        return worldFromCamera.rotation.ApplyInverse(p, time);
+    Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+        return cameraTransform.CameraFromRender(v, time);
+    }
+
+    PBRT_CPU_GPU
+    Point3f CameraFromRender(const Point3f &p, Float time) const {
+        return cameraTransform.CameraFromRender(p, time);
     }
 
     CameraBase() = default;
-    CameraBase(const CameraTransform &worldFromCamera, Float shutterOpen,
+    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
                Float shutterClose, FilmHandle film, MediumHandle medium);
 
     PBRT_CPU_GPU
@@ -126,7 +195,7 @@ class CameraBase {
 class ProjectiveCamera : public CameraBase {
   public:
     // ProjectiveCamera Public Methods
-    ProjectiveCamera(const CameraTransform &worldFromCamera,
+    ProjectiveCamera(const CameraTransform &cameraTransform,
                      const Transform &screenFromCamera, const Bounds2f &screenWindow,
                      Float shutterOpen, Float shutterClose, Float lensRadius,
                      Float focalDistance, FilmHandle film, MediumHandle medium);
@@ -146,11 +215,11 @@ class ProjectiveCamera : public CameraBase {
 class OrthographicCamera : public ProjectiveCamera {
   public:
     // OrthographicCamera Public Methods
-    OrthographicCamera(const CameraTransform &worldFromCamera,
+    OrthographicCamera(const CameraTransform &cameraTransform,
                        const Bounds2f &screenWindow, Float shutterOpen,
                        Float shutterClose, Float lensRadius, Float focalDistance,
                        FilmHandle film, MediumHandle medium)
-        : ProjectiveCamera(worldFromCamera, Orthographic(0, 1), screenWindow, shutterOpen,
+        : ProjectiveCamera(cameraTransform, Orthographic(0, 1), screenWindow, shutterOpen,
                            shutterClose, lensRadius, focalDistance, film, medium) {
         // Compute differential changes in origin for orthographic camera rays
         dxCamera = cameraFromRaster(Vector3f(1, 0, 0));
@@ -162,7 +231,7 @@ class OrthographicCamera : public ProjectiveCamera {
         // FindMinimumDifferentials();
     }
     static OrthographicCamera *Create(const ParameterDictionary &parameters,
-                                      const CameraTransform &worldFromCamera,
+                                      const CameraTransform &cameraTransform,
                                       FilmHandle film, MediumHandle medium,
                                       const FileLoc *loc, Allocator alloc = {});
 
@@ -205,13 +274,13 @@ class PerspectiveCamera : public ProjectiveCamera {
   public:
     PerspectiveCamera() = default;
     // PerspectiveCamera Public Methods
-    PerspectiveCamera(const CameraTransform &worldFromCamera,
+    PerspectiveCamera(const CameraTransform &cameraTransform,
                       const Bounds2f &screenWindow, Float shutterOpen, Float shutterClose,
                       Float lensRadius, Float focalDistance, Float fov, FilmHandle film,
                       MediumHandle medium);
 
     static PerspectiveCamera *Create(const ParameterDictionary &parameters,
-                                     const CameraTransform &worldFromCamera,
+                                     const CameraTransform &cameraTransform,
                                      FilmHandle film, MediumHandle medium,
                                      const FileLoc *loc, Allocator alloc = {});
 
@@ -248,16 +317,16 @@ class SphericalCamera : public CameraBase {
     enum Mapping { EquiRect, EquiArea };
 
     // SphericalCamera Public Methods
-    SphericalCamera(const CameraTransform &worldFromCamera, Float shutterOpen,
+    SphericalCamera(const CameraTransform &cameraTransform, Float shutterOpen,
                     Float shutterClose, FilmHandle film, MediumHandle medium,
                     Mapping mapping)
-        : CameraBase(worldFromCamera, shutterOpen, shutterClose, film, medium),
+        : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
           mapping(mapping) {
         FindMinimumDifferentials(this);
     }
 
     static SphericalCamera *Create(const ParameterDictionary &parameters,
-                                   const CameraTransform &worldFromCamera,
+                                   const CameraTransform &cameraTransform,
                                    FilmHandle film, MediumHandle medium,
                                    const FileLoc *loc, Allocator alloc = {});
 
@@ -301,13 +370,14 @@ class SphericalCamera : public CameraBase {
 class RealisticCamera : public CameraBase {
   public:
     // RealisticCamera Public Methods
-    RealisticCamera(const CameraTransform &worldFromCamera, Float shutterOpen,
+    RealisticCamera(const CameraTransform &cameraTransform, Float shutterOpen,
                     Float shutterClose, Float apertureDiameter, Float focusDistance,
-                    Float dispersionFactor, std::vector<Float> &lensData, FilmHandle film,
-                    MediumHandle medium, Allocator alloc);
+                    Float dispersionFactor, std::vector<Float> &lensData, Float scale,
+                    FilmHandle film, MediumHandle medium,
+                    pstd::optional<Image> apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
-                                   const CameraTransform &worldFromCamera,
+                                   const CameraTransform &cameraTransform,
                                    FilmHandle film, MediumHandle medium,
                                    const FileLoc *loc, Allocator alloc = {});
 
@@ -355,9 +425,11 @@ class RealisticCamera : public CameraBase {
     };
 
     // RealisticCamera Private Data
+    Float scale;
     Float dispersionFactor;
     pstd::vector<LensElementInterface> elementInterfaces;
     pstd::vector<Bounds2f> exitPupilBounds;
+    pstd::optional<Image> apertureImage;
 
     // RealisticCamera Private Methods
     PBRT_CPU_GPU
@@ -373,7 +445,10 @@ class RealisticCamera : public CameraBase {
     Float RearElementRadius() const { return elementInterfaces.back().apertureRadius; }
 
     PBRT_CPU_GPU
-    bool TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
+    Float FilmDiagonal() const { return film.Diagonal() * scale; }
+
+    PBRT_CPU_GPU
+    Float TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
 
     PBRT_CPU_GPU
     static bool IntersectSphericalElement(Float radius, Float zCenter, const Ray &ray,
@@ -438,8 +513,8 @@ inline Float CameraHandle::SampleTime(Float u) const {
     return Apply<Float>(sample);
 }
 
-inline const CameraTransform &CameraHandle::WorldFromCamera() const {
-    auto wfc = [&](auto ptr) -> const CameraTransform & { return ptr->WorldFromCamera(); };
+inline const CameraTransform &CameraHandle::GetCameraTransform() const {
+    auto wfc = [&](auto ptr) -> const CameraTransform & { return ptr->GetCameraTransform(); };
     return Apply<const CameraTransform &>(wfc);
 }
 

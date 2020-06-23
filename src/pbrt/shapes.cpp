@@ -28,8 +28,8 @@
 namespace pbrt {
 
 // Sphere Method Definitions
-Bounds3f Sphere::CameraWorldBound() const {
-    return (*cameraWorldFromObject)(
+Bounds3f Sphere::Bounds() const {
+    return (*renderFromObject)(
         Bounds3f(Point3f(-radius, -radius, zMin), Point3f(radius, radius, zMax)));
 }
 
@@ -38,9 +38,9 @@ pstd::optional<ShapeSample> Sphere::Sample(const Point2f &u) const {
     // Reproject _pObj_ to sphere surface and compute _pObjError_
     pObj *= radius / Distance(pObj, Point3f(0, 0, 0));
     Vector3f pObjError = gamma(5) * Abs((Vector3f)pObj);
-    Point3fi pi = (*cameraWorldFromObject)(Point3fi(pObj, pObjError));
+    Point3fi pi = (*renderFromObject)(Point3fi(pObj, pObjError));
 
-    Normal3f n = Normalize((*cameraWorldFromObject)(Normal3f(pObj.x, pObj.y, pObj.z)));
+    Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, pObj.z)));
     if (reverseOrientation)
         n *= -1;
 
@@ -48,7 +48,7 @@ pstd::optional<ShapeSample> Sphere::Sample(const Point2f &u) const {
 }
 
 Float Sphere::SolidAngle(const Point3f &p, int nSamples) const {
-    Point3f pCenter = (*cameraWorldFromObject)(Point3f(0, 0, 0));
+    Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
     if (DistanceSquared(p, pCenter) <= radius * radius)
         return 4 * Pi;
 
@@ -62,86 +62,86 @@ Float Sphere::SolidAngle(const Point3f &p, int nSamples) const {
 }
 
 std::string Sphere::ToString() const {
-    return StringPrintf("[ Sphere cameraWorldFromObject: %s "
-                        "objectFromCameraWorld: %s reverseOrientation: %s "
+    return StringPrintf("[ Sphere renderFromObject: %s "
+                        "objectFromRender: %s reverseOrientation: %s "
                         "transformSwapsHandedness: %s radius: %f zMin: %f "
                         "zMax: %f thetaMin: %f "
                         "thetaMax: %f phiMax: %f ]",
-                        *cameraWorldFromObject, *objectFromCameraWorld,
+                        *renderFromObject, *objectFromRender,
                         reverseOrientation, transformSwapsHandedness, radius, zMin, zMax,
                         thetaMin, thetaMax, phiMax);
 }
 
-Sphere *Sphere::Create(const Transform *cameraWorldFromObject,
-                       const Transform *objectFromCameraWorld, bool reverseOrientation,
-                       const ParameterDictionary &dict, const FileLoc *loc,
+Sphere *Sphere::Create(const Transform *renderFromObject,
+                       const Transform *objectFromRender, bool reverseOrientation,
+                       const ParameterDictionary &parameters, const FileLoc *loc,
                        Allocator alloc) {
-    Float radius = dict.GetOneFloat("radius", 1.f);
-    Float zmin = dict.GetOneFloat("zmin", -radius);
-    Float zmax = dict.GetOneFloat("zmax", radius);
-    Float phimax = dict.GetOneFloat("phimax", 360.f);
-    return alloc.new_object<Sphere>(cameraWorldFromObject, objectFromCameraWorld,
+    Float radius = parameters.GetOneFloat("radius", 1.f);
+    Float zmin = parameters.GetOneFloat("zmin", -radius);
+    Float zmax = parameters.GetOneFloat("zmax", radius);
+    Float phimax = parameters.GetOneFloat("phimax", 360.f);
+    return alloc.new_object<Sphere>(renderFromObject, objectFromRender,
                                     reverseOrientation, radius, zmin, zmax, phimax);
 }
 
 // Disk Method Definitions
-Bounds3f Disk::CameraWorldBound() const {
-    return (*cameraWorldFromObject)(
+Bounds3f Disk::Bounds() const {
+    return (*renderFromObject)(
         Bounds3f(Point3f(-radius, -radius, height), Point3f(radius, radius, height)));
 }
 
 DirectionCone Disk::NormalBounds() const {
-    Normal3f n = (*cameraWorldFromObject)(Normal3f(0, 0, 1));
+    Normal3f n = (*renderFromObject)(Normal3f(0, 0, 1));
     return DirectionCone(Vector3f(n));
 }
 
 std::string Disk::ToString() const {
     return StringPrintf(
-        "[ Disk cameraWorldFromObject: %s objectFromCameraWorld: %s "
+        "[ Disk renderFromObject: %s objectFromRender: %s "
         "reverseOrientation: %s "
         "transformSwapsHandedness: %s height: %f radius: %f innerRadius: %f "
         "phiMax: %f ]",
-        *cameraWorldFromObject, *objectFromCameraWorld, reverseOrientation,
+        *renderFromObject, *objectFromRender, reverseOrientation,
         transformSwapsHandedness, height, radius, innerRadius, phiMax);
 }
 
-Disk *Disk::Create(const Transform *cameraWorldFromObject,
-                   const Transform *objectFromCameraWorld, bool reverseOrientation,
-                   const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
-    Float height = dict.GetOneFloat("height", 0.);
-    Float radius = dict.GetOneFloat("radius", 1);
-    Float innerRadius = dict.GetOneFloat("innerradius", 0);
-    Float phimax = dict.GetOneFloat("phimax", 360);
-    return alloc.new_object<Disk>(cameraWorldFromObject, objectFromCameraWorld,
+Disk *Disk::Create(const Transform *renderFromObject,
+                   const Transform *objectFromRender, bool reverseOrientation,
+                   const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    Float height = parameters.GetOneFloat("height", 0.);
+    Float radius = parameters.GetOneFloat("radius", 1);
+    Float innerRadius = parameters.GetOneFloat("innerradius", 0);
+    Float phimax = parameters.GetOneFloat("phimax", 360);
+    return alloc.new_object<Disk>(renderFromObject, objectFromRender,
                                   reverseOrientation, height, radius, innerRadius,
                                   phimax);
 }
 
 // Cylinder Method Definitions
-Bounds3f Cylinder::CameraWorldBound() const {
-    return (*cameraWorldFromObject)(
+Bounds3f Cylinder::Bounds() const {
+    return (*renderFromObject)(
         Bounds3f(Point3f(-radius, -radius, zMin), Point3f(radius, radius, zMax)));
 }
 
 std::string Cylinder::ToString() const {
-    return StringPrintf("[ Cylinder cameraWorldFromObject: %s objectFromCameraWorld: %s "
+    return StringPrintf("[ Cylinder renderFromObject: %s objectFromRender: %s "
                         "reverseOrientation: %s "
                         "transformSwapsHandedness: %s radius: %f zMin: %f zMax: %f "
                         "phiMax: %f ]",
-                        *cameraWorldFromObject, *objectFromCameraWorld,
+                        *renderFromObject, *objectFromRender,
                         reverseOrientation, transformSwapsHandedness, radius, zMin, zMax,
                         phiMax);
 }
 
-Cylinder *Cylinder::Create(const Transform *cameraWorldFromObject,
-                           const Transform *objectFromCameraWorld,
-                           bool reverseOrientation, const ParameterDictionary &dict,
+Cylinder *Cylinder::Create(const Transform *renderFromObject,
+                           const Transform *objectFromRender,
+                           bool reverseOrientation, const ParameterDictionary &parameters,
                            const FileLoc *loc, Allocator alloc) {
-    Float radius = dict.GetOneFloat("radius", 1);
-    Float zmin = dict.GetOneFloat("zmin", -1);
-    Float zmax = dict.GetOneFloat("zmax", 1);
-    Float phimax = dict.GetOneFloat("phimax", 360);
-    return alloc.new_object<Cylinder>(cameraWorldFromObject, objectFromCameraWorld,
+    Float radius = parameters.GetOneFloat("radius", 1);
+    Float zmin = parameters.GetOneFloat("zmin", -1);
+    Float zmax = parameters.GetOneFloat("zmax", 1);
+    Float phimax = parameters.GetOneFloat("phimax", 360);
+    return alloc.new_object<Cylinder>(renderFromObject, objectFromRender,
                                       reverseOrientation, radius, zmin, zmax, phimax);
 }
 
@@ -184,7 +184,7 @@ pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
     return tris;
 }
 
-Bounds3f Triangle::CameraWorldBound() const {
+Bounds3f Triangle::Bounds() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
     auto mesh = GetMesh();
     const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -383,13 +383,13 @@ std::string Triangle::ToString() const {
                         meshIndex, triIndex, p0, p1, p2);
 }
 
-TriangleMesh *Triangle::CreateMesh(const Transform *cameraWorldFromObject,
+TriangleMesh *Triangle::CreateMesh(const Transform *renderFromObject,
                                    bool reverseOrientation,
-                                   const ParameterDictionary &dict, const FileLoc *loc,
+                                   const ParameterDictionary &parameters, const FileLoc *loc,
                                    Allocator alloc) {
-    std::vector<int> vi = dict.GetIntArray("indices");
-    std::vector<Point3f> P = dict.GetPoint3fArray("P");
-    std::vector<Point2f> uvs = dict.GetPoint2fArray("uv");
+    std::vector<int> vi = parameters.GetIntArray("indices");
+    std::vector<Point3f> P = parameters.GetPoint3fArray("P");
+    std::vector<Point2f> uvs = parameters.GetPoint2fArray("uv");
 
     if (vi.empty()) {
         if (P.size() == 3)
@@ -419,13 +419,13 @@ TriangleMesh *Triangle::CreateMesh(const Transform *cameraWorldFromObject,
         uvs = {};
     }
 
-    std::vector<Vector3f> S = dict.GetVector3fArray("S");
+    std::vector<Vector3f> S = parameters.GetVector3fArray("S");
     if (!S.empty() && S.size() != P.size()) {
         Error(loc, "Number of \"S\"s for triangle mesh must match \"P\"s. "
                    "Discarding \"S\"s.");
         S = {};
     }
-    std::vector<Normal3f> N = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> N = parameters.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error(loc, "Number of \"N\"s for triangle mesh must match \"P\"s. "
                    "Discarding \"N\"s.");
@@ -441,7 +441,7 @@ TriangleMesh *Triangle::CreateMesh(const Transform *cameraWorldFromObject,
             return {};
         }
 
-    std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
+    std::vector<int> faceIndices = parameters.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
         Error(loc,
               "Number of face indices %d does not match number of triangles %d. "
@@ -451,7 +451,7 @@ TriangleMesh *Triangle::CreateMesh(const Transform *cameraWorldFromObject,
     }
 
     return alloc.new_object<TriangleMesh>(
-        *cameraWorldFromObject, reverseOrientation, std::move(vi), std::move(P),
+        *renderFromObject, reverseOrientation, std::move(vi), std::move(P),
         std::move(S), std::move(N), std::move(uvs), std::move(faceIndices));
 }
 
@@ -477,13 +477,13 @@ std::string ToString(CurveType type) {
 
 CurveCommon::CurveCommon(pstd::span<const Point3f> c, Float width0, Float width1,
                          CurveType type, pstd::span<const Normal3f> norm,
-                         const Transform *cameraWorldFromObject,
-                         const Transform *objectFromCameraWorld, bool reverseOrientation)
+                         const Transform *renderFromObject,
+                         const Transform *objectFromRender, bool reverseOrientation)
     : type(type),
-      cameraWorldFromObject(cameraWorldFromObject),
-      objectFromCameraWorld(objectFromCameraWorld),
+      renderFromObject(renderFromObject),
+      objectFromRender(objectFromRender),
       reverseOrientation(reverseOrientation),
-      transformSwapsHandedness(cameraWorldFromObject->SwapsHandedness()) {
+      transformSwapsHandedness(renderFromObject->SwapsHandedness()) {
     width[0] = width0;
     width[1] = width1;
     CHECK_EQ(c.size(), 4);
@@ -501,23 +501,23 @@ CurveCommon::CurveCommon(pstd::span<const Point3f> c, Float width0, Float width1
 std::string CurveCommon::ToString() const {
     return StringPrintf(
         "[ CurveCommon type: %s cpObj: %s width: %s n: %s normalAngle: %f "
-        "invSinNormalAngle: %f cameraWorldFromObject: %s "
-        "objectFromCameraWorld: %s "
+        "invSinNormalAngle: %f renderFromObject: %s "
+        "objectFromRender: %s "
         "reverseOrientation: %s transformSwapsHandedness: %s ]",
         type, pstd::MakeSpan(cpObj), pstd::MakeSpan(width), pstd::MakeSpan(n),
-        normalAngle, invSinNormalAngle, *cameraWorldFromObject, *objectFromCameraWorld,
+        normalAngle, invSinNormalAngle, *renderFromObject, *objectFromRender,
         reverseOrientation, transformSwapsHandedness);
 }
 
-pstd::vector<ShapeHandle> CreateCurve(const Transform *cameraWorldFromObject,
-                                      const Transform *objectFromCameraWorld,
+pstd::vector<ShapeHandle> CreateCurve(const Transform *renderFromObject,
+                                      const Transform *objectFromRender,
                                       bool reverseOrientation,
                                       pstd::span<const Point3f> c, Float w0, Float w1,
                                       CurveType type, pstd::span<const Normal3f> norm,
                                       int splitDepth, Allocator alloc) {
     CurveCommon *common =
-        alloc.new_object<CurveCommon>(c, w0, w1, type, norm, cameraWorldFromObject,
-                                      objectFromCameraWorld, reverseOrientation);
+        alloc.new_object<CurveCommon>(c, w0, w1, type, norm, renderFromObject,
+                                      objectFromRender, reverseOrientation);
 
     const int nSegments = 1 << splitDepth;
     pstd::vector<ShapeHandle> segments(nSegments, alloc);
@@ -534,12 +534,12 @@ pstd::vector<ShapeHandle> CreateCurve(const Transform *cameraWorldFromObject,
     return segments;
 }
 
-Bounds3f Curve::CameraWorldBound() const {
+Bounds3f Curve::Bounds() const {
     Bounds3f b =
         BoundCubicBezier<Bounds3f>(pstd::MakeConstSpan(common->cpObj), uMin, uMax);
     Float width[2] = {Lerp(uMin, common->width[0], common->width[1]),
                       Lerp(uMax, common->width[0], common->width[1])};
-    return (*common->cameraWorldFromObject)(
+    return (*common->renderFromObject)(
         Expand(b, std::max(width[0], width[1]) * 0.5f));
 }
 
@@ -563,8 +563,8 @@ bool Curve::intersect(const Ray &r, Float tMax,
     ++nCurveTests;
 #endif
     // Transform _Ray_ to object space
-    Point3fi oi = (*common->objectFromCameraWorld)(Point3fi(r.o));
-    Vector3fi di = (*common->objectFromCameraWorld)(Vector3fi(r.d));
+    Point3fi oi = (*common->objectFromRender)(Point3fi(r.o));
+    Vector3fi di = (*common->objectFromRender)(Vector3fi(r.d));
     Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
     // Compute object-space control points for curve segment, _cpObj_
@@ -763,7 +763,7 @@ bool Curve::recursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
             }
             Point3f pHit = ray(tHit);
             Point3fi pe(pHit, pError);
-            *si = {{(*common->cameraWorldFromObject)(SurfaceInteraction(
+            *si = {{(*common->renderFromObject)(SurfaceInteraction(
                         pe, Point2f(u, v), -ray.d, dpdu, dpdv, Normal3f(0, 0, 0),
                         Normal3f(0, 0, 0), ray.time,
                         OrientationIsReversed() ^ TransformSwapsHandedness())),
@@ -813,23 +813,23 @@ std::string Curve::ToString() const {
     return StringPrintf("[ Curve common: %s uMin: %f uMax: %f ]", *common, uMin, uMax);
 }
 
-pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
-                                        const Transform *objectFromCameraWorld,
+pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
+                                        const Transform *objectFromRender,
                                         bool reverseOrientation,
-                                        const ParameterDictionary &dict,
+                                        const ParameterDictionary &parameters,
                                         const FileLoc *loc, Allocator alloc) {
-    Float width = dict.GetOneFloat("width", 1.f);
-    Float width0 = dict.GetOneFloat("width0", width);
-    Float width1 = dict.GetOneFloat("width1", width);
+    Float width = parameters.GetOneFloat("width", 1.f);
+    Float width0 = parameters.GetOneFloat("width0", width);
+    Float width1 = parameters.GetOneFloat("width1", width);
 
-    int degree = dict.GetOneInt("degree", 3);
+    int degree = parameters.GetOneInt("degree", 3);
     if (degree != 2 && degree != 3) {
         Error(loc, "Invalid degree %d: only degree 2 and 3 curves are supported.",
               degree);
         return {};
     }
 
-    std::string basis = dict.GetOneString("basis", "bezier");
+    std::string basis = parameters.GetOneString("basis", "bezier");
     if (basis != "bezier" && basis != "bspline") {
         Error(loc,
               "Invalid basis \"%s\": only \"bezier\" and \"bspline\" are "
@@ -839,7 +839,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
     }
 
     int nSegments;
-    std::vector<Point3f> cp = dict.GetPoint3fArray("P");
+    std::vector<Point3f> cp = parameters.GetPoint3fArray("P");
     if (basis == "bezier") {
         // After the first segment, which uses degree+1 control points,
         // subsequent segments reuse the last control point of the previous
@@ -864,7 +864,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
     }
 
     CurveType type;
-    std::string curveType = dict.GetOneString("type", "flat");
+    std::string curveType = parameters.GetOneString("type", "flat");
     if (curveType == "flat")
         type = CurveType::Flat;
     else if (curveType == "ribbon")
@@ -876,7 +876,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
         type = CurveType::Cylinder;
     }
 
-    std::vector<Normal3f> n = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> n = parameters.GetNormal3fArray("N");
     if (!n.empty()) {
         if (type != CurveType::Ribbon) {
             Warning("Curve normals are only used with \"ribbon\" type curves.");
@@ -895,7 +895,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
         return {};
     }
 
-    int sd = dict.GetOneInt("splitdepth", 3);
+    int sd = parameters.GetOneInt("splitdepth", 3);
 
     if (type == CurveType::Ribbon && n.empty()) {
         Error(loc, "Must provide normals \"N\" at curve endpoints with ribbon "
@@ -943,7 +943,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *cameraWorldFromObject,
         if (!n.empty())
             nspan = pstd::MakeSpan(&n[seg], 2);
         auto c =
-            CreateCurve(cameraWorldFromObject, objectFromCameraWorld, reverseOrientation,
+            CreateCurve(renderFromObject, objectFromRender, reverseOrientation,
                         segCpBezier, Lerp(Float(seg) / Float(nSegments), width0, width1),
                         Lerp(Float(seg + 1) / Float(nSegments), width0, width1), type,
                         nspan, sd, alloc);
@@ -960,13 +960,13 @@ std::string BilinearIntersection::ToString() const {
     return StringPrintf("[ BilinearIntersection uv: %s t: %f", uv, t);
 }
 
-BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *cameraWorldFromObject,
+BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
                                              bool reverseOrientation,
-                                             const ParameterDictionary &dict,
+                                             const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
-    std::vector<int> vertexIndices = dict.GetIntArray("indices");
-    std::vector<Point3f> P = dict.GetPoint3fArray("P");
-    std::vector<Point2f> uv = dict.GetPoint2fArray("uv");
+    std::vector<int> vertexIndices = parameters.GetIntArray("indices");
+    std::vector<Point3f> P = parameters.GetPoint3fArray("P");
+    std::vector<Point2f> uv = parameters.GetPoint2fArray("uv");
 
     if (vertexIndices.empty()) {
         if (P.size() == 4)
@@ -998,7 +998,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *cameraWorldFromObj
         uv = {};
     }
 
-    std::vector<Normal3f> N = dict.GetNormal3fArray("N");
+    std::vector<Normal3f> N = parameters.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
         Error(loc, "Number of \"N\"s for bilinear patch mesh must match \"P\"s. "
                    "Discarding \"N\"s.");
@@ -1015,7 +1015,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *cameraWorldFromObj
             return {};
         }
 
-    std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
+    std::vector<int> faceIndices = parameters.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vertexIndices.size() / 4) {
         Error(loc,
               "Number of face indices %d does not match number of bilinear "
@@ -1028,7 +1028,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *cameraWorldFromObj
     // Grab this before the vertexIndices are std::moved...
     size_t nBlps = vertexIndices.size() / 4;
 
-    std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    std::string filename = ResolveFilename(parameters.GetOneString("imagefile", ""));
     PiecewiseConstant2D *imageDist = nullptr;
     if (!filename.empty()) {
         auto im = Image::Read(filename, alloc);
@@ -1039,7 +1039,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *cameraWorldFromObj
     }
 
     return alloc.new_object<BilinearPatchMesh>(
-        *cameraWorldFromObject, reverseOrientation, std::move(vertexIndices),
+        *renderFromObject, reverseOrientation, std::move(vertexIndices),
         std::move(P), std::move(N), std::move(uv), std::move(faceIndices), imageDist);
 }
 
@@ -1115,7 +1115,7 @@ BilinearPatch::BilinearPatch(int meshIndex, int blpIndex)
     }
 }
 
-Bounds3f BilinearPatch::CameraWorldBound() const {
+Bounds3f BilinearPatch::Bounds() const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     auto mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1392,7 +1392,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     return pdf / Length(Cross(dpdu, dpdv));
 }
 
-Float BilinearPatch::SolidAngle(const Point3f &pref) const {
+Float BilinearPatch::SolidAngle(const Point3f &pref, int /*nSamples: unused...*/) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     auto mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1448,48 +1448,49 @@ STAT_COUNTER("Geometry/Cylinders", nCylinders);
 STAT_COUNTER("Geometry/Disks", nDisks);
 
 pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
-                                              const Transform *cameraWorldFromObject,
-                                              const Transform *objectFromCameraWorld,
+                                              const Transform *renderFromObject,
+                                              const Transform *objectFromRender,
                                               bool reverseOrientation,
-                                              const ParameterDictionary &dict,
+                                              const ParameterDictionary &parameters,
                                               const FileLoc *loc, Allocator alloc) {
     pstd::vector<ShapeHandle> shapes(alloc);
     if (name == "sphere") {
-        shapes = {Sphere::Create(cameraWorldFromObject, objectFromCameraWorld,
-                                 reverseOrientation, dict, loc, alloc)};
+        shapes = {Sphere::Create(renderFromObject, objectFromRender,
+                                 reverseOrientation, parameters, loc, alloc)};
         ++nSpheres;
     }
     // Create remaining single _Shape_ types
     else if (name == "cylinder") {
-        shapes = {Cylinder::Create(cameraWorldFromObject, objectFromCameraWorld,
-                                   reverseOrientation, dict, loc, alloc)};
+        shapes = {Cylinder::Create(renderFromObject, objectFromRender,
+                                   reverseOrientation, parameters, loc, alloc)};
         ++nCylinders;
     } else if (name == "disk") {
-        shapes = {Disk::Create(cameraWorldFromObject, objectFromCameraWorld,
-                               reverseOrientation, dict, loc, alloc)};
+        shapes = {Disk::Create(renderFromObject, objectFromRender,
+                               reverseOrientation, parameters, loc, alloc)};
         ++nDisks;
     } else if (name == "bilinearmesh") {
         BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(
-            cameraWorldFromObject, reverseOrientation, dict, loc, alloc);
+            renderFromObject, reverseOrientation, parameters, loc, alloc);
         shapes = BilinearPatch::CreatePatches(mesh, alloc);
     }
     // Create multiple-_Shape_ types
     else if (name == "curve")
-        shapes = Curve::Create(cameraWorldFromObject, objectFromCameraWorld,
-                               reverseOrientation, dict, loc, alloc);
+        shapes = Curve::Create(renderFromObject, objectFromRender,
+                               reverseOrientation, parameters, loc, alloc);
     else if (name == "trianglemesh") {
-        TriangleMesh *mesh = Triangle::CreateMesh(cameraWorldFromObject,
-                                                  reverseOrientation, dict, loc, alloc);
+        TriangleMesh *mesh = Triangle::CreateMesh(renderFromObject,
+                                                  reverseOrientation, parameters, loc,
+                                                  alloc);
         shapes = Triangle::CreateTriangles(mesh, alloc);
     } else if (name == "plymesh") {
-        std::string filename = ResolveFilename(dict.GetOneString("plyfile", ""));
+        std::string filename = ResolveFilename(parameters.GetOneString("plyfile", ""));
         pstd::optional<TriQuadMesh> plyMesh = TriQuadMesh::ReadPLY(filename);
         if (!plyMesh)
             return {};
 
         if (!plyMesh->triIndices.empty()) {
             TriangleMesh *mesh = alloc.new_object<TriangleMesh>(
-                *cameraWorldFromObject, reverseOrientation, plyMesh->triIndices,
+                *renderFromObject, reverseOrientation, plyMesh->triIndices,
                 plyMesh->p, std::vector<Vector3f>(), plyMesh->n, plyMesh->uv,
                 plyMesh->faceIndices);
             shapes = Triangle::CreateTriangles(mesh, alloc);
@@ -1497,7 +1498,7 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
 
         if (!plyMesh->quadIndices.empty()) {
             BilinearPatchMesh *mesh = alloc.new_object<BilinearPatchMesh>(
-                *cameraWorldFromObject, reverseOrientation, plyMesh->quadIndices,
+                *renderFromObject, reverseOrientation, plyMesh->quadIndices,
                 plyMesh->p, plyMesh->n, plyMesh->uv, plyMesh->faceIndices,
                 nullptr /* image dist */);
             pstd::vector<ShapeHandle> quadMesh =
@@ -1505,20 +1506,20 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
             shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
         }
     } else if (name == "loopsubdiv") {
-        int nLevels = dict.GetOneInt("levels", 3);
-        std::vector<int> vertexIndices = dict.GetIntArray("indices");
+        int nLevels = parameters.GetOneInt("levels", 3);
+        std::vector<int> vertexIndices = parameters.GetIntArray("indices");
         if (vertexIndices.empty())
             ErrorExit(loc, "Vertex indices \"indices\" not provided for "
                            "LoopSubdiv shape.");
 
-        std::vector<Point3f> P = dict.GetPoint3fArray("P");
+        std::vector<Point3f> P = parameters.GetPoint3fArray("P");
         if (P.empty())
             ErrorExit(loc, "Vertex positions \"P\" not provided for LoopSubdiv shape.");
 
         // don't actually use this for now...
-        std::string scheme = dict.GetOneString("scheme", "loop");
+        std::string scheme = parameters.GetOneString("scheme", "loop");
 
-        TriangleMesh *mesh = LoopSubdivide(cameraWorldFromObject, reverseOrientation,
+        TriangleMesh *mesh = LoopSubdivide(renderFromObject, reverseOrientation,
                                            nLevels, vertexIndices, P, alloc);
 
         shapes = Triangle::CreateTriangles(mesh, alloc);
@@ -1535,22 +1536,8 @@ std::string ShapeHandle::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->ToString();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->ToString();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->ToString();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->ToString();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->ToString();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->ToString();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto tostr = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(tostr);
 }
 
 // Shape Method Definitions

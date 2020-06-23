@@ -39,75 +39,18 @@ std::string SpectrumHandle::ToString() const {
     if (!ptr())
         return "(nullptr)";
 
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return Cast<BlackbodySpectrum>()->ToString();
-    case TypeIndex<ConstantSpectrum>():
-        return Cast<ConstantSpectrum>()->ToString();
-    case TypeIndex<ProductSpectrum>():
-        return Cast<ProductSpectrum>()->ToString();
-    case TypeIndex<ScaledSpectrum>():
-        return Cast<ScaledSpectrum>()->ToString();
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return Cast<PiecewiseLinearSpectrum>()->ToString();
-    case TypeIndex<DenselySampledSpectrum>():
-        return Cast<DenselySampledSpectrum>()->ToString();
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return Cast<RGBReflectanceSpectrum>()->ToString();
-    case TypeIndex<RGBSpectrum>():
-        return Cast<RGBSpectrum>()->ToString();
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto tostr = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(tostr);
 }
 
 std::string SpectrumHandle::ParameterType() const {
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return Cast<BlackbodySpectrum>()->ParameterType();
-    case TypeIndex<ConstantSpectrum>():
-        return Cast<ConstantSpectrum>()->ParameterType();
-    case TypeIndex<ProductSpectrum>():
-        return Cast<ProductSpectrum>()->ParameterType();
-    case TypeIndex<ScaledSpectrum>():
-        return Cast<ScaledSpectrum>()->ParameterType();
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return Cast<PiecewiseLinearSpectrum>()->ParameterType();
-    case TypeIndex<DenselySampledSpectrum>():
-        return Cast<DenselySampledSpectrum>()->ParameterType();
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return Cast<RGBReflectanceSpectrum>()->ParameterType();
-    case TypeIndex<RGBSpectrum>():
-        return Cast<RGBSpectrum>()->ParameterType();
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto pt = [&](auto ptr) { return ptr->ParameterType(); };
+    return ApplyCPU<std::string>(pt);
 }
 
 std::string SpectrumHandle::ParameterString() const {
-    switch (Tag()) {
-    case TypeIndex<BlackbodySpectrum>():
-        return Cast<BlackbodySpectrum>()->ParameterString();
-    case TypeIndex<ConstantSpectrum>():
-        return Cast<ConstantSpectrum>()->ParameterString();
-    case TypeIndex<ProductSpectrum>():
-        return Cast<ProductSpectrum>()->ParameterString();
-    case TypeIndex<ScaledSpectrum>():
-        return Cast<ScaledSpectrum>()->ParameterString();
-    case TypeIndex<PiecewiseLinearSpectrum>():
-        return Cast<PiecewiseLinearSpectrum>()->ParameterString();
-    case TypeIndex<DenselySampledSpectrum>():
-        return Cast<DenselySampledSpectrum>()->ParameterString();
-    case TypeIndex<RGBReflectanceSpectrum>():
-        return Cast<RGBReflectanceSpectrum>()->ParameterString();
-    case TypeIndex<RGBSpectrum>():
-        return Cast<RGBSpectrum>()->ParameterString();
-    default:
-        LOG_FATAL("Unhandled Spectrum type %d", Tag());
-        return {};
-    }
+    auto ps = [&](auto ptr) { return ptr->ParameterString(); };
+    return ApplyCPU<std::string>(ps);
 }
 
 Float SpectrumToY(SpectrumHandle s) {
@@ -204,15 +147,8 @@ pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &
     }
 }
 
-SampledSpectrum BlackbodySpectrum::Sample(const SampledWavelengths &lambda) const {
-    SampledSpectrum s;
-    for (int i = 0; i < NSpectrumSamples; ++i)
-        s[i] = scale * Blackbody(lambda[i], T);
-    return s;
-}
-
 std::string BlackbodySpectrum::ToString() const {
-    return StringPrintf("[ BlackbodySpectrum %f ]", T);
+    return StringPrintf("[ BlackbodySpectrum T: %f scale: %f ]", T, scale);
 }
 
 std::string BlackbodySpectrum::ParameterType() const {
@@ -220,7 +156,7 @@ std::string BlackbodySpectrum::ParameterType() const {
 }
 
 std::string BlackbodySpectrum::ParameterString() const {
-    return StringPrintf("%f", T);
+    return StringPrintf("%f %f", T, scale);
 }
 
 SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
@@ -228,7 +164,7 @@ SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
 }
 
 std::string ConstantSpectrum::ToString() const {
-    return StringPrintf("[ ConstantSpectrum %f ]", c);
+    return StringPrintf("[ ConstantSpectrum c: %f ]", c);
 }
 
 std::string ConstantSpectrum::ParameterType() const {

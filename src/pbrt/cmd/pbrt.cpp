@@ -59,6 +59,8 @@ Rendering options:
   --quick                      Automatically reduce a number of quality settings
                                to render more quickly.
   --quiet                      Suppress all text output other than error messages.
+  --render-coord-sys <name>    Coordinate system to use for the scene when rendering,
+                               where name is "camera", "cameraworld", or "world".
   --seed <n>                   Set random number generator seed. Default: 0.
   --spp <n>                    Override number of pixel samples specified in scene
                                description file.
@@ -85,6 +87,7 @@ int main(int argc, char *argv[]) {
     ExtendedOptions options;
     LogConfig logConfig;
     std::string logLevel = "error";
+    std::string renderCoordSys = "cameraworld";
     std::vector<std::string> filenames;
     bool format = false, toPly = false, gpu = false;
 
@@ -148,6 +151,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "pixelstats", &options.recordPixelStatistics, onError) ||
             ParseArg(&argv, "quick", &options.quickRender, onError) ||
             ParseArg(&argv, "quiet", &options.quiet, onError) ||
+            ParseArg(&argv, "render-coord-sys", &renderCoordSys, onError) ||
             ParseArg(&argv, "seed", &options.seed, onError) ||
             ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
             ParseArg(&argv, "toply", &toPly, onError) ||
@@ -181,6 +185,15 @@ int main(int argc, char *argv[]) {
         printf("See the file LICENSE.txt for the conditions of the license.\n");
         fflush(stdout);
     }
+
+    if (renderCoordSys == "camera")
+        options.renderingSpace = RenderingCoordinateSystem::Camera;
+    else if (renderCoordSys == "cameraworld")
+        options.renderingSpace = RenderingCoordinateSystem::CameraWorld;
+    else if (renderCoordSys == "world")
+        options.renderingSpace = RenderingCoordinateSystem::World;
+    else
+        ErrorExit("%s: unknown rendering coordinate system.", renderCoordSys);
 
     if (options.mseReferenceImage && !options.mseReferenceOutput)
         ErrorExit("Must provide MSE reference output filename via "

@@ -239,13 +239,6 @@ ENDIF ()
 INCLUDE (CheckCXXSourceCompiles)
 INCLUDE (CheckCXXSourceRuns)
 
-CHECK_CXX_SOURCE_COMPILES (
-  "int main() { float x = 0x1p-32f; }"
-  HAVE_HEX_FP_CONSTANTS )
-IF ( HAVE_HEX_FP_CONSTANTS )
-  ADD_DEFINITIONS ( -D PBRT_HAVE_HEX_FP_CONSTANTS )
-ENDIF ()
-
 CHECK_CXX_SOURCE_COMPILES ( "
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -743,6 +736,7 @@ SET ( PBRT_TEST_SOURCE
   src/pbrt/util/sampling_test.cpp
   src/pbrt/util/spectrum_test.cpp
   src/pbrt/util/splines_test.cpp
+  src/pbrt/util/taggedptr_test.cpp
   src/pbrt/util/transform_test.cpp
   src/pbrt/util/vecmath_test.cpp
   )

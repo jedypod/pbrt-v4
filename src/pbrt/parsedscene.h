@@ -7,7 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/camera.h>
+#include <pbrt/cameras.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
@@ -55,19 +55,19 @@ struct TransformedSceneEntity : public SceneEntity {
 struct CameraSceneEntity : public SceneEntity {
     CameraSceneEntity() = default;
     CameraSceneEntity(const std::string &name, ParameterDictionary parameters,
-                      FileLoc loc, const CameraTransform &worldFromCamera,
+                      FileLoc loc, const CameraTransform &cameraTransform,
                       const std::string &medium)
         : SceneEntity(name, parameters, loc),
-          worldFromCamera(worldFromCamera),
+          cameraTransform(cameraTransform),
           medium(medium) {}
 
     std::string ToString() const {
         return StringPrintf("[ CameraSeneEntity name: %s parameters: %s loc: %s "
-                            "worldFromCamera: %s medium: %s ]",
-                            name, parameters, loc, worldFromCamera, medium);
+                            "cameraTransform: %s medium: %s ]",
+                            name, parameters, loc, cameraTransform, medium);
     }
 
-    CameraTransform worldFromCamera;
+    CameraTransform cameraTransform;
     std::string medium;
 };
 
@@ -355,13 +355,13 @@ class ParsedScene : public SceneRepresentation {
         // I believe that this GetMatrix() is related to precision: we get
         // a more accurate inverse if we re-invert from scratch than to
         // take the accumulated inverse...
-        return pbrt::Transform((cameraFromWorldT * curTransform[index]).GetMatrix());
+        return pbrt::Transform((renderFromWorld * curTransform[index]).GetMatrix());
     }
 
     bool CTMIsAnimated() const { return curTransform.IsAnimated(); }
 
     Float transformStartTime = 0, transformEndTime = 1;
-    class Transform cameraFromWorldT;
+    class Transform renderFromWorld;
     InstanceDefinitionSceneEntity *currentInstance = nullptr;
 
     class GraphicsState;

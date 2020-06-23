@@ -52,13 +52,10 @@ class Integrator {
     virtual void Render() = 0;
     virtual std::string ToString() const = 0;
 
-    const Bounds3f &CameraWorldBound() const { return cameraWorldBound; }
+    const Bounds3f &SceneBounds() const { return sceneBounds; }
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
                                                 Float tMax = Infinity) const;
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
-    pstd::optional<ShapeIntersection> IntersectTr(Ray ray, Float tMax, RNG &rng,
-                                                  const SampledWavelengths &lambda,
-                                                  SampledSpectrum *transmittance) const;
 
     bool Unoccluded(const Interaction &p0, const Interaction &p1) const {
         return !IntersectP(p0.SpawnRayTo(p1), 1 - ShadowEpsilon);
@@ -77,16 +74,16 @@ class Integrator {
         : lights(std::move(l)), aggregate(aggregate) {
         // Scene Constructor Implementation
         if (aggregate)
-            cameraWorldBound = aggregate.CameraWorldBound();
+            sceneBounds = aggregate.Bounds();
         for (auto &light : lights) {
-            light.Preprocess(cameraWorldBound);
+            light.Preprocess(sceneBounds);
             if (light.Type() == LightType::Infinite)
                 infiniteLights.push_back(light);
         }
     }
 
     PrimitiveHandle aggregate;
-    Bounds3f cameraWorldBound;
+    Bounds3f sceneBounds;
 };
 
 class ImageTileIntegrator : public Integrator {

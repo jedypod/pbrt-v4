@@ -84,7 +84,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
 
     MediumHandle cameraMedium = findMedium(scene.camera.medium, &scene.camera.loc);
     camera = CameraHandle::Create(scene.camera.name, scene.camera.parameters,
-                                  cameraMedium, scene.camera.worldFromCamera, film,
+                                  cameraMedium, scene.camera.cameraTransform, film,
                                   &scene.camera.loc, alloc);
 
     maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
@@ -94,7 +94,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
             MediumHandle outsideMedium = findMedium(light.medium, &light.loc);
             LightHandle l = LightHandle::Create(
                 light.name, light.parameters, light.worldFromObject,
-                scene.camera.worldFromCamera, outsideMedium, &light.loc, alloc);
+                scene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
             if (l.Is<UniformInfiniteLight>() || l.Is<ImageInfiniteLight>()) {
                 if (envLight)
                     Warning(&light.loc,
@@ -147,7 +147,10 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
     for (LightHandle light : allLights)
         light.Preprocess(accel->Bounds());
 
-    if (allLights.size() == 0)
+    bool haveLights = !lights.empty();
+    for (const auto &m : media)
+        haveLights |= m.second.IsEmissive();
+    if (!haveLights)
         ErrorExit("No light sources specified");
 
     std::string lightSamplerName =

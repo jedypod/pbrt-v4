@@ -455,4 +455,29 @@ pstd::optional<TriQuadMesh> TriQuadMesh::ReadPLY(const std::string &filename) {
     return mesh;
 }
 
+void TriQuadMesh::ConvertToOnlyTriangles() {
+    if (quadIndices.empty())
+        return;
+
+    triIndices.reserve(triIndices.size() + 3 * quadIndices.size() / 2);
+
+    for (size_t i = 0; i < quadIndices.size(); i += 4) {
+        triIndices.push_back(quadIndices[i]);  // 0, 1, 2 of original
+        triIndices.push_back(quadIndices[i + 1]);
+        triIndices.push_back(quadIndices[i + 3]);
+
+        triIndices.push_back(quadIndices[i]);  // 0, 2, 3 of original
+        triIndices.push_back(quadIndices[i + 3]);
+        triIndices.push_back(quadIndices[i + 2]);
+    }
+
+    quadIndices.clear();
+}
+
+std::string TriQuadMesh::ToString() const {
+    return StringPrintf("[ TriQuadMesh p: %s n: %s uv: %s faceIndices: %s triIndices: %s "
+                        "quadIndices: %s ]", p, n, uv, faceIndices, triIndices,
+                        quadIndices);
+}
+
 }  // namespace pbrt

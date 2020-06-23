@@ -52,12 +52,12 @@ struct QuadricIntersection {
 class alignas(8) Sphere {
   public:
     // Sphere Public Methods
-    Sphere(const Transform *cameraWorldFromObject, const Transform *objectFromCameraWorld,
+    Sphere(const Transform *renderFromObject, const Transform *objectFromRender,
            bool reverseOrientation, Float radius, Float zMin, Float zMax, Float phiMax)
-        : cameraWorldFromObject(cameraWorldFromObject),
-          objectFromCameraWorld(objectFromCameraWorld),
+        : renderFromObject(renderFromObject),
+          objectFromRender(objectFromRender),
           reverseOrientation(reverseOrientation),
-          transformSwapsHandedness(cameraWorldFromObject->SwapsHandedness()),
+          transformSwapsHandedness(renderFromObject->SwapsHandedness()),
           radius(radius),
           zMin(Clamp(std::min(zMin, zMax), -radius, radius)),
           zMax(Clamp(std::max(zMin, zMax), -radius, radius)),
@@ -65,8 +65,8 @@ class alignas(8) Sphere {
           thetaMax(std::acos(Clamp(std::max(zMin, zMax) / radius, -1, 1))),
           phiMax(Radians(Clamp(phiMax, 0, 360))) {}
 
-    static Sphere *Create(const Transform *cameraWorldFromObject,
-                          const Transform *objectFromCameraWorld, bool reverseOrientation,
+    static Sphere *Create(const Transform *renderFromObject,
+                          const Transform *objectFromRender, bool reverseOrientation,
                           const ParameterDictionary &parameters, const FileLoc *loc,
                           Allocator alloc);
 
@@ -75,8 +75,8 @@ class alignas(8) Sphere {
         Float phi;
         Point3f pHit;
         // Transform _Ray_ to object space
-        Point3fi oi = (*objectFromCameraWorld)(Point3fi(r.o));
-        Vector3fi di = (*objectFromCameraWorld)(Vector3fi(r.d));
+        Point3fi oi = (*objectFromRender)(Point3fi(r.o));
+        Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
         Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
         // Compute quadratic sphere coefficients
@@ -180,14 +180,14 @@ class alignas(8) Sphere {
         Vector3f pError = gamma(5) * Abs((Vector3f)pHit);
 
         // Initialize _SurfaceInteraction_ from parametric information
-        return (*cameraWorldFromObject)(
+        return (*renderFromObject)(
             SurfaceInteraction(Point3fi(pHit, pError), Point2f(u, v),
-                               (*objectFromCameraWorld)(wo), dpdu, dpdv, dndu, dndv, time,
+                               (*objectFromRender)(wo), dpdu, dpdv, dndu, dndv, time,
                                OrientationIsReversed() ^ TransformSwapsHandedness()));
     }
 
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
 
     PBRT_CPU_GPU
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
@@ -216,7 +216,7 @@ class alignas(8) Sphere {
 
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const Interaction &ref, const Point2f &u) const {
-        Point3f pCenter = (*cameraWorldFromObject)(Point3f(0, 0, 0));
+        Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
 
         // Sample uniformly on sphere if $\pt{}$ is inside it
         Point3f pOrigin = ref.OffsetRayOrigin(pCenter);
@@ -274,12 +274,12 @@ class alignas(8) Sphere {
         Float phi = u[1] * 2 * Pi;
 
         // Compute surface normal and sampled point on sphere
-        Vector3f nWorld =
+        Vector3f nRender =
             samplingFrame.FromLocal(SphericalDirection(sinAlpha, cosAlpha, phi));
-        Point3f pWorld = pCenter + radius * Point3f(nWorld.x, nWorld.y, nWorld.z);
-        Vector3f pError = gamma(5) * Abs((Vector3f)pWorld);
-        Point3fi pi(pWorld, pError);
-        Normal3f n(nWorld);
+        Point3f pRender = pCenter + radius * Point3f(nRender.x, nRender.y, nRender.z);
+        Vector3f pError = gamma(5) * Abs((Vector3f)pRender);
+        Point3fi pi(pRender, pError);
+        Normal3f n(nRender);
         if (reverseOrientation)
             n *= -1;
 
@@ -294,7 +294,7 @@ class alignas(8) Sphere {
 
     PBRT_CPU_GPU
     Float PDF(const Interaction &ref, const Vector3f &wi) const {
-        Point3f pCenter = (*cameraWorldFromObject)(Point3f(0, 0, 0));
+        Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
         // Return uniform PDF if point is inside sphere
         Point3f pOrigin = ref.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
@@ -406,7 +406,7 @@ class alignas(8) Sphere {
     Float zMin, zMax;
     Float thetaMin, thetaMax, phiMax;
 
-    const Transform *cameraWorldFromObject, *objectFromCameraWorld;
+    const Transform *renderFromObject, *objectFromRender;
     bool reverseOrientation;
     bool transformSwapsHandedness;
 };
@@ -415,31 +415,31 @@ class alignas(8) Sphere {
 class alignas(8) Disk {
   public:
     // Disk Public Methods
-    Disk(const Transform *cameraWorldFromObject, const Transform *objectFromCameraWorld,
+    Disk(const Transform *renderFromObject, const Transform *objectFromRender,
          bool reverseOrientation, Float height, Float radius, Float innerRadius,
          Float phiMax)
-        : cameraWorldFromObject(cameraWorldFromObject),
-          objectFromCameraWorld(objectFromCameraWorld),
+        : renderFromObject(renderFromObject),
+          objectFromRender(objectFromRender),
           reverseOrientation(reverseOrientation),
-          transformSwapsHandedness(cameraWorldFromObject->SwapsHandedness()),
+          transformSwapsHandedness(renderFromObject->SwapsHandedness()),
           height(height),
           radius(radius),
           innerRadius(innerRadius),
           phiMax(Radians(Clamp(phiMax, 0, 360))) {}
 
-    static Disk *Create(const Transform *cameraWorldFromObject,
-                        const Transform *objectFromCameraWorld, bool reverseOrientation,
+    static Disk *Create(const Transform *renderFromObject,
+                        const Transform *objectFromRender, bool reverseOrientation,
                         const ParameterDictionary &parameters, const FileLoc *loc,
                         Allocator alloc);
 
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
 
     PBRT_CPU_GPU
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
         // Transform _Ray_ to object space
-        Point3fi oi = (*objectFromCameraWorld)(Point3fi(r.o));
-        Vector3fi di = (*objectFromCameraWorld)(Vector3fi(r.d));
+        Point3fi oi = (*objectFromRender)(Point3fi(r.o));
+        Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
         Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
         // Compute plane intersection for disk
@@ -489,9 +489,9 @@ class alignas(8) Disk {
         Vector3f pError(0, 0, 0);
 
         // Initialize _SurfaceInteraction_ from parametric information
-        return (*cameraWorldFromObject)(
+        return (*renderFromObject)(
             SurfaceInteraction(Point3fi(pHit, pError), Point2f(u, v),
-                               (*objectFromCameraWorld)(wo), dpdu, dpdv, dndu, dndv, time,
+                               (*objectFromRender)(wo), dpdu, dpdv, dndu, dndv, time,
                                OrientationIsReversed() ^ TransformSwapsHandedness()));
     }
 
@@ -520,8 +520,8 @@ class alignas(8) Disk {
     pstd::optional<ShapeSample> Sample(const Point2f &u) const {
         Point2f pd = SampleUniformDiskConcentric(u);
         Point3f pObj(pd.x * radius, pd.y * radius, height);
-        Point3fi pi = (*cameraWorldFromObject)(Point3fi(pObj));
-        Normal3f n = Normalize((*cameraWorldFromObject)(Normal3f(0, 0, 1)));
+        Point3fi pi = (*renderFromObject)(Point3fi(pObj));
+        Normal3f n = Normalize((*renderFromObject)(Normal3f(0, 0, 1)));
         if (reverseOrientation)
             n *= -1;
 
@@ -584,7 +584,7 @@ class alignas(8) Disk {
 
   private:
     // Disk Private Data
-    const Transform *cameraWorldFromObject, *objectFromCameraWorld;
+    const Transform *renderFromObject, *objectFromRender;
     bool reverseOrientation;
     bool transformSwapsHandedness;
 
@@ -595,34 +595,34 @@ class alignas(8) Disk {
 class alignas(8) Cylinder {
   public:
     // Cylinder Public Methods
-    Cylinder(const Transform *cameraWorldFromObject,
-             const Transform *objectFromCameraWorld, bool reverseOrientation,
+    Cylinder(const Transform *renderFromObject,
+             const Transform *objectFromRender, bool reverseOrientation,
              Float radius, Float zMin, Float zMax, Float phiMax)
-        : cameraWorldFromObject(cameraWorldFromObject),
-          objectFromCameraWorld(objectFromCameraWorld),
+        : renderFromObject(renderFromObject),
+          objectFromRender(objectFromRender),
           reverseOrientation(reverseOrientation),
-          transformSwapsHandedness(cameraWorldFromObject->SwapsHandedness()),
+          transformSwapsHandedness(renderFromObject->SwapsHandedness()),
           radius(radius),
           zMin(std::min(zMin, zMax)),
           zMax(std::max(zMin, zMax)),
           phiMax(Radians(Clamp(phiMax, 0, 360))) {}
 
-    static Cylinder *Create(const Transform *cameraWorldFromObject,
-                            const Transform *objectFromCameraWorld,
+    static Cylinder *Create(const Transform *renderFromObject,
+                            const Transform *objectFromRender,
                             bool reverseOrientation,
                             const ParameterDictionary &parameters, const FileLoc *loc,
                             Allocator alloc);
 
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
 
     PBRT_CPU_GPU
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
         Float phi;
         Point3f pHit;
         // Transform _Ray_ to object space
-        Point3fi oi = (*objectFromCameraWorld)(Point3fi(r.o));
-        Vector3fi di = (*objectFromCameraWorld)(Vector3fi(r.d));
+        Point3fi oi = (*objectFromRender)(Point3fi(r.o));
+        Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
         Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
         // Compute quadratic cylinder coefficients
@@ -716,8 +716,8 @@ class alignas(8) Cylinder {
         Point3fi pHitError(pHit, pError);
 
         // Initialize _SurfaceInteraction_ from parametric information
-        return (*cameraWorldFromObject)(SurfaceInteraction(
-            pHitError, Point2f(u, v), (*objectFromCameraWorld)(wo), dpdu, dpdv, dndu,
+        return (*renderFromObject)(SurfaceInteraction(
+            pHitError, Point2f(u, v), (*objectFromRender)(wo), dpdu, dpdv, dndu,
             dndv, time, OrientationIsReversed() ^ TransformSwapsHandedness()));
     }
 
@@ -750,9 +750,9 @@ class alignas(8) Cylinder {
         pObj.x *= radius / hitRad;
         pObj.y *= radius / hitRad;
         Vector3f pObjError = gamma(3) * Abs(Vector3f(pObj.x, pObj.y, 0));
-        Point3fi pi = (*cameraWorldFromObject)(Point3fi(pObj, pObjError));
+        Point3fi pi = (*renderFromObject)(Point3fi(pObj, pObjError));
 
-        Normal3f n = Normalize((*cameraWorldFromObject)(Normal3f(pObj.x, pObj.y, 0)));
+        Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, 0)));
         if (reverseOrientation)
             n *= -1;
 
@@ -846,7 +846,7 @@ class alignas(8) Cylinder {
     }
 
     // Cylinder Private Data
-    const Transform *cameraWorldFromObject, *objectFromCameraWorld;
+    const Transform *renderFromObject, *objectFromRender;
     bool reverseOrientation;
     bool transformSwapsHandedness;
 
@@ -875,7 +875,7 @@ class alignas(8) Triangle {
     static void Init(Allocator alloc);
 
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
 
     PBRT_CPU_GPU
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
@@ -983,6 +983,7 @@ class alignas(8) Triangle {
                                       std::max<Float>(0.01, AbsDot(rnf, wi[0])),
                                       std::max<Float>(0.01, AbsDot(rnf, wi[2]))};
             u = SampleBilinear(u, w);
+            DCHECK(u[0] >= 0 && u[0] < 1 && u[1] >= 0 && u[1] < 1);
             pdf *= BilinearPDF(u, w);
         }
         Float triPDF;
@@ -1063,7 +1064,7 @@ class alignas(8) Triangle {
     // Returns the solid angle subtended by the triangle w.r.t. the given
     // reference point p.
     PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p) const {
+    Float SolidAngle(const Point3f &p, int = 0 /*nSamples: unused...*/) const {
         // Project the vertices into the unit sphere around p.
         auto mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -1091,13 +1092,13 @@ class alignas(8) Triangle {
     PBRT_CPU_GPU
     static pstd::optional<SurfaceInteraction> InteractionFromIntersection(
         const TriangleMesh *mesh, int triIndex, pstd::array<Float, 3> b, Float time,
-        const Vector3f &wo, pstd::optional<Transform> worldFromInstance = {}) {
+        const Vector3f &wo, pstd::optional<Transform> renderFromInstance = {}) {
         const int *v = &mesh->vertexIndices[3 * triIndex];
         Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
-        if (worldFromInstance) {
-            p0 = (*worldFromInstance)(p0);
-            p1 = (*worldFromInstance)(p1);
-            p2 = (*worldFromInstance)(p2);
+        if (renderFromInstance) {
+            p0 = (*renderFromInstance)(p0);
+            p1 = (*renderFromInstance)(p1);
+            p2 = (*renderFromInstance)(p2);
         }
         // Compute triangle partial derivatives
         Vector3f dpdu, dpdv;
@@ -1161,8 +1162,8 @@ class alignas(8) Triangle {
             Normal3f ns;
             if (mesh->n != nullptr) {
                 ns = (b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] + b[2] * mesh->n[v[2]]);
-                if (worldFromInstance)
-                    ns = (*worldFromInstance)(ns);
+                if (renderFromInstance)
+                    ns = (*renderFromInstance)(ns);
 
                 if (LengthSquared(ns) > 0)
                     ns = Normalize(ns);
@@ -1175,8 +1176,8 @@ class alignas(8) Triangle {
             Vector3f ss;
             if (mesh->s != nullptr) {
                 ss = (b[0] * mesh->s[v[0]] + b[1] * mesh->s[v[1]] + b[2] * mesh->s[v[2]]);
-                if (worldFromInstance)
-                    ss = (*worldFromInstance)(ss);
+                if (renderFromInstance)
+                    ss = (*renderFromInstance)(ss);
 
                 if (LengthSquared(ss) == 0)
                     ss = isect.dpdu;
@@ -1198,9 +1199,9 @@ class alignas(8) Triangle {
                 Vector2f duv12 = triuv[1] - triuv[2];
                 Normal3f dn1 = mesh->n[v[0]] - mesh->n[v[2]];
                 Normal3f dn2 = mesh->n[v[1]] - mesh->n[v[2]];
-                if (worldFromInstance) {
-                    dn1 = (*worldFromInstance)(dn1);
-                    dn2 = (*worldFromInstance)(dn2);
+                if (renderFromInstance) {
+                    dn1 = (*renderFromInstance)(dn1);
+                    dn2 = (*renderFromInstance)(dn2);
                 }
 
                 Float determinant =
@@ -1215,8 +1216,8 @@ class alignas(8) Triangle {
                     // parameterizations are still reasonable.
                     Vector3f dn = Cross(Vector3f(mesh->n[v[2]] - mesh->n[v[0]]),
                                         Vector3f(mesh->n[v[1]] - mesh->n[v[0]]));
-                    if (worldFromInstance)
-                        dn = (*worldFromInstance)(dn);
+                    if (renderFromInstance)
+                        dn = (*renderFromInstance)(dn);
 
                     if (LengthSquared(dn) == 0)
                         dndu = dndv = Normal3f(0, 0, 0);
@@ -1241,7 +1242,7 @@ class alignas(8) Triangle {
 
     std::string ToString() const;
 
-    static TriangleMesh *CreateMesh(const Transform *cameraWorldFromObject,
+    static TriangleMesh *CreateMesh(const Transform *renderFromObject,
                                     bool reverseOrientation,
                                     const ParameterDictionary &parameters,
                                     const FileLoc *loc, Allocator alloc);
@@ -1285,8 +1286,8 @@ std::string ToString(CurveType type);
 // CurveCommon Declarations
 struct CurveCommon {
     CurveCommon(pstd::span<const Point3f> c, Float w0, Float w1, CurveType type,
-                pstd::span<const Normal3f> norm, const Transform *cameraWorldFromObject,
-                const Transform *objectFromCameraWorld, bool reverseOrientation);
+                pstd::span<const Normal3f> norm, const Transform *renderFromObject,
+                const Transform *objectFromRender, bool reverseOrientation);
 
     std::string ToString() const;
 
@@ -1295,7 +1296,7 @@ struct CurveCommon {
     Float width[2];
     Normal3f n[2];
     Float normalAngle, invSinNormalAngle;
-    const Transform *cameraWorldFromObject, *objectFromCameraWorld;
+    const Transform *renderFromObject, *objectFromRender;
     bool reverseOrientation, transformSwapsHandedness;
 };
 
@@ -1306,14 +1307,14 @@ class alignas(8) Curve {
     Curve(const CurveCommon *common, Float uMin, Float uMax)
         : common(common), uMin(uMin), uMax(uMax) {}
 
-    static pstd::vector<ShapeHandle> Create(const Transform *cameraWorldFromObject,
-                                            const Transform *objectFromCameraWorld,
+    static pstd::vector<ShapeHandle> Create(const Transform *renderFromObject,
+                                            const Transform *objectFromRender,
                                             bool reverseOrientation,
                                             const ParameterDictionary &parameters,
                                             const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     PBRT_CPU_GPU
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
     PBRT_CPU_GPU
@@ -1378,7 +1379,7 @@ class alignas(8) BilinearPatch {
 
     static void Init(Allocator alloc);
 
-    static BilinearPatchMesh *CreateMesh(const Transform *cameraWorldFromObject,
+    static BilinearPatchMesh *CreateMesh(const Transform *renderFromObject,
                                          bool reverseOrientation,
                                          const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc);
@@ -1389,16 +1390,16 @@ class alignas(8) BilinearPatch {
     PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(
         const BilinearPatchMesh *mesh, int patchIndex, const Point2f &uvHit, Float time,
-        const Vector3f &wo, pstd::optional<Transform> worldFromInstance = {}) {
+        const Vector3f &wo, pstd::optional<Transform> renderFromInstance = {}) {
         const int *v = &mesh->vertexIndices[4 * patchIndex];
         Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]], p01 = mesh->p[v[2]],
                 p11 = mesh->p[v[3]];
 
-        if (worldFromInstance) {
-            p00 = (*worldFromInstance)(p00);
-            p10 = (*worldFromInstance)(p10);
-            p01 = (*worldFromInstance)(p01);
-            p11 = (*worldFromInstance)(p11);
+        if (renderFromInstance) {
+            p00 = (*renderFromInstance)(p00);
+            p10 = (*renderFromInstance)(p10);
+            p01 = (*renderFromInstance)(p01);
+            p11 = (*renderFromInstance)(p11);
         }
 
         Point3f pHit = Lerp(uvHit[0], Lerp(uvHit[1], p00, p01), Lerp(uvHit[1], p10, p11));
@@ -1485,11 +1486,11 @@ class alignas(8) BilinearPatch {
         if (mesh->n != nullptr) {
             Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
                      n11 = mesh->n[v[3]];
-            if (worldFromInstance) {
-                n00 = (*worldFromInstance)(n00);
-                n10 = (*worldFromInstance)(n10);
-                n01 = (*worldFromInstance)(n01);
-                n11 = (*worldFromInstance)(n11);
+            if (renderFromInstance) {
+                n00 = (*renderFromInstance)(n00);
+                n10 = (*renderFromInstance)(n10);
+                n01 = (*renderFromInstance)(n01);
+                n11 = (*renderFromInstance)(n11);
             }
 
             // TODO: should these be computed using normalized normals?
@@ -1502,7 +1503,7 @@ class alignas(8) BilinearPatch {
                 ns = Normalize(ns);
                 Normal3f n = Normal3f(Normalize(isect.n));
                 Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
-                if (LengthSquared(axis) > .0001f) {
+                if (LengthSquared(axis) > 1e-14) {
                     axis = Normalize(axis);
                     // The shading normal is different enough.
                     //
@@ -1517,6 +1518,10 @@ class alignas(8) BilinearPatch {
                     Transform r = Rotate(sinTheta, cosTheta, axis);
                     Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
 
+                    // Gram-Schmidt to ensure that Dot(sdpdu, ns) is
+                    // basically zero.  (Otherwise a CHECK in the Frame
+                    // constructor can end up hitting...)
+                    sdpdu -= Dot(sdpdu, ns) * Vector3f(ns);
                     isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
                 }
             }
@@ -1525,7 +1530,7 @@ class alignas(8) BilinearPatch {
         return isect;
     }
     PBRT_CPU_GPU
-    Bounds3f CameraWorldBound() const;
+    Bounds3f Bounds() const;
     PBRT_CPU_GPU
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
                                                 Float tMax = Infinity) const;
@@ -1544,7 +1549,8 @@ class alignas(8) BilinearPatch {
     Float PDF(const Interaction &) const;
 
     PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p) const;
+    Float SolidAngle(const Point3f &p, int = 0 /*nSamples: unused...*/) const;
+
     PBRT_CPU_GPU
     DirectionCone NormalBounds() const;
 
@@ -1646,234 +1652,66 @@ class alignas(8) BilinearPatch {
     static pstd::vector<const BilinearPatchMesh *> *allMeshes;
 };
 
-inline Bounds3f ShapeHandle::CameraWorldBound() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->CameraWorldBound();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->CameraWorldBound();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+inline Bounds3f ShapeHandle::Bounds() const {
+    auto cwb = [&](auto ptr) { return ptr->Bounds(); };
+    return Apply<Bounds3f>(cwb);
 }
 
 inline pstd::optional<ShapeIntersection> ShapeHandle::Intersect(const Ray &ray,
                                                                 Float tMax) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Intersect(ray, tMax);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Intersect(ray, tMax);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto intr = [&](auto ptr) { return ptr->Intersect(ray, tMax); };
+    return Apply<pstd::optional<ShapeIntersection>>(intr);
 }
 
 inline bool ShapeHandle::IntersectP(const Ray &ray, Float tMax) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->IntersectP(ray, tMax);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->IntersectP(ray, tMax);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto intr = [&](auto ptr) { return ptr->IntersectP(ray, tMax); };
+    return Apply<bool>(intr);
 }
 
 inline Float ShapeHandle::Area() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Area();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Area();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Area();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Area();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Area();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Area();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto area = [&](auto ptr) { return ptr->Area(); };
+    return Apply<Float>(area);
 }
 
 inline pstd::optional<ShapeSample> ShapeHandle::Sample(const Point2f &u) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Sample(u);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Sample(u);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Sample(u);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Sample(u);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Sample(u);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Sample(u);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample(u); };
+    return Apply<pstd::optional<ShapeSample>>(sample);
 }
 
 inline Float ShapeHandle::PDF(const Interaction &in) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->PDF(in);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->PDF(in);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->PDF(in);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->PDF(in);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->PDF(in);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->PDF(in);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto pdf = [&](auto ptr) { return ptr->PDF(in); };
+    return Apply<Float>(pdf);
 }
 
 inline pstd::optional<ShapeSample> ShapeHandle::Sample(const Interaction &ref,
                                                        const Point2f &u) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->Sample(ref, u);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->Sample(ref, u);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sample = [&](auto ptr) { return ptr->Sample(ref, u); };
+    return Apply<pstd::optional<ShapeSample>>(sample);
 }
 
 inline Float ShapeHandle::PDF(const Interaction &ref, const Vector3f &wi) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->PDF(ref, wi);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->PDF(ref, wi);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto pdf = [&](auto ptr) { return ptr->PDF(ref, wi); };
+    return Apply<Float>(pdf);
 }
 
 inline Float ShapeHandle::SolidAngle(const Point3f &p, int nSamples) const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->SolidAngle(p);
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->SolidAngle(p, nSamples);
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->SolidAngle(p, nSamples);
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->SolidAngle(p, nSamples);
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto sa = [&](auto ptr) { return ptr->SolidAngle(p, nSamples); };
+    return Apply<Float>(sa);
 }
 
 inline DirectionCone ShapeHandle::NormalBounds() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->NormalBounds();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->NormalBounds();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->NormalBounds();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->NormalBounds();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->NormalBounds();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->NormalBounds();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto nb = [&](auto ptr) { return ptr->NormalBounds(); };
+    return Apply<DirectionCone>(nb);
 }
 
 inline bool ShapeHandle::OrientationIsReversed() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->OrientationIsReversed();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->OrientationIsReversed();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto oir = [&](auto ptr) { return ptr->OrientationIsReversed(); };
+    return Apply<bool>(oir);
 }
 
 inline bool ShapeHandle::TransformSwapsHandedness() const {
-    if (Tag() == TypeIndex<Triangle>())
-        return Cast<Triangle>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<BilinearPatch>())
-        return Cast<BilinearPatch>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Curve>())
-        return Cast<Curve>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Sphere>())
-        return Cast<Sphere>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Cylinder>())
-        return Cast<Cylinder>()->TransformSwapsHandedness();
-    else if (Tag() == TypeIndex<Disk>())
-        return Cast<Disk>()->TransformSwapsHandedness();
-    else {
-        LOG_FATAL("Unhandled case");
-        return {};
-    }
+    auto tsh = [&](auto ptr) { return ptr->TransformSwapsHandedness(); };
+    return Apply<bool>(tsh);
 }
 
 }  // namespace pbrt

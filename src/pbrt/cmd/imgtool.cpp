@@ -1723,7 +1723,7 @@ int whitebalance(int argc, char *argv[]) {
         }
         ccMatrix = colorSpace->ColorCorrectionMatrixForXYZ(SpectrumToXYZ(illum));
     } else if (temperature > 0) {
-        BlackbodySpectrum bb(temperature);
+        BlackbodySpectrum bb(temperature, 1.f);
         ccMatrix = colorSpace->ColorCorrectionMatrixForXYZ(SpectrumToXYZ(&bb));
     } else
         ccMatrix = colorSpace->ColorCorrectionMatrixForxy(xy[0], xy[1]);
@@ -2123,18 +2123,18 @@ int denoise(int argc, char *argv[]) {
     pstd::optional<ImageChannelDesc> albedoDesc =
         in.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
     checkForChannels(albedoDesc, "Albedo.R,Albedo.G,Albedo.B");
-    pstd::optional<ImageChannelDesc> lVarianceDesc = in.GetChannelDesc({"LVariance"});
-    checkForChannels(lVarianceDesc, "LVariance");
+    pstd::optional<ImageChannelDesc> varianceDesc = in.GetChannelDesc({"rgbVariance"});
+    checkForChannels(varianceDesc, "rgbVariance");
 
     ImageChannelDesc jointDesc = *in.GetChannelDesc({"Pz", "Nx", "Ny", "Nz"});
     ImageChannelValues jointSigmaIndir(4, 1);
     Float xySigmaIndir[2] = {2.f, 2.f};
-    Image filteredLVariance = in.JointBilateralFilter(*lVarianceDesc, 7, xySigmaIndir,
+    Image filteredVariance = in.JointBilateralFilter(*varianceDesc, 7, xySigmaIndir,
                                                       jointDesc, jointSigmaIndir);
 
     int halfWidth = 3;
     int nLevels = 3;
-    Image denoisedImage = denoiseImage(in, *rgbDesc, filteredLVariance, *albedoDesc,
+    Image denoisedImage = denoiseImage(in, *rgbDesc, filteredVariance, *albedoDesc,
                                        *zDesc, *deltaZDesc, *nsDesc, halfWidth, nLevels);
 
     Image result(PixelFormat::Float, in.Resolution(), {"R", "G", "B"});

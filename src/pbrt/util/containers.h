@@ -865,6 +865,83 @@ class TypedIndexSpan {
     pstd::span<S> span;
 };
 
+template <typename T>
+class SampledGrid {
+public:
+    using const_iterator = typename pstd::vector<T>::const_iterator;
+
+    SampledGrid() = default;
+    SampledGrid(Allocator alloc) : values(alloc) { }
+    SampledGrid(pstd::span<const T> v, int nx, int ny, int nz,
+                Allocator alloc)
+        : values(v.begin(), v.end(), alloc), nx(nx), ny(ny), nz(nz) {
+        CHECK_EQ(nx * ny * nz, values.size());
+    }
+
+    size_t BytesAllocated() const { return values.size() * sizeof(T); }
+
+    int xSize() const { return nx; }
+    int ySize() const { return ny; }
+    int zSize() const { return nz; }
+
+    const_iterator begin() const { return values.begin(); }
+    const_iterator end() const { return values.end(); }
+
+    PBRT_CPU_GPU
+    T Lookup(const Point3f &p) const {
+        // Compute voxel coordinates and offsets for _p_
+        Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
+        Point3i pi = (Point3i)Floor(pSamples);
+        Vector3f d = pSamples - (Point3f)pi;
+
+        // Trilinearly interpolate density values to compute local density
+        T d00 = Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
+        T d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)), Lookup(pi + Vector3i(1, 1, 0)));
+        T d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)), Lookup(pi + Vector3i(1, 0, 1)));
+        T d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)), Lookup(pi + Vector3i(1, 1, 1)));
+        T d0 = Lerp(d.y, d00, d10);
+        T d1 = Lerp(d.y, d01, d11);
+        return Lerp(d.z, d0, d1);
+    }
+
+    PBRT_CPU_GPU
+    T Lookup(const Point3i &p) const {
+        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
+        if (!InsideExclusive(p, sampleBounds))
+            return {};
+        return values[(p.z * ny + p.y) * nx + p.x];
+    }
+
+    T MaximumValue(const Bounds3f &bounds) const {
+        Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
+                                 bounds.pMin.z * nz - .5f),
+                         Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
+                                 bounds.pMax.z * nz - .5f)};
+        Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+                         Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
+                             Point3i(nx - 1, ny - 1, nz - 1))};
+
+        T maxValue = Lookup(Point3i(pi[0]));
+        for (int z = pi[0].z; z <= pi[1].z; ++z)
+            for (int y = pi[0].y; y <= pi[1].y; ++y)
+                for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                    using std::max;
+                    maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
+                }
+
+        return maxValue;
+    }
+
+    std::string ToString() const {
+        return StringPrintf("[ SampledGrid nx: %d ny: %d nz: %d values: %s ]", nx, ny, nz,
+                            values);
+    }
+
+private:
+    pstd::vector<T> values;
+    int nx, ny, nz;
+};
+
 }  // namespace pbrt
 
 #endif  // PBRT_CONTAINERS_H

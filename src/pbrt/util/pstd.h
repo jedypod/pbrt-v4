@@ -97,18 +97,18 @@ class optional {
 
     optional() = default;
     PBRT_CPU_GPU
-    optional(const T &v) : set(true) { new (&optionalValue) T(v); }
+    optional(const T &v) : set(true) { new (ptr()) T(v); }
     PBRT_CPU_GPU
-    optional(T &&v) : set(true) { new (&optionalValue) T(std::move(v)); }
+    optional(T &&v) : set(true) { new (ptr()) T(std::move(v)); }
     PBRT_CPU_GPU
     optional(const optional &v) : set(v.has_value()) {
         if (v.has_value())
-            new (&optionalValue) T(v.value());
+            new (ptr()) T(v.value());
     }
     PBRT_CPU_GPU
     optional(optional &&v) : set(v.has_value()) {
         if (v.has_value()) {
-            new (&optionalValue) T(std::move(v.value()));
+            new (ptr()) T(std::move(v.value()));
             v.reset();
         }
     }
@@ -116,14 +116,14 @@ class optional {
     PBRT_CPU_GPU
     optional &operator=(const T &v) {
         reset();
-        new (&optionalValue) T(v);
+        new (ptr()) T(v);
         set = true;
         return *this;
     }
     PBRT_CPU_GPU
     optional &operator=(T &&v) {
         reset();
-        new (&optionalValue) T(std::move(v));
+        new (ptr()) T(std::move(v));
         set = true;
         return *this;
     }
@@ -131,7 +131,7 @@ class optional {
     optional &operator=(const optional &v) {
         reset();
         if (v.has_value()) {
-            new (&optionalValue) T(v.value());
+            new (ptr()) T(v.value());
             set = true;
         }
         return *this;
@@ -140,7 +140,7 @@ class optional {
     optional &operator=(optional &&v) {
         reset();
         if (v.has_value()) {
-            new (&optionalValue) T(std::move(v.value()));
+            new (ptr()) T(std::move(v.value()));
             set = true;
             v.reset();
         }
@@ -167,13 +167,12 @@ class optional {
     PBRT_CPU_GPU
     T &value() {
         CHECK(set);
-        // Note: this and similar need std::launder in C++17, apparently...
-        return *reinterpret_cast<T *>(&optionalValue);
+        return *ptr();
     }
     PBRT_CPU_GPU
     const T &value() const {
         CHECK(set);
-        return *reinterpret_cast<const T *>(&optionalValue);
+        return *ptr();
     }
 
     PBRT_CPU_GPU
@@ -188,6 +187,27 @@ class optional {
     bool has_value() const { return set; }
 
   private:
+#ifdef __NVCC__
+    // Work-around NVCC bug
+    PBRT_CPU_GPU
+    T *ptr() {
+        return reinterpret_cast<T *>(&optionalValue);
+    }
+    PBRT_CPU_GPU
+    const T *ptr() const {
+        return reinterpret_cast<const T *>(&optionalValue);
+    }
+#else
+    PBRT_CPU_GPU
+    T *ptr() {
+        return std::launder(reinterpret_cast<T *>(&optionalValue));
+    }
+    PBRT_CPU_GPU
+    const T *ptr() const {
+        return std::launder(reinterpret_cast<const T *>(&optionalValue));
+    }
+#endif
+
     std::aligned_storage_t<sizeof(T), alignof(T)> optionalValue;
     bool set = false;
 };

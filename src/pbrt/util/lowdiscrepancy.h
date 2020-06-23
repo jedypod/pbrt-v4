@@ -278,13 +278,8 @@ struct NoRandomizer {
 template <typename R>
 PBRT_CPU_GPU inline Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a,
                                                 R randomizer) {
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-    return std::min(randomizer(MultiplyGenerator(C, a)) * Float(2.3283064365386963e-10),
-                    OneMinusEpsilon);
-#else
     return std::min(randomizer(MultiplyGenerator(C, a)) * Float(0x1p-32),
                     OneMinusEpsilon);
-#endif
 }
 
 PBRT_CPU_GPU
@@ -370,11 +365,7 @@ PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomize
                   "\"02sequence.\"");
 
     uint32_t v = randomizer(SobolSampleBits32(a, dimension));
-#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
-    return std::min(v * 2.3283064365386963e-10f /* 1/2^32 */, FloatOneMinusEpsilon);
-#else
     return std::min(v * 0x1p-32f /* 1/2^32 */, FloatOneMinusEpsilon);
-#endif
 }
 
 PBRT_CPU_GPU
