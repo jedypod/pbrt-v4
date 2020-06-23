@@ -946,6 +946,8 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
     SampledSpectrum L(0.f), beta(1.f);
     int numScatters = 0;
 
+    lambda.TerminateSecondaryWavelengths();
+
     while (true) {
     restart:
         // Intersect _ray_ with scene and store intersection in _isect_
@@ -972,9 +974,6 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
                 Float pScatter = sigma_s[0] / mediumSample->sigma_maj;
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
-                // Sample Tmaj samples proportional to Tmaj (assuming monochromatic),
-                // so it cancels modulo a sigma_maj factor, but then that is
-                // cancelled in pa/ps/pn divided by that...
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
                 if (mode == 0)
                     // absorbed; done
