@@ -58,21 +58,6 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> 
                                const Transform &worldFromMedium, const FileLoc *loc,
                                Allocator alloc);
 
-    /* RNG vs Sampler:
-       - Sampler gives better results when ray interacts with the medium
-         (presumably) mostly due to the first dimension being good.
-
-       - However, RNG is a huge help when the ray passes through the
-         medium but doesn't interact with it after all; direct lighting
-         et al. behind it are much better...
-
-      Best would probably be one sampler dimension than just RNG, but it's
-      not clear how to most cleanly pipe that through.
-     */
-    PBRT_CPU_GPU inline SampledSpectrum Tr(const Ray &ray, Float tMax,
-                                           const SampledWavelengths &lambda,
-                                           RNG &rng) const;
-
     PBRT_CPU_GPU inline MediumSample Sample(const Ray &ray, Float tMax, RNG &rng,
                                             const SampledWavelengths &lambda,
                                             ScratchBuffer &scratchBuffer) const;

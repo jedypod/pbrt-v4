@@ -298,27 +298,6 @@ bool Integrator::IntersectP(const Ray &ray, Float tMax) const {
         return false;
 }
 
-pstd::optional<ShapeIntersection> Integrator::IntersectTr(
-    Ray ray, Float tMax, RNG &rng, const SampledWavelengths &lambda,
-    SampledSpectrum *Tr) const {
-    *Tr = SampledSpectrum(1.f);
-    while (true) {
-        pstd::optional<ShapeIntersection> si = Intersect(ray, tMax);
-        // Accumulate beam transmittance for ray segment
-        if (ray.medium != nullptr)
-            *Tr *= ray.medium.Tr(ray, si ? si->tHit : tMax, lambda, rng);
-
-        // Initialize next ray segment or terminate transmittance computation
-        if (!si)
-            return {};
-        if (si->intr.material)
-            return si;
-
-        ray = si->intr.SpawnRay(ray.d);
-        tMax -= si->tHit;
-    }
-}
-
 std::string Integrator::ToString() const {
     std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
                                  aggregate, sceneBounds, lights.size());
@@ -332,8 +311,16 @@ std::string Integrator::ToString() const {
 
 SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
                                const SampledWavelengths &lambda, RNG &rng) const {
+    auto rescale = [](SampledSpectrum &Tr, SampledSpectrum &pdf) {
+        if (Tr.MaxComponentValue() > 0x1p24f ||
+            pdf.MaxComponentValue() > 0x1p24f) {
+            Tr /= 0x1p24f;
+            pdf /= 0x1p24f;
+        }
+    };
+
     Ray ray = p0.SpawnRayTo(p1);
-    SampledSpectrum Tr(1.f);
+    SampledSpectrum Tr(1.f), pdf(1.f);
     if (LengthSquared(ray.d) == 0)
         return Tr;
 
@@ -344,8 +331,33 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             return SampledSpectrum(0.0f);
 
         // Update transmittance for current ray segment
-        if (ray.medium != nullptr)
-            Tr *= ray.medium.Tr(ray, si ? si->tHit : 1 - ShadowEpsilon, lambda, rng);
+        if (ray.medium != nullptr) {
+            Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
+            ray.d = pExit - ray.o;
+
+            while (ray.o != pExit) {
+                Float u = rng.Uniform<Float>();
+                NewMediumSample mediumSample =
+                    ray.medium.SampleTmaj(ray, 1.f, u, lambda, nullptr);
+                if (!mediumSample.intr)
+                    break;
+
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                const MediumInteraction &intr = *mediumSample.intr;
+                SampledSpectrum sigma_n = intr.sigma_n();
+
+                // ratio-tracking: only evaluate null scattering
+                Tr *= Tmaj * sigma_n;
+                pdf *= Tmaj * intr.sigma_maj;
+
+                if (!Tr)
+                    return SampledSpectrum(0.f);
+
+                ray = intr.SpawnRayTo(pExit);
+
+                rescale(Tr, pdf);
+            }
+        }
 
         // Generate next ray segment or return final transmittance
         if (!si)
@@ -353,7 +365,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
         ray = si->intr.SpawnRayTo(p1);
     }
     VLOG(2, "Tr from %s to %s = %s", p0.pi, p1.pi, Tr);
-    return Tr;
+    return Tr / pdf.Average();
 }
 
 // WhittedIntegrator Method Definitions

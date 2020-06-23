@@ -93,14 +93,6 @@ class alignas(8) HomogeneousMedium {
                                      const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    SampledSpectrum Tr(const Ray &ray, Float tMax, const SampledWavelengths &lambda,
-                       RNG &rng) const {
-        SampledSpectrum sigma_t = sigma_a_spec.Sample(lambda) +
-            sigma_s_spec.Sample(lambda);
-        return Exp(-sigma_t * std::min(tMax * Length(ray.d), MaxFloat));
-    }
-
-    PBRT_CPU_GPU
     MediumSample Sample(const Ray &ray, Float tMax, RNG &rng,
                         const SampledWavelengths &lambda,
                         ScratchBuffer &scratchBuffer) const {
@@ -173,8 +165,6 @@ class alignas(8) GridDensityMedium {
     MediumSample Sample(const Ray &rWorld, Float raytMax, RNG &rng,
                         const SampledWavelengths &lambda,
                         ScratchBuffer &scratchBuffer) const {
-        // CO    ++nSampleCalls;
-
         raytMax *= Length(rWorld.d);
         Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
         // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium
@@ -199,7 +189,6 @@ class alignas(8) GridDensityMedium {
 
                 DCHECK_RARE(1e-5, densityGrid->Lookup(ray((t + t1) / 2)) > node.maxDensity);
                 while (true) {
-                    // CO                ++nSampleSteps;
                     t +=
                         -std::log(1 - rng.Uniform<Float>()) / (sigma_t * node.maxDensity);
 
@@ -227,81 +216,6 @@ class alignas(8) GridDensityMedium {
         mediumSample.Tr = foundInteraction ? sigma_s_spec.Sample(lambda) / sigma_t
                                            : SampledSpectrum(1.f);
         return mediumSample;
-    }
-
-    PBRT_CPU_GPU
-    SampledSpectrum Tr(const Ray &rWorld, Float raytMax, const SampledWavelengths &lambda,
-                       RNG &rng) const {
-        // CO    ++nTrCalls;
-
-        raytMax *= Length(rWorld.d);
-        Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
-        // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium
-        // bounds
-        const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
-        Float tMin, tMax;
-        if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
-            return SampledSpectrum(1.f);
-
-        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-        SampledSpectrum sigma_t = sigma_a + sigma_s;
-
-        // Perform ratio tracking to estimate the transmittance value
-        SampledSpectrum Tr(1.f);
-        TraverseOctree(&densityOctree, ray.o, ray.d, raytMax,
-                       [&](const OctreeNode &node, Float t, Float t1) {
-                           if (node.maxDensity == 0)
-                               // Empty--skip it!
-                               return OctreeTraversal::Continue;
-
-                           DCHECK_GE(t1, 0);
-
-                           CHECK_GE(t, .999 * tMin);
-
-                           // ratio tracking
-                           Float sigma_bar = node.maxDensity * sigma_t.MaxComponentValue();
-                           DCHECK_GE(sigma_bar, 0);
-                           if (sigma_bar == 0)
-                               return OctreeTraversal::Continue;
-
-                           while (true) {
-                               // CO                ++nTrSteps;
-                               t += -std::log(1 - rng.Uniform<Float>()) / sigma_bar;
-                               if (t >= t1)
-                                   // exited node; keep going
-                                   return OctreeTraversal::Continue;
-
-                               if (t >= tMax)
-                                   // past hit point. stop
-                                   return OctreeTraversal::Abort;
-
-                               Float density = densityGrid->Lookup(ray(t));
-                               CHECK_RARE(1e-9, density < 0);
-                               density = std::max<Float>(density, 0);
-
-                               // FIXME: if sigma_bar isn't a majorant, then is this clamp
-                               // wrong???
-                               Tr *= 1 - Clamp(density * sigma_t / sigma_bar, 0, 1);
-                               CHECK(Tr.MaxComponentValue() != Infinity);
-                               CHECK(!Tr.HasNaNs());
-                               Float Tr_max = Tr.MaxComponentValue();
-                               if (Tr_max < 1) {
-                                   Float q = 1 - Tr_max;
-                                   if (rng.Uniform<Float>() < q) {
-                                       Tr = SampledSpectrum(0.f);
-                                       return OctreeTraversal::Abort;
-                                   }
-                                   Tr /= 1 - q;
-                                   CHECK(Tr.MaxComponentValue() != Infinity);
-                                   CHECK(!Tr.HasNaNs());
-                               }
-                           }
-                       });
-
-        CHECK(Tr.MaxComponentValue() != Infinity);
-        CHECK(!Tr.HasNaNs());
-        return Tr;
     }
 
     PBRT_CPU_GPU
@@ -368,13 +282,6 @@ inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
 inline Float PhaseFunctionHandle::PDF(const Vector3f &wo, const Vector3f &wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Apply<Float>(pdf);
-}
-
-inline SampledSpectrum MediumHandle::Tr(const Ray &ray, Float tMax,
-                                        const SampledWavelengths &lambda,
-                                        RNG &rng) const {
-    auto tr = [&](auto ptr) { return ptr->Tr(ray, tMax, lambda, rng); };
-    return Apply<SampledSpectrum>(tr);
 }
 
 inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,

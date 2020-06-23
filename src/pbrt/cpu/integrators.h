@@ -56,9 +56,6 @@ class Integrator {
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
                                                 Float tMax = Infinity) const;
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
-    pstd::optional<ShapeIntersection> IntersectTr(Ray ray, Float tMax, RNG &rng,
-                                                  const SampledWavelengths &lambda,
-                                                  SampledSpectrum *transmittance) const;
 
     bool Unoccluded(const Interaction &p0, const Interaction &p1) const {
         return !IntersectP(p0.SpawnRayTo(p1), 1 - ShadowEpsilon);
