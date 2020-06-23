@@ -370,7 +370,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            SampledSpectrum sigma_maj(sigma_t.MaxComponentValue() * node.maxDensity);
+            SampledSpectrum sigma_maj(sigma_t * node.maxDensity);
 
             // At what u value do we hit the the cell exit point?
             Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
@@ -391,7 +391,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
 
             // Scattering event (of some sort)
             Point3f p = ray(t);
-            SampledSpectrum Tmaj(FastExp(-sigma_maj[0] * (t - t0)));
+            SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
 
             if (densityGrid) {
                 Float density = densityGrid->Lookup(p);
