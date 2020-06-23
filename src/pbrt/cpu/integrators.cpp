@@ -965,18 +965,18 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
                     break;
 
                 const MediumInteraction &intr = *mediumSample.intr;
-                const SampledSpectrum &sigma_a = mediumSample.sigma_a;
-                const SampledSpectrum &sigma_s = mediumSample.sigma_s;
+                const SampledSpectrum &sigma_a = intr.sigma_a;
+                const SampledSpectrum &sigma_s = intr.sigma_s;
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
-                Float pAbsorb = sigma_a[0] / mediumSample.sigma_maj[0];
-                Float pScatter = sigma_s[0] / mediumSample.sigma_maj[0];
+                Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                Float pScatter = sigma_s[0] / intr.sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
                 if (mode == 0)
                     // absorbed; done
-                    return L + mediumSample.Le;
+                    return L + intr.Le;
                 else if (mode == 1) {
                     if (numScatters++ >= maxDepth)
                         return L;
@@ -1084,15 +1084,15 @@ SampledSpectrum VolPathIntegrator::Li(
                 ++volumeInteractions;
 
                 const MediumInteraction &intr = *mediumSample.intr;
-                const SampledSpectrum &sigma_a = mediumSample.sigma_a;
-                const SampledSpectrum &sigma_s = mediumSample.sigma_s;
+                const SampledSpectrum &sigma_a = intr.sigma_a;
+                const SampledSpectrum &sigma_s = intr.sigma_s;
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
                 if (depth < maxDepth)
-                    L += mediumSample.Le * sigma_a / mediumSample.sigma_maj[0];
+                    L += intr.Le * sigma_a / intr.sigma_maj[0];
 
-                Float pAbsorb = sigma_a[0] / mediumSample.sigma_maj[0];
-                Float pScatter = sigma_s[0] / mediumSample.sigma_maj[0];
+                Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
+                Float pScatter = sigma_s[0] / intr.sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
                 CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
 
@@ -1139,11 +1139,11 @@ SampledSpectrum VolPathIntegrator::Li(
                     anyNonSpecularBounces = true;
                 } else {
                     // null scatter
-                    SampledSpectrum sigma_n = mediumSample.sigma_n();
+                    SampledSpectrum sigma_n = intr.sigma_n();
 
                     beta *= Tmaj * sigma_n;
                     pdfUni *= Tmaj * sigma_n;
-                    pdfNEE *= Tmaj * mediumSample.sigma_maj;
+                    pdfNEE *= Tmaj * intr.sigma_maj;
 
                     tMax -= mediumSample.t;
                     ray = intr.SpawnRay(ray.d);
@@ -1423,17 +1423,18 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr,
                     break;
 
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;
-                SampledSpectrum sigma_n = mediumSample.sigma_n();
+                const MediumInteraction &intr = *mediumSample.intr;
+                SampledSpectrum sigma_n = intr.sigma_n();
 
                 // ratio-tracking: only evaluate null scattering
                 betaLight *= Tmaj * sigma_n;
-                pdfLight *= Tmaj * mediumSample.sigma_maj;
+                pdfLight *= Tmaj * intr.sigma_maj;
                 pdfUni *= Tmaj * sigma_n;
 
                 if (!betaLight)
                     return SampledSpectrum(0.f);
 
-                lightRay = mediumSample.intr->SpawnRayTo(pExit);
+                lightRay = intr.SpawnRayTo(pExit);
 
                 rescale(betaLight, pdfLight, pdfUni);
             }

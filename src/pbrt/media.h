@@ -68,18 +68,14 @@ struct MediumSample {
 };
 
 struct NewMediumSample {
+    NewMediumSample() : Tmaj(1) { }
+    explicit NewMediumSample(const SampledSpectrum &Tmaj) : Tmaj(Tmaj) {}
+    NewMediumSample(const MediumInteraction &intr, Float t, const SampledSpectrum &Tmaj)
+        : intr(intr), t(t), Tmaj(Tmaj) {}
+
     pstd::optional<MediumInteraction> intr;
     Float t;
-    SampledSpectrum sigma_a, sigma_s, sigma_maj;
-    SampledSpectrum Tmaj, Le;
-
-    PBRT_CPU_GPU
-    SampledSpectrum sigma_n() const {
-        SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = sigma_maj - sigma_t;
-        CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
-        return ClampZero(sigma_n);
-    }
+    SampledSpectrum Tmaj;
 
     std::string ToString() const;
 };

@@ -38,9 +38,8 @@ std::string PhaseFunctionHandle::ToString() const {
 }
 
 std::string NewMediumSample::ToString() const {
-    return StringPrintf("[ NewMediumSample intr: %s t: %f sigma_a: %s sigma_s: %s "
-                        "sigma_maj: %s Tmaj: %s Le: %s ]",
-                        intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le);
+    return StringPrintf("[ NewMediumSample intr: %s t: %f Tmaj: %s ]",
+                        intr, t, Tmaj);
 }
 
 // Media Definitions
@@ -156,17 +155,15 @@ NewMediumSample HomogeneousMedium::SampleTmaj(const Ray &ray, Float tMax, Float 
     SampledSpectrum sigma_maj = sigma_t;
 
     Float t = SampleExponential(u, sigma_maj[0]);
-    if (t >= tMax) {
-        NewMediumSample sample;
-        sample.Tmaj = FastExp(-tMax * sigma_maj);
-        return sample;
-    }
+    if (t >= tMax)
+        return NewMediumSample(FastExp(-tMax * sigma_maj));
 
     SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
 
     SampledSpectrum Le = Le_spec.Sample(lambda);
-    MediumInteraction intr(rayp(t), -rayp.d, ray.time, this, &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le};
+    MediumInteraction intr(rayp(t), -rayp.d, ray.time, sigma_a, sigma_s, sigma_maj, Le,
+                           this, &phase);
+    return NewMediumSample(intr, t, Tmaj);
 }
 
 HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
@@ -365,7 +362,6 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
     SampledSpectrum sigma_t = sigma_a + sigma_s;
 
     NewMediumSample mediumSample;
-    mediumSample.Tmaj = SampledSpectrum(1.f);
 
     TraverseOctree(
         &densityOctree, ray.o, ray.d, raytMax,
@@ -389,7 +385,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
 
             if (t >= tMax) {
                 // Nothing before the geom intersection; get out of here
-                mediumSample.Tmaj = FastExp(-sigma_maj * (tMax - t0));
+                mediumSample = NewMediumSample(FastExp(-sigma_maj * (tMax - t0)));
                 return OctreeTraversal::Abort;
             }
 
@@ -413,9 +409,9 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
             }
 
             MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
-                                   this, &phase);
-            mediumSample = NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj,
-                                           Le(p, lambda)};
+                                   sigma_a, sigma_s, sigma_maj, Le(p, lambda), this,
+                                   &phase);
+            mediumSample = NewMediumSample(intr, t, Tmaj);
             return OctreeTraversal::Abort;
         });
 

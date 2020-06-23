@@ -19,6 +19,7 @@
 #include <pbrt/base/medium.h>
 #include <pbrt/base/sampler.h>
 #include <pbrt/ray.h>
+#include <pbrt/util/spectrum.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 
@@ -158,18 +159,35 @@ class MediumInteraction : public Interaction {
     // MediumInteraction Public Methods
     PBRT_CPU_GPU
     MediumInteraction() : phase(nullptr) {}
+    // TODO: get rid of this once old volume stuff is gone...
     PBRT_CPU_GPU
     MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
                       MediumHandle medium, PhaseFunctionHandle phase)
         : Interaction(p, wo, time, medium), phase(phase) {}
+    PBRT_CPU_GPU
+    MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
+                      const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s,
+                      const SampledSpectrum &sigma_maj, const SampledSpectrum &Le,
+                      MediumHandle medium, PhaseFunctionHandle phase)
+        : Interaction(p, wo, time, medium), phase(phase), sigma_a(sigma_a),
+          sigma_s(sigma_s), sigma_maj(sigma_maj), Le(Le) {}
 
     PBRT_CPU_GPU
     bool IsValid() const { return phase != nullptr; }
+
+    PBRT_CPU_GPU
+    SampledSpectrum sigma_n() const {
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+        SampledSpectrum sigma_n = sigma_maj - sigma_t;
+        CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
+        return ClampZero(sigma_n);
+    }
 
     std::string ToString() const;
 
     // MediumInteraction Public Data
     PhaseFunctionHandle phase;
+    SampledSpectrum sigma_a, sigma_s, sigma_maj, Le;
 };
 
 // SurfaceInteraction Declarations
