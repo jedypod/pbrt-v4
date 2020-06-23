@@ -37,8 +37,8 @@ std::string PhaseFunctionHandle::ToString() const {
     return ApplyCPU<std::string>(ts);
 }
 
-std::string NewMediumSample::ToString() const {
-    return StringPrintf("[ NewMediumSample intr: %s t: %f Tmaj: %s ]",
+std::string MediumSample::ToString() const {
+    return StringPrintf("[ MediumSample intr: %s t: %f Tmaj: %s ]",
                         intr, t, Tmaj);
 }
 
@@ -142,7 +142,7 @@ std::string MediumHandle::ToString() const {
 }
 
 // HomogeneousMedium Method Definitions
-NewMediumSample HomogeneousMedium::SampleTmaj(const Ray &ray, Float tMax, Float u,
+MediumSample HomogeneousMedium::Sample_Tmaj(const Ray &ray, Float tMax, Float u,
                                               const SampledWavelengths &lambda,
                                               ScratchBuffer *scratchBuffer) const {
     // So t corresponds to distance...
@@ -156,14 +156,14 @@ NewMediumSample HomogeneousMedium::SampleTmaj(const Ray &ray, Float tMax, Float 
 
     Float t = SampleExponential(u, sigma_maj[0]);
     if (t >= tMax)
-        return NewMediumSample(FastExp(-tMax * sigma_maj));
+        return MediumSample(FastExp(-tMax * sigma_maj));
 
     SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
 
     SampledSpectrum Le = Le_spec.Sample(lambda);
     MediumInteraction intr(rayp(t), -rayp.d, ray.time, sigma_a, sigma_s, sigma_maj, Le,
                            this, &phase);
-    return NewMediumSample(intr, t, Tmaj);
+    return MediumSample(intr, t, Tmaj);
 }
 
 HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
@@ -344,7 +344,7 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
 }
 
-NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, Float u,
+MediumSample GridDensityMedium::Sample_Tmaj(const Ray &rWorld, Float raytMax, Float u,
                                               const SampledWavelengths &lambda,
                                               ScratchBuffer *scratchBuffer) const {
     raytMax *= Length(rWorld.d);
@@ -361,7 +361,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
 
-    NewMediumSample mediumSample;
+    MediumSample mediumSample;
 
     TraverseOctree(
         &densityOctree, ray.o, ray.d, raytMax,
@@ -385,7 +385,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
 
             if (t >= tMax) {
                 // Nothing before the geom intersection; get out of here
-                mediumSample = NewMediumSample(FastExp(-sigma_maj * (tMax - t0)));
+                mediumSample = MediumSample(FastExp(-sigma_maj * (tMax - t0)));
                 return OctreeTraversal::Abort;
             }
 
@@ -411,7 +411,7 @@ NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, 
             MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
                                    sigma_a, sigma_s, sigma_maj, Le(p, lambda), this,
                                    &phase);
-            mediumSample = NewMediumSample(intr, t, Tmaj);
+            mediumSample = MediumSample(intr, t, Tmaj);
             return OctreeTraversal::Abort;
         });
 

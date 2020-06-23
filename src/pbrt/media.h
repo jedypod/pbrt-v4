@@ -63,14 +63,9 @@ class alignas(8) HenyeyGreensteinPhaseFunction {
 };
 
 struct MediumSample {
-    SampledSpectrum Tr;  // Actually Tr/pdf .... FIXME/revisit
-    pstd::optional<MediumInteraction> intr;
-};
-
-struct NewMediumSample {
-    NewMediumSample() : Tmaj(1) { }
-    explicit NewMediumSample(const SampledSpectrum &Tmaj) : Tmaj(Tmaj) {}
-    NewMediumSample(const MediumInteraction &intr, Float t, const SampledSpectrum &Tmaj)
+    MediumSample() : Tmaj(1) { }
+    explicit MediumSample(const SampledSpectrum &Tmaj) : Tmaj(Tmaj) {}
+    MediumSample(const MediumInteraction &intr, Float t, const SampledSpectrum &Tmaj)
         : intr(intr), t(t), Tmaj(Tmaj) {}
 
     pstd::optional<MediumInteraction> intr;
@@ -93,7 +88,7 @@ class alignas(8) HomogeneousMedium {
                                      const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
+    MediumSample Sample_Tmaj(const Ray &ray, Float tMax, Float u,
                                const SampledWavelengths &lambda,
                                ScratchBuffer *scratchBuffer) const;
 
@@ -124,7 +119,7 @@ class alignas(8) GridDensityMedium {
                                      Allocator alloc);
 
     PBRT_CPU_GPU
-    NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
+    MediumSample Sample_Tmaj(const Ray &ray, Float tMax, Float u,
                                const SampledWavelengths &lambda,
                                ScratchBuffer *scratchBuffer) const;
 
@@ -189,12 +184,12 @@ inline Float PhaseFunctionHandle::PDF(const Vector3f &wo, const Vector3f &wi) co
     return Apply<Float>(pdf);
 }
 
-inline NewMediumSample MediumHandle::SampleTmaj(const Ray &ray, Float tMax, Float u,
+inline MediumSample MediumHandle::Sample_Tmaj(const Ray &ray, Float tMax, Float u,
                                                 const SampledWavelengths &lambda,
                                                 ScratchBuffer *scratchBuffer) const {
-    auto sampletn = [&](auto ptr) { return ptr->SampleTmaj(ray, tMax, u, lambda,
+    auto sampletn = [&](auto ptr) { return ptr->Sample_Tmaj(ray, tMax, u, lambda,
                                                            scratchBuffer); };
-    return Apply<NewMediumSample>(sampletn);
+    return Apply<MediumSample>(sampletn);
 }
 
 }  // namespace pbrt

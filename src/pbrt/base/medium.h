@@ -47,7 +47,7 @@ class PhaseFunctionHandle : public TaggedPointer<HenyeyGreensteinPhaseFunction> 
 
 class HomogeneousMedium;
 class GridDensityMedium;
-struct NewMediumSample;
+struct MediumSample;
 
 class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> {
   public:
@@ -58,7 +58,7 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> 
                                const Transform &worldFromMedium, const FileLoc *loc,
                                Allocator alloc);
 
-    PBRT_CPU_GPU inline NewMediumSample SampleTmaj(
+    PBRT_CPU_GPU inline MediumSample Sample_Tmaj(
         const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
         ScratchBuffer *scratchBuffer /* optional */) const;
 

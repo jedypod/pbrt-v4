@@ -337,8 +337,8 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
 
             while (ray.o != pExit) {
                 Float u = rng.Uniform<Float>();
-                NewMediumSample mediumSample =
-                    ray.medium.SampleTmaj(ray, 1.f, u, lambda, nullptr);
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, 1.f, u, lambda, nullptr);
                 if (!mediumSample.intr)
                     break;
 
@@ -970,8 +970,8 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
 
             while (tMax > 0) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                NewMediumSample mediumSample =
-                    ray.medium.SampleTmaj(ray, tMax, u, lambda, &scratchBuffer);
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, tMax, u, lambda, &scratchBuffer);
 
                 if (!mediumSample.intr)
                     break;
@@ -1082,8 +1082,8 @@ SampledSpectrum VolPathIntegrator::Li(
             Float tMax = si ? si->tHit : Infinity;
             while (!scattered) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                NewMediumSample mediumSample =
-                    ray.medium.SampleTmaj(ray, tMax, u, lambda, &scratchBuffer);
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, tMax, u, lambda, &scratchBuffer);
 
                 // Handle an interaction with a medium or a surface
                 if (!mediumSample.intr) {
@@ -1429,8 +1429,8 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr,
 
             while (lightRay.o != pExit) {
                 Float u = sampler.GetRNG().Uniform<Float>();
-                NewMediumSample mediumSample =
-                    lightRay.medium.SampleTmaj(lightRay, 1.f, u, lambda, nullptr);
+                MediumSample mediumSample =
+                    lightRay.medium.Sample_Tmaj(lightRay, 1.f, u, lambda, nullptr);
                 if (!mediumSample.intr)
                     break;
 
@@ -1974,10 +1974,10 @@ int RandomWalk(const Integrator &integrator, const SampledWavelengths &lambda,
         Vertex &vertex = path[bounces], &prev = path[bounces - 1];
         pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
         Float tMax = si ? si->tHit : Infinity;
-        NewMediumSample mediumSample;
+        MediumSample mediumSample;
         if (ray.medium) {
             while (true) {
-                mediumSample = ray.medium.SampleTmaj(ray, tMax, sampler.Get1D(),
+                mediumSample = ray.medium.Sample_Tmaj(ray, tMax, sampler.Get1D(),
                                                      lambda, &scratchBuffer);
 
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;
