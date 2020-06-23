@@ -68,7 +68,7 @@ struct MediumSample {
 };
 
 struct NewMediumSample {
-    MediumInteraction intr;
+    pstd::optional<MediumInteraction> intr;
     Float t;
     SampledSpectrum sigma_a, sigma_s, sigma_maj;
     SampledSpectrum Tmaj, Le;
@@ -143,9 +143,9 @@ class alignas(8) HomogeneousMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
-                                             const SampledWavelengths &lambda,
-                                             ScratchBuffer *scratchBuffer) const;
+    NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
+                               const SampledWavelengths &lambda,
+                               ScratchBuffer *scratchBuffer) const;
 
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
@@ -309,9 +309,9 @@ class alignas(8) GridDensityMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
-                                             const SampledWavelengths &lambda,
-                                             ScratchBuffer *scratchBuffer) const;
+    NewMediumSample SampleTmaj(const Ray &ray, Float tMax, Float u,
+                               const SampledWavelengths &lambda,
+                               ScratchBuffer *scratchBuffer) const;
 
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
@@ -388,12 +388,12 @@ inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,
     return Apply<MediumSample>(sample);
 }
 
-inline pstd::optional<NewMediumSample> MediumHandle::SampleTmaj(
-    const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
-    ScratchBuffer *scratchBuffer) const {
+inline NewMediumSample MediumHandle::SampleTmaj(const Ray &ray, Float tMax, Float u,
+                                                const SampledWavelengths &lambda,
+                                                ScratchBuffer *scratchBuffer) const {
     auto sampletn = [&](auto ptr) { return ptr->SampleTmaj(ray, tMax, u, lambda,
                                                            scratchBuffer); };
-    return Apply<pstd::optional<NewMediumSample>>(sampletn);
+    return Apply<NewMediumSample>(sampletn);
 }
 
 }  // namespace pbrt

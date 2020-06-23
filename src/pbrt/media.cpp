@@ -143,9 +143,9 @@ std::string MediumHandle::ToString() const {
 }
 
 // HomogeneousMedium Method Definitions
-pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
-    const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
-    ScratchBuffer *scratchBuffer) const {
+NewMediumSample HomogeneousMedium::SampleTmaj(const Ray &ray, Float tMax, Float u,
+                                              const SampledWavelengths &lambda,
+                                              ScratchBuffer *scratchBuffer) const {
     // So t corresponds to distance...
     tMax *= Length(ray.d);
     Ray rayp(ray.o, Normalize(ray.d));
@@ -153,13 +153,16 @@ pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
     SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
-    SampledSpectrum sigma_maj(sigma_t.MaxComponentValue());
+    SampledSpectrum sigma_maj = sigma_t;
 
     Float t = SampleExponential(u, sigma_maj[0]);
-    if (t >= tMax)
-        return {};
+    if (t >= tMax) {
+        NewMediumSample sample;
+        sample.Tmaj = FastExp(-tMax * sigma_maj);
+        return sample;
+    }
 
-    SampledSpectrum Tmaj(FastExp(-t * sigma_maj[0]));
+    SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
 
     SampledSpectrum Le = Le_spec.Sample(lambda);
     MediumInteraction intr(rayp(t), -rayp.d, ray.time, this, &phase);
@@ -344,9 +347,9 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
 }
 
-pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
-    const Ray &rWorld, Float raytMax, Float u, const SampledWavelengths &lambda,
-    ScratchBuffer *scratchBuffer) const {
+NewMediumSample GridDensityMedium::SampleTmaj(const Ray &rWorld, Float raytMax, Float u,
+                                              const SampledWavelengths &lambda,
+                                              ScratchBuffer *scratchBuffer) const {
     raytMax *= Length(rWorld.d);
     Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
     // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium bounds
@@ -361,26 +364,8 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
 
-#if 0
-    Float sigma_maj = sigma_t.MaxComponentValue() * densityOctree.maxDensity;
-    // Simple, octree-free...
-    Float t = tMin + SampleExponential(u, sigma_maj);
-    if (t >= tMax)
-        return {};
-
-    Point3f p = ray(t);
-    Float Tmaj = Exp(-sigma_maj * (t - tMin));
-
-    Float density = densityGrid.Lookup(p);
-    sigma_a *= density;
-    sigma_s *= density;
-
-    MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time, this,
-                           &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le(p, lambda)};
-
-#else  // SIMPLE - no octree
-    pstd::optional<NewMediumSample> mediumSample;
+    NewMediumSample mediumSample;
+    mediumSample.Tmaj = SampledSpectrum(1.f);
 
     TraverseOctree(
         &densityOctree, ray.o, ray.d, raytMax,
@@ -402,9 +387,11 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
             Float t = t0 + SampleExponential(u, sigma_maj[0]);
             CHECK_RARE(1e-5, t > t1);
 
-            if (t >= tMax)  // raytMax)
+            if (t >= tMax) {
                 // Nothing before the geom intersection; get out of here
+                mediumSample.Tmaj = FastExp(-sigma_maj * (tMax - t0));
                 return OctreeTraversal::Abort;
+            }
 
             // Scattering event (of some sort)
             Point3f p = ray(t);
@@ -421,7 +408,6 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
                 CHECK_LE(density.b, node.maxDensity);
                 SampledSpectrum spec =
                     RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
-                LOG_VERBOSE("rgb %s spec %s", density, spec);
                 sigma_a *= spec;
                 sigma_s *= spec;
             }
@@ -434,7 +420,6 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
         });
 
     return mediumSample;
-#endif  // !SIMPLE - no octree
 }
 
 GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
