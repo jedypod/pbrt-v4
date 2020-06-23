@@ -39,8 +39,8 @@ std::string PhaseFunctionHandle::ToString() const {
 
 std::string NewMediumSample::ToString() const {
     return StringPrintf("[ NewMediumSample intr: %s t: %f sigma_a: %s sigma_s: %s "
-                        "sigma_maj: %f Le: %s, Tmaj: %f ]",
-                        intr, t, sigma_a, sigma_s, sigma_maj, Le, Tmaj);
+                        "sigma_maj: %s Tmaj: %s Le: %s ]",
+                        intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le);
 }
 
 // Media Definitions
@@ -153,13 +153,13 @@ pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
     SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
-    Float sigma_maj = sigma_t.MaxComponentValue();
+    SampledSpectrum sigma_maj(sigma_t.MaxComponentValue());
 
-    Float t = SampleExponential(u, sigma_maj);
+    Float t = SampleExponential(u, sigma_maj[0]);
     if (t >= tMax)
         return {};
 
-    Float Tmaj = FastExp(-t * sigma_maj);
+    SampledSpectrum Tmaj(FastExp(-t * sigma_maj[0]));
 
     SampledSpectrum Le = Le_spec.Sample(lambda);
     MediumInteraction intr(rayp(t), -rayp.d, ray.time, this, &phase);
@@ -389,17 +389,17 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            Float sigma_maj = sigma_t.MaxComponentValue() * node.maxDensity;
+            SampledSpectrum sigma_maj(sigma_t.MaxComponentValue() * node.maxDensity);
 
             // At what u value do we hit the the cell exit point?
-            Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj);
+            Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
             if (u >= uEnd) {
                 // exit this cell w/o a scattering event
                 u = (u - uEnd) / (1 - uEnd);  // remap to [0,1)
                 return OctreeTraversal::Continue;
             }
 
-            Float t = t0 + SampleExponential(u, sigma_maj);
+            Float t = t0 + SampleExponential(u, sigma_maj[0]);
             CHECK_RARE(1e-5, t > t1);
 
             if (t >= tMax)  // raytMax)
@@ -408,7 +408,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
 
             // Scattering event (of some sort)
             Point3f p = ray(t);
-            Float Tmaj = FastExp(-sigma_maj * (t - t0));
+            SampledSpectrum Tmaj(FastExp(-sigma_maj[0] * (t - t0)));
 
             if (densityGrid) {
                 Float density = densityGrid->Lookup(p);

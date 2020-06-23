@@ -968,10 +968,10 @@ SampledSpectrum SimpleVolPathIntegrator::Li(
                 const MediumInteraction &intr = mediumSample->intr;
                 const SampledSpectrum &sigma_a = mediumSample->sigma_a;
                 const SampledSpectrum &sigma_s = mediumSample->sigma_s;
-                Float Tmaj = mediumSample->Tmaj;
+                const SampledSpectrum &Tmaj = mediumSample->Tmaj;
 
-                Float pAbsorb = sigma_a[0] / mediumSample->sigma_maj;
-                Float pScatter = sigma_s[0] / mediumSample->sigma_maj;
+                Float pAbsorb = sigma_a[0] / mediumSample->sigma_maj[0];
+                Float pScatter = sigma_s[0] / mediumSample->sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
@@ -1084,13 +1084,13 @@ SampledSpectrum VolPathIntegrator::Li(
                 const MediumInteraction &intr = mediumSample->intr;
                 const SampledSpectrum &sigma_a = mediumSample->sigma_a;
                 const SampledSpectrum &sigma_s = mediumSample->sigma_s;
-                Float Tmaj = mediumSample->Tmaj;
+                const SampledSpectrum &Tmaj = mediumSample->Tmaj;
 
                 if (depth < maxDepth)
-                    L += mediumSample->Le * sigma_a / mediumSample->sigma_maj;
+                    L += mediumSample->Le * sigma_a / mediumSample->sigma_maj[0];
 
-                Float pAbsorb = sigma_a[0] / mediumSample->sigma_maj;
-                Float pScatter = sigma_s[0] / mediumSample->sigma_maj;
+                Float pAbsorb = sigma_a[0] / mediumSample->sigma_maj[0];
+                Float pScatter = sigma_s[0] / mediumSample->sigma_maj[0];
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
                 CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
 
@@ -1420,7 +1420,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr,
                 if (!mediumSample)
                     break;
 
-                Float Tmaj = mediumSample->Tmaj;
+                const SampledSpectrum &Tmaj = mediumSample->Tmaj;
                 SampledSpectrum sigma_n = mediumSample->sigma_n();
 
                 // ratio-tracking: only evaluate null scattering

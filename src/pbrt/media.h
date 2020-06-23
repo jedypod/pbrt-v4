@@ -70,14 +70,13 @@ struct MediumSample {
 struct NewMediumSample {
     MediumInteraction intr;
     Float t;
-    SampledSpectrum sigma_a, sigma_s;
-    Float sigma_maj, Tmaj;
-    SampledSpectrum Le;
+    SampledSpectrum sigma_a, sigma_s, sigma_maj;
+    SampledSpectrum Tmaj, Le;
 
     PBRT_CPU_GPU
     SampledSpectrum sigma_n() const {
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = SampledSpectrum(sigma_maj) - sigma_t;
+        SampledSpectrum sigma_n = sigma_maj - sigma_t;
         CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
         return ClampZero(sigma_n);
     }
