@@ -142,30 +142,6 @@ std::string MediumHandle::ToString() const {
 }
 
 // HomogeneousMedium Method Definitions
-MediumSample HomogeneousMedium::Sample_Tmaj(const Ray &ray, Float tMax, Float u,
-                                              const SampledWavelengths &lambda,
-                                              ScratchBuffer *scratchBuffer) const {
-    // So t corresponds to distance...
-    tMax *= Length(ray.d);
-    Ray rayp(ray.o, Normalize(ray.d));
-
-    SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-    SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-    SampledSpectrum sigma_t = sigma_a + sigma_s;
-    SampledSpectrum sigma_maj = sigma_t;
-
-    Float t = SampleExponential(u, sigma_maj[0]);
-    if (t >= tMax)
-        return MediumSample(FastExp(-tMax * sigma_maj));
-
-    SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
-
-    SampledSpectrum Le = Le_spec.Sample(lambda);
-    MediumInteraction intr(rayp(t), -rayp.d, ray.time, sigma_a, sigma_s, sigma_maj, Le,
-                           this, &phase);
-    return MediumSample(intr, t, Tmaj);
-}
-
 HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
@@ -342,80 +318,6 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
     node->maxDensity = node->child(0)->maxDensity;
     for (int i = 1; i < 8; ++i)
         node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
-}
-
-MediumSample GridDensityMedium::Sample_Tmaj(const Ray &rWorld, Float raytMax, Float u,
-                                              const SampledWavelengths &lambda,
-                                              ScratchBuffer *scratchBuffer) const {
-    raytMax *= Length(rWorld.d);
-    Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
-    // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium bounds
-    const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
-    Float tMin, tMax;
-    if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
-        return {};
-
-    CHECK_LE(tMax, raytMax);
-
-    SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-    SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-    SampledSpectrum sigma_t = sigma_a + sigma_s;
-
-    MediumSample mediumSample;
-
-    TraverseOctree(
-        &densityOctree, ray.o, ray.d, raytMax,
-        [&](const OctreeNode &node, Float t0, Float t1) {
-            if (node.maxDensity == 0)
-                // Empty--skip it!
-                return OctreeTraversal::Continue;
-
-            SampledSpectrum sigma_maj(sigma_t * node.maxDensity);
-
-            // At what u value do we hit the the cell exit point?
-            Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
-            if (u >= uEnd) {
-                // exit this cell w/o a scattering event
-                u = (u - uEnd) / (1 - uEnd);  // remap to [0,1)
-                return OctreeTraversal::Continue;
-            }
-
-            Float t = t0 + SampleExponential(u, sigma_maj[0]);
-            CHECK_RARE(1e-5, t > t1);
-
-            if (t >= tMax) {
-                // Nothing before the geom intersection; get out of here
-                mediumSample = MediumSample(FastExp(-sigma_maj * (tMax - t0)));
-                return OctreeTraversal::Abort;
-            }
-
-            // Scattering event (of some sort)
-            Point3f p = ray(t);
-            SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
-
-            if (densityGrid) {
-                Float density = densityGrid->Lookup(p);
-                sigma_a *= density;
-                sigma_s *= density;
-            } else {
-                RGB density = rgbDensityGrid->Lookup(p);
-                CHECK_LE(density.r, node.maxDensity);
-                CHECK_LE(density.g, node.maxDensity);
-                CHECK_LE(density.b, node.maxDensity);
-                SampledSpectrum spec =
-                    RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
-                sigma_a *= spec;
-                sigma_s *= spec;
-            }
-
-            MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
-                                   sigma_a, sigma_s, sigma_maj, Le(p, lambda), this,
-                                   &phase);
-            mediumSample = MediumSample(intr, t, Tmaj);
-            return OctreeTraversal::Abort;
-        });
-
-    return mediumSample;
 }
 
 GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
