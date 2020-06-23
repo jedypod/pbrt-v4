@@ -293,27 +293,31 @@ std::string ProjectiveCamera::BaseToString() const {
 }
 
 CameraHandle CameraHandle::Create(const std::string &name,
-                                  const ParameterDictionary &dict, MediumHandle medium,
+                                  const ParameterDictionary &parameters, MediumHandle medium,
                                   const CameraTransform &cameraTransform, FilmHandle film,
                                   const FileLoc *loc, Allocator alloc) {
     CameraHandle camera;
     if (name == "perspective")
         camera =
-            PerspectiveCamera::Create(dict, cameraTransform, film, medium, loc, alloc);
+            PerspectiveCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                      alloc);
     else if (name == "orthographic")
         camera =
-            OrthographicCamera::Create(dict, cameraTransform, film, medium, loc, alloc);
+            OrthographicCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                       alloc);
     else if (name == "realistic")
-        camera = RealisticCamera::Create(dict, cameraTransform, film, medium, loc, alloc);
+        camera = RealisticCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                         alloc);
     else if (name == "spherical")
-        camera = SphericalCamera::Create(dict, cameraTransform, film, medium, loc, alloc);
+        camera = SphericalCamera::Create(parameters, cameraTransform, film, medium, loc,
+                                         alloc);
     else
         ErrorExit(loc, "%s: camera type unknown.", name);
 
     if (!camera)
         ErrorExit(loc, "%s: unable to create camera.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return camera;
 }
 
@@ -392,22 +396,22 @@ std::string OrthographicCamera::ToString() const {
                         BaseToString(), dxCamera, dyCamera);
 }
 
-OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &dict,
+OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parameters,
                                                const CameraTransform &cameraTransform,
                                                FilmHandle film, MediumHandle medium,
                                                const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e6f);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6f);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -421,7 +425,7 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -623,22 +627,22 @@ std::string PerspectiveCamera::ToString() const {
                         BaseToString(), dxCamera, dyCamera, A, cosTotalWidth);
 }
 
-PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
+PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &parameters,
                                              const CameraTransform &cameraTransform,
                                              FilmHandle film, MediumHandle medium,
                                              const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e6);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -652,7 +656,7 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -662,7 +666,7 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &dict,
         } else
             Error(loc, "\"screenwindow\" should have four values");
     }
-    Float fov = dict.GetOneFloat("fov", 90.);
+    Float fov = parameters.GetOneFloat("fov", 90.);
     return alloc.new_object<PerspectiveCamera>(cameraTransform, screen, shutteropen,
                                                shutterclose, lensradius, focaldistance,
                                                fov, film, medium);
@@ -689,22 +693,22 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(
     return CameraRay{RenderFromCamera(ray)};
 }
 
-SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
+SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
-    Float lensradius = dict.GetOneFloat("lensradius", 0.f);
-    Float focaldistance = dict.GetOneFloat("focaldistance", 1e30f);
+    Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
+    Float focaldistance = parameters.GetOneFloat("focaldistance", 1e30f);
     Float frame =
-        dict.GetOneFloat("frameaspectratio",
+        parameters.GetOneFloat("frameaspectratio",
                          Float(film.FullResolution().x) / Float(film.FullResolution().y));
     Bounds2f screen;
     if (frame > 1.f) {
@@ -718,7 +722,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
         screen.pMin.y = -1.f / frame;
         screen.pMax.y = 1.f / frame;
     }
-    std::vector<Float> sw = dict.GetFloatArray("screenwindow");
+    std::vector<Float> sw = parameters.GetFloatArray("screenwindow");
     if (!sw.empty()) {
         if (sw.size() == 4) {
             screen.pMin.x = sw[0];
@@ -731,7 +735,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &dict,
     (void)lensradius;     // don't need this
     (void)focaldistance;  // don't need this
 
-    std::string m = dict.GetOneString("mapping", "equiarea");
+    std::string m = parameters.GetOneString("mapping", "equiarea");
     Mapping mapping;
     if (m == "equiarea")
         mapping = EquiArea;
@@ -1456,12 +1460,12 @@ std::string RealisticCamera::ToString() const {
                         exitPupilBounds);
 }
 
-RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
+RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
-    Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
+    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
+    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
         Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
                 shutterclose, shutteropen);
@@ -1469,11 +1473,11 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
     }
 
     // Realistic camera-specific parameters
-    std::string lensFile = ResolveFilename(dict.GetOneString("lensfile", ""));
-    Float apertureDiameter = dict.GetOneFloat("aperturediameter", 1.0);
-    Float focusDistance = dict.GetOneFloat("focusdistance", 10.0);
-    Float dispersionFactor = dict.GetOneFloat("dispersionfactor", 0.);
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    std::string lensFile = ResolveFilename(parameters.GetOneString("lensfile", ""));
+    Float apertureDiameter = parameters.GetOneFloat("aperturediameter", 1.0);
+    Float focusDistance = parameters.GetOneFloat("focusdistance", 10.0);
+    Float dispersionFactor = parameters.GetOneFloat("dispersionfactor", 0.);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
 
     if (lensFile.empty()) {
         Error(loc, "No lens description file supplied!");
@@ -1521,7 +1525,7 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &dict,
         return image;
     };
 
-    std::string apertureName = ResolveFilename(dict.GetOneString("aperture", ""));
+    std::string apertureName = ResolveFilename(parameters.GetOneString("aperture", ""));
     pstd::optional<Image> apertureImage;
     if (!apertureName.empty()) {
         // built-in diaphragm shapes

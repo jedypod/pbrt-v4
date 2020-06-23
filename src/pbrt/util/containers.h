@@ -868,6 +868,10 @@ class TypedIndexSpan {
 template <typename T>
 class SampledGrid {
 public:
+    using const_iterator = typename pstd::vector<T>::const_iterator;
+
+    SampledGrid() = default;
+    SampledGrid(Allocator alloc) : values(alloc) { }
     SampledGrid(pstd::span<const T> v, int nx, int ny, int nz,
                 Allocator alloc)
         : values(v.begin(), v.end(), alloc), nx(nx), ny(ny), nz(nz) {
@@ -875,6 +879,13 @@ public:
     }
 
     size_t BytesAllocated() const { return values.size() * sizeof(T); }
+
+    int xSize() const { return nx; }
+    int ySize() const { return ny; }
+    int zSize() const { return nz; }
+
+    const_iterator begin() const { return values.begin(); }
+    const_iterator end() const { return values.end(); }
 
     PBRT_CPU_GPU
     T Lookup(const Point3f &p) const {
@@ -897,11 +908,11 @@ public:
     T Lookup(const Point3i &p) const {
         Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
         if (!InsideExclusive(p, sampleBounds))
-            return 0;
+            return {};
         return values[(p.z * ny + p.y) * nx + p.x];
     }
 
-    Float MaximumValue(const Bounds3f &bounds) const {
+    T MaximumValue(const Bounds3f &bounds) const {
         Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
                                  bounds.pMin.z * nz - .5f),
                          Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
@@ -910,13 +921,15 @@ public:
                          Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
                              Point3i(nx - 1, ny - 1, nz - 1))};
 
-        Float max = -Infinity;
+        T maxValue = Lookup(Point3i(pi[0]));
         for (int z = pi[0].z; z <= pi[1].z; ++z)
             for (int y = pi[0].y; y <= pi[1].y; ++y)
-                for (int x = pi[0].x; x <= pi[1].x; ++x)
-                    max = std::max(max, Lookup(Point3i(x, y, z)));
+                for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                    using std::max;
+                    maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
+                }
 
-        return max;
+        return maxValue;
     }
 
     std::string ToString() const {

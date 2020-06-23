@@ -33,19 +33,14 @@ std::string PhaseFunctionHandle::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
-    switch (Tag()) {
-    case TypeIndex<HenyeyGreensteinPhaseFunction>():
-        return Cast<HenyeyGreensteinPhaseFunction>()->ToString();
-    default:
-        LOG_FATAL("Unhandled phase function");
-        return {};
-    }
+    auto ts = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(ts);
 }
 
 std::string NewMediumSample::ToString() const {
     return StringPrintf("[ NewMediumSample intr: %s t: %f sigma_a: %s sigma_s: %s "
-                        "sigma_nt: %f Tn: %f ]",
-                        "YOLO INTR" /*intr*/, t, sigma_a, sigma_s, sigma_nt, Tn);
+                        "sigma_maj: %f Le: %s, Tmaj: %f ]",
+                        intr, t, sigma_a, sigma_s, sigma_maj, Le, Tmaj);
 }
 
 // Media Definitions
@@ -134,23 +129,21 @@ bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigm
     return false;
 }
 
+bool MediumHandle::IsEmissive() const {
+    auto is = [&](auto ptr) { return ptr->IsEmissive(); };
+    return ApplyCPU<bool>(is);
+}
+
 std::string MediumHandle::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
-    switch (Tag()) {
-    case TypeIndex<HomogeneousMedium>():
-        return Cast<HomogeneousMedium>()->ToString();
-    case TypeIndex<GridDensityMedium>():
-        return Cast<GridDensityMedium>()->ToString();
-    default:
-        LOG_FATAL("Unhandled medium");
-        return {};
-    };
+    auto ts = [&](auto ptr) { return ptr->ToString(); };
+    return ApplyCPU<std::string>(ts);
 }
 
 // HomogeneousMedium Method Definitions
-pstd::optional<NewMediumSample> HomogeneousMedium::SampleTn(
+pstd::optional<NewMediumSample> HomogeneousMedium::SampleTmaj(
     const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
     // So t corresponds to distance...
@@ -160,48 +153,54 @@ pstd::optional<NewMediumSample> HomogeneousMedium::SampleTn(
     SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
     SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
     SampledSpectrum sigma_t = sigma_a + sigma_s;
-    Float sigma_nt = sigma_t.MaxComponentValue();
+    Float sigma_maj = sigma_t.MaxComponentValue();
 
-    Float t = SampleExponential(u, sigma_nt);
+    Float t = SampleExponential(u, sigma_maj);
     if (t >= tMax)
         return {};
 
-    Float Tn = FastExp(-t * sigma_nt);
+    Float Tmaj = FastExp(-t * sigma_maj);
 
+    SampledSpectrum Le = Le_spec.Sample(lambda);
     MediumInteraction intr(rayp(t), -rayp.d, ray.time, this, &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_nt, Tn};
+    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le};
 }
 
-HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &dict,
+HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = dict.GetOneString("preset", "");
+    std::string preset = parameters.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
     if (sig_a == nullptr) {
-        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
+                                            alloc);
+    if (Le == nullptr)
+        Le = alloc.new_object<ConstantSpectrum>(0.f);
+
+    Float scale = parameters.GetOneFloat("scale", 1.f);
     if (scale != 1) {
         sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
         sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
     }
 
-    Float g = dict.GetOneFloat("g", 0.0f);
+    Float g = parameters.GetOneFloat("g", 0.0f);
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, g, alloc);
+    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, Le, g, alloc);
 }
 
 std::string HomogeneousMedium::ToString() const {
@@ -209,23 +208,32 @@ std::string HomogeneousMedium::ToString() const {
                         sigma_a_spec, sigma_s_spec, g);
 }
 
-STAT_MEMORY_COUNTER("Memory/Volume density grid", densityBytes);
+STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 STAT_MEMORY_COUNTER("Memory/Volume density octree", densityOctreeBytes);
 
 // GridDensityMedium Method Definitions
 GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s,
-                                     Float g, int nx, int ny, int nz,
+                                     SpectrumHandle Le, Float g,
                                      const Transform &worldFromMedium,
-                                     std::vector<Float> d, Allocator alloc)
+                                     pstd::optional<SampledGrid<Float>> dgrid,
+                                     pstd::optional<SampledGrid<RGB>> rgbgrid,
+                                     const RGBColorSpace *colorSpace,
+                                     SampledGrid<Float> Legrid, Allocator alloc)
     : sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
+      Le_spec(Le, alloc),
       phase(g),
       g(g),
       mediumFromWorld(Inverse(worldFromMedium)),
       worldFromMedium(worldFromMedium),
-      densityGrid(d, nx, ny, nz, alloc),
+      densityGrid(std::move(dgrid)),
+      rgbDensityGrid(std::move(rgbgrid)),
+      colorSpace(colorSpace),
+      LeScaleGrid(std::move(Legrid)),
       treeBufferResource(256 * 1024, alloc.resource()) {
-    densityBytes += densityGrid.BytesAllocated();
+    volumeGridBytes += LeScaleGrid.BytesAllocated();
+    volumeGridBytes += densityGrid ? densityGrid->BytesAllocated() :
+        rgbDensityGrid->BytesAllocated();
 
     // Create densityOctree. For starters, make the full thing. (Probably
     // not the best approach).
@@ -282,7 +290,45 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
                                     const Bounds3f &bounds, int depth) {
     if (depth == 0) {
         // leaf
-        node->maxDensity = densityGrid.MaximumValue(bounds);
+        if (densityGrid)
+            node->maxDensity = densityGrid->MaximumValue(bounds);
+        else {
+            int nx = rgbDensityGrid->xSize();
+            int ny = rgbDensityGrid->ySize();
+            int nz = rgbDensityGrid->zSize();
+            Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
+                                     bounds.pMin.z * nz - .5f),
+                             Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
+                                     bounds.pMax.z * nz - .5f)};
+            Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+                             Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
+                                 Point3i(nx - 1, ny - 1, nz - 1))};
+
+            std::vector<SampledWavelengths> lambdas;
+            for (Float u : Stratified1D(16))
+                lambdas.push_back(SampledWavelengths::SampleImportance(u));
+
+            node->maxDensity = 0;
+            for (int z = pi[0].z; z <= pi[1].z; ++z)
+                for (int y = pi[0].y; y <= pi[1].y; ++y)
+                    for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                        RGB rgb = rgbDensityGrid->Lookup(Point3i(x, y, z));
+
+                        Float maxComponent = std::max({rgb.r, rgb.g, rgb.b});
+                        if (maxComponent == 0)
+                            continue;
+
+                        RGBSpectrum spec(*colorSpace, rgb);
+                        for (const SampledWavelengths &lambda : lambdas) {
+                            SampledSpectrum s = spec.Sample(lambda);
+                            node->maxDensity =
+                                std::max(node->maxDensity, s.MaxComponentValue());
+                        }
+                    }
+
+            node->maxDensity *= 1.025f;
+        }
+
         CHECK_GE(node->maxDensity, 0);
         return;
     }
@@ -293,15 +339,12 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         buildOctree(node->child(i), alloc, OctreeChildBounds(bounds, i), depth - 1);
     }
 
-    node->minDensity = node->child(0)->minDensity;
     node->maxDensity = node->child(0)->maxDensity;
-    for (int i = 1; i < 8; ++i) {
-        node->minDensity = std::min(node->minDensity, node->child(i)->minDensity);
+    for (int i = 1; i < 8; ++i)
         node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
-    }
 }
 
-pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
+pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
     const Ray &rWorld, Float raytMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
     raytMax *= Length(rWorld.d);
@@ -319,14 +362,14 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
     SampledSpectrum sigma_t = sigma_a + sigma_s;
 
 #if 0
-    Float sigma_nt = sigma_t.MaxComponentValue() * densityOctree.maxDensity;
+    Float sigma_maj = sigma_t.MaxComponentValue() * densityOctree.maxDensity;
     // Simple, octree-free...
-    Float t = tMin + SampleExponential(u, sigma_nt);
+    Float t = tMin + SampleExponential(u, sigma_maj);
     if (t >= tMax)
         return {};
 
     Point3f p = ray(t);
-    Float Tn = Exp(-sigma_nt * (t - tMin));
+    Float Tmaj = Exp(-sigma_maj * (t - tMin));
 
     Float density = densityGrid.Lookup(p);
     sigma_a *= density;
@@ -334,7 +377,7 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
     MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time, this,
                            &phase);
-    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_nt, Tn};
+    return NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj, Le(p, lambda)};
 
 #else  // SIMPLE - no octree
     pstd::optional<NewMediumSample> mediumSample;
@@ -346,19 +389,17 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
-
-            Float sigma_nt = sigma_t.MaxComponentValue() * node.maxDensity;
+            Float sigma_maj = sigma_t.MaxComponentValue() * node.maxDensity;
 
             // At what u value do we hit the the cell exit point?
-            Float uEnd = InvertExponentialSample(t1 - t0, sigma_nt);
+            Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj);
             if (u >= uEnd) {
                 // exit this cell w/o a scattering event
-                u = (u - uEnd) / (1 - uEnd);
+                u = (u - uEnd) / (1 - uEnd);  // remap to [0,1)
                 return OctreeTraversal::Continue;
             }
 
-            Float t = t0 + SampleExponential(u, sigma_nt);
+            Float t = t0 + SampleExponential(u, sigma_maj);
             CHECK_RARE(1e-5, t > t1);
 
             if (t >= tMax)  // raytMax)
@@ -367,28 +408,28 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 
             // Scattering event (of some sort)
             Point3f p = ray(t);
-            Float Tn = FastExp(-sigma_nt * (t - t0));
+            Float Tmaj = FastExp(-sigma_maj * (t - t0));
 
-            Float density = densityGrid.Lookup(p);
-
-            static bool doRGB = getenv("RGB");
-            if (doRGB) {
-                RGB rgb(FBm(p, Vector3f(0, 0, 0), Vector3f(0, 0, 0), 1.99f, 5),
-                        FBm(.5f * p + Vector3f(5.1, 25.2, -3.2), Vector3f(0, 0, 0),
-                            Vector3f(0, 0, 0), 1.99f, 5),
-                        FBm(2.5f * p + Vector3f(-6.8, 5.7, -2.09), Vector3f(0, 0, 0),
-                            Vector3f(0, 0, 0), 1.99f, 5));
-                rgb = RGB(0.25, 0.25, 0.25) + 0.5 * Clamp(rgb, 0, 1);
-                RGBSpectrum spec(*RGBColorSpace::sRGB, rgb);
-                sigma_a *= spec.Sample(lambda);
-                sigma_s *= spec.Sample(lambda);
+            if (densityGrid) {
+                Float density = densityGrid->Lookup(p);
+                sigma_a *= density;
+                sigma_s *= density;
+            } else {
+                RGB density = rgbDensityGrid->Lookup(p);
+                CHECK_LE(density.r, node.maxDensity);
+                CHECK_LE(density.g, node.maxDensity);
+                CHECK_LE(density.b, node.maxDensity);
+                SampledSpectrum spec =
+                    RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
+                LOG_VERBOSE("rgb %s spec %s", density, spec);
+                sigma_a *= spec;
+                sigma_s *= spec;
             }
-            sigma_a *= density;
-            sigma_s *= density;
 
             MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
                                    this, &phase);
-            mediumSample = NewMediumSample{intr, t, sigma_a, sigma_s, sigma_nt, Tn};
+            mediumSample = NewMediumSample{intr, t, sigma_a, sigma_s, sigma_maj, Tmaj,
+                                           Le(p, lambda)};
             return OctreeTraversal::Abort;
         });
 
@@ -396,60 +437,86 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTn(
 #endif  // !SIMPLE - no octree
 }
 
-GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
+GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
                                              const Transform &worldFromMedium,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = dict.GetOneString("preset", "");
+    std::string preset = parameters.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
 
     if (sig_a == nullptr) {
-        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    Float scale = dict.GetOneFloat("scale", 1.f);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
     if (scale != 1) {
         sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
         sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
     }
 
-    Float g = dict.GetOneFloat("g", 0.0f);
+    Float g = parameters.GetOneFloat("g", 0.0f);
 
-    std::vector<Float> density = dict.GetFloatArray("density");
-    if (density.empty()) {
-        Error(loc, "No \"density\" values provided for heterogeneous medium?");
-        return nullptr;
-    }
-    int nx = dict.GetOneInt("nx", 1);
-    int ny = dict.GetOneInt("ny", 1);
-    int nz = dict.GetOneInt("nz", 1);
-    Point3f p0 = dict.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-    Point3f p1 = dict.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-    if (density.size() != nx * ny * nz) {
-        Error(loc,
-              "GridDensityMedium has %d density values; expected nx*ny*nz = "
-              "%d",
-              (int)density.size(), nx * ny * nz);
-        return nullptr;
+    std::vector<Float> density = parameters.GetFloatArray("density");
+    std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
+    if (density.empty() && rgbDensity.empty())
+        ErrorExit(loc, "No \"density\" values provided for heterogeneous medium.");
+    if (!density.empty() && !rgbDensity.empty())
+        ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
+
+    int nx = parameters.GetOneInt("nx", 1);
+    int ny = parameters.GetOneInt("ny", 1);
+    int nz = parameters.GetOneInt("nz", 1);
+    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+    size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
+    if (nDensity != nx * ny * nz)
+        ErrorExit(loc, "GridDensityMedium has %d density values; expected nx*ny*nz = %d",
+                  nDensity, nx * ny * nz);
+
+    const RGBColorSpace *colorSpace = parameters.ColorSpace();
+
+    pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    if (density.size())
+        densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
+    else
+        rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
+
+    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
+                                            alloc);
+    if (Le == nullptr)
+        Le = alloc.new_object<ConstantSpectrum>(0.f);
+
+    SampledGrid<Float> LeGrid(alloc);
+    std::vector<Float> LeScale = parameters.GetFloatArray("Lescale");
+    if (LeScale.empty())
+        LeGrid = SampledGrid<Float>({1.f}, 1, 1, 1, alloc);
+    else {
+        if (LeScale.size() != nx * ny * nz)
+            ErrorExit("Expected %d x %d %d = %d values for \"Lescale\" but were "
+                      "given %d.", nx, ny, nz, nx * ny * nz, LeScale.size());
+        LeGrid = SampledGrid<Float>(LeScale, nx, ny, nz, alloc);
     }
 
     Transform MediumFromData =
         Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-    return alloc.new_object<GridDensityMedium>(sig_a, sig_s, g, nx, ny, nz,
+    return alloc.new_object<GridDensityMedium>(sig_a, sig_s, Le, g,
                                                worldFromMedium * MediumFromData,
-                                               std::move(density), alloc);
+                                               std::move(densityGrid),
+                                               std::move(rgbDensityGrid), colorSpace,
+                                               std::move(LeGrid), alloc);
 }
 
 std::string GridDensityMedium::ToString() const {
@@ -460,21 +527,21 @@ std::string GridDensityMedium::ToString() const {
 }
 
 MediumHandle MediumHandle::Create(const std::string &name,
-                                  const ParameterDictionary &dict,
+                                  const ParameterDictionary &parameters,
                                   const Transform &worldFromMedium, const FileLoc *loc,
                                   Allocator alloc) {
     MediumHandle m = nullptr;
     if (name == "homogeneous")
-        m = HomogeneousMedium::Create(dict, loc, alloc);
+        m = HomogeneousMedium::Create(parameters, loc, alloc);
     else if (name == "heterogeneous")
-        m = GridDensityMedium::Create(dict, worldFromMedium, loc, alloc);
+        m = GridDensityMedium::Create(parameters, worldFromMedium, loc, alloc);
     else
         ErrorExit(loc, "%s: medium unknown.", name);
 
     if (!m)
         ErrorExit(loc, "%s: unable to create medium.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return m;
 }
 

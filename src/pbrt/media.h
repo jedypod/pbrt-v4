@@ -71,12 +71,13 @@ struct NewMediumSample {
     MediumInteraction intr;
     Float t;
     SampledSpectrum sigma_a, sigma_s;
-    Float sigma_nt, Tn;
+    Float sigma_maj, Tmaj;
+    SampledSpectrum Le;
 
     PBRT_CPU_GPU
     SampledSpectrum sigma_n() const {
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = SampledSpectrum(sigma_nt) - sigma_t;
+        SampledSpectrum sigma_n = SampledSpectrum(sigma_maj) - sigma_t;
         CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
         return ClampZero(sigma_n);
     }
@@ -88,9 +89,10 @@ struct NewMediumSample {
 class alignas(8) HomogeneousMedium {
   public:
     // HomogeneousMedium Public Methods
-    HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float g,
-                      Allocator alloc)
-        : sigma_a_spec(sigma_a, alloc), sigma_s_spec(sigma_s, alloc), phase(g), g(g) {}
+    HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, SpectrumHandle Le,
+                      Float g, Allocator alloc)
+        : sigma_a_spec(sigma_a, alloc), sigma_s_spec(sigma_s, alloc), Le_spec(Le, alloc),
+          phase(g), g(g) {}
 
     static HomogeneousMedium *Create(const ParameterDictionary &parameters,
                                      const FileLoc *loc, Allocator alloc);
@@ -142,15 +144,17 @@ class alignas(8) HomogeneousMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTn(const Ray &ray, Float tMax, Float u,
+    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
                                              const SampledWavelengths &lambda,
                                              ScratchBuffer *scratchBuffer) const;
+
+    bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     std::string ToString() const;
 
   private:
     // HomogeneousMedium Private Data
-    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec, Le_spec;
     HenyeyGreensteinPhaseFunction phase;
     Float g;
 };
@@ -159,9 +163,12 @@ class alignas(8) HomogeneousMedium {
 class alignas(8) GridDensityMedium {
   public:
     // GridDensityMedium Public Methods
-    GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float g, int nx,
-                      int ny, int nz, const Transform &worldFromMedium,
-                      std::vector<Float> density, Allocator alloc);
+    GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, SpectrumHandle Le,
+                      Float g, const Transform &worldFromMedium,
+                      pstd::optional<SampledGrid<Float>> densityGrid,
+                      pstd::optional<SampledGrid<RGB>> rgbDensityGrid,
+                      const RGBColorSpace *colorSpace, SampledGrid<Float> LeScaleGrid,
+                      Allocator alloc);
 
     static GridDensityMedium *Create(const ParameterDictionary &parameters,
                                      const Transform &worldFromMedium, const FileLoc *loc,
@@ -195,7 +202,7 @@ class alignas(8) GridDensityMedium {
                     // Empty--skip it!
                     return OctreeTraversal::Continue;
 
-                DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t + t1) / 2)) > node.maxDensity);
+                DCHECK_RARE(1e-5, densityGrid->Lookup(ray((t + t1) / 2)) > node.maxDensity);
                 while (true) {
                     // CO                ++nSampleSteps;
                     t +=
@@ -209,7 +216,7 @@ class alignas(8) GridDensityMedium {
                         // Nothing before the geom intersection; get out of here
                         return OctreeTraversal::Abort;
 
-                    if (densityGrid.Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
+                    if (densityGrid->Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
                         // Populate _mi_ with medium interaction information and
                         // return
                         PhaseFunctionHandle phase =
@@ -257,20 +264,10 @@ class alignas(8) GridDensityMedium {
 
                            CHECK_GE(t, .999 * tMin);
 
-                           // Residual tracking. First, account for the constant part.
-                           if (node.minDensity > 0) {
-                               Float dt = std::min(t1, tMax) - t;
-                               Tr *= Exp(-dt * node.minDensity * sigma_t);
-                               CHECK(Tr.MaxComponentValue() != Infinity);
-                               CHECK(!Tr.HasNaNs());
-                           }
-
-                           // Now do ratio tracking through the residual volume.
-                           Float sigma_bar = (node.maxDensity - node.minDensity) *
-                                             sigma_t.MaxComponentValue();
+                           // ratio tracking
+                           Float sigma_bar = node.maxDensity * sigma_t.MaxComponentValue();
                            DCHECK_GE(sigma_bar, 0);
                            if (sigma_bar == 0)
-                               // There's no residual; go on to the next octree node.
                                return OctreeTraversal::Continue;
 
                            while (true) {
@@ -284,7 +281,7 @@ class alignas(8) GridDensityMedium {
                                    // past hit point. stop
                                    return OctreeTraversal::Abort;
 
-                               Float density = densityGrid.Lookup(ray(t)) - node.minDensity;
+                               Float density = densityGrid->Lookup(ray(t));
                                CHECK_RARE(1e-9, density < 0);
                                density = std::max<Float>(density, 0);
 
@@ -313,21 +310,22 @@ class alignas(8) GridDensityMedium {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<NewMediumSample> SampleTn(const Ray &ray, Float tMax, Float u,
+    pstd::optional<NewMediumSample> SampleTmaj(const Ray &ray, Float tMax, Float u,
                                              const SampledWavelengths &lambda,
                                              ScratchBuffer *scratchBuffer) const;
+
+    bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     std::string ToString() const;
 
   private:
     struct OctreeNode {
-        Float minDensity, maxDensity;  //  unused for interior nodes
+        Float maxDensity;  //  unused for interior nodes
         pstd::array<OctreeNode *, 8> *children = nullptr;
-        Bounds3f bounds;
 
         PBRT_CPU_GPU
         OctreeNode *&child(int n) {
-            CHECK(children);
+            DCHECK(children);
             return (*children)[n];
         }
 
@@ -341,12 +339,22 @@ class alignas(8) GridDensityMedium {
     void simplifyOctree(OctreeNode *node, const Bounds3f &bounds, Float SE,
                         Float sigma_t);
 
+    PBRT_CPU_GPU
+    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+        return Le_spec.Sample(lambda) * LeScaleGrid.Lookup(p);
+    }
+
     // GridDensityMedium Private Data
-    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec, Le_spec;
     HenyeyGreensteinPhaseFunction phase;
     Float g;
     Transform mediumFromWorld, worldFromMedium;
-    SampledGrid<Float> densityGrid;
+
+    pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    const RGBColorSpace *colorSpace;
+
+    SampledGrid<Float> LeScaleGrid;
     OctreeNode densityOctree;
     pstd::pmr::monotonic_buffer_resource treeBufferResource;
 };
@@ -381,10 +389,11 @@ inline MediumSample MediumHandle::Sample(const Ray &ray, Float tMax, RNG &rng,
     return Apply<MediumSample>(sample);
 }
 
-inline pstd::optional<NewMediumSample> MediumHandle::SampleTn(
+inline pstd::optional<NewMediumSample> MediumHandle::SampleTmaj(
     const Ray &ray, Float tMax, Float u, const SampledWavelengths &lambda,
     ScratchBuffer *scratchBuffer) const {
-    auto sampletn = [&](auto ptr) { return ptr->SampleTn(ray, tMax, u, lambda, scratchBuffer); };
+    auto sampletn = [&](auto ptr) { return ptr->SampleTmaj(ray, tMax, u, lambda,
+                                                           scratchBuffer); };
     return Apply<pstd::optional<NewMediumSample>>(sampletn);
 }
 

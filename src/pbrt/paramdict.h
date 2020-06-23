@@ -78,6 +78,7 @@ class ParameterDictionary {
                                                  SpectrumType spectrumType,
                                                  Allocator alloc) const;
     std::vector<std::string> GetStringArray(const std::string &name) const;
+    std::vector<RGB> GetRGBArray(const std::string &name) const;
 
     // For --upgrade only
     pstd::optional<RGB> GetOneRGB(const std::string &name) const;

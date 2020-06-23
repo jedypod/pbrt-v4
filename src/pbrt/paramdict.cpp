@@ -487,6 +487,24 @@ std::string ParameterDictionary::GetTexture(const std::string &name) const {
     return "";
 }
 
+std::vector<RGB> ParameterDictionary::GetRGBArray(const std::string &name) const {
+    for (const ParsedParameter *p : params) {
+        if (p->name == name && p->type == "rgb") {
+            if (p->numbers.size() % 3)
+                ErrorExit(&p->loc, "Number of values given for \"rgb\" parameter %d "
+                          "\"name\" isn't a multiple of 3.");
+
+            std::vector<RGB> rgb(p->numbers.size() / 3);
+            for (int i = 0; i < p->numbers.size() / 3; ++i)
+                rgb[i] = RGB(p->numbers[3*i], p->numbers[3*i + 1], p->numbers[3*i + 2]);
+
+            p->lookedUp = true;
+            return rgb;
+        }
+    }
+    return {};
+}
+
 pstd::optional<RGB> ParameterDictionary::GetOneRGB(const std::string &name) const {
     for (const ParsedParameter *p : params) {
         if (p->name == name && p->type == "rgb") {

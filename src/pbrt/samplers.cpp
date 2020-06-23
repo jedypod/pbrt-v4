@@ -58,13 +58,13 @@ std::string HaltonSampler::ToString() const {
                         dimension, samplesPerPixel, rng);
 }
 
-HaltonSampler *HaltonSampler::Create(const ParameterDictionary &dict,
+HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
                                      const Point2i &fullResolution, const FileLoc *loc,
                                      Allocator alloc) {
-    int nsamp = dict.GetOneInt("pixelsamples", 16);
+    int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
         nsamp = *Options->pixelSamples;
-    int seed = dict.GetOneInt("seed", Options->seed);
+    int seed = parameters.GetOneInt("seed", Options->seed);
     if (Options->quickRender)
         nsamp = 1;
 
@@ -108,9 +108,9 @@ std::vector<SamplerHandle> PaddedSobolSampler::Clone(int n, Allocator alloc) {
     return samplers;
 }
 
-PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &dict,
+PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parameters,
                                                const FileLoc *loc, Allocator alloc) {
-    int nsamp = dict.GetOneInt("pixelsamples", 16);
+    int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
         nsamp = *Options->pixelSamples;
     if (Options->quickRender)
@@ -118,7 +118,8 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &dict,
 
     RandomizeStrategy randomizer;
     std::string s =
-        dict.GetOneString("randomization", nsamp <= 2 ? "cranleypatterson" : "owen");
+        parameters.GetOneString("randomization",
+                                nsamp <= 2 ? "cranleypatterson" : "owen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
@@ -174,9 +175,9 @@ std::string PMJ02BNSampler::ToString() const {
                         pmjInstance, pixelSamples);
 }
 
-PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &dict,
+PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &parameters,
                                        const FileLoc *loc, Allocator alloc) {
-    int nsamp = dict.GetOneInt("pixelsamples", 16);
+    int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
         nsamp = *Options->pixelSamples;
     if (Options->quickRender)
@@ -199,12 +200,12 @@ std::vector<SamplerHandle> RandomSampler::Clone(int n, Allocator alloc) {
     return samplers;
 }
 
-RandomSampler *RandomSampler::Create(const ParameterDictionary &dict, const FileLoc *loc,
+RandomSampler *RandomSampler::Create(const ParameterDictionary &parameters, const FileLoc *loc,
                                      Allocator alloc) {
-    int ns = dict.GetOneInt("pixelsamples", 4);
+    int ns = parameters.GetOneInt("pixelsamples", 4);
     if (Options->pixelSamples)
         ns = *Options->pixelSamples;
-    int seed = dict.GetOneInt("seed", Options->seed);
+    int seed = parameters.GetOneInt("seed", Options->seed);
     return alloc.new_object<RandomSampler>(ns, seed);
 }
 
@@ -217,17 +218,17 @@ std::string SobolSampler::ToString() const {
                         sequenceIndex, rng, randomizeStrategy);
 }
 
-SobolSampler *SobolSampler::Create(const ParameterDictionary &dict,
+SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
                                    const Point2i &fullResolution, const FileLoc *loc,
                                    Allocator alloc) {
-    int nsamp = dict.GetOneInt("pixelsamples", 16);
+    int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
         nsamp = *Options->pixelSamples;
     if (Options->quickRender)
         nsamp = 1;
 
     RandomizeStrategy randomizer;
-    std::string s = dict.GetOneString("randomization", "owen");
+    std::string s = parameters.GetOneString("randomization", "owen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
@@ -261,11 +262,11 @@ std::vector<SamplerHandle> StratifiedSampler::Clone(int n, Allocator alloc) {
     return samplers;
 }
 
-StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &dict,
+StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
-    bool jitter = dict.GetOneBool("jitter", true);
-    int xSamples = dict.GetOneInt("xsamples", 4);
-    int ySamples = dict.GetOneInt("ysamples", 4);
+    bool jitter = parameters.GetOneBool("jitter", true);
+    int xSamples = parameters.GetOneInt("xsamples", 4);
+    int ySamples = parameters.GetOneInt("ysamples", 4);
     if (Options->pixelSamples) {
         int nSamples = *Options->pixelSamples;
         int div = std::sqrt(nSamples);
@@ -280,7 +281,7 @@ StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &dict,
     }
     if (Options->quickRender)
         xSamples = ySamples = 1;
-    int seed = dict.GetOneInt("seed", Options->seed);
+    int seed = parameters.GetOneInt("seed", Options->seed);
 
     return alloc.new_object<StratifiedSampler>(xSamples, ySamples, jitter, seed);
 }
@@ -385,29 +386,29 @@ DebugMLTSampler DebugMLTSampler::Create(pstd::span<const std::string> state,
 }
 
 SamplerHandle SamplerHandle::Create(const std::string &name,
-                                    const ParameterDictionary &dict,
+                                    const ParameterDictionary &parameters,
                                     const Point2i &fullResolution, const FileLoc *loc,
                                     Allocator alloc) {
     SamplerHandle sampler = nullptr;
     if (name == "paddedsobol")
-        sampler = PaddedSobolSampler::Create(dict, loc, alloc);
+        sampler = PaddedSobolSampler::Create(parameters, loc, alloc);
     else if (name == "halton")
-        sampler = HaltonSampler::Create(dict, fullResolution, loc, alloc);
+        sampler = HaltonSampler::Create(parameters, fullResolution, loc, alloc);
     else if (name == "sobol")
-        sampler = SobolSampler::Create(dict, fullResolution, loc, alloc);
+        sampler = SobolSampler::Create(parameters, fullResolution, loc, alloc);
     else if (name == "random")
-        sampler = RandomSampler::Create(dict, loc, alloc);
+        sampler = RandomSampler::Create(parameters, loc, alloc);
     else if (name == "pmj02bn")
-        sampler = PMJ02BNSampler::Create(dict, loc, alloc);
+        sampler = PMJ02BNSampler::Create(parameters, loc, alloc);
     else if (name == "stratified")
-        sampler = StratifiedSampler::Create(dict, loc, alloc);
+        sampler = StratifiedSampler::Create(parameters, loc, alloc);
     else
         ErrorExit(loc, "%s: sampler type unknown.", name);
 
     if (!sampler)
         ErrorExit(loc, "%s: unable to create sampler.", name);
 
-    dict.ReportUnused();
+    parameters.ReportUnused();
     return sampler;
 }
 
