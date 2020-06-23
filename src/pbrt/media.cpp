@@ -215,7 +215,9 @@ STAT_MEMORY_COUNTER("Memory/Volume density octree", densityOctreeBytes);
 GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s,
                                      SpectrumHandle Le, Float g,
                                      const Transform &worldFromMedium,
-                                     SampledGrid<Float> dgrid,
+                                     pstd::optional<SampledGrid<Float>> dgrid,
+                                     pstd::optional<SampledGrid<RGB>> rgbgrid,
+                                     const RGBColorSpace *colorSpace,
                                      SampledGrid<Float> Legrid, Allocator alloc)
     : sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
@@ -225,9 +227,13 @@ GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigm
       mediumFromWorld(Inverse(worldFromMedium)),
       worldFromMedium(worldFromMedium),
       densityGrid(std::move(dgrid)),
+      rgbDensityGrid(std::move(rgbgrid)),
+      colorSpace(colorSpace),
       LeScaleGrid(std::move(Legrid)),
       treeBufferResource(256 * 1024, alloc.resource()) {
-    volumeGridBytes += densityGrid.BytesAllocated() + LeScaleGrid.BytesAllocated();
+    volumeGridBytes += LeScaleGrid.BytesAllocated();
+    volumeGridBytes += densityGrid ? densityGrid->BytesAllocated() :
+        rgbDensityGrid->BytesAllocated();
 
     // Create densityOctree. For starters, make the full thing. (Probably
     // not the best approach).
@@ -284,7 +290,45 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
                                     const Bounds3f &bounds, int depth) {
     if (depth == 0) {
         // leaf
-        node->maxDensity = densityGrid.MaximumValue(bounds);
+        if (densityGrid)
+            node->maxDensity = densityGrid->MaximumValue(bounds);
+        else {
+            int nx = rgbDensityGrid->xSize();
+            int ny = rgbDensityGrid->ySize();
+            int nz = rgbDensityGrid->zSize();
+            Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
+                                     bounds.pMin.z * nz - .5f),
+                             Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
+                                     bounds.pMax.z * nz - .5f)};
+            Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+                             Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
+                                 Point3i(nx - 1, ny - 1, nz - 1))};
+
+            std::vector<SampledWavelengths> lambdas;
+            for (Float u : Stratified1D(16))
+                lambdas.push_back(SampledWavelengths::SampleImportance(u));
+
+            node->maxDensity = 0;
+            for (int z = pi[0].z; z <= pi[1].z; ++z)
+                for (int y = pi[0].y; y <= pi[1].y; ++y)
+                    for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                        RGB rgb = rgbDensityGrid->Lookup(Point3i(x, y, z));
+
+                        Float maxComponent = std::max({rgb.r, rgb.g, rgb.b});
+                        if (maxComponent == 0)
+                            continue;
+
+                        RGBSpectrum spec(*colorSpace, rgb);
+                        for (const SampledWavelengths &lambda : lambdas) {
+                            SampledSpectrum s = spec.Sample(lambda);
+                            node->maxDensity =
+                                std::max(node->maxDensity, s.MaxComponentValue());
+                        }
+                    }
+
+            node->maxDensity *= 1.025f;
+        }
+
         CHECK_GE(node->maxDensity, 0);
         return;
     }
@@ -345,15 +389,13 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
                 // Empty--skip it!
                 return OctreeTraversal::Continue;
 
-            DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t0 + t1) / 2)) > 1.001f * node.maxDensity);
-
             Float sigma_maj = sigma_t.MaxComponentValue() * node.maxDensity;
 
             // At what u value do we hit the the cell exit point?
             Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj);
             if (u >= uEnd) {
                 // exit this cell w/o a scattering event
-                u = (u - uEnd) / (1 - uEnd);
+                u = (u - uEnd) / (1 - uEnd);  // remap to [0,1)
                 return OctreeTraversal::Continue;
             }
 
@@ -368,22 +410,21 @@ pstd::optional<NewMediumSample> GridDensityMedium::SampleTmaj(
             Point3f p = ray(t);
             Float Tmaj = FastExp(-sigma_maj * (t - t0));
 
-            Float density = densityGrid.Lookup(p);
-
-            static bool doRGB = getenv("RGB");
-            if (doRGB) {
-                RGB rgb(FBm(p, Vector3f(0, 0, 0), Vector3f(0, 0, 0), 1.99f, 5),
-                        FBm(.5f * p + Vector3f(5.1, 25.2, -3.2), Vector3f(0, 0, 0),
-                            Vector3f(0, 0, 0), 1.99f, 5),
-                        FBm(2.5f * p + Vector3f(-6.8, 5.7, -2.09), Vector3f(0, 0, 0),
-                            Vector3f(0, 0, 0), 1.99f, 5));
-                rgb = RGB(0.25, 0.25, 0.25) + 0.5 * Clamp(rgb, 0, 1);
-                RGBSpectrum spec(*RGBColorSpace::sRGB, rgb);
-                sigma_a *= spec.Sample(lambda);
-                sigma_s *= spec.Sample(lambda);
+            if (densityGrid) {
+                Float density = densityGrid->Lookup(p);
+                sigma_a *= density;
+                sigma_s *= density;
+            } else {
+                RGB density = rgbDensityGrid->Lookup(p);
+                CHECK_LE(density.r, node.maxDensity);
+                CHECK_LE(density.g, node.maxDensity);
+                CHECK_LE(density.b, node.maxDensity);
+                SampledSpectrum spec =
+                    RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
+                LOG_VERBOSE("rgb %s spec %s", density, spec);
+                sigma_a *= spec;
+                sigma_s *= spec;
             }
-            sigma_a *= density;
-            sigma_s *= density;
 
             MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
                                    this, &phase);
@@ -428,21 +469,30 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
     Float g = dict.GetOneFloat("g", 0.0f);
 
     std::vector<Float> density = dict.GetFloatArray("density");
-    if (density.empty())
-        ErrorExit(loc, "No \"density\" values provided for heterogeneous medium?");
+    std::vector<RGB> rgbDensity = dict.GetRGBArray("density");
+    if (density.empty() && rgbDensity.empty())
+        ErrorExit(loc, "No \"density\" values provided for heterogeneous medium.");
+    if (!density.empty() && !rgbDensity.empty())
+        ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
 
     int nx = dict.GetOneInt("nx", 1);
     int ny = dict.GetOneInt("ny", 1);
     int nz = dict.GetOneInt("nz", 1);
     Point3f p0 = dict.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = dict.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-    if (density.size() != nx * ny * nz)
-        ErrorExit(loc,
-              "GridDensityMedium has %d density values; expected nx*ny*nz = "
-              "%d",
-              (int)density.size(), nx * ny * nz);
+    size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
+    if (nDensity != nx * ny * nz)
+        ErrorExit(loc, "GridDensityMedium has %d density values; expected nx*ny*nz = %d",
+                  nDensity, nx * ny * nz);
 
-    SampledGrid<Float> densityGrid(density, nx, ny, nz, alloc);
+    const RGBColorSpace *colorSpace = dict.ColorSpace();
+
+    pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    if (density.size())
+        densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
+    else
+        rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
 
     SpectrumHandle Le = dict.GetOneSpectrum("Le", nullptr, SpectrumType::General,
                                             alloc);
@@ -464,8 +514,9 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &dict,
         Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
     return alloc.new_object<GridDensityMedium>(sig_a, sig_s, Le, g,
                                                worldFromMedium * MediumFromData,
-                                               std::move(densityGrid), std::move(LeGrid),
-                                               alloc);
+                                               std::move(densityGrid),
+                                               std::move(rgbDensityGrid), colorSpace,
+                                               std::move(LeGrid), alloc);
 }
 
 std::string GridDensityMedium::ToString() const {

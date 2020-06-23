@@ -165,7 +165,9 @@ class alignas(8) GridDensityMedium {
     // GridDensityMedium Public Methods
     GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, SpectrumHandle Le,
                       Float g, const Transform &worldFromMedium,
-                      SampledGrid<Float> densityGrid, SampledGrid<Float> LeScaleGrid,
+                      pstd::optional<SampledGrid<Float>> densityGrid,
+                      pstd::optional<SampledGrid<RGB>> rgbDensityGrid,
+                      const RGBColorSpace *colorSpace, SampledGrid<Float> LeScaleGrid,
                       Allocator alloc);
 
     static GridDensityMedium *Create(const ParameterDictionary &parameters,
@@ -200,7 +202,7 @@ class alignas(8) GridDensityMedium {
                     // Empty--skip it!
                     return OctreeTraversal::Continue;
 
-                DCHECK_RARE(1e-5, densityGrid.Lookup(ray((t + t1) / 2)) > node.maxDensity);
+                DCHECK_RARE(1e-5, densityGrid->Lookup(ray((t + t1) / 2)) > node.maxDensity);
                 while (true) {
                     // CO                ++nSampleSteps;
                     t +=
@@ -214,7 +216,7 @@ class alignas(8) GridDensityMedium {
                         // Nothing before the geom intersection; get out of here
                         return OctreeTraversal::Abort;
 
-                    if (densityGrid.Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
+                    if (densityGrid->Lookup(ray(t)) > rng.Uniform<Float>() * node.maxDensity) {
                         // Populate _mi_ with medium interaction information and
                         // return
                         PhaseFunctionHandle phase =
@@ -279,7 +281,7 @@ class alignas(8) GridDensityMedium {
                                    // past hit point. stop
                                    return OctreeTraversal::Abort;
 
-                               Float density = densityGrid.Lookup(ray(t));
+                               Float density = densityGrid->Lookup(ray(t));
                                CHECK_RARE(1e-9, density < 0);
                                density = std::max<Float>(density, 0);
 
@@ -348,7 +350,11 @@ class alignas(8) GridDensityMedium {
     Float g;
     Transform mediumFromWorld, worldFromMedium;
 
-    SampledGrid<Float> densityGrid, LeScaleGrid;
+    pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    const RGBColorSpace *colorSpace;
+
+    SampledGrid<Float> LeScaleGrid;
     OctreeNode densityOctree;
     pstd::pmr::monotonic_buffer_resource treeBufferResource;
 };

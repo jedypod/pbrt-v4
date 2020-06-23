@@ -868,6 +868,8 @@ class TypedIndexSpan {
 template <typename T>
 class SampledGrid {
 public:
+    using const_iterator = typename pstd::vector<T>::const_iterator;
+
     SampledGrid() = default;
     SampledGrid(Allocator alloc) : values(alloc) { }
     SampledGrid(pstd::span<const T> v, int nx, int ny, int nz,
@@ -877,6 +879,13 @@ public:
     }
 
     size_t BytesAllocated() const { return values.size() * sizeof(T); }
+
+    int xSize() const { return nx; }
+    int ySize() const { return ny; }
+    int zSize() const { return nz; }
+
+    const_iterator begin() const { return values.begin(); }
+    const_iterator end() const { return values.end(); }
 
     PBRT_CPU_GPU
     T Lookup(const Point3f &p) const {
@@ -899,7 +908,7 @@ public:
     T Lookup(const Point3i &p) const {
         Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
         if (!InsideExclusive(p, sampleBounds))
-            return 0;
+            return {};
         return values[(p.z * ny + p.y) * nx + p.x];
     }
 

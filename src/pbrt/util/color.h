@@ -149,6 +149,11 @@ class RGB {
     Float r = 0, g = 0, b = 0;
 };
 
+PBRT_CPU_GPU
+inline RGB max(const RGB &a, const RGB &b) {
+    return RGB(std::max(a.r, b.r), std::max(a.g, b.g), std::max(a.b, b.b));
+}
+
 template <typename U, typename V>
 PBRT_CPU_GPU inline RGB Clamp(const RGB &rgb, U min, V max) {
     return RGB(pbrt::Clamp(rgb.r, min, max), pbrt::Clamp(rgb.g, min, max),
