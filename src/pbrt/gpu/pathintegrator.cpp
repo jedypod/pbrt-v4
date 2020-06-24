@@ -147,7 +147,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
     for (LightHandle light : allLights)
         light.Preprocess(accel->Bounds());
 
-    bool haveLights = !lights.empty();
+    bool haveLights = !allLights.empty();
     for (const auto &m : media)
         haveLights |= m.second.IsEmissive();
     if (!haveLights)

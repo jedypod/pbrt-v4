@@ -56,7 +56,7 @@ void GPUInit() {
     // This causes the stack smasher check to fail on Linux with CUDA 11...
 //CO    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 2 * 8192));
     // CO#else
-    // CO    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
+    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
     // CO#endif
     size_t stackSize;
     CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
