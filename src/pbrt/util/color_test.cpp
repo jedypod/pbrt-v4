@@ -46,7 +46,7 @@ TEST(RGBColorSpace, sRGB) {
 }
 
 TEST(RGBColorSpace, StdIllumWhitesRGB) {
-    XYZ xyz = SpectrumToXYZ(RGBColorSpace::sRGB->illuminant);
+    XYZ xyz = SpectrumToXYZ(&RGBColorSpace::sRGB->illuminant);
     RGB rgb = RGBColorSpace::sRGB->ToRGB(xyz);
     EXPECT_GE(rgb.r, .99);
     EXPECT_LE(rgb.r, 1.01);
@@ -57,7 +57,7 @@ TEST(RGBColorSpace, StdIllumWhitesRGB) {
 }
 
 TEST(RGBColorSpace, StdIllumWhiteRec2020) {
-    XYZ xyz = SpectrumToXYZ(RGBColorSpace::Rec2020->illuminant);
+    XYZ xyz = SpectrumToXYZ(&RGBColorSpace::Rec2020->illuminant);
     RGB rgb = RGBColorSpace::Rec2020->ToRGB(xyz);
     EXPECT_GE(rgb.r, .99);
     EXPECT_LE(rgb.r, 1.01);
@@ -68,7 +68,7 @@ TEST(RGBColorSpace, StdIllumWhiteRec2020) {
 }
 
 TEST(RGBColorSpace, StdIllumWhiteACES2065_1) {
-    XYZ xyz = SpectrumToXYZ(RGBColorSpace::ACES2065_1->illuminant);
+    XYZ xyz = SpectrumToXYZ(&RGBColorSpace::ACES2065_1->illuminant);
     RGB rgb = RGBColorSpace::ACES2065_1->ToRGB(xyz);
     EXPECT_GE(rgb.r, .99);
     EXPECT_LE(rgb.r, 1.01);

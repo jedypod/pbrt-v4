@@ -7,9 +7,8 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/spectrum.h>
-#include <pbrt/util/color.h>
 #include <pbrt/util/math.h>
+#include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>
 
 #include <string>
@@ -65,7 +64,7 @@ class RGBColorSpace {
     static const RGBColorSpace *Lookup(Point2f r, Point2f g, Point2f b, Point2f w);
 
     Point2f r, g, b, w;  // xy chromaticities
-    SpectrumHandle illuminant;
+    const DenselySampledSpectrum illuminant;
 
     std::string ToString() const;
 

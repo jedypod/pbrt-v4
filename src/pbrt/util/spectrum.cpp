@@ -205,6 +205,9 @@ std::string DenselySampledSpectrum::ParameterString() const {
     return {};
 }
 
+RGBReflectanceSpectrum::RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb)
+    : rgb(rgb), rsp(cs.ToRGBCoeffs(rgb)) {}
+
 std::string RGBReflectanceSpectrum::ToString() const {
     return StringPrintf("[ RGBReflectanceSpectrum rsp: %s ]", rsp);
 }
@@ -217,6 +220,13 @@ std::string RGBReflectanceSpectrum::ParameterString() const {
     return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
 }
 
+RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
+    : rgb(rgb), illuminant(&cs.illuminant) {
+    Float m = std::max({rgb.r, rgb.g, rgb.b});
+    scale = 2 * m;
+    rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
+}
+
 std::string RGBSpectrum::ParameterType() const {
     return "rgb";
 }
@@ -227,7 +237,7 @@ std::string RGBSpectrum::ParameterString() const {
 
 std::string RGBSpectrum::ToString() const {
     return StringPrintf("[ RGBSpectrum rgb: %s rsp: %s scale: %f illuminant: %s ]", rgb,
-                        rsp, scale, illuminant);
+                        rsp, scale, *illuminant);
 }
 
 std::string SampledWavelengths::ToString() const {

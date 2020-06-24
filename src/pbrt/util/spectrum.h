@@ -13,10 +13,8 @@
 // spectrum/sampled.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/spectrum.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
-#include <pbrt/util/colorspace.h>
 #include <pbrt/util/float.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
@@ -38,6 +36,36 @@ constexpr Float LambdaMax = 830;
 
 PBRT_CPU_GPU
 Float Blackbody(Float lambda, Float T);
+
+class BlackbodySpectrum;
+class ConstantSpectrum;
+class PiecewiseLinearSpectrum;
+class DenselySampledSpectrum;
+class RGBReflectanceSpectrum;
+class RGBSpectrum;
+
+class SpectrumHandle
+    : public TaggedPointer<BlackbodySpectrum, ConstantSpectrum, PiecewiseLinearSpectrum,
+                           DenselySampledSpectrum, RGBReflectanceSpectrum, RGBSpectrum> {
+  public:
+    using TaggedPointer::TaggedPointer;
+
+    PBRT_CPU_GPU
+    void Scale(Float s);
+
+    PBRT_CPU_GPU
+    Float operator()(Float lambda) const;
+
+    PBRT_CPU_GPU
+    SampledSpectrum Sample(const SampledWavelengths &lambda) const;
+
+    PBRT_CPU_GPU
+    Float MaxValue() const;
+
+    std::string ToString() const;
+    std::string ParameterType() const;
+    std::string ParameterString() const;
+};
 
 Float SpectrumToY(SpectrumHandle s);
 XYZ SpectrumToXYZ(SpectrumHandle s);
@@ -469,8 +497,7 @@ class alignas(8) DenselySampledSpectrum {
 class alignas(8) RGBReflectanceSpectrum {
   public:
     PBRT_CPU_GPU
-    RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb)
-        : rgb(rgb), rsp(cs.ToRGBCoeffs(rgb)) {}
+    RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
     void Scale(Float s) {
@@ -504,14 +531,8 @@ class alignas(8) RGBReflectanceSpectrum {
 class alignas(8) RGBSpectrum {
   public:
     RGBSpectrum() = default;
-
     PBRT_CPU_GPU
-    RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
-        : rgb(rgb), illuminant(cs.illuminant) {
-        Float m = std::max({rgb.r, rgb.g, rgb.b});
-        scale = 2 * m;
-        rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
-    }
+    RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
     void Scale(Float s) {
@@ -520,7 +541,7 @@ class alignas(8) RGBSpectrum {
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {
-        return scale * rsp(lambda) * illuminant(lambda);
+        return scale * rsp(lambda) * (*illuminant)(lambda);
     }
 
     PBRT_CPU_GPU
@@ -528,12 +549,12 @@ class alignas(8) RGBSpectrum {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
             s[i] = scale * rsp(lambda[i]);
-        return s * illuminant.Sample(lambda);
+        return s * illuminant->Sample(lambda);
     }
 
     PBRT_CPU_GPU
     Float MaxValue() const {
-        return scale * rsp.MaxValue() * illuminant.MaxValue();
+        return scale * rsp.MaxValue() * illuminant->MaxValue();
     }
 
     std::string ToString() const;
@@ -544,7 +565,7 @@ class alignas(8) RGBSpectrum {
     RGB rgb;
     Float scale;
     RGBSigmoidPolynomial rsp;
-    SpectrumHandle illuminant;
+    const DenselySampledSpectrum *illuminant;
 };
 
 // Spectrum Inline Functions
