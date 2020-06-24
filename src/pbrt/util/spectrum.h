@@ -382,30 +382,6 @@ class alignas(8) ScaledSpectrum {
     SpectrumHandle s;
 };
 
-class alignas(8) ProductSpectrum {
-  public:
-    ProductSpectrum(SpectrumHandle s1, SpectrumHandle s2) : s1(s1), s2(s2) {}
-
-    PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return s1(lambda) * s2(lambda); }
-    PBRT_CPU_GPU
-    SampledSpectrum Sample(const SampledWavelengths &lambda) const;
-
-    PBRT_CPU_GPU
-    Float MaxValue() const {
-        // This is inaccurate, since the two may hit maximums at different
-        // wavelengths.  At least it's conservative...
-        return s1.MaxValue() * s2.MaxValue();
-    }
-
-    std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
-
-  private:
-    SpectrumHandle s1, s2;
-};
-
 class alignas(8) PiecewiseLinearSpectrum {
   public:
     PiecewiseLinearSpectrum() = default;
@@ -437,11 +413,24 @@ class alignas(8) PiecewiseLinearSpectrum {
 
 class alignas(8) DenselySampledSpectrum {
   public:
-    DenselySampledSpectrum() = default;
+    DenselySampledSpectrum(int lambdaMin = LambdaMin,
+                           int lambdaMax = LambdaMax, Allocator alloc = {})
+        : lambdaMin(lambdaMin), lambdaMax(lambdaMax),
+          v(lambdaMax - lambdaMin + 1, alloc) {}
     DenselySampledSpectrum(SpectrumHandle s, int lambdaMin = LambdaMin,
                            int lambdaMax = LambdaMax, Allocator alloc = {});
     DenselySampledSpectrum(SpectrumHandle s, Allocator alloc)
         : DenselySampledSpectrum(s, LambdaMin, LambdaMax, alloc) {}
+
+    template <typename F>
+    static DenselySampledSpectrum SampleFunction(F func, int lambdaMin = LambdaMin,
+                                                 int lambdaMax = LambdaMax,
+                                                 Allocator alloc = {}) {
+        DenselySampledSpectrum s(lambdaMin, lambdaMax, alloc);
+        for (int lambda = lambdaMin; lambda <= lambdaMax; ++lambda)
+            s.v[lambda - lambdaMin] = func(lambda + 0.5f);
+        return s;
+    }
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {

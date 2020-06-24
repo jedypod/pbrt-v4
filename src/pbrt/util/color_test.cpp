@@ -104,7 +104,10 @@ TEST(RGBSpectrum, RoundTripsRGB) {
         RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
         RGBReflectanceSpectrum rs(cs, rgb);
 
-        ProductSpectrum rsIllum(&rs, cs.illuminant);
+        DenselySampledSpectrum rsIllum =
+            DenselySampledSpectrum::SampleFunction([&](Float lambda) {
+                return rs(lambda) * cs.illuminant(lambda);
+            });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 
@@ -128,7 +131,10 @@ TEST(RGBSpectrum, RoundTripRec2020) {
                 .1 + .7 * rng.Uniform<Float>());
         RGBReflectanceSpectrum rs(cs, rgb);
 
-        ProductSpectrum rsIllum(&rs, cs.illuminant);
+        DenselySampledSpectrum rsIllum =
+            DenselySampledSpectrum::SampleFunction([&](Float lambda) {
+                return rs(lambda) * cs.illuminant(lambda);
+            });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 
@@ -151,7 +157,10 @@ TEST(RGBSpectrum, RoundTripACES) {
                 .3 + .4 * rng.Uniform<Float>());
         RGBReflectanceSpectrum rs(cs, rgb);
 
-        ProductSpectrum rsIllum(&rs, cs.illuminant);
+        DenselySampledSpectrum rsIllum =
+            DenselySampledSpectrum::SampleFunction([&](Float lambda) {
+                return rs(lambda) * cs.illuminant(lambda);
+            });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 

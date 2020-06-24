@@ -22,7 +22,6 @@ class SampledWavelengths;
 
 class BlackbodySpectrum;
 class ConstantSpectrum;
-class ProductSpectrum;
 class ScaledSpectrum;
 class PiecewiseLinearSpectrum;
 class DenselySampledSpectrum;
@@ -30,7 +29,7 @@ class RGBReflectanceSpectrum;
 class RGBSpectrum;
 
 class SpectrumHandle
-    : public TaggedPointer<BlackbodySpectrum, ConstantSpectrum, ProductSpectrum,
+    : public TaggedPointer<BlackbodySpectrum, ConstantSpectrum,
                            ScaledSpectrum, PiecewiseLinearSpectrum,
                            DenselySampledSpectrum, RGBReflectanceSpectrum, RGBSpectrum> {
   public:

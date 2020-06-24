@@ -195,24 +195,6 @@ std::string ScaledSpectrum::ParameterString() const {
     return {};
 }
 
-SampledSpectrum ProductSpectrum::Sample(const SampledWavelengths &lambda) const {
-    return s1.Sample(lambda) * s2.Sample(lambda);
-}
-
-std::string ProductSpectrum::ToString() const {
-    return StringPrintf("[ ProductSpectrum s1: %s s2: %s ]", s1, s2);
-}
-
-std::string ProductSpectrum::ParameterType() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
-std::string ProductSpectrum::ParameterString() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
 DenselySampledSpectrum::DenselySampledSpectrum(SpectrumHandle s, int lambdaMin,
                                                int lambdaMax, Allocator alloc)
     : lambdaMin(lambdaMin), lambdaMax(lambdaMax), v(lambdaMax - lambdaMin + 1, alloc) {
