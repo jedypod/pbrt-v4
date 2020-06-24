@@ -65,7 +65,11 @@ class alignas(8) HenyeyGreensteinPhaseFunction {
 
 struct MediumSample {
     MediumSample() : Tmaj(1) { }
+
+    PBRT_CPU_GPU
     explicit MediumSample(const SampledSpectrum &Tmaj) : Tmaj(Tmaj) {}
+
+    PBRT_CPU_GPU
     MediumSample(const MediumInteraction &intr, Float t, const SampledSpectrum &Tmaj)
         : intr(intr), t(t), Tmaj(Tmaj) {}
 

@@ -97,8 +97,9 @@ if (CMAKE_CUDA_COMPILER)
         enable_language (CUDA)
         set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_BUILD_GPU_RENDERER)
         set (PBRT_CUDA_ENABLED ON)
-#FIXME
-        INCLUDE_DIRECTORIES(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
+
+        # FIXME
+        include_directories (${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
 
         # http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
         set (PBRT_CUDA_DIAG_FLAGS "")
@@ -136,8 +137,10 @@ if (CMAKE_CUDA_COMPILER)
         set (PBRT_CUDA_LIB cuda)
 
         # optix
-#FIXME
-        INCLUDE_DIRECTORIES(${PBRT_OPTIX7_PATH}/include)
+        # FIXME
+        include_directories (${PBRT_OPTIX7_PATH}/include)
+        # FIXME. Sigh. I'm not sure how else to pass this through to cuda_compile_ptx...
+        include_directories (src)
 
         # from Ingo's configure_optix.cmake (Apache licensed)
         find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
@@ -154,7 +157,9 @@ if (CMAKE_CUDA_COMPILER)
         #    'output_var', which can then be added to cmake targets.
         macro (cuda_compile_and_embed output_var cuda_file)
           set (c_var_name ${output_var})
-          cuda_compile_ptx (ptx_files ${cuda_file} OPTIONS "--std=c++17 -O3" ${PBRT_CUDA_DIAG_FLAGS} "--gpu-architecture=${ARCH} -D PBRT_BUILD_GPU_RENDERER")
+          cuda_compile_ptx (ptx_files ${cuda_file}
+                            OPTIONS --std=c++17 -O3 ${PBRT_CUDA_DIAG_FLAGS}
+                                    --gpu-architecture=${ARCH} -D PBRT_BUILD_GPU_RENDERER)
           list (GET ptx_files 0 ptx_file)
           set (embedded_file ${ptx_file}_embedded.c)
           add_custom_command (
@@ -614,7 +619,7 @@ add_sanitizers (pbrt_exe)
 add_executable (imgtool src/pbrt/cmd/imgtool.cpp)
 add_executable (pbrt::imgtool ALIAS imgtool)
 
-add_library (sky_lib STATIC src/ext/skymodel/arhosekskymodel.c)
+add_library (sky_lib STATIC src/ext/skymodel/ArHosekSkyModel.c)
 
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PUBLIC ${PBRT_CXX_FLAGS})
