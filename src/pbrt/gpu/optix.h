@@ -4,61 +4,42 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base.h>
 #include <pbrt/gpu.h>
-#include <pbrt/interaction.h>
-#include <pbrt/util/sampling.h>
-
-#include <cuda/std/atomic>
+#include <pbrt/base.h>
+#include <pbrt/shapes.h>
 
 #include <optix.h>
 
 namespace pbrt {
 
-class TriangleMesh;
-class BilinearPatchMesh;
-
-struct TriangleMeshRecord {
+struct MeshRecord {
     const TriangleMesh *mesh;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    LightHandle *areaLights;
+    MaterialHandle *materialHandle;
+    FloatTextureHandle *alphaTextureHandle;
+    LightHandle **areaLights;
 };
 
-struct BilinearMeshRecord {
-    const BilinearPatchMesh *mesh;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    LightHandle *areaLights;
+struct ShapeRecord {
+    const ShapeHandle *shapeHandle;
+    MaterialHandle *materialHandle;
+    FloatTextureHandle *alphaTextureHandle;
+    LightHandle *areaLight;
 };
 
-struct QuadricRecord {
-    ShapeHandle shape;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    LightHandle areaLight;
-};
-
-struct RayIntersectParameters {
+struct LaunchParams {
     OptixTraversableHandle traversable;
 
-    const cuda::std::atomic<int> *numActiveRays;
+    const int *numActiveRays;
     const Point3fSOA *rayo;
     const Vector3fSOA *rayd;
-
-    // akk types of rays
-    float *tMax;
 
     // intersection rays
     const int *rayIndexToPixelIndex;
     SurfaceInteraction *intersections;
 
-    // shadow rays
-    int *occluded;
-
-    // "one random" rays for subsurface...
-    const MaterialHandle *materialArray;
-    WeightedReservoirSampler<SurfaceInteraction, Float> *reservoirSamplerArray;
+    // shadow rays only
+    const float *tMax;
+    uint8_t *occluded;
 };
 
 } // namespace pbrt

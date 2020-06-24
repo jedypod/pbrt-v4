@@ -43,6 +43,7 @@
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/float.h>
+#include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/shuffle.h>
 #include <pbrt/util/sobolmatrices.h>
@@ -186,11 +187,10 @@ public:
     }
 
     std::string ToString() const {
-        return StringPrintf("[ HaltonPixelIndexer pixelSampleForIndex: %d "
-                            "sampleIndex: %d baseScales: %s baseExponents: %s "
+        return StringPrintf("[ HaltonPixelIndexer baseScales: %s baseExponents: %s "
                             "multInverse[0]: %d multInverse[1]: %d ]",
-                            pixelSampleForIndex, sampleIndex, baseScales,
-                            baseExponents, multInverse[0], multInverse[1]);
+                            baseScales, baseExponents,
+                            multInverse[0], multInverse[1]);
     }
 
 private:

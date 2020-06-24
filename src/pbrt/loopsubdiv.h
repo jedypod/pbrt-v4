@@ -48,8 +48,7 @@ namespace pbrt {
 
 // LoopSubdiv Declarations
 TriangleMesh *CreateLoopSubdivMesh(const Transform *worldFromObject, bool reverseOrientation,
-                                   const ParameterDictionary &dict, const FileLoc *loc,
-                                   Allocator alloc);
+                                   const ParameterDictionary &dict, Allocator alloc);
 
 }  // namespace pbrt
 

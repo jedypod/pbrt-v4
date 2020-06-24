@@ -57,8 +57,7 @@
 namespace pbrt {
 
 // Memory Declarations
-void *AllocAligned(size_t size, int alignment = PBRT_L1_CACHE_LINE_SIZE);
-
+void *AllocAligned(size_t size);
 template <typename T>
 T *AllocAligned(size_t count) {
     return (T *)AllocAligned(count * sizeof(T));
@@ -72,10 +71,13 @@ template <typename T> struct AllocationTraits { using SingleObject = T *; };
 template <typename T> struct AllocationTraits<T[]> { using Array = T *; };
 template <typename T, size_t n> struct AllocationTraits<T[n]> { struct Invalid { }; };
 
+#ifndef PBRT_L1_CACHE_LINE_SIZE
+#define PBRT_L1_CACHE_LINE_SIZE 64
+#endif
+
 class MaterialBuffer {
 public:
-    MaterialBuffer() = default;
-    MaterialBuffer(int size)
+    MaterialBuffer(int size = 4096)
         : size(size) {
         ptr = new uint8_t[size];
     }
@@ -103,8 +105,8 @@ public:
     }
 
 private:
-    uint8_t *ptr = nullptr;
-    int size = 0, offset = 0;
+    uint8_t *ptr;
+    int size, offset = 0;
 };
 
 class alignas(PBRT_L1_CACHE_LINE_SIZE)

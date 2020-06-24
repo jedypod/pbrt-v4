@@ -145,24 +145,8 @@ class WeightedReservoirSampler {
                 reservoir = sample;
         }
         nSamplesConsidered += effectiveSamples;
-        DCHECK_LT(weightSum, 1e80);
-        DCHECK_LT(nSamplesConsidered, ~0ull);
-    }
-
-    template <typename F>
-    PBRT_HOST_DEVICE_INLINE
-    void Add(F func, Float weight, int64_t effectiveSamples = 1) {
-        weightSum += weight;
-        if (nSamplesConsidered == 0)
-            reservoir = func();
-        else {
-            Float p = weight / weightSum;
-            if (rng.Uniform<Float>() < p)
-                reservoir = func();
-        }
-        nSamplesConsidered += effectiveSamples;
-        DCHECK_LT(weightSum, 1e80);
-        DCHECK_LT(nSamplesConsidered, ~0ull);
+        CHECK_LT(weightSum, 1e80);
+        CHECK_LT(nSamplesConsidered, ~0ull);
     }
 
     PBRT_HOST_DEVICE_INLINE
@@ -174,19 +158,13 @@ class WeightedReservoirSampler {
 
     PBRT_HOST_DEVICE_INLINE
     void Reset() {
-        nSamplesConsidered = 0;
         weightSum = 0;
     }
 
     PBRT_HOST_DEVICE_INLINE
-    void Seed(uint64_t seed) {
-        rng.SetSequence(seed);
-    }
-
-    PBRT_HOST_DEVICE_INLINE
     void Merge(const WeightedReservoirSampler &wrs) {
-        DCHECK_LE(weightSum + wrs.WeightSum(), 1e80);
-        DCHECK_GE(nSamplesConsidered + wrs.nSamplesConsidered, nSamplesConsidered);
+        CHECK_LE(weightSum + wrs.WeightSum(), 1e80);
+        CHECK_GE(nSamplesConsidered + wrs.nSamplesConsidered, nSamplesConsidered);
         if (wrs.HasSample()) {
             Add(wrs.GetSample(), wrs.WeightSum());
             // -1 since Add() added one...
@@ -204,7 +182,7 @@ class WeightedReservoirSampler {
 
     PBRT_HOST_DEVICE_INLINE
     const T &GetSample() const {
-        DCHECK(HasSample());
+        CHECK(HasSample());
         return reservoir;
     }
 

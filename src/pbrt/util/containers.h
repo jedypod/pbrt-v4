@@ -277,11 +277,9 @@ public:
         if (other.nStored <= N)
             for (int i = 0; i < other.nStored; ++i)
                 alloc.template construct<T>(fixed + i, std::move(other.fixed[i]));
-            // Leave other.nStored as is, so that the detrius left after we
-            // moved out of fixed has its destructors run...
-        else
-            other.nStored = 0;
 
+        // Leave other.nStored as is, so that the detrius left after we
+        // moved out of fixed has its destructors run...
         other.nAlloc = 0;
         other.ptr = nullptr;
     }

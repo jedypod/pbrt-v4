@@ -46,6 +46,7 @@
 #include <pbrt/transform.h>
 #include <pbrt/util/profile.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/util/vecmath.h>
 
 #include <map>
@@ -53,20 +54,6 @@
 #include <vector>
 
 namespace pbrt {
-
-struct ShapeSample {
-    Interaction intr;
-    Float pdf;
-
-    std::string ToString() const;
-};
-
-struct ShapeIntersection {
-    SurfaceInteraction intr;
-    Float tHit;
-
-    std::string ToString() const;
-};
 
 // Sphere Declarations
 struct QuadricIntersection {
@@ -95,7 +82,7 @@ class Sphere {
                           const Transform *objectFromWorld,
                           bool reverseOrientation,
                           const ParameterDictionary &dict,
-                          const FileLoc *loc, Allocator alloc);
+                          Allocator alloc);
 
     PBRT_HOST_DEVICE
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
@@ -312,17 +299,8 @@ class Sphere {
         Point3f pCenter = (*worldFromObject)(Point3f(0, 0, 0));
         // Return uniform PDF if point is inside sphere
         Point3f pOrigin = ref.OffsetRayOrigin(pCenter);
-        if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
-            pstd::optional<ShapeIntersection> isect = Intersect(Ray(pOrigin, wi));
-            CHECK_RARE(1e-6, !isect.has_value());
-            if (!isect)
-                return 0;
-
-            Float pdf = DistanceSquared(pOrigin, isect->intr.p()) /
-                (AbsDot(isect->intr.n, -wi) * Area());
-            if (std::isinf(pdf)) pdf = 0.f;
-            return pdf;
-        }
+        if (DistanceSquared(pOrigin, pCenter) <= radius * radius)
+            return PDF(ref, wi);
 
         // Compute general sphere PDF
         Float sinThetaMax2 = radius * radius / DistanceSquared(ref.p(), pCenter);
@@ -445,7 +423,7 @@ class Disk {
                         const Transform *objectFromWorld,
                         bool reverseOrientation,
                         const ParameterDictionary &dict,
-                        const FileLoc *loc, Allocator alloc);
+                        Allocator alloc);
 
     PBRT_HOST_DEVICE
     Bounds3f WorldBound() const;
@@ -618,7 +596,7 @@ class Cylinder {
     static Cylinder *Create(const Transform *worldFromObject,
                             const Transform *objectFromWorld, bool reverseOrientation,
                             const ParameterDictionary &dict,
-                            const FileLoc *loc, Allocator alloc);
+                            Allocator alloc);
 
     PBRT_HOST_DEVICE
     Bounds3f WorldBound() const;
@@ -851,6 +829,9 @@ class Cylinder {
     Float radius, zMin, zMax, phiMax;
 };
 
+
+STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
+
 // Triangle Declarations
 class TriangleMesh {
 public:
@@ -867,18 +848,18 @@ public:
     static TriangleMesh *Create(const Transform *worldFromObject,
                                 bool reverseOrientation,
                                 const ParameterDictionary &dict,
-                                const FileLoc *loc, Allocator alloc);
+                                Allocator alloc);
 
     PBRT_HOST_DEVICE
     SurfaceInteraction InteractionFromIntersection(int triIndex, pstd::array<Float, 3> b,
                                                    Float time, const Vector3f &wo,
-                                                   pstd::optional<Transform> worldFromInstance = {}) const {
+                                                   pstd::optional<Transform> instanceToWorld = {}) const {
         const int *v = &vertexIndices[3 * triIndex];
         Point3f p0 = p[v[0]], p1 = p[v[1]], p2 = p[v[2]];
-        if (worldFromInstance) {
-            p0 = (*worldFromInstance)(p0);
-            p1 = (*worldFromInstance)(p1);
-            p2 = (*worldFromInstance)(p2);
+        if (instanceToWorld) {
+            p0 = (*instanceToWorld)(p0);
+            p1 = (*instanceToWorld)(p1);
+            p2 = (*instanceToWorld)(p2);
         }
         // Compute triangle partial derivatives
         Vector3f dpdu, dpdv;
@@ -936,8 +917,8 @@ public:
             Normal3f ns;
             if (n != nullptr) {
                 ns = (b[0] * n[v[0]] + b[1] * n[v[1]] + b[2] * n[v[2]]);
-                if (worldFromInstance)
-                    ns = (*worldFromInstance)(ns);
+                if (instanceToWorld)
+                    ns = (*instanceToWorld)(ns);
 
                 if (LengthSquared(ns) > 0)
                     ns = Normalize(ns);
@@ -950,8 +931,8 @@ public:
             Vector3f ss;
             if (s != nullptr) {
                 ss = (b[0] * s[v[0]] + b[1] * s[v[1]] + b[2] * s[v[2]]);
-                if (worldFromInstance)
-                    ss = (*worldFromInstance)(ss);
+                if (instanceToWorld)
+                    ss = (*instanceToWorld)(ss);
 
                 if (LengthSquared(ss) == 0)
                     ss = isect.dpdu;
@@ -973,9 +954,9 @@ public:
                 Vector2f duv12 = triuv[1] - triuv[2];
                 Normal3f dn1 = n[v[0]] - n[v[2]];
                 Normal3f dn2 = n[v[1]] - n[v[2]];
-                if (worldFromInstance) {
-                    dn1 = (*worldFromInstance)(dn1);
-                    dn2 = (*worldFromInstance)(dn2);
+                if (instanceToWorld) {
+                    dn1 = (*instanceToWorld)(dn1);
+                    dn2 = (*instanceToWorld)(dn2);
                 }
 
                 Float determinant = DifferenceOfProducts(duv02[0], duv12[1], duv02[1], duv12[0]);
@@ -989,8 +970,8 @@ public:
                     // parameterizations are still reasonable.
                     Vector3f dn = Cross(Vector3f(n[v[2]] - n[v[0]]),
                                         Vector3f(n[v[1]] - n[v[0]]));
-                    if (worldFromInstance)
-                        dn = (*worldFromInstance)(dn);
+                    if (instanceToWorld)
+                        dn = (*instanceToWorld)(dn);
 
                     if (LengthSquared(dn) == 0)
                         dndu = dndv = Normal3f(0, 0, 0);
@@ -1050,6 +1031,7 @@ class alignas(8) Triangle {
     Triangle() = default;
     Triangle(int meshIndex, int triIndex)
         : meshIndex(meshIndex), triIndex(triIndex) {
+        triangleBytes += sizeof(*this);
     }
 
     PBRT_HOST_DEVICE
@@ -1169,7 +1151,7 @@ class Curve {
                                             const Transform *objectFromWorld,
                                             bool reverseOrientation,
                                             const ParameterDictionary &dict,
-                                            const FileLoc *loc, Allocator alloc);
+                                            Allocator alloc);
 
     PBRT_HOST_DEVICE
     Bounds3f WorldBound() const;
@@ -1230,144 +1212,24 @@ class BilinearPatchMesh {
                       std::vector<Normal3f> N, std::vector<Point2f> uv,
                       std::vector<int> faceIndices, Distribution2D *imageDist);
 
-    static BilinearPatchMesh *Create(const Transform *worldFromObject,
-                                     bool reverseOrientation,
-                                     const ParameterDictionary &dict,
-                                     const FileLoc *loc, Allocator alloc);
-
-    pstd::vector<ShapeHandle> CreatePatches(Allocator alloc);
-
-    PBRT_HOST_DEVICE
-    SurfaceInteraction InteractionFromIntersection(int patchIndex, const Point2f &uvHit,
-                                                   Float time, const Vector3f &wo,
-                                                   pstd::optional<Transform> worldFromInstance = {}) const {
-        const int *v = &vertexIndices[4 * patchIndex];
-        Point3f p00 = p[v[0]], p10 = p[v[1]], p01 = p[v[2]], p11 = p[v[3]];
-
-        if (worldFromInstance) {
-            p00 = (*worldFromInstance)(p00);
-            p10 = (*worldFromInstance)(p10);
-            p01 = (*worldFromInstance)(p01);
-            p11 = (*worldFromInstance)(p11);
-        }
-
-        Point3f pHit = Lerp(uvHit[0], Lerp(uvHit[1], p00, p01), Lerp(uvHit[1], p10, p11));
-
-        Vector3f dpdu = Lerp(uvHit[1], p10, p11) - Lerp(uvHit[1], p00, p01);
-        Vector3f dpdv = Lerp(uvHit[0], p01, p11) - Lerp(uvHit[0], p00, p10);
-
-        // Interpolate texture coordinates, if provided
-        Point2f uv = uvHit;
-        if (this->uv != nullptr) {
-            const Point2f &uv00 = this->uv[v[0]];
-            const Point2f &uv10 = this->uv[v[1]];
-            const Point2f &uv01 = this->uv[v[2]];
-            const Point2f &uv11 = this->uv[v[3]];
-
-            Float dsdu = -uv00[0] + uv10[0] + uv[1] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
-            Float dsdv = -uv00[0] + uv01[0] + uv[0] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
-            Float dtdu = -uv00[1] + uv10[1] + uv[1] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
-            Float dtdv = -uv00[1] + uv01[1] + uv[0] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
-
-            Float duds = std::abs(dsdu) < 1e-8f ? 0 : 1 / dsdu;
-            Float dvds = std::abs(dsdv) < 1e-8f ? 0 : 1 / dsdv;
-            Float dudt = std::abs(dtdu) < 1e-8f ? 0 : 1 / dtdu;
-            Float dvdt = std::abs(dtdv) < 1e-8f ? 0 : 1 / dtdv;
-
-            // actually this is st (and confusing)
-            uv = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
-
-            // dpds = dpdu * duds + dpdv * dvds, etc
-            // duds = 1/dsdu
-            Vector3f dpds = dpdu * duds + dpdv * dvds;
-            Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
-
-            // These end up as zero-vectors of the mapping is degenerate...
-            if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
-                dpdu = dpds;
-                dpdv = dpdt;
-            }
-        }
-
-        // Compute coefficients for fundamental forms
-        Float E = Dot(dpdu, dpdu);
-        Float F = Dot(dpdu, dpdv);
-        Float G = Dot(dpdv, dpdv);
-        Vector3f N = Normalize(Cross(dpdu, dpdv));
-        Float e = 0;  // 2nd derivative d2p/du2 == 0
-        Vector3f d2Pduv(p00.x - p01.x - p10.x + p11.x,
-                        p00.y - p01.y - p10.y + p11.y,
-                        p00.z - p01.z - p10.z + p11.z);
-        Float f = Dot(N, d2Pduv);
-        Float g = 0;  // samesies
-
-        // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        Float EGF2 = DifferenceOfProducts(E, G, F, F);
-        Normal3f dndu, dndv;
-        if (EGF2 != 0) {
-            Float invEGF2 = 1 / EGF2;
-            dndu = Normal3f(DifferenceOfProducts(f, F, e, G) * invEGF2 * dpdu +
-                            DifferenceOfProducts(e, F, f, E) * invEGF2 * dpdv);
-            dndv = Normal3f(DifferenceOfProducts(g, F, f, G) * invEGF2 * dpdu +
-                            DifferenceOfProducts(f, F, g, E) * invEGF2 * dpdv);
-        }
-
-        // Two lerps; each is gamma(3). TODO: double check.
-        Vector3f pError = gamma(6) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
-
-        // Initialize _SurfaceInteraction_ from parametric information
-        int faceIndex = faceIndices != nullptr ? faceIndices[patchIndex] : 0;
-        Point3fi pe(pHit, pError);
-        SurfaceInteraction isect(pe, uv, wo, dpdu, dpdv, dndu, dndv, time,
-                                 reverseOrientation ^ transformSwapsHandedness,
-                                 faceIndex);
-
-        if (n != nullptr) {
-            Normal3f n00 = n[v[0]], n10 = n[v[1]], n01 = n[v[2]], n11 = n[v[3]];
-            if (worldFromInstance) {
-                n00 = (*worldFromInstance)(n00);
-                n10 = (*worldFromInstance)(n10);
-                n01 = (*worldFromInstance)(n01);
-                n11 = (*worldFromInstance)(n11);
-            }
-
-            Normal3f dndu = Lerp(uvHit[1], n10, n11) - Lerp(uvHit[1], n00, n01);
-            Normal3f dndv = Lerp(uvHit[0], n01, n11) - Lerp(uvHit[0], n00, n10);
-
-            Normal3f ns = Lerp(uvHit[0], Lerp(uvHit[1], n00, n01), Lerp(uvHit[1], n10, n11));
-            if (LengthSquared(ns) > 0) {
-                ns = Normalize(ns);
-                Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
-                Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
-                if (LengthSquared(axis) > .0001f) {
-                    axis = Normalize(axis);
-                    // The shading normal is different enough.
-                    //
-                    // Don't worry about if ns == -n; that, too, is handled
-                    // naturally by the following.
-                    //
-                    // Rotate dpdu and dpdv around the axis perpendicular to the
-                    // plane defined by n and ns by the angle between them -> their
-                    // dot product will equal ns.
-                    Float cosTheta = Dot(n, ns), sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-                    Transform r = Rotate(sinTheta, cosTheta, axis);
-                    Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
-
-                    if (reverseOrientation) {
-                        ns = -ns;
-                        sdpdv = -sdpdv;
-                    }
-                    isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
-                }
-            }
-        }
-
-        return isect;
-    }
+    static pstd::vector<ShapeHandle> Create(const Transform *worldFromObject,
+                                            bool reverseOrientation,
+                                            const ParameterDictionary &dict,
+                                            Allocator alloc);
+    static pstd::vector<ShapeHandle> Create(const Transform *worldFromObject,
+                                            bool reverseOrientation,
+                                            std::vector<int> indices, std::vector<Point3f> p,
+                                            std::vector<Normal3f> n, std::vector<Point2f> uv,
+                                            std::vector<int> faceIndices,
+                                            Distribution2D *imageDist,
+                                            Allocator alloc);
 
     std::string ToString() const;
 
     static void Init(Allocator alloc);
+
+  private:
+    friend class BilinearPatch;
 
     bool reverseOrientation, transformSwapsHandedness;
     int nPatches, nVertices;
@@ -1430,63 +1292,7 @@ class alignas(8) BilinearPatch {
     PBRT_HOST_DEVICE
     static pstd::optional<BilinearIntersection> Intersect(const Ray &ray, Float tMax,
                                                           const Point3f &p00, const Point3f &p10,
-                                                          const Point3f &p01, const Point3f &p11) {
-        Vector3f qn = Cross(p10-p00, p01-p11);
-        Vector3f e10 = p10 - p00; // p01------u--------p11
-        Vector3f e11 = p11 - p10; // |                   |
-        Vector3f e00 = p01 - p00; // v e00           e11 v
-        // |        e10        |
-        // p00------u--------p10
-        Vector3f q00 = p00 - ray.o;
-        Vector3f q10 = p10 - ray.o;
-        Float a = Dot(Cross(q00, ray.d), e00); // the equation is
-        Float c = Dot(qn, ray.d);              // a + b u + c u^2
-        Float b = Dot(Cross(q10, ray.d), e11); // first compute a+b+c
-        b -= a + c;                                    // and then b
-        Float det = b*b - 4*a*c;
-        if (det < 0) return {};
-        det = std::sqrt(det);
-        Float u1, u2;             // two roots (u parameter)
-        Float t = tMax, u, v; // need solution for the smallest t > 0
-        if (c == 0) {                        // if c == 0, it is a trapezoid
-            u1  = -a/b; u2 = -1;              // and there is only one root
-        } else {                             // (c != 0 in Stanford models)
-            u1  = (-b - copysignf(det, b))/2; // numerically "stable" root
-            u2  = a/u1;                       // Viete's formula for u1*u2
-            u1 /= c;
-        }
-        if (0 <= u1 && u1 <= 1) {                // is it inside the patch?
-            Vector3f pa = Lerp(u1, q00, q10);       // point on edge e10 (Figure 8.4)
-            Vector3f pb = Lerp(u1, e00, e11);       // it is, actually, pb - pa
-            Vector3f n  = Cross(ray.d, pb);
-            det = Dot(n, n);
-            n = Cross(n, pa);
-            Float t1 = Dot(n, pb);
-            Float v1 = Dot(n, ray.d);     // no need to check t1 < t
-            if (t1 > 0 && 0 <= v1 && v1 <= det) { // if t1 > ray.tmax,
-                t = t1/det; u = u1; v = v1/det;    // it will be rejected
-            }                                     // in rtPotentialIntersection
-        }
-        if (0 <= u2 && u2 <= 1) {                // it is slightly different,
-            Vector3f pa = Lerp(u2, q00, q10);       // since u1 might be good
-            Vector3f pb = Lerp(u2, e00, e11);       // and we need 0 < t2 < t1
-            Vector3f n  = Cross(ray.d, pb);
-            det = Dot(n, n);
-            n = Cross(n, pa);
-            Float t2 = Dot(n, pb)/det;
-            Float v2 = Dot(n, ray.d);
-            if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
-                t = t2; u = u2; v = v2/det;
-            }
-        }
-
-        // TODO: reject hits with sufficiently small t that we're not sure.
-
-        if (t >= tMax)
-            return {};
-
-        return BilinearIntersection{{u, v}, t};
-    }
+                                                          const Point3f &p01, const Point3f &p11);
 
 private:
     PBRT_HOST_DEVICE

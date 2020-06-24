@@ -6,9 +6,9 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/api.h>
 #include <pbrt/base.h>
 #include <pbrt/filters.h>
-#include <pbrt/gpu.h>
 #include <pbrt/mipmap.h>
 #include <pbrt/util/args.h>
 #include <pbrt/util/check.h>
@@ -37,23 +37,6 @@ extern "C" {
 #include <cstdlib>
 #include <map>
 #include <string>
-
-#ifdef PBRT_HAVE_OPTIX
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-
-#include <optix.h>
-#include <optix_stubs.h>
-
-#define OPTIX_CHECK(EXPR)                                               \
-        do {                                                            \
-            OptixResult res = EXPR;                                     \
-            if (res != OPTIX_SUCCESS)                                   \
-                LOG_FATAL("OptiX call " #EXPR " failed with code %d: \"%s\"", \
-                          int(res), optixGetErrorString(res));          \
-        } while(false) /* eat semicolon */
-#endif
 
 using namespace pbrt;
 
@@ -108,7 +91,6 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        replace the pixel with the median of the 3x3 neighboring
                        pixels. Default: infinity (i.e., disabled).
     --flipy            Flip the image along the y axis
-    --gamma <v>        Apply a gamma curve with exponent v. (Default: 1 (none)).
     --maxluminance <n> Luminance value mapped to white by tonemapping.
                        Default: 1
     --outfile          Output image filename.
@@ -138,13 +120,6 @@ static std::map<std::string, CommandUsage> commandUsage = {
   std::string(R"( options:
     (none)
 )")}},
-#ifdef PBRT_HAVE_OPTIX
-{"denoise-optix",
- {"denoise-optix [options] <filename>",
-  std::string(R"( options:
-    --outfile <name>   Filename to use for the denoised image.
-)")}},
-#endif // PBRT_HAVE_OPTIX
 {"error",
  {"error [options] <filename prefix>\nwhere all image files starting with <filename prefix> are used to compute error",
   std::string(R"(
@@ -1334,7 +1309,7 @@ int bloom(int argc, char *argv[]) {
 
 int convert(int argc, char *argv[]) {
     bool acesFilmic = false;
-    float scale = 1.f, gamma = 1.f;
+    float scale = 1.f;
     int repeat = 1;
     bool flipy = false;
     bool tonemap = false;
@@ -1360,7 +1335,6 @@ int convert(int argc, char *argv[]) {
             ParseArg(&argv, "crop", pstd::MakeSpan(cropWindow), onError) ||
             ParseArg(&argv, "despike", &despikeLimit, onError) ||
             ParseArg(&argv, "flipy", &flipy, onError) ||
-            ParseArg(&argv, "gamma", &gamma, onError) ||
             ParseArg(&argv, "maxluminance", &maxY, onError) ||
             ParseArg(&argv, "outfile", &outFile, onError) ||
             ParseArg(&argv, "preservecolors", &preserveColors, onError) ||
@@ -1501,14 +1475,6 @@ int convert(int argc, char *argv[]) {
                 for (int c = 0; c < nc; ++c)
                     image.SetChannel({x, y}, c,
                                      scale * image.GetChannel({x, y}, c));
-    }
-
-    if (gamma != 1) {
-        for (int y = 0; y < res.y; ++y)
-            for (int x = 0; x < res.x; ++x)
-                for (int c = 0; c < nc; ++c)
-                    image.SetChannel({x, y}, c,
-                                     std::pow(std::max<Float>(0, image.GetChannel({x, y}, c)), gamma));
     }
 
     if (tonemap) {
@@ -2081,152 +2047,12 @@ int denoise(int argc, char *argv[]) {
     return 0;
 }
 
-#ifdef PBRT_HAVE_OPTIX
-int denoise_optix(int argc, char *argv[]) {
-    std::string inFilename, outFilename;
-
-    auto onError = [](const std::string &err) {
-        usage("denoise-optix", "%s", err.c_str());
-        exit(1);
-    };
-    while (*argv != nullptr) {
-        if (ParseArg(&argv, "outfile", &outFilename, onError)) {
-            // success
-        } else if (argv[0][0] == '-')
-            usage("denoise-optix", "%s: unknown command flag", *argv);
-        else if (inFilename.empty()) {
-            inFilename = *argv;
-            ++argv;
-        } else
-            usage("denoise-optix", "multiple input filenames provided.");
-    }
-    if (inFilename.empty())
-        usage("denoise-optix", "input image filename must be provided.");
-    if (outFilename.empty())
-        usage("denoise-optix", "output image filename must be provided.");
-
-    CUcontext cudaContext;
-    CU_CHECK(cuCtxGetCurrent(&cudaContext));
-    CHECK(cudaContext != nullptr);
-
-    OPTIX_CHECK(optixInit());
-    OptixDeviceContext optixContext;
-    OPTIX_CHECK(optixDeviceContextCreate(cudaContext, 0, &optixContext));
-
-    auto im = Image::Read(inFilename);
-    if (!im)
-        return 1;
-    Image &image = im->image;
-
-    OptixDenoiserOptions options = {};
-    options.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL;
-    options.pixelFormat = OPTIX_PIXEL_FORMAT_FLOAT3;
-
-    OptixDenoiser denoiserHandle;
-    OPTIX_CHECK(optixDenoiserCreate(optixContext, &options, &denoiserHandle));
-
-    OPTIX_CHECK(optixDenoiserSetModel(denoiserHandle, OPTIX_DENOISER_MODEL_KIND_HDR,
-                                      nullptr, 0));
-
-    OptixDenoiserSizes memorySizes;
-    OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiserHandle, image.Resolution().x,
-                                                    image.Resolution().y, &memorySizes));
-
-    void *denoiserState;
-    CUDA_CHECK(cudaMalloc(&denoiserState, memorySizes.stateSizeInBytes));
-    void *scratchBuffer;
-    CUDA_CHECK(cudaMalloc(&scratchBuffer, memorySizes.recommendedScratchSizeInBytes));
-
-    OPTIX_CHECK(optixDenoiserSetup(denoiserHandle, 0 /* stream */, image.Resolution().x,
-                                   image.Resolution().y, CUdeviceptr(denoiserState),
-                                   memorySizes.stateSizeInBytes, CUdeviceptr(scratchBuffer),
-                                   memorySizes.recommendedScratchSizeInBytes));
-
-    CUDAMemoryResource cudaMemoryResource;
-    Allocator alloc(&cudaMemoryResource);
-
-    pstd::optional<ImageChannelDesc> desc[3] = {
-        image.GetChannelDesc({"R", "G", "B"}),
-        image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"}),
-        image.GetChannelDesc({"Nsx", "Nsy", "Nsz"})
-    };
-    if (!desc[0]) {
-        fprintf(stderr, "%s: image doesn't have R, G, B channels.", inFilename.c_str());
-        return 1;
-    }
-    if (!desc[1]) {
-        fprintf(stderr, "%s: image doesn't have Albedo.{R,G,B} channels.", inFilename.c_str());
-        return 1;
-    }
-    if (!desc[2]) {
-        fprintf(stderr, "%s: image doesn't have Nsx, Nsy, Nsz channels.", inFilename.c_str());
-        return 1;
-    }
-
-    OptixImage2D *inputLayers = alloc.allocate_object<OptixImage2D>(3);
-    for (int i = 0; i < 3; ++i) {
-        inputLayers[i].width = image.Resolution().x;
-        inputLayers[i].height = image.Resolution().y;
-        inputLayers[i].rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
-        inputLayers[i].pixelStrideInBytes = 0;
-        inputLayers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
-
-        size_t sz = 3 * image.Resolution().x * image.Resolution().y;
-        float *buf = alloc.allocate_object<float>(sz);
-        int offset = 0;
-        for (int y = 0; y < image.Resolution().y; ++y)
-            for (int x = 0; x < image.Resolution().x; ++x) {
-                ImageChannelValues v = image.GetChannels({x, y}, *desc[i]);
-                if (i == 2)
-                    v[2] *= -1;  // flip z--right handed...
-                for (int c = 0; c < 3; ++c)
-                    buf[offset++] = v[c];
-            }
-
-        inputLayers[i].data = CUdeviceptr(buf);
-    }
-
-    OptixImage2D *outputImage = alloc.allocate_object<OptixImage2D>();
-    outputImage->width = image.Resolution().x;
-    outputImage->height = image.Resolution().y;
-    outputImage->rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
-    outputImage->pixelStrideInBytes = 0;
-    outputImage->format = OPTIX_PIXEL_FORMAT_FLOAT3;
-
-    float *intensity = alloc.allocate_object<float>();
-    OPTIX_CHECK(optixDenoiserComputeIntensity(denoiserHandle, 0 /* stream */,
-                                              &inputLayers[0], CUdeviceptr(intensity),
-                                              CUdeviceptr(scratchBuffer),
-                                              memorySizes.recommendedScratchSizeInBytes));
-
-    size_t sz = 3 * image.Resolution().x * image.Resolution().y;
-    pstd::vector<float> buf(sz, alloc);
-    outputImage->data = CUdeviceptr(buf.data());
-
-    OptixDenoiserParams params = {};
-    params.denoiseAlpha = 0;
-    params.hdrIntensity = CUdeviceptr(intensity);
-    params.blendFactor = 0;  // TODO what should this be??
-
-    OPTIX_CHECK(optixDenoiserInvoke(denoiserHandle, 0 /* stream */, &params,
-                                    CUdeviceptr(denoiserState), memorySizes.stateSizeInBytes,
-                                    inputLayers, 3, 0 /* offset x */, 0 /* offset y */,
-                                    outputImage, CUdeviceptr(scratchBuffer),
-                                    memorySizes.recommendedScratchSizeInBytes));
-
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    Image result(buf, image.Resolution(), {"R", "G", "B"});
-    CHECK(result.Write(outFilename));
-
-    return 0;
-}
-#endif // PBRT_HAVE_OPTIX
 
 int main(int argc, char *argv[]) {
     LogConfig logConfig;
+    InitLogging(logConfig, argv[0]);
 
-    InitPBRT({}, logConfig);
+    pbrtInit({});
 
     if (argc < 2) {
         help();
@@ -2247,10 +2073,6 @@ int main(int argc, char *argv[]) {
         return diff(argc - 2, argv + 2);
     else if (strcmp(argv[1], "denoise") == 0)
         return denoise(argc - 2, argv + 2);
-#ifdef PBRT_HAVE_OPTIX
-    else if (strcmp(argv[1], "denoise-optix") == 0)
-        return denoise_optix(argc - 2, argv + 2);
-#endif // PBRT_HAVE_OPTIX
     else if (strcmp(argv[1], "error") == 0)
         return error(argc - 2, argv + 2);
     else if (strcmp(argv[1], "falsecolor") == 0)
@@ -2355,11 +2177,10 @@ int main(int argc, char *argv[]) {
     else {
         fprintf(stderr, "imgtool: unknown command \"%s\"", argv[1]);
         help();
-        CleanupPBRT();
+        pbrtCleanup();
         return 1;
     }
 
-    CleanupPBRT();
-
+    pbrtCleanup();
     return 0;
 }

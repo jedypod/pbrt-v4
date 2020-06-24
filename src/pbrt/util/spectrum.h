@@ -124,7 +124,7 @@ path, 500x500, 16spp
 */
 static constexpr int NSpectrumSamples = 4;
 
-class alignas(8) SampledWavelengths {
+class SampledWavelengths {
   public:
     PBRT_HOST_DEVICE_INLINE
     static SampledWavelengths SampleEqui(Float u, Float lambdaMin = LambdaMin,
@@ -183,7 +183,7 @@ class alignas(8) SampledWavelengths {
     pstd::array<Float, NSpectrumSamples> lambda;
 };
 
-class alignas(8) SampledSpectrum {
+class SampledSpectrum {
   public:
     PBRT_HOST_DEVICE_INLINE
     SampledSpectrum() { v.fill(0); }
@@ -347,18 +347,22 @@ class alignas(8) SampledSpectrum {
     }
 
     PBRT_HOST_DEVICE
-    XYZ ToXYZ(const SampledWavelengths &lambda) const;
+    XYZ ToXYZ(const SampledWavelengths &lambda,
+              const DenselySampledSpectrum &X,
+              const DenselySampledSpectrum &Y,
+              const DenselySampledSpectrum &Z) const;
     PBRT_HOST_DEVICE
     RGB ToRGB(const SampledWavelengths &lambda,
               const RGBColorSpace &cs) const;
     PBRT_HOST_DEVICE
-    Float y(const SampledWavelengths &lambda) const;
+    Float y(const SampledWavelengths &lambda,
+            const DenselySampledSpectrum &Y) const;
 
   private:
     pstd::array<Float, NSpectrumSamples> v;
 };
 
-class alignas(8) BlackbodySpectrum {
+class BlackbodySpectrum {
   public:
     BlackbodySpectrum(Float T) : T(T) {
         // Normalize _Le_ based on maximum blackbody radiance
@@ -385,7 +389,7 @@ class alignas(8) BlackbodySpectrum {
     Float T, scale;
 };
 
-class alignas(8) ConstantSpectrum {
+class ConstantSpectrum {
   public:
     ConstantSpectrum(Float c) : c(c) {}
 
@@ -406,7 +410,7 @@ class alignas(8) ConstantSpectrum {
     Float c;
 };
 
-class alignas(8) ScaledSpectrum {
+class ScaledSpectrum {
   public:
     ScaledSpectrum(Float scale, SpectrumHandle s)
         : scale(scale), s(s) { }
@@ -432,7 +436,7 @@ class alignas(8) ScaledSpectrum {
     SpectrumHandle s;
 };
 
-class alignas(8) ProductSpectrum {
+class ProductSpectrum {
   public:
     ProductSpectrum(SpectrumHandle s1, SpectrumHandle s2)
         : s1(s1), s2(s2) {}
@@ -459,7 +463,7 @@ class alignas(8) ProductSpectrum {
     SpectrumHandle s1, s2;
 };
 
-class alignas(8) PiecewiseLinearSpectrum {
+class PiecewiseLinearSpectrum {
   public:
     PiecewiseLinearSpectrum() = default;
     PiecewiseLinearSpectrum(pstd::span<const Float> l,
@@ -478,8 +482,7 @@ class alignas(8) PiecewiseLinearSpectrum {
     PBRT_HOST_DEVICE
     Float operator()(Float lambda) const;
 
-    static pstd::optional<SpectrumHandle> Read(const std::string &filename,
-                                               Allocator alloc);
+    static pstd::optional<PiecewiseLinearSpectrum> Read(const std::string &filename);
 
     std::string ToString() const;
     std::string ParameterType() const;
@@ -489,7 +492,7 @@ class alignas(8) PiecewiseLinearSpectrum {
     pstd::vector<Float> lambda, v;
 };
 
-class alignas(8) DenselySampledSpectrum {
+class DenselySampledSpectrum {
  public:
     DenselySampledSpectrum() = default;
     DenselySampledSpectrum(SpectrumHandle s,
@@ -534,7 +537,7 @@ class alignas(8) DenselySampledSpectrum {
 };
 
 
-class alignas(8) RGBReflectanceSpectrum {
+class RGBReflectanceSpectrum {
  public:
     PBRT_HOST_DEVICE
     RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb);
@@ -566,7 +569,7 @@ class alignas(8) RGBReflectanceSpectrum {
     RGBSigmoidPolynomial rsp;
 };
 
-class alignas(8) RGBSpectrum {
+class RGBSpectrum {
 public:
     RGBSpectrum() = default;
     PBRT_HOST_DEVICE
@@ -675,38 +678,7 @@ SpectrumHandle Zero(), One();
 
 static constexpr Float CIE_Y_integral = 106.856895;
 
-PBRT_HOST_DEVICE
-inline const DenselySampledSpectrum &X() {
-#ifdef __CUDA_ARCH__
-    extern __device__ DenselySampledSpectrum *xGPU;
-    return *xGPU;
-#else
-    extern DenselySampledSpectrum *x;
-    return *x;
-#endif
-}
-
-PBRT_HOST_DEVICE
-inline const DenselySampledSpectrum &Y() {
-#ifdef __CUDA_ARCH__
-    extern __device__ DenselySampledSpectrum *yGPU;
-    return *yGPU;
-#else
-    extern DenselySampledSpectrum *y;
-    return *y;
-#endif
-}
-
-PBRT_HOST_DEVICE
-inline const DenselySampledSpectrum &Z() {
-#ifdef __CUDA_ARCH__
-    extern __device__ DenselySampledSpectrum *zGPU;
-    return *zGPU;
-#else
-    extern DenselySampledSpectrum *z;
-    return *z;
-#endif
-}
+SpectrumHandle X(), Y(), Z();
 
 SpectrumHandle IllumA();
 SpectrumHandle IllumD50();

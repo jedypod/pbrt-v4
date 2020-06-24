@@ -47,12 +47,6 @@
 #include <string>
 #include <thread>
 
-#ifdef PBRT_HAVE_OPTIX
-  #include <cuda_runtime.h>
-  #include <vector>
-  #include <pbrt/util/pstd.h>
-#endif
-
 namespace pbrt {
 
 // ProgressReporter Declarations
@@ -81,21 +75,10 @@ class ProgressReporter {
     // ProgressReporter Public Methods
     ProgressReporter()
         : quiet(true) {}
-    ProgressReporter(int64_t totalWork, const std::string &title, bool gpu = false);
+    ProgressReporter(int64_t totalWork, const std::string &title);
     ~ProgressReporter();
 
     void Update(int64_t num = 1) {
-#ifdef PBRT_HAVE_OPTIX
-        if (gpuEvents.size() > 0) {
-            CHECK_LE(gpuEventsLaunchedOffset + num, gpuEvents.size());
-            while (num-- > 0) {
-                CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]),
-                         cudaSuccess);
-                ++gpuEventsLaunchedOffset;
-            }
-            return;
-        }
-#endif
         if (num == 0 || quiet) return;
         workDone += num;
     }
@@ -108,8 +91,7 @@ class ProgressReporter {
 
   private:
     // ProgressReporter Private Methods
-    void launchThread();
-    void printBar();
+    void PrintBar();
 
     // ProgressReporter Private Data
     int64_t totalWork;
@@ -119,12 +101,6 @@ class ProgressReporter {
     std::atomic<int64_t> workDone;
     std::atomic<bool> exitThread;
     std::thread updateThread;
-
-#ifdef PBRT_HAVE_OPTIX
-    std::vector<cudaEvent_t> gpuEvents;
-    std::atomic<int> gpuEventsLaunchedOffset;
-    int gpuEventsFinishedOffset;
-#endif
 };
 
 }  // namespace pbrt

@@ -8,6 +8,7 @@
 #include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
+#include <pbrt/pdfopt.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/rng.h>
 #include <pbrt/samplers.h>
@@ -208,47 +209,49 @@ TEST(Sampler, ConsistentValues) {
     constexpr int spp = rootSpp * rootSpp;
     Point2i resolution(100, 101);
 
-    std::vector<SamplerHandle> samplers;
-    samplers.push_back(new HaltonSampler(spp, resolution));
-    samplers.push_back(new RandomSampler(spp));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::CranleyPatterson));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Xor));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Owen));
-    samplers.push_back(new PMJ02BNSampler(spp));
-    samplers.push_back(new StratifiedSampler(rootSpp, rootSpp, true));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::None));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::CranleyPatterson));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Xor));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Owen));
+    std::vector<std::unique_ptr<Sampler>> samplers;
+    samplers.push_back(std::make_unique<HaltonSampler>(spp, resolution));
+    samplers.push_back(std::make_unique<RandomSampler>(spp));
+    samplers.push_back(std::make_unique<PaddedSobolSampler>(spp, RandomizeStrategy::None));
+    samplers.push_back(std::make_unique<PaddedSobolSampler>(spp, RandomizeStrategy::CranleyPatterson));
+    samplers.push_back(std::make_unique<PaddedSobolSampler>(spp, RandomizeStrategy::Xor));
+    samplers.push_back(std::make_unique<PaddedSobolSampler>(spp, RandomizeStrategy::Owen));
+    samplers.push_back(std::make_unique<PMJ02BNSampler>(spp));
+    samplers.push_back(std::make_unique<StratifiedSampler>(rootSpp, rootSpp, true));
+    samplers.push_back(std::make_unique<SobolSampler>(spp, resolution, RandomizeStrategy::None));
+    samplers.push_back(std::make_unique<SobolSampler>(spp, resolution,
+                                                      RandomizeStrategy::CranleyPatterson));
+    samplers.push_back(std::make_unique<SobolSampler>(spp, resolution,
+                                                      RandomizeStrategy::Xor));
+    samplers.push_back(std::make_unique<SobolSampler>(spp, resolution, RandomizeStrategy::Owen));
 
-    for (auto &sampler : samplers) {
+    for (const auto &sampler : samplers) {
         std::vector<Float> s1d[spp];
         std::vector<Point2f> s2d[spp];
 
         for (int s = 0; s < spp; ++s) {
-            sampler.StartPixelSample({1, 5}, s);
+            sampler->StartPixelSample({1, 5}, s);
             for (int i = 0; i < 10; ++i) {
-                s2d[s].push_back(sampler.Get2D());
-                s1d[s].push_back(sampler.Get1D());
+                s2d[s].push_back(sampler->Get2D());
+                s1d[s].push_back(sampler->Get1D());
             }
         }
 
         // Go somewhere else and generate some samples, just to make sure
         // things are shaken up.
-        sampler.StartPixelSample({0, 6}, 10);
-        sampler.Get2D();
-        sampler.Get2D();
-        sampler.Get1D();
+        sampler->StartPixelSample({0, 6}, 10);
+        sampler->Get2D();
+        sampler->Get2D();
+        sampler->Get1D();
 
         // Now go back and generate samples again, but enumerate them in a
         // different order to make sure the sampler is doing the right
         // thing.
         for (int s = spp - 1; s >= 0; --s) {
-            sampler.StartPixelSample({1, 5}, s);
+            sampler->StartPixelSample({1, 5}, s);
             for (int i = 0; i < s2d[s].size(); ++i) {
-                EXPECT_EQ(s2d[s][i], sampler.Get2D());
-                EXPECT_EQ(s1d[s][i], sampler.Get1D());
+                EXPECT_EQ(s2d[s][i], sampler->Get2D());
+                EXPECT_EQ(s1d[s][i], sampler->Get1D());
             }
         }
     }
@@ -282,14 +285,14 @@ static void checkElementary(const char *name, std::vector<Point2f> samples,
     }
 }
 
-static void checkElementarySampler(const char *name, SamplerHandle sampler,
+static void checkElementarySampler(const char *name, std::unique_ptr<Sampler> sampler,
                                    int logSamples) {
     // Get all of the samples for a pixel.
-    int spp = sampler.SamplesPerPixel();
+    int spp = sampler->samplesPerPixel;
     std::vector<Point2f> samples;
     for (int i = 0; i < spp; ++i) {
-        sampler.StartPixelSample(Point2i(0, 0), i);
-        samples.push_back(sampler.Get2D());
+        sampler->StartPixelSample(Point2i(0, 0), i);
+        samples.push_back(sampler->Get2D());
     }
 
     checkElementary(name, samples, logSamples);
@@ -299,11 +302,11 @@ static void checkElementarySampler(const char *name, SamplerHandle sampler,
 
 TEST(PaddedSobolSampler, ElementaryIntervals) {
     for (auto rand : { RandomizeStrategy::None, RandomizeStrategy::Owen,
-                       RandomizeStrategy::Xor })
+                          RandomizeStrategy::Xor })
         for (int logSamples = 2; logSamples <= 10; ++logSamples)
             checkElementarySampler(
                 "PaddedSobolSampler",
-                new PaddedSobolSampler(1 << logSamples, rand),
+                std::make_unique<PaddedSobolSampler>(1 << logSamples, rand),
                 logSamples);
 }
 
@@ -311,7 +314,8 @@ TEST(SobolUnscrambledSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples)
         checkElementarySampler(
             "Sobol Unscrambled",
-            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::None),
+            std::make_unique<SobolSampler>(1 << logSamples, Point2i(1, 1),
+                                           RandomizeStrategy::None),
             logSamples);
 }
 
@@ -319,7 +323,8 @@ TEST(SobolXORScrambledSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples)
         checkElementarySampler(
             "Sobol XOR Scrambled",
-            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::Xor),
+            std::make_unique<SobolSampler>(1 << logSamples, Point2i(1, 1),
+                                           RandomizeStrategy::Xor),
             logSamples);
 }
 
@@ -327,7 +332,8 @@ TEST(SobolOwenScrambledSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples)
         checkElementarySampler(
             "Sobol Owen Scrambled",
-            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::Owen),
+            std::make_unique<SobolSampler>(1 << logSamples, Point2i(1, 1),
+                                           RandomizeStrategy::Owen),
             logSamples);
 }
 
@@ -335,7 +341,8 @@ TEST(PMJ02BNSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; logSamples += 2)
         checkElementarySampler(
             "PMJ02BNSampler",
-            new PMJ02BNSampler(1 << logSamples), logSamples);
+            std::make_unique<PMJ02BNSampler>(1 << logSamples),
+            logSamples);
 }
 
 TEST(CranleyPattersonRotator, Basics) {
@@ -2260,6 +2267,53 @@ TEST(Sampling, HierWarpInverseDomain) {
                 EXPECT_LT(err.y, 1e-4) << "u.y " << u.y << " vs inv " << inv->y << " at " << v.y;
             }
         }
+}
+
+TEST(PdfOpt, OneExact) {
+    PDFSelectionOptimizer opt;
+
+    auto f = [](Float v) { return v; };
+    RNG rng;
+    // Method 1 is exact, 2 is pretty bad.
+    for (int i = 0; i < 10000; ++i) {
+        float alpha = opt.alpha();
+
+        Float t = (rng.Uniform<Float>() < alpha) ?
+            SampleLinear(rng.Uniform<Float>(), 0, 1) :
+            rng.Uniform<Float>() / 10;
+
+        Float pdf1 = LinearPDF(t, 0, 1);
+        Float pdf2 = (t < 0.1) ? 10 : 0;
+
+        opt.Update(f(t), pdf1, pdf2);
+    }
+
+    // Should mostly be using the first technique
+    EXPECT_GT(opt.alpha(), 0.9);
+}
+
+TEST(PdfOpt, BothMeh) {
+    PDFSelectionOptimizer opt;
+
+    auto f = [](Float v) { return 1; };
+    RNG rng;
+    // Both are equally bad
+    for (int i = 0; i < 10000; ++i) {
+        float alpha = opt.alpha();
+
+        Float t = (rng.Uniform<Float>() < alpha) ?
+            SampleLinear(rng.Uniform<Float>(), 0, 1) :
+            SampleLinear(rng.Uniform<Float>(), 1, 0);
+
+        Float pdf1 = LinearPDF(t, 0, 1);
+        Float pdf2 = LinearPDF(t, 1, 0);
+
+        opt.Update(f(t), pdf1, pdf2);
+    }
+
+    // Should be about the same of each.
+    EXPECT_GT(opt.alpha(), 0.48);
+    EXPECT_LT(opt.alpha(), 0.52);
 }
 
 TEST(WeightedReservoir, Basic) {

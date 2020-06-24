@@ -33,6 +33,7 @@
 // core/parser.cpp*
 #include <pbrt/parser.h>
 
+#include <pbrt/api.h>
 #include <pbrt/genscene.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>

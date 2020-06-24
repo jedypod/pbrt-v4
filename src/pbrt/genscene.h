@@ -11,7 +11,6 @@
 #include <pbrt/util/print.h>
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -68,20 +67,6 @@ public:
     virtual void ObjectEnd(FileLoc loc) = 0;
     virtual void ObjectInstance(const std::string &name, FileLoc loc) = 0;
     virtual void WorldEnd(FileLoc loc) = 0;
-
-protected:
-    template <typename... Args>
-    void ErrorExitDeferred(const char *fmt, Args&&... args) const {
-        errorExit = true;
-        Error(fmt, args...);
-    }
-    template <typename... Args>
-    void ErrorExitDeferred(const FileLoc *loc, const char *fmt, Args&&... args) const {
-        errorExit = true;
-        Error(loc, fmt, args...);
-    }
-
-    mutable bool errorExit = false;
 };
 
 struct GeneralSceneEntity {
@@ -189,23 +174,6 @@ struct AnimatedShapeSceneEntity : public TransformedSceneEntity {
     std::string insideMedium, outsideMedium;
 };
 
-struct InstanceDefinitionSceneEntity {
-    InstanceDefinitionSceneEntity() = default;
-    InstanceDefinitionSceneEntity(const std::string &name, FileLoc loc)
-        : name(name), loc(loc) { }
-
-    std::string ToString() const {
-        return StringPrintf("[ InstanceDefinitionSceneEntity name: %s loc: %s "
-                            " shapes: %s animatedShapes: %s ]", name, loc,
-                            shapes, animatedShapes);
-    }
-
-    std::string name;
-    FileLoc loc;
-    std::vector<ShapeSceneEntity> shapes;
-    std::vector<AnimatedShapeSceneEntity> animatedShapes;
-};
-
 struct TextureSceneEntity : public TransformedSceneEntity {
     TextureSceneEntity() = default;
     TextureSceneEntity(const std::string &texName,
@@ -266,8 +234,8 @@ struct TransformHash {
 
 class TransformCache {
   public:
-    TransformCache(pstd::pmr::memory_resource *memoryResource)
-        : bufferResource(memoryResource), alloc(&bufferResource) { }
+    TransformCache(Allocator alloc)
+        : alloc(alloc) { }
     ~TransformCache();
 
     // TransformCache Public Methods
@@ -275,7 +243,6 @@ class TransformCache {
 
   private:
     // TransformCache Private Data
-    pstd::pmr::monotonic_buffer_resource bufferResource;
     Allocator alloc;
     std::unordered_set<Transform *, TransformHash> hashTable;
 };
@@ -311,7 +278,7 @@ struct TransformSet {
 
 class GeneralScene : public GeneralSceneBase {
 public:
-    GeneralScene(pstd::pmr::memory_resource *transformMemoryResource);
+    GeneralScene();
     ~GeneralScene();
 
     MemoryArena &GetMemoryArena() { return sceneArena; }
@@ -368,12 +335,13 @@ public:
     GeneralSceneEntity filter;
     GeneralSceneEntity accelerator;
 
-    std::vector<std::pair<std::string, GeneralSceneEntity>> namedMaterials;
+    std::map<std::string, GeneralSceneEntity> namedMaterials;
     std::vector<GeneralSceneEntity> materials;
     std::map<std::string, TransformedSceneEntity> media;
     std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
-    std::map<std::string, InstanceDefinitionSceneEntity> instanceDefinitions;
+    std::map<std::string, std::pair<std::vector<ShapeSceneEntity>,
+                                    std::vector<AnimatedShapeSceneEntity>>> instanceDefinitions;
 
     std::vector<LightSceneEntity> lights;
     std::vector<GeneralSceneEntity> areaLights;
@@ -382,10 +350,6 @@ public:
     std::vector<InstanceSceneEntity> instances;
 
     std::string ToString() const;
-
-    void CreateTextures(std::map<std::string, FloatTextureHandle> *floatTextureMap,
-                        std::map<std::string, SpectrumTextureHandle> *spectrumTextureMap,
-                        Allocator alloc, bool gpu) const;
 
     void CreateMaterials(/*const*/std::map<std::string, FloatTextureHandle> &floatTextures,
                          /*const*/std::map<std::string, SpectrumTextureHandle> &spectrumTextures,
@@ -405,7 +369,8 @@ private:
 
     Float transformStartTime = 0, transformEndTime = 1;
     TransformSet cameraFromWorldT;
-    InstanceDefinitionSceneEntity *currentInstance = nullptr;
+    std::pair<std::vector<ShapeSceneEntity>,
+              std::vector<AnimatedShapeSceneEntity>> *currentInstance = nullptr;
     bool haveScatteringMedia = false;
 
     MemoryArena sceneArena;
@@ -427,6 +392,7 @@ private:
     std::vector<uint32_t> pushedActiveTransformBits;
     std::vector<std::pair<char, FileLoc>> pushStack; // 'a': attribute, 't': transform, 'o': object
 
+    pstd::pmr::monotonic_buffer_resource transformMemoryResource;
     TransformCache transformCache;
 };
 
@@ -434,7 +400,6 @@ class FormattingScene : public GeneralSceneBase {
 public:
     FormattingScene(bool toPly, bool upgrade)
         : toPly(toPly), upgrade(upgrade) {}
-    ~FormattingScene();
 
     MemoryArena &GetMemoryArena() { return arena; }
 
@@ -488,18 +453,9 @@ public:
     }
 
 private:
-    std::string upgradeMaterialIndex(const std::string &name, ParameterDictionary *dict,
-                                     FileLoc loc) const;
-    std::string upgradeMaterial(std::string *name, ParameterDictionary *dict,
-                                FileLoc loc) const;
-
     MemoryArena arena;
     int catIndentCount = 0;
     bool toPly, upgrade;
-    std::map<std::string, std::string> definedTextures;
-    std::map<std::string, std::string> definedNamedMaterials;
-    std::map<std::string, ParameterDictionary> namedMaterialDictionaries;
-    std::map<std::string, std::string> definedObjectInstances;
 };
 
 } // namespace pbrt

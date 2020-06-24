@@ -42,12 +42,11 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/base.h>
-#include <pbrt/transform.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/profile.h>
 #include <pbrt/util/spectrum.h>
-#include <pbrt/util/scattering.h>
+#include <pbrt/transform.h>
 
 #include <memory>
 #include <vector>
@@ -100,12 +99,12 @@ class HomogeneousMedium : public Medium {
         : sigma_a(sigma_a),
           sigma_s(sigma_s),
           g(g) {}
-    static HomogeneousMedium *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                     Allocator alloc);
+    static std::unique_ptr<HomogeneousMedium> Create(
+        const ParameterDictionary &dict, Allocator alloc);
 
     SampledSpectrum Tr(const Ray &ray, Float tMax, const SampledWavelengths &lambda,
-                       SamplerHandle sampler) const;
-    SampledSpectrum Sample(const Ray &ray, Float tMax, SamplerHandle sampler,
+                       Sampler &sampler) const;
+    SampledSpectrum Sample(const Ray &ray, Float tMax, Sampler &sampler,
                            const SampledWavelengths &lambda,
                            MemoryArena &arena,
                            MediumInteraction *mi) const;
@@ -125,9 +124,9 @@ class GridDensityMedium : public Medium {
     GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float g,
                       int nx, int ny, int nz, const Transform &worldFromMedium,
                       std::vector<Float> density, Allocator alloc);
-    static GridDensityMedium *Create(const ParameterDictionary &dict,
-                                     const Transform &worldFromMedium, const FileLoc *loc,
-                                     Allocator alloc);
+    static std::unique_ptr<GridDensityMedium> Create(
+        const ParameterDictionary &dict,
+        const Transform &worldFromMedium, Allocator alloc);
 
     Float Density(const Point3f &p) const;
     Float D(const Point3i &p) const {
@@ -135,12 +134,12 @@ class GridDensityMedium : public Medium {
         if (!InsideExclusive(p, sampleBounds)) return 0;
         return density[(p.z * ny + p.y) * nx + p.x];
     }
-    SampledSpectrum Sample(const Ray &ray, Float tMax, SamplerHandle sampler,
+    SampledSpectrum Sample(const Ray &ray, Float tMax, Sampler &sampler,
                            const SampledWavelengths &lambda,
                            MemoryArena &arena,
                            MediumInteraction *mi) const;
     SampledSpectrum Tr(const Ray &ray, Float tMax, const SampledWavelengths &lambda,
-                       SamplerHandle sampler) const;
+                       Sampler &sampler) const;
 
     std::string ToString() const;
 

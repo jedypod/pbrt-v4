@@ -36,7 +36,6 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/base.h>
-#include <pbrt/lights.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/profile.h>
@@ -291,46 +290,6 @@ class BVHLightSampler final : public LightSampler {
         return pdf;
     }
 
-    template <typename F>
-    PBRT_HOST_DEVICE
-    void SampleSingle(const Interaction &intr, Float u, F func) const {
-        // First to improve execution convergence
-        for (LightHandle light : infiniteLights)
-            func(light, 1.f);
-        if (root)
-            SampleSingleRecursive(root, intr, u, 1.f, func);
-    }
-
-    PBRT_HOST_DEVICE
-    Float PDFSingle(const Interaction &intr, LightHandle light) const {
-        ProfilerScope _(ProfilePhase::LightDistribLookup);
-
-#ifndef __CUDA_ARCH__
-        // Why the hell is this being flagged as calling a host function?
-        if (light->type == LightType::DeltaDirection ||
-            light->type == LightType::Infinite)
-            return 1;
-#endif
-
-        LightBVHNode *node = lightToNode[light];
-        Float pdf = 1;
-
-        if (node->lightBounds.Importance(intr) == 0)
-            return 0;
-
-        for (; node->parent != nullptr; node = node->parent) {
-            pstd::array<Float, 2> ci = {
-                node->parent->children[0]->lightBounds.Importance(intr),
-                node->parent->children[1]->lightBounds.Importance(intr)
-            };
-            int childIndex = static_cast<int>(node == node->parent->children[1]);
-            DCHECK_GT(ci[childIndex], 0);
-            pdf *= ci[childIndex] / (ci[0] + ci[1]);
-        }
-
-        return pdf;
-    }
-
     std::string ToString() const;
 
  private:
@@ -360,28 +319,6 @@ class BVHLightSampler final : public LightSampler {
             Float nodePDF;
             int child = SampleDiscrete(ci, u, &nodePDF, &u);
             SampleRecursive(node->children[child], intr, u, pdf * nodePDF, func);
-        }
-    }
-
-    template <typename F>
-    PBRT_HOST_DEVICE
-    static void SampleSingleRecursive(const LightBVHNode *node, const Interaction &intr,
-                                      Float u, Float pdf, F func) {
-        if (node->isLeaf) {
-            if (node->lightBounds.Importance(intr) > 0)
-                func(node->light, pdf);
-        } else {
-            pstd::array<Float, 2> ci = { node->children[0]->lightBounds.Importance(intr),
-                                         node->children[1]->lightBounds.Importance(intr) };
-            if (ci[0] == 0 && ci[1] == 0)
-                // It may happen that we follow a path down the tree and later find that there
-                // aren't any lights that illuminate our point; a natural consequence of the
-                // bounds tightening up on the way down.
-                return;
-
-            Float nodePDF;
-            int child = SampleDiscrete(ci, u, &nodePDF, &u);
-            SampleSingleRecursive(node->children[child], intr, u, pdf * nodePDF, func);
         }
     }
 

@@ -47,9 +47,10 @@
 
 namespace pbrt {
 
-struct BasicOptions {
+struct Options {
     int nThreads = 0;
     int seed = 0;
+    pstd::optional<int> pixelSamples;
     bool quickRender = false;
     bool quiet = false;
     bool recordPixelStatistics = false;
@@ -57,10 +58,6 @@ struct BasicOptions {
     bool upgrade = false;
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool forceDiffuse = false;
-};
-
-struct Options : BasicOptions  {
-    pstd::optional<int> pixelSamples;
     pstd::optional<std::string> imageFile;
     pstd::optional<std::string> mseReferenceImage, mseReferenceOutput;
     pstd::optional<std::string> debugStart;
@@ -74,10 +71,6 @@ struct Options : BasicOptions  {
 };
 
 extern Options PbrtOptions;
-
-#if defined(PBRT_HAVE_OPTIX) && defined(__CUDACC__)
-extern __constant__ BasicOptions PbrtOptionsGPU;
-#endif
 
 }  // namespace pbrt
 

@@ -393,12 +393,12 @@ static SpectrumHandle readSpectrumFromFile(const std::string &filename, Allocato
     std::string fn = ResolveFilename(filename);
     if (cachedSpectra.find(fn) != cachedSpectra.end()) return cachedSpectra[fn];
 
-    pstd::optional<SpectrumHandle> pls = PiecewiseLinearSpectrum::Read(fn, alloc);
+    pstd::optional<PiecewiseLinearSpectrum> pls = PiecewiseLinearSpectrum::Read(fn);
     if (!pls)
         return nullptr;
 
-    cachedSpectra[fn] = *pls;
-    return *pls;
+    cachedSpectra[fn] = alloc.new_object<PiecewiseLinearSpectrum>(*pls);
+    return cachedSpectra[fn];
 }
 
 std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
@@ -441,7 +441,7 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                     lambda[i] = v[2 * i];
                     value[i] = v[2 * i + 1];
                 }
-                return alloc.new_object<PiecewiseLinearSpectrum>(lambda, value, alloc);
+                return alloc.new_object<PiecewiseLinearSpectrum>(lambda, value);
             });
     }
     else if (param.type == "spectrum" && !param.strings.empty())
@@ -573,18 +573,6 @@ void ParameterDictionary::RenameParameter(const std::string &before,
     for (ParsedParameter *p : params)
         if (p->name == before)
             p->name = after;
-}
-
-void ParameterDictionary::RenameUsedTextures(const std::map<std::string, std::string> &m) {
-    for (ParsedParameter *p : params) {
-        if (p->type != "texture")
-            continue;
-
-        CHECK_EQ(1, p->strings.size());
-        auto iter = m.find(p->strings[0]);
-        if (iter != m.end())
-            p->strings[0] = iter->second;
-    }
 }
 
 void ParameterDictionary::ReportUnused() const {

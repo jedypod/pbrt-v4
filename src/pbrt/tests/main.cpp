@@ -32,8 +32,9 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/options.h>
+#include <pbrt/api.h>
 #include <pbrt/util/args.h>
+#include <pbrt/options.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/error.h>
 
@@ -52,11 +53,10 @@ General pbrt_test arguments:
   --log-level <level>         Log messages at or above this level, where <level>
                               is "verbose", "error", or "fatal". Default: "error".
   --nthreads <num>            Use specified number of threads for rendering.
-  --test_filter <regexp>      Regular expression of test names to run.
   --vlog-level <n>            Set VLOG verbosity. (Default: 0, disabled.)
 )");
 
-    CleanupPBRT();
+    pbrtCleanup();
 
     exit(msg.empty() ? 0 : 1);
 }
@@ -66,7 +66,10 @@ int main(int argc, char **argv) {
     opt.quiet = true;
     LogConfig logConfig;
     std::string logLevel = "error";
-    std::string testFilter;
+
+    pbrtInit(opt);
+
+    testing::InitGoogleTest(&argc, argv);
 
     char **origArgv = argv;
     // Process command-line arguments
@@ -79,7 +82,6 @@ int main(int argc, char **argv) {
 
         if (ParseArg(&argv, "log-level", &logLevel, onError) ||
             ParseArg(&argv, "nthreads", &opt.nThreads, onError) ||
-            ParseArg(&argv, "test-filter", &testFilter, onError) ||
             ParseArg(&argv, "vlog-level", &logConfig.vlogLevel, onError)) {
             // success
         } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-h") == 0)) {
@@ -92,23 +94,14 @@ int main(int argc, char **argv) {
     }
 
     logConfig.level = LogLevelFromString(logLevel);
+    if (logConfig.level == LogLevel::Invalid)
+        ErrorExit("%s: --log-level unknown", logLevel);
 
-    InitPBRT(opt, logConfig);
-
-    int googleArgc = 1;
-    const char *googleArgv[4] = {};
-    googleArgv[0] = argv[0];
-    std::string filter;
-    if (!testFilter.empty()) {
-        filter = StringPrintf("--gtest_filter=%s", testFilter);
-        googleArgc += 1;
-        googleArgv[1] = filter.c_str();
-    }
-    testing::InitGoogleTest(&googleArgc, (char **)googleArgv);
+    InitLogging(logConfig, argv[0]);
 
     int ret = RUN_ALL_TESTS();
 
-    CleanupPBRT();
+    pbrtCleanup();
 
     return ret;
 }

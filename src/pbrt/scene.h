@@ -52,8 +52,8 @@ namespace pbrt {
 class Scene {
   public:
     // Scene Public Methods
-    Scene(PrimitiveHandle aggregate, std::vector<LightHandle> l)
-        : lights(std::move(l)), aggregate(aggregate) {
+    Scene(PrimitiveHandle a, std::vector<LightHandle> l)
+        : lights(std::move(l)), aggregate(std::move(a)) {
         // Scene Constructor Implementation
         if (aggregate)
             worldBound = aggregate.WorldBound();
@@ -66,7 +66,7 @@ class Scene {
     const Bounds3f &WorldBound() const { return worldBound; }
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax = Infinity) const;
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
-    pstd::optional<ShapeIntersection> IntersectTr(Ray ray, Float tMax, SamplerHandle sampler,
+    pstd::optional<ShapeIntersection> IntersectTr(Ray ray, Float tMax, Sampler &sampler,
                                                   const SampledWavelengths &lambda,
                                                   SampledSpectrum *transmittance) const;
 

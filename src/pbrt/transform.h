@@ -166,87 +166,9 @@ class Transform {
     // than just using the default operator() implementations that use
     // FloatInterval for everything...
     PBRT_HOST_DEVICE
-    Point3fi operator()(const Point3fi &p) const {
-        Float x = Float(p.x), y = Float(p.y), z = Float(p.z);
-        // Compute transformed coordinates from point _pt_
-        Float xp = (m[0][0] * x + m[0][1] * y) + (m[0][2] * z + m[0][3]);
-        Float yp = (m[1][0] * x + m[1][1] * y) + (m[1][2] * z + m[1][3]);
-        Float zp = (m[2][0] * x + m[2][1] * y) + (m[2][2] * z + m[2][3]);
-        Float wp = (m[3][0] * x + m[3][1] * y) + (m[3][2] * z + m[3][3]);
-
-        // Compute absolute error for transformed point
-        Vector3f pOutError;
-        if (p.IsExact()) {
-            pOutError.x = gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                                      std::abs(m[0][2] * z) + std::abs(m[0][3]));
-            pOutError.y = gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                                      std::abs(m[1][2] * z) + std::abs(m[1][3]));
-            pOutError.z = gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                                      std::abs(m[2][2] * z) + std::abs(m[2][3]));
-        } else {
-            Vector3f pInError = p.Error();
-            pOutError.x = (gamma(3) + 1) *
-                (std::abs(m[0][0]) * pInError.x + std::abs(m[0][1]) * pInError.y +
-                 std::abs(m[0][2]) * pInError.z) +
-                gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                            std::abs(m[0][2] * z) + std::abs(m[0][3]));
-            pOutError.y = (gamma(3) + 1) *
-                (std::abs(m[1][0]) * pInError.x + std::abs(m[1][1]) * pInError.y +
-                 std::abs(m[1][2]) * pInError.z) +
-                gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                            std::abs(m[1][2] * z) + std::abs(m[1][3]));
-            pOutError.z = (gamma(3) + 1) *
-                (std::abs(m[2][0]) * pInError.x + std::abs(m[2][1]) * pInError.y +
-                 std::abs(m[2][2]) * pInError.z) +
-                gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                            std::abs(m[2][2] * z) + std::abs(m[2][3]));
-        }
-
-        if (wp == 1)
-            return Point3fi(Point3f(xp, yp, zp), pOutError);
-        else
-            return Point3fi(Point3f(xp, yp, zp), pOutError) / wp;
-    }
-
+    Point3fi operator()(const Point3fi &p) const;
     PBRT_HOST_DEVICE
-    Vector3fi operator()(const Vector3fi &v) const {
-        Float x = Float(v.x), y = Float(v.y), z = Float(v.z);
-
-        Vector3f vOutError;
-        if (v.IsExact()) {
-            vOutError.x = gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                                      std::abs(m[0][2] * z));
-            vOutError.y = gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                                      std::abs(m[1][2] * z));
-            vOutError.z = gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                                      std::abs(m[2][2] * z));
-        } else {
-            Vector3f vInError = v.Error();
-            vOutError.x = (gamma(3) + 1) *
-                (std::abs(m[0][0]) * vInError.x + std::abs(m[0][1]) * vInError.y +
-                 std::abs(m[0][2]) * vInError.z) +
-                gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                            std::abs(m[0][2] * z));
-            vOutError.y = (gamma(3) + 1) *
-                (std::abs(m[1][0]) * vInError.x + std::abs(m[1][1]) * vInError.y +
-                 std::abs(m[1][2]) * vInError.z) +
-                gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                            std::abs(m[1][2] * z));
-            vOutError.z = (gamma(3) + 1) *
-                (std::abs(m[2][0]) * vInError.x + std::abs(m[2][1]) * vInError.y +
-                 std::abs(m[2][2]) * vInError.z) +
-                gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                            std::abs(m[2][2] * z));
-        }
-
-        Float xp = m[0][0] * x + m[0][1] * y + m[0][2] * z;
-        Float yp = m[1][0] * x + m[1][1] * y + m[1][2] * z;
-        Float zp = m[2][0] * x + m[2][1] * y + m[2][2] * z;
-
-        return Vector3fi(Vector3f(xp, yp, zp), vOutError);
-    }
-
-
+    Vector3fi operator()(const Vector3fi &v) const;
     PBRT_HOST_DEVICE
     Point3fi ApplyInverse(const Point3fi &p) const;
 
@@ -299,37 +221,10 @@ PBRT_HOST_DEVICE
 Transform RotateY(Float theta);
 PBRT_HOST_DEVICE
 Transform RotateZ(Float theta);
-
-PBRT_HOST_DEVICE_INLINE
-Transform Rotate(Float sinTheta, Float cosTheta, const Vector3f &axis) {
-    Vector3f a = Normalize(axis);
-    SquareMatrix<4> m;
-    // Compute rotation of first basis vector
-    m[0][0] = a.x * a.x + (1 - a.x * a.x) * cosTheta;
-    m[0][1] = a.x * a.y * (1 - cosTheta) - a.z * sinTheta;
-    m[0][2] = a.x * a.z * (1 - cosTheta) + a.y * sinTheta;
-    m[0][3] = 0;
-
-    // Compute rotations of second and third basis vectors
-    m[1][0] = a.x * a.y * (1 - cosTheta) + a.z * sinTheta;
-    m[1][1] = a.y * a.y + (1 - a.y * a.y) * cosTheta;
-    m[1][2] = a.y * a.z * (1 - cosTheta) - a.x * sinTheta;
-    m[1][3] = 0;
-
-    m[2][0] = a.x * a.z * (1 - cosTheta) - a.y * sinTheta;
-    m[2][1] = a.y * a.z * (1 - cosTheta) + a.x * sinTheta;
-    m[2][2] = a.z * a.z + (1 - a.z * a.z) * cosTheta;
-    m[2][3] = 0;
-    return Transform(m, Transpose(m));
-}
-
-PBRT_HOST_DEVICE_INLINE
-Transform Rotate(Float theta, const Vector3f &axis) {
-    Float sinTheta = std::sin(Radians(theta));
-    Float cosTheta = std::cos(Radians(theta));
-    return Rotate(sinTheta, cosTheta, axis);
-}
-
+PBRT_HOST_DEVICE
+Transform Rotate(Float theta, const Vector3f &axis);
+PBRT_HOST_DEVICE
+Transform Rotate(Float sinTheta, Float cosTheta, const Vector3f &axis);
 PBRT_HOST_DEVICE
 Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up);
 PBRT_HOST_DEVICE

@@ -63,12 +63,6 @@
   #define PBRT_DEVICE_INLINE inline
 #endif
 
-#ifdef PBRT_HAVE_OPTIX
-  #define PBRT_L1_CACHE_LINE_SIZE 128
-#else
-  #define PBRT_L1_CACHE_LINE_SIZE 64
-#endif
-
 // From ABSL_ARRAYSIZE
 #define PBRT_ARRAYSIZE(array) \
   (sizeof(::pbrt::detail::ArraySizeHelper(array)))
@@ -156,7 +150,8 @@ struct CameraSample;
 class ProjectiveCamera;
 class PerspectiveCamera;
 class RealisticCamera;
-class FilterHandle;
+class Sampler;
+class Filter;
 class FilterSampler;
 class Film;
 class RGBFilm;
@@ -177,7 +172,8 @@ class SpectrumTextureHandle;
 class Medium;
 class MediumInteraction;
 struct MediumInterface;
-class BSSRDFHandle;
+class BSSRDF;
+class SeparableBSSRDF;
 class MeasuredBRDFData;
 class TabulatedBSSRDF;
 struct BSSRDFTable;
@@ -216,15 +212,11 @@ class ParameterDictionary;
 class TextureParameterDictionary;
 class DirectionCone;
 struct Options;
-struct LogConfig;
 
 using Allocator = pstd::pmr::polymorphic_allocator<pstd::byte>;
 
  // TransportMode Declarations
 enum class TransportMode { Radiance, Importance };
-
-void InitPBRT(const Options &opt, const LogConfig &logConfig);
-void CleanupPBRT();
 
 }  // namespace pbrt
 

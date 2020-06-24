@@ -33,7 +33,6 @@
 // spectrum/spectrum.cpp*
 #include <pbrt/util/spectrum.h>
 
-#include <pbrt/gpu.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
@@ -197,8 +196,7 @@ std::string PiecewiseLinearSpectrum::ParameterString() const {
     return ret;
 }
 
-pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &fn,
-                                                             Allocator alloc) {
+pstd::optional<PiecewiseLinearSpectrum> PiecewiseLinearSpectrum::Read(const std::string &fn) {
     pstd::optional<std::vector<Float>> vals = ReadFloatFile(fn);
     if (!vals) {
         Warning("%s: unable to read spectrum file.", fn);
@@ -218,8 +216,7 @@ pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &
             lambda.push_back((*vals)[2 * i]);
             v.push_back((*vals)[2 * i + 1]);
         }
-        SpectrumHandle handle = alloc.new_object<PiecewiseLinearSpectrum>(lambda, v, alloc);
-        return handle;
+        return PiecewiseLinearSpectrum(lambda, v);
     }
 }
 
@@ -369,10 +366,11 @@ std::string SampledWavelengths::ToString() const {
 }
 
 // SampledSpectrumMethod Definitions
-Float SampledSpectrum::y(const SampledWavelengths &lambda) const {
+Float SampledSpectrum::y(const SampledWavelengths &lambda,
+                         const DenselySampledSpectrum &Y) const {
 
     Float ySum = 0;
-    SampledSpectrum Ys = SPDs::Y().Sample(lambda);
+    SampledSpectrum Ys = Y.Sample(lambda);
     for (int i = 0; i < NSpectrumSamples; ++i) {
         if (lambda.pdf[i] == 0) continue;
         ySum += Ys[i] * v[i] / lambda.pdf[i];
@@ -390,11 +388,14 @@ std::string SampledSpectrum::ToString() const {
     return str;
 }
 
-XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
+XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda,
+                           const DenselySampledSpectrum &X,
+                           const DenselySampledSpectrum &Y,
+                           const DenselySampledSpectrum &Z) const {
     XYZ xyz;
-    SampledSpectrum Xs = SPDs::X().Sample(lambda);
-    SampledSpectrum Ys = SPDs::Y().Sample(lambda);
-    SampledSpectrum Zs = SPDs::Z().Sample(lambda);
+    SampledSpectrum Xs = X.Sample(lambda);
+    SampledSpectrum Ys = Y.Sample(lambda);
+    SampledSpectrum Zs = Z.Sample(lambda);
     for (int i = 0; i < NSpectrumSamples; ++i) {
         if (lambda.pdf[i] == 0) continue;
         xyz.X += Xs[i] * v[i] / lambda.pdf[i];
@@ -406,7 +407,7 @@ XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
 
 RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
                            const RGBColorSpace &cs) const {
-    XYZ xyz = ToXYZ(lambda);
+    XYZ xyz = ToXYZ(lambda, cs.X, cs.Y, cs.Z);
     return cs.ToRGB(xyz);
 }
 
@@ -1668,14 +1669,10 @@ pbrt::SpectrumHandle MakeSpectrumFromInterleaved(
 // Spectral Data Definitions
 namespace SPDs {
 
-#ifdef PBRT_HAVE_OPTIX
-__device__ DenselySampledSpectrum *xGPU, *yGPU, *zGPU;
-#endif
-DenselySampledSpectrum *x, *y, *z;
-
 namespace {
 
 ConstantSpectrum *zero, *one;
+DenselySampledSpectrum *x, *y, *z;
 
 SpectrumHandle illuma, illumd50, illumacesd60, illumd65;
 SpectrumHandle illumf1, illumf2, illumf3, illumf4;
@@ -1702,19 +1699,13 @@ void Init(Allocator alloc) {
     one = alloc.new_object<ConstantSpectrum>(1.);
 
     PiecewiseLinearSpectrum xpls(CIE_lambda, CIE_X);
-    x = alloc.new_object<DenselySampledSpectrum>(&xpls, alloc);
+    x = alloc.new_object<DenselySampledSpectrum>(&xpls);
 
     PiecewiseLinearSpectrum ypls(CIE_lambda, CIE_Y);
-    y = alloc.new_object<DenselySampledSpectrum>(&ypls, alloc);
+    y = alloc.new_object<DenselySampledSpectrum>(&ypls);
 
     PiecewiseLinearSpectrum zpls(CIE_lambda, CIE_Z);
-    z = alloc.new_object<DenselySampledSpectrum>(&zpls, alloc);
-
-#ifdef PBRT_HAVE_OPTIX
-    CUDA_CHECK(cudaMemcpyToSymbol(xGPU, &x, sizeof(x)));
-    CUDA_CHECK(cudaMemcpyToSymbol(yGPU, &y, sizeof(y)));
-    CUDA_CHECK(cudaMemcpyToSymbol(zGPU, &z, sizeof(z)));
-#endif
+    z = alloc.new_object<DenselySampledSpectrum>(&zpls);
 
     illuma = MakeSpectrumFromInterleaved(CIE_Illum_A, true, alloc);
     illumd50 = MakeSpectrumFromInterleaved(CIE_Illum_D5000, true, alloc);
@@ -1783,6 +1774,18 @@ SpectrumHandle Zero() {
 
 SpectrumHandle One() {
     return one;
+}
+
+SpectrumHandle X() {
+    return x;
+}
+
+SpectrumHandle Y() {
+    return y;
+}
+
+SpectrumHandle Z() {
+    return z;
 }
 
 SpectrumHandle IllumA() {

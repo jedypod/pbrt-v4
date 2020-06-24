@@ -34,7 +34,6 @@
 // core/scene.cpp*
 #include <pbrt/scene.h>
 
-#include <pbrt/shapes.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
@@ -51,22 +50,16 @@ STAT_COUNTER("Intersections/Shadow ray intersection tests", nShadowTests);
 pstd::optional<ShapeIntersection> Scene::Intersect(const Ray &ray, Float tMax) const {
     ++nIntersectionTests;
     DCHECK_NE(ray.d, Vector3f(0,0,0));
-    if (aggregate)
-        return aggregate.Intersect(ray, tMax);
-    else
-        return {};
+    return aggregate.Intersect(ray, tMax);
 }
 
 bool Scene::IntersectP(const Ray &ray, Float tMax) const {
     ++nShadowTests;
     DCHECK_NE(ray.d, Vector3f(0,0,0));
-    if (aggregate)
-        return aggregate.IntersectP(ray, tMax);
-    else
-        return false;
+    return aggregate.IntersectP(ray, tMax);
 }
 
-pstd::optional<ShapeIntersection> Scene::IntersectTr(Ray ray, Float tMax, SamplerHandle sampler,
+pstd::optional<ShapeIntersection> Scene::IntersectTr(Ray ray, Float tMax, Sampler &sampler,
                                                      const SampledWavelengths &lambda,
                                                      SampledSpectrum *Tr) const {
     *Tr = SampledSpectrum(1.f);
@@ -77,7 +70,7 @@ pstd::optional<ShapeIntersection> Scene::IntersectTr(Ray ray, Float tMax, Sample
 
         // Initialize next ray segment or terminate transmittance computation
         if (!si) return {};
-        if (si->intr.material) return si;
+        if (si->intr.material != nullptr) return si;
 
         ray = si->intr.SpawnRay(ray.d);
         tMax -= si->tHit;

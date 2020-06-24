@@ -55,7 +55,6 @@
 #include <cmath>
 #include <limits>
 #include <string>
-#include <tuple>
 
 namespace pbrt {
 
@@ -178,27 +177,18 @@ class MeasuredBxDF;
 class MixBxDF;
 class MicrofacetReflectionBxDF;
 class MicrofacetTransmissionBxDF;
-class BSSRDFAdapter;
+class DisneyBxDF;
+class SeparableBSSRDFAdapter;
 using CoatedDiffuseBxDF = LayeredBxDF<DielectricInterfaceBxDF, LambertianBxDF>;
 using GeneralLayeredBxDF = LayeredBxDF<BxDFHandle, BxDFHandle>;
-
-struct RhoHemiDirSample {
-    Float u;
-    Point2f u2;
-};
-
-struct RhoHemiHemiSample {
-    Float u;
-    Point2f u2[2];
-};
 
 class BxDFHandle : public TaggedPointer<LambertianBxDF, CoatedDiffuseBxDF, GeneralLayeredBxDF,
                                         DielectricInterfaceBxDF,
                                         ThinDielectricBxDF, SpecularReflectionBxDF,
                                         SpecularTransmissionBxDF, HairBxDF, MeasuredBxDF,
                                         MixBxDF, MicrofacetReflectionBxDF,
-                                        MicrofacetTransmissionBxDF,
-                                        BSSRDFAdapter>
+                                        MicrofacetTransmissionBxDF, DisneyBxDF,
+                                        SeparableBSSRDFAdapter>
 {
   public:
     using TaggedPointer::TaggedPointer;
@@ -208,8 +198,8 @@ class BxDFHandle : public TaggedPointer<LambertianBxDF, CoatedDiffuseBxDF, Gener
                              ThinDielectricBxDF, SpecularReflectionBxDF,
                              SpecularTransmissionBxDF, HairBxDF, MeasuredBxDF,
                              MixBxDF, MicrofacetReflectionBxDF,
-                             MicrofacetTransmissionBxDF,
-                             BSSRDFAdapter> tp)
+                             MicrofacetTransmissionBxDF, DisneyBxDF,
+                             SeparableBSSRDFAdapter> tp)
     : TaggedPointer(tp) { }
 
     // BxDF Interface
@@ -219,17 +209,12 @@ class BxDFHandle : public TaggedPointer<LambertianBxDF, CoatedDiffuseBxDF, Gener
     PBRT_HOST_DEVICE
     pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc, const Point2f &u,
                                         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
-
-    // RhoSampler: f(index) -> std::pair<Float, Point2f>
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(const Vector3f &wo, RhoSampler rhoSampler,
-                        int nSamples = 16) const;
-
-    // RhoSampler: f(index) -> std::tuple<Float, Point2f, Float, Point2f>
-    template <typename RhoSampler>
+    SampledSpectrum rho(const Vector3f &wo, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u2) const;
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(RhoSampler rhoSampler, int nSamples = 16) const;
+    SampledSpectrum rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
+                        pstd::span<const Float> uc2, pstd::span<const Point2f> u2) const;
 
     PBRT_HOST_DEVICE
     Float PDF(const Vector3f &wo, const Vector3f &wi,
@@ -275,10 +260,6 @@ class BSDF {
         return (bxdf.Flags() & BxDFFlags::Glossy);
     }
     PBRT_HOST_DEVICE
-    bool IsSpecular() const {
-        return (bxdf.Flags() & BxDFFlags::Specular);
-    }
-    PBRT_HOST_DEVICE
     bool HasReflection() const {
         return (bxdf.Flags() & BxDFFlags::Reflection);
     }
@@ -316,18 +297,17 @@ class BSDF {
         return bxdf.f(wo, wi);
     }
 
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(RhoSampler rhoSampler, int nSamples = 16) const {
-        return bxdf.rho(rhoSampler, nSamples);
+    SampledSpectrum rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
+                        pstd::span<const Float> uc2, pstd::span<const Point2f> u2) const {
+        return bxdf.rho(uc1, u1, uc2, u2);
     }
 
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(const Vector3f &woWorld, RhoSampler rhoSampler,
-                        int nSamples = 16) const {
+    SampledSpectrum rho(const Vector3f &woWorld, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u) const {
         Vector3f wo = WorldToLocal(woWorld);
-        return bxdf.rho(wo, rhoSampler, nSamples);
+        return bxdf.rho(wo, uc, u);
     }
 
     template <typename BxDF>
@@ -434,18 +414,16 @@ class alignas(8) MixBxDF {
     MixBxDF(Float t, BxDFHandle bxdf0, BxDFHandle bxdf1)
         : t(t), bxdf0(bxdf0), bxdf1(bxdf1) { }
 
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-        SampledSpectrum rho(const Vector3f &w, RhoSampler rhoSampler,
-                            int nSamples) const {
-        return Lerp(t, bxdf0.rho(w, rhoSampler, nSamples),
-                    bxdf1.rho(w, rhoSampler, nSamples));
+    SampledSpectrum rho(const Vector3f &w, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u) const {
+        return Lerp(t, bxdf0.rho(w, uc, u), bxdf1.rho(w, uc, u));
     }
 
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(RhoSampler rhoSampler, int nSamples) const {
-        return Lerp(t, bxdf0.rho(rhoSampler, nSamples), bxdf1.rho(rhoSampler, nSamples));
+    SampledSpectrum rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
+                        pstd::span<const Float> uc2, pstd::span<const Point2f> u2) const {
+        return Lerp(t, bxdf0.rho(uc1, u1, uc2, u2), bxdf1.rho(uc1, u1, uc2, u2));
     }
 
     PBRT_HOST_DEVICE
@@ -508,10 +486,14 @@ class alignas(8) FresnelDielectric {
     bool opaque;
 };
 
-class FresnelHandle : public TaggedPointer<FresnelConductor, FresnelDielectric> {
+class DisneyFresnel;
+
+class FresnelHandle : public TaggedPointer<FresnelConductor, FresnelDielectric,
+                                           DisneyFresnel> {
 public:
     using TaggedPointer::TaggedPointer;
-    FresnelHandle(TaggedPointer<FresnelConductor, FresnelDielectric> tp)
+    FresnelHandle(TaggedPointer<FresnelConductor, FresnelDielectric,
+                                DisneyFresnel> tp)
         : TaggedPointer(tp) { }
 
     PBRT_HOST_DEVICE_INLINE
@@ -600,18 +582,16 @@ class alignas(8) LambertianBxDF {
             return pt / (pr + pt) * AbsCosTheta(wi) * InvPi;
     }
 
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(const Vector3f &, RhoSampler, int nSamples) const {
+    SampledSpectrum rho(const Vector3f &, pstd::span<const Float>,
+                        pstd::span<const Point2f>) const {
         return R + T;
     }
-
-    template <typename RhoSampler>
     PBRT_HOST_DEVICE
-    SampledSpectrum rho(RhoSampler rhoSampler, int nSamples) const {
+    SampledSpectrum rho(int, pstd::span<const Float>, pstd::span<const Point2f>,
+                        pstd::span<const Float>, pstd::span<const Point2f>) const {
         return R + T;
     }
-
     std::string ToString() const;
 
     PBRT_HOST_DEVICE
@@ -765,17 +745,41 @@ class alignas(8) TrowbridgeReitzDistribution {
     Float alpha_x, alpha_y;
 };
 
-class MicrofacetDistributionHandle : public TaggedPointer<TrowbridgeReitzDistribution> {
+class alignas(8) DisneyMicrofacetDistribution : public TrowbridgeReitzDistribution {
+public:
+    DisneyMicrofacetDistribution(Float alpha_x, Float alpha_y)
+        : TrowbridgeReitzDistribution(alpha_x, alpha_y) {}
+
+    PBRT_HOST_DEVICE_INLINE
+    Float G1(const Vector3f &w) const {
+        //    if (Dot(w, wh) * CosTheta(w) < 0.) return 0.;
+        return 1 / (1 + Lambda(w));
+    }
+
+    PBRT_HOST_DEVICE_INLINE
+    Float G(const Vector3f &wo, const Vector3f &wi) const {
+        // Disney uses the separable masking-shadowing model.
+        return G1(wo) * G1(wi);
+    }
+};
+
+class MicrofacetDistributionHandle : public TaggedPointer<TrowbridgeReitzDistribution,
+                                                          DisneyMicrofacetDistribution> {
   public:
     using TaggedPointer::TaggedPointer;
-    MicrofacetDistributionHandle(TaggedPointer<TrowbridgeReitzDistribution> tp)
+    MicrofacetDistributionHandle(TaggedPointer<TrowbridgeReitzDistribution,
+                                               DisneyMicrofacetDistribution> tp)
         : TaggedPointer(tp) { }
 
     // MicrofacetDistributionHandle Public Methods
     PBRT_HOST_DEVICE_INLINE
     Float D(const Vector3f &wm) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->D(wm);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->D(wm);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->D(wm);
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
@@ -785,8 +789,12 @@ class MicrofacetDistributionHandle : public TaggedPointer<TrowbridgeReitzDistrib
 
     PBRT_HOST_DEVICE_INLINE
     Float Lambda(const Vector3f &w) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->Lambda(w);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->Lambda(w);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->Lambda(w);
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
@@ -797,20 +805,32 @@ class MicrofacetDistributionHandle : public TaggedPointer<TrowbridgeReitzDistrib
 
     PBRT_HOST_DEVICE_INLINE
     Float G(const Vector3f &wo, const Vector3f &wi) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->G(wo, wi);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->G(wo, wi);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->G(wo, wi);
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
     Vector3f Sample_wm(const Point2f &u) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->Sample_wm(u);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->Sample_wm(u);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->Sample_wm(u);
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
     Vector3f Sample_wm(const Vector3f &wo, const Point2f &u) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->Sample_wm(wo, u);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->Sample_wm(wo, u);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->Sample_wm(wo, u);
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
@@ -819,20 +839,32 @@ class MicrofacetDistributionHandle : public TaggedPointer<TrowbridgeReitzDistrib
     }
 
     std::string ToString() const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->ToString();
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->ToString();
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->ToString();
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
     bool EffectivelySpecular() const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->EffectivelySpecular();
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->EffectivelySpecular();
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->EffectivelySpecular();
+        }
     }
 
     PBRT_HOST_DEVICE_INLINE
     MicrofacetDistributionHandle Regularize(MaterialBuffer &materialBuffer) const {
-        DCHECK_EQ(Tag(), TypeIndex<TrowbridgeReitzDistribution>());
-        return Cast<TrowbridgeReitzDistribution>()->Regularize(materialBuffer);
+        if (Tag() == TypeIndex<TrowbridgeReitzDistribution>())
+            return Cast<TrowbridgeReitzDistribution>()->Regularize(materialBuffer);
+        else {
+            DCHECK_EQ(Tag(), TypeIndex<DisneyMicrofacetDistribution>());
+            return Cast<DisneyMicrofacetDistribution>()->Regularize(materialBuffer);
+        }
     }
 };
 
@@ -857,204 +889,15 @@ public:
     }
 
     PBRT_HOST_DEVICE
-    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
-        if (!distrib || distrib.EffectivelySpecular())
-            return SampledSpectrum(0);
-
-        if (SameHemisphere(wo, wi)) {
-            // reflect
-            Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-            Vector3f wh = wi + wo;
-            // Handle degenerate cases for microfacet reflection
-            if (cosTheta_i == 0 || cosTheta_o == 0) return SampledSpectrum(0.);
-            if (wh.x == 0 && wh.y == 0 && wh.z == 0) return SampledSpectrum(0.);
-            wh = Normalize(wh);
-            Float F = FrDielectric(Dot(wi, FaceForward(wh, Vector3f(0, 0, 1))), eta);
-            return SampledSpectrum(distrib.D(wh) * distrib.G(wo, wi) * F /
-                                   (4 * cosTheta_i * cosTheta_o));
-        } else {
-            // transmit
-            Float cosTheta_o = CosTheta(wo), cosTheta_i = CosTheta(wi);
-            if (cosTheta_i == 0 || cosTheta_o == 0) return SampledSpectrum(0.);
-
-            // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-            Float etap = CosTheta(wo) > 0 ? eta : (1 / eta);
-            Vector3f wh = wo + wi * etap;
-            CHECK_RARE(1e-6, LengthSquared(wh) == 0);
-            if (LengthSquared(wh) == 0) return SampledSpectrum(0.);
-            wh = FaceForward(Normalize(wh), Normal3f(0, 0, 1));
-
-            Float F = FrDielectric(Dot(wo, wh), eta);
-
-            Float sqrtDenom = Dot(wo, wh) + etap * Dot(wi, wh);
-            Float factor = (mode == TransportMode::Radiance) ? Sqr(1 / etap) : 1;
-
-            return SampledSpectrum((1 - F) * factor *
-                                   std::abs(distrib.D(wh) * distrib.G(wo, wi) *
-                                            AbsDot(wi, wh) * AbsDot(wo, wh) /
-                                            (cosTheta_i * cosTheta_o * Sqr(sqrtDenom))));
-
-        }
-    }
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const;
 
     PBRT_HOST_DEVICE
     pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
                                         const Point2f &u,
-                                        BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
-        if (wo.z == 0) return {};
-
-        if (!distrib) {
-            Float F = FrDielectric(CosTheta(wo), eta);
-
-            Float pr = F, pt = 1 - F;
-            if (!(sampleFlags & BxDFReflTransFlags::Reflection)) pr = 0;
-            if (!(sampleFlags & BxDFReflTransFlags::Transmission)) pt = 0;
-            if (pr == 0 && pt == 0) return {};
-
-            if (uc < pr / (pr + pt)) {
-                // reflect
-                Vector3f wi(-wo.x, -wo.y, wo.z);
-                SampledSpectrum fr(F / AbsCosTheta(wi));
-                return BSDFSample(fr, wi, pr / (pr + pt),
-                                  BxDFFlags::SpecularReflection);
-            } else {
-                // transmit
-                // Figure out which $\eta$ is incident and which is transmitted
-                bool entering = CosTheta(wo) > 0;
-                Float etap = entering ? eta : (1 / eta);
-
-                // Compute ray direction for specular transmission
-                Vector3f wi;
-                bool tir = !Refract(wo, FaceForward(Normal3f(0, 0, 1), wo), etap, &wi);
-                CHECK_RARE(1e-6, tir);
-                if (tir)
-                    return {};
-                SampledSpectrum ft((1 - F) / AbsCosTheta(wi));
-
-                // Account for non-symmetry with transmission to different medium
-                if (mode == TransportMode::Radiance) ft /= Sqr(etap);
-                return BSDFSample(ft, wi, pt / (pr + pt),
-                                  BxDFFlags::SpecularTransmission);
-            }
-        } else {
-            // TODO: sample wh first, then compute fresnel, then choose a lobe...
-            // Need that random sample passed in...
-            Float compPDF;
-            Vector3f wh = distrib.Sample_wm(wo, u);
-            Float F = FrDielectric(Dot(Reflect(wo, wh),
-                                       FaceForward(wh, Vector3f(0, 0, 1))), eta);
-
-            Float pr = F, pt = 1 - F;
-            if (!(sampleFlags & BxDFReflTransFlags::Reflection)) pr = 0;
-            if (!(sampleFlags & BxDFReflTransFlags::Transmission)) pt = 0;
-            if (pr == 0 && pt == 0) return {};
-
-            if (uc < pr / (pr + pt)) {
-                // reflect
-                // Sample microfacet orientation $\wh$ and reflected direction $\wi$
-                Vector3f wi = Reflect(wo, wh);
-                CHECK_RARE(1e-6, Dot(wo, wh) <= 0);
-                if (!SameHemisphere(wo, wi) || Dot(wo, wh) <= 0) return {};
-
-                // Compute PDF of _wi_ for microfacet reflection
-                Float pdf = distrib.PDF(wo, wh) / (4 * Dot(wo, wh)) * pr / (pr + pt);
-                CHECK(!std::isnan(pdf));
-
-                // TODO: reuse fragments from f()
-                Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-                // Handle degenerate cases for microfacet reflection
-                if (cosTheta_i == 0 || cosTheta_o == 0) return {};
-                SampledSpectrum f(distrib.D(wh) * distrib.G(wo, wi) * F /
-                                  (4 * cosTheta_i * cosTheta_o));
-                if (distrib.EffectivelySpecular())
-                    return BSDFSample(f / pdf, wi, 1, BxDFFlags::SpecularReflection);
-                else
-                    return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
-            } else {
-                // FIXME (make consistent): this etap is 1/etap as used in specular...
-                Float etap = CosTheta(wo) > 0 ? eta : (1 / eta);
-                Vector3f wi;
-                bool tir = !Refract(wo, (Normal3f)wh, etap, &wi);
-                CHECK_RARE(1e-6, tir);
-                if (SameHemisphere(wo, wi)) return {};
-                if (tir || wi.z == 0) return {};
-
-                // Evaluate BSDF
-                // TODO: share fragments with f(), PDF()...
-                wh = FaceForward(wh, Normal3f(0, 0, 1));
-
-                Float sqrtDenom = Dot(wo, wh) + etap * Dot(wi, wh);
-                Float factor = (mode == TransportMode::Radiance) ? Sqr(1 / etap) : 1;
-
-                SampledSpectrum f((1 - F) * factor *
-                                  std::abs(distrib.D(wh) * distrib.G(wo, wi) *
-                                           AbsDot(wi, wh) * AbsDot(wo, wh) /
-                                           (AbsCosTheta(wi) * AbsCosTheta(wo) * Sqr(sqrtDenom))));
-
-                // Compute PDF
-                Float dwh_dwi = /*Sqr(etap) * */AbsDot(wi, wh) /
-                    Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
-                Float pdf = distrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
-                CHECK(!std::isnan(pdf));
-
-                //CO            LOG(WARNING) << "pt/(pr+pt) " << pt / (pr + pt);
-                //CO            LOG(WARNING) << "Sample_f: (1-F) " << (1-F) << ", factor " << factor <<
-                //CO                ", D " << distrib.D(wh) << ", G " << distrib.G(wo, wi) <<
-                //CO                ", others " << (AbsDot(wi, wh) * AbsDot(wo, wh) /
-                //CO                                (AbsCosTheta(wi) * AbsCosTheta(wo) * Sqr(sqrtDenom))) <<
-                //CO                ", pdf " << pdf << ", f*cos/pdf " << f*AbsCosTheta(wi)/pdf;
-
-                if (distrib.EffectivelySpecular())
-                    return BSDFSample(f / pdf, wi, 1, BxDFFlags::SpecularTransmission);
-                else
-                    return BSDFSample(f, wi, pdf, BxDFFlags::GlossyTransmission);
-            }
-        }
-    }
-
+                                        BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
     PBRT_HOST_DEVICE
     Float PDF(const Vector3f &wo, const Vector3f &wi,
-              BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
-        if (!distrib || distrib.EffectivelySpecular()) return 0;
-
-        if (SameHemisphere(wo, wi)) {
-            if (!(sampleFlags & BxDFReflTransFlags::Reflection)) return 0;
-
-            Vector3f wh = wo + wi;
-            CHECK_RARE(1e-6, LengthSquared(wh) == 0);
-            CHECK_RARE(1e-6, Dot(wo, wh) < 0);
-            if (LengthSquared(wh) == 0 || Dot(wo, wh) <= 0)
-                return 0;
-
-            wh = Normalize(wh);
-
-            Float F = FrDielectric(Dot(wi, FaceForward(wh, Vector3f(0, 0, 1))), eta);
-            CHECK_RARE(1e-6, F == 0);
-            Float pr = F, pt = 1 - F;
-            if (!(sampleFlags & BxDFReflTransFlags::Transmission)) pt = 0;
-
-            return distrib.PDF(wo, wh) / (4 * Dot(wo, wh)) * pr / (pr + pt);
-        } else {
-            if (!(sampleFlags & BxDFReflTransFlags::Transmission)) return 0;
-            // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-            Float etap = CosTheta(wo) > 0 ? eta : (1 / eta);
-            Vector3f wh = wo + wi * etap;
-            CHECK_RARE(1e-6, LengthSquared(wh) == 0);
-            if (LengthSquared(wh) == 0) return 0;
-            wh = Normalize(wh);
-
-            Float F = FrDielectric(Dot(wo, FaceForward(wh, Normal3f(0, 0, 1))), eta);
-            Float pr = F, pt = 1 - F;
-            if (pt == 0) return 0;
-            if (!(sampleFlags & BxDFReflTransFlags::Reflection)) pr = 0;
-
-            // Compute change of variables _dwh\_dwi_ for microfacet transmission
-            Float dwh_dwi = /*Sqr(etap) * */AbsDot(wi, wh) /
-                Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
-            CHECK_RARE(1e-6, (1 - F) == 0);
-            return distrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
-        }
-    }
+              BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 
     std::string ToString() const;
 
@@ -1084,9 +927,7 @@ public:
         : eta(eta), mode(mode) { }
 
     PBRT_HOST_DEVICE
-    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
-        return SampledSpectrum(0);
-    }
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const;
 
     PBRT_HOST_DEVICE
     pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
@@ -1127,9 +968,7 @@ public:
     }
 
     PBRT_HOST_DEVICE
-    Float PDF(const Vector3f &wo, const Vector3f &wi, BxDFReflTransFlags sampleFlags) const {
-        return 0;
-    }
+    Float PDF(const Vector3f &wo, const Vector3f &wi, BxDFReflTransFlags sampleFlags) const;
 
     std::string ToString() const;
 
@@ -1320,6 +1159,482 @@ class alignas(8) SpecularReflectionBxDF {
     FresnelHandle fresnel;
 };
 
+// Only used for Disney FWIW
+class alignas(8) SpecularTransmissionBxDF {
+  public:
+    // SpecularTransmission Public Methods
+    PBRT_HOST_DEVICE
+    SpecularTransmissionBxDF(const SampledSpectrum &T, Float eta, TransportMode mode)
+        : T(T),
+          eta(eta),
+          mode(mode) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        return SampledSpectrum(0.f);
+    }
+
+    PBRT_HOST_DEVICE
+    pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
+                                        const Point2f &u,
+                                        BxDFReflTransFlags sampleFlags) const;
+
+    PBRT_HOST_DEVICE
+    Float PDF(const Vector3f &wo, const Vector3f &wi,
+              BxDFReflTransFlags sampleFlags) const { return 0; }
+
+    std::string ToString() const;
+
+    PBRT_HOST_DEVICE
+    BxDFHandle Regularize(MaterialBuffer &materialBuffer);
+
+    PBRT_HOST_DEVICE
+    void FlipTransportMode() {
+        mode = (mode == TransportMode::Radiance) ? TransportMode::Importance :
+            TransportMode::Radiance;
+    }
+
+    PBRT_HOST_DEVICE
+    BxDFFlags Flags() const { return (BxDFFlags::Transmission | BxDFFlags::Specular); }
+
+  private:
+    // SpecularTransmission Private Data
+    SampledSpectrum T;
+    Float eta;
+    TransportMode mode;
+};
+
+/*
+
+Implementation of the Disney BSDF with Subsurface Scattering, as described in:
+http://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf.
+
+That model is based on the Disney BRDF, described in:
+https://disney-animation.s3.amazonaws.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf
+
+Many thanks for Brent Burley and Karl Li for answering many questions about
+the details of the implementation.
+
+The initial implementation of the BRDF was adapted from
+https://github.com/wdas/brdf/blob/master/src/brdfs/disney.brdf, which is
+licensed under a slightly-modified Apache 2.0 license.
+
+*/
+
+///////////////////////////////////////////////////////////////////////////
+// DisneyDiffuse
+
+class DisneyDiffuseLobe {
+  public:
+    PBRT_HOST_DEVICE
+    DisneyDiffuseLobe(const SampledSpectrum &R)
+        : R(R) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        if (!SameHemisphere(wo, wi)) return SampledSpectrum(0.f);
+
+        Float Fo = SchlickWeight(AbsCosTheta(wo)),
+              Fi = SchlickWeight(AbsCosTheta(wi));
+
+        // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
+        // Burley 2015, eq (4).
+        return R * InvPi * (1 - Fo / 2) * (1 - Fi / 2);
+    }
+
+    std::string ToString() const;
+
+  private:
+    SampledSpectrum R;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// DisneyFakeSS
+
+// "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
+// approximation of the BSSRDF.
+class DisneyFakeSSLobe {
+  public:
+    PBRT_HOST_DEVICE
+    DisneyFakeSSLobe(const SampledSpectrum &R, Float roughness)
+        : R(R),
+          roughness(roughness) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        if (!SameHemisphere(wo, wi)) return SampledSpectrum(0.f);
+
+        Vector3f wh = wi + wo;
+        if (LengthSquared(wh) == 0) return SampledSpectrum(0.);
+        wh = Normalize(wh);
+        Float cosThetaD = Dot(wi, wh);
+
+        // Fss90 used to "flatten" retroreflection based on roughness
+        Float Fss90 = cosThetaD * cosThetaD * roughness;
+        Float Fo = SchlickWeight(AbsCosTheta(wo)),
+              Fi = SchlickWeight(AbsCosTheta(wi));
+        Float Fss = Lerp(Fo, 1.0, Fss90) * Lerp(Fi, 1.0, Fss90);
+        // 1.25 scale is used to (roughly) preserve albedo
+        Float ss =
+            1.25f * (Fss * (1 / (AbsCosTheta(wo) + AbsCosTheta(wi)) - .5f) + .5f);
+
+        return R * InvPi * ss;
+    }
+
+    std::string ToString() const;
+
+  private:
+    SampledSpectrum R;
+    Float roughness;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// DisneyRetro
+
+class DisneyRetroLobe {
+  public:
+    PBRT_HOST_DEVICE
+    DisneyRetroLobe(const SampledSpectrum &R, Float roughness)
+        : R(R),
+          roughness(roughness) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        if (!SameHemisphere(wo, wi)) return SampledSpectrum(0.f);
+
+        Vector3f wh = wi + wo;
+        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+            return SampledSpectrum(0.);
+        wh = Normalize(wh);
+        Float cosThetaD = Dot(wi, wh);
+
+        Float Fo = SchlickWeight(AbsCosTheta(wo)),
+              Fi = SchlickWeight(AbsCosTheta(wi));
+        Float Rr = 2 * roughness * cosThetaD * cosThetaD;
+
+        // Burley 2015, eq (4).
+        return R * InvPi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1));
+    }
+
+    std::string ToString() const;
+
+  private:
+    SampledSpectrum R;
+    Float roughness;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// DisneySheen
+
+class DisneySheenLobe {
+  public:
+    PBRT_HOST_DEVICE
+    DisneySheenLobe(const SampledSpectrum &R)
+        : R(R) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        if (!SameHemisphere(wo, wi)) return SampledSpectrum(0.f);
+
+        Vector3f wh = wi + wo;
+        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+            return SampledSpectrum(0.);
+        wh = Normalize(wh);
+        Float cosThetaD = Dot(wi, wh);
+
+        return R * SchlickWeight(cosThetaD);
+    }
+
+    std::string ToString() const;
+
+  private:
+    SampledSpectrum R;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// DisneyClearcoat
+
+class DisneyClearcoatLobe {
+  public:
+    PBRT_HOST_DEVICE
+    DisneyClearcoatLobe(Float weight, Float gloss)
+        : weight(weight),
+          gloss(gloss) {}
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        if (!SameHemisphere(wo, wi)) return SampledSpectrum(0.f);
+
+        Vector3f wh = wi + wo;
+        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+            return SampledSpectrum(0.);
+        wh = Normalize(wh);
+
+        // Clearcoat has ior = 1.5 hardcoded -> F0 = 0.04. It then uses the
+        // GTR1 distribution, which has even fatter tails than Trowbridge-Reitz
+        // (which is GTR2).
+        Float Dr = GTR1(AbsCosTheta(wh), gloss);
+        Float Fr = FrSchlick(.04, Dot(wo, wh));
+        // The geometric term always based on alpha = 0.25.
+        Float Gr =
+            smithG_GGX(AbsCosTheta(wo), .25) * smithG_GGX(AbsCosTheta(wi), .25);
+
+        return SampledSpectrum(weight * Gr * Fr * Dr / 4);
+    }
+
+    PBRT_HOST_DEVICE
+    pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
+                                        const Point2f &u,
+                                        BxDFReflTransFlags sampleFlags) const {
+        if (!(sampleFlags & BxDFReflTransFlags::Reflection)) return {};
+
+        // TODO: double check all this: there still seem to be some very
+        // occasional fireflies with clearcoat; presumably there is a bug
+        // somewhere.
+        if (wo.z == 0) return {};
+
+        Float alpha2 = gloss * gloss;
+        Float cosTheta = SafeSqrt((1 - std::pow(alpha2, 1 - u[0])) / (1 - alpha2));
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+        Float phi = 2 * Pi * u[1];
+        Vector3f wh = SphericalDirection(sinTheta, cosTheta, phi);
+        if (!SameHemisphere(wo, wh)) wh = -wh;
+
+        Vector3f wi = Reflect(wo, wh);
+        if (!SameHemisphere(wo, wi)) return {};
+
+        return BSDFSample(f(wo, wi), wi, PDF(wo, wi, sampleFlags),
+                          BxDFFlags::GlossyReflection);
+    }
+
+    PBRT_HOST_DEVICE
+    Float PDF(const Vector3f &wo, const Vector3f &wi,
+              BxDFReflTransFlags sampleFlags) const {
+        if (!(sampleFlags & BxDFReflTransFlags::Reflection)) return 0;
+        if (!SameHemisphere(wo, wi)) return 0;
+
+        Vector3f wh = wi + wo;
+        CHECK_RARE(1e-6, Dot(wo, wh) < 0);
+        if (LengthSquared(wh) == 0 || Dot(wo, wh) < 0) return 0;
+        wh = Normalize(wh);
+
+        // The sampling routine samples wh exactly from the GTR1 distribution.
+        // Thus, the final value of the PDF is just the value of the
+        // distribution for wh converted to a mesure with respect to the
+        // surface normal.
+        Float Dr = GTR1(AbsCosTheta(wh), gloss);
+        return Dr * AbsCosTheta(wh) / (4 * Dot(wo, wh));
+    }
+
+    std::string ToString() const;
+
+  private:
+    PBRT_HOST_DEVICE
+    inline static Float GTR1(Float cosTheta, Float alpha) {
+        Float alpha2 = alpha * alpha;
+        return (alpha2 - 1) /
+            (Pi * std::log(alpha2) * (1 + (alpha2 - 1) * cosTheta * cosTheta));
+    }
+
+    // Smith masking/shadowing term.
+    PBRT_HOST_DEVICE
+    inline static Float smithG_GGX(Float cosTheta, Float alpha) {
+        Float alpha2 = alpha * alpha;
+        Float cosTheta2 = cosTheta * cosTheta;
+        return 1 / (cosTheta + SafeSqrt(alpha2 + cosTheta2 - alpha2 * cosTheta2));
+    }
+
+    Float weight, gloss;
+};
+
+class alignas(8) DisneyBxDF {
+ public:
+    PBRT_HOST_DEVICE_INLINE
+        DisneyBxDF(DisneyDiffuseLobe *diffuseReflection, DisneyFakeSSLobe *fakeSS,
+                   DisneyRetroLobe *retro, DisneySheenLobe *sheen,
+                   DisneyClearcoatLobe *clearcoat,
+                   MicrofacetReflectionBxDF *glossyReflection,
+                   MicrofacetTransmissionBxDF *glossyTransmission,
+                   LambertianBxDF *diffuseTransmission,
+                   SpecularTransmissionBxDF *subsurfaceBxDF)
+        : diffuseReflection(diffuseReflection), fakeSS(fakeSS), retro(retro), sheen(sheen),
+          clearcoat(clearcoat), glossyReflection(glossyReflection),
+          glossyTransmission(glossyTransmission),
+          diffuseTransmission(diffuseTransmission), subsurfaceBxDF(subsurfaceBxDF) {
+    }
+
+    PBRT_HOST_DEVICE
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
+        SampledSpectrum f(0.);
+        if (diffuseReflection)     f += diffuseReflection->f(wo, wi);
+        if (fakeSS)                f += fakeSS->f(wo, wi);
+        if (retro)                 f += retro->f(wo, wi);
+        if (sheen)                 f += sheen->f(wo, wi);
+        if (clearcoat)             f += clearcoat->f(wo, wi);
+        if (glossyReflection)    f += glossyReflection->f(wo, wi);
+        if (glossyTransmission)  f += glossyTransmission->f(wo, wi);
+        if (diffuseTransmission)   f += diffuseTransmission->f(wo, wi);
+        // subsurfaceBxDF is perfectly specular, so no need to worry about
+        // it for evaluation.
+        return f;
+    }
+
+    PBRT_HOST_DEVICE
+    pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
+                                        const Point2f &u,
+                                        BxDFReflTransFlags sampleFlags) const {
+        auto BSDFSampleCosine = [](const Vector3f &wo, const Point2f &u) {
+            Vector3f wi = SampleCosineHemisphere(u);
+            if (!SameHemisphere(wo, wi)) wi = -wi;
+            return BSDFSample{SampledSpectrum(0.f), wi,
+                              CosineHemispherePDF(AbsCosTheta(wi)),
+                              BxDFFlags::Diffuse | BxDFFlags::Reflection};
+        };
+
+        int n = nLobes(sampleFlags);
+        int comp = std::min<int>(uc * n, n - 1);
+        uc = (uc * n) - comp;
+        CHECK(uc >= 0 && uc < 1);
+        bool sampleReflection = sampleFlags & BxDFReflTransFlags::Reflection;
+        bool sampleTransmission = sampleFlags & BxDFReflTransFlags::Transmission;
+
+        pstd::optional<BSDFSample> bs;
+        if (sampleReflection && diffuseReflection && comp-- == 0)
+            bs = BSDFSampleCosine(wo, u);
+        else if (sampleReflection && fakeSS && comp-- == 0)
+            bs = BSDFSampleCosine(wo, u);
+        else if (sampleReflection && retro && comp-- == 0)
+            bs = BSDFSampleCosine(wo, u);
+        else if (sampleReflection && sheen && comp-- == 0)
+            bs = BSDFSampleCosine(wo, u);
+        else if (sampleReflection && clearcoat && comp-- == 0)
+            bs = clearcoat->Sample_f(wo, uc, u, sampleFlags);
+        else if (sampleReflection && glossyReflection && comp-- == 0)
+            bs = glossyReflection->Sample_f(wo, uc, u, sampleFlags);
+        else if (sampleTransmission && glossyTransmission && comp-- == 0)
+            bs = glossyTransmission->Sample_f(wo, uc, u, sampleFlags);
+        else if (sampleTransmission && diffuseTransmission && comp-- == 0) {
+            bs = BSDFSampleCosine(wo, u);
+            bs->wi = -bs->wi;
+        } else if (sampleTransmission && subsurfaceBxDF) {
+            CHECK_EQ(0, comp);
+            bs = subsurfaceBxDF->Sample_f(wo, uc, u, sampleFlags);
+        }
+
+        if (bs && !bs->IsSpecular()) {
+            bs->f = f(wo, bs->wi);
+            bs->pdf = PDF(wo, bs->wi, sampleFlags);
+        }
+        return bs;
+    }
+
+    PBRT_HOST_DEVICE
+    Float PDF(const Vector3f &wo, const Vector3f &wi,
+              BxDFReflTransFlags sampleFlags) const {
+        int nLobes = 0;
+        bool sampleReflection = sampleFlags & BxDFReflTransFlags::Reflection;
+        bool sampleTransmission = sampleFlags & BxDFReflTransFlags::Transmission;
+        Float pdf = 0;
+
+        if (diffuseReflection && sampleReflection) {
+            pdf += SameHemisphere(wo, wi) ? CosineHemispherePDF(AbsCosTheta(wi)) : 0;
+            ++nLobes;
+        }
+        if (fakeSS && sampleReflection) {
+            pdf += SameHemisphere(wo, wi) ? CosineHemispherePDF(AbsCosTheta(wi)) : 0;
+            ++nLobes;
+        }
+        if (retro && sampleReflection) {
+            pdf += SameHemisphere(wo, wi) ? CosineHemispherePDF(AbsCosTheta(wi)) : 0;
+            ++nLobes;
+        }
+        if (sheen && sampleReflection) {
+            pdf += SameHemisphere(wo, wi) ? CosineHemispherePDF(AbsCosTheta(wi)) : 0;
+            ++nLobes;
+        }
+        if (clearcoat && sampleReflection) {
+            pdf += clearcoat->PDF(wo, wi, sampleFlags);
+            ++nLobes;
+        }
+        if (glossyReflection && sampleReflection) {
+            pdf += glossyReflection->PDF(wo, wi, sampleFlags);
+            ++nLobes;
+        }
+        if (glossyTransmission && sampleTransmission) {
+            pdf += glossyTransmission->PDF(wo, wi, sampleFlags);
+            ++nLobes;
+        }
+        if (diffuseTransmission && sampleTransmission) {
+            pdf += !SameHemisphere(wo, wi) ? CosineHemispherePDF(AbsCosTheta(wi)) : 0;
+            ++nLobes;
+        }
+        // subsurfaceBxDF is specular, so can ignore it
+
+        return pdf / nLobes;
+    }
+
+    std::string ToString() const;
+
+    PBRT_HOST_DEVICE_INLINE
+    BxDFFlags Flags() const {
+        if (clearcoat)
+            return (BxDFFlags::Reflection | BxDFFlags::Glossy);
+        else
+            return (BxDFFlags::Reflection | BxDFFlags::Diffuse);
+    }
+
+ private:
+    PBRT_HOST_DEVICE
+    int nLobes(BxDFReflTransFlags sampleFlags) const {
+        bool sampleReflection = sampleFlags & BxDFReflTransFlags::Reflection;
+        bool sampleTransmission = sampleFlags & BxDFReflTransFlags::Transmission;
+        return (((diffuseReflection && sampleReflection) ? 1 : 0) +
+                ((fakeSS && sampleReflection) ? 1 : 0) +
+                ((retro && sampleReflection) ? 1 : 0) +
+                ((sheen && sampleReflection) ? 1 : 0) +
+                ((clearcoat && sampleReflection) ? 1 : 0) +
+                ((glossyReflection && sampleReflection) ? 1 : 0) +
+                ((glossyTransmission && sampleTransmission) ? 1 : 0) +
+                ((diffuseTransmission && sampleTransmission) ? 1 : 0) +
+                ((subsurfaceBxDF && sampleTransmission) ? 1 : 0));
+    }
+
+    DisneyDiffuseLobe *diffuseReflection;
+    DisneyFakeSSLobe *fakeSS;
+    DisneyRetroLobe *retro;
+    DisneySheenLobe *sheen;
+    DisneyClearcoatLobe *clearcoat;
+    MicrofacetReflectionBxDF *glossyReflection;
+    MicrofacetTransmissionBxDF *glossyTransmission;
+    LambertianBxDF *diffuseTransmission;
+    SpecularTransmissionBxDF *subsurfaceBxDF;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// DisneyFresnel
+
+// Specialized Fresnel function used for the disney component, based on
+// a mixture between dielectric and the Schlick Fresnel approximation.
+class alignas(8) DisneyFresnel {
+  public:
+    PBRT_HOST_DEVICE_INLINE
+    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta)
+        : R0(R0), metallic(metallic), eta(eta) {}
+
+    PBRT_HOST_DEVICE_INLINE
+    SampledSpectrum Evaluate(Float cosI) const {
+        return Lerp(metallic,
+                    SampledSpectrum(FrDielectric(cosI, eta)),
+                    FrSchlick(R0, cosI));
+    }
+
+    std::string ToString() const;
+
+  private:
+    SampledSpectrum R0;
+    Float metallic, eta;
+};
+
 // HairBSDF Constants
 static const int pMax = 3;
 static const Float SqrtPiOver8 = 0.626657069f;
@@ -1418,51 +1733,23 @@ private:
 inline SampledSpectrum FresnelHandle::Evaluate(Float cosTheta_i) const {
     if (Tag() == TypeIndex<FresnelConductor>())
         return Cast<FresnelConductor>()->Evaluate(cosTheta_i);
-    else {
-        DCHECK_EQ(Tag(), TypeIndex<FresnelDielectric>());
+    else if (Tag() == TypeIndex<FresnelDielectric>())
         return Cast<FresnelDielectric>()->Evaluate(cosTheta_i);
+    else {
+        DCHECK_EQ(Tag(), TypeIndex<DisneyFresnel>());
+        return Cast<DisneyFresnel>()->Evaluate(cosTheta_i);
     }
 }
 
-class BSSRDFAdapter {
+class SeparableBSSRDFAdapter {
   public:
-    // BSSRDFAdapter Public Methods
+    // SeparableBSSRDFAdapter Public Methods
     PBRT_HOST_DEVICE
-    BSSRDFAdapter(Float eta, TransportMode mode)
-        : flags(BxDFFlags::Reflection | BxDFFlags::Diffuse), eta(eta), mode(mode) {}
-
-    PBRT_HOST_DEVICE
-    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const {
-        // Sw()
-        Float c = 1 - 2 * FresnelMoment1(1 / eta);
-        SampledSpectrum f((1 - FrDielectric(CosTheta(wi), eta)) /
-                          (c * Pi));
-
-        // Update BSSRDF transmission term to account for adjoint light
-        // transport
-        if (mode == TransportMode::Radiance)
-            f *= Sqr(eta);
-        return f;
-    }
+    SeparableBSSRDFAdapter(const SeparableBSSRDF *bssrdf)
+        : flags(BxDFFlags::Reflection | BxDFFlags::Diffuse), bssrdf(bssrdf) {}
 
     PBRT_HOST_DEVICE
-    pstd::optional<BSDFSample> Sample_f(const Vector3f &wo, Float uc,
-                                        const Point2f &u, BxDFReflTransFlags sampleFlags) const {
-        if (!(sampleFlags & BxDFReflTransFlags::Reflection))
-            return {};
-
-        // Cosine-sample the hemisphere, flipping the direction if necessary
-        Vector3f wi = SampleCosineHemisphere(u);
-        if (wo.z < 0) wi.z *= -1;
-        return BSDFSample(f(wo, wi), wi, PDF(wo, wi, sampleFlags),
-                          BxDFFlags::DiffuseReflection);
-    }
-
-    PBRT_HOST_DEVICE
-    Float PDF(const Vector3f &wo, const Vector3f &wi, BxDFReflTransFlags sampleFlags) const {
-        if (!(sampleFlags & BxDFReflTransFlags::Reflection)) return 0;
-        return SameHemisphere(wo, wi) ? AbsCosTheta(wi) * InvPi : 0;
-    }
+    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi) const;
 
     std::string ToString() const;
 
@@ -1471,8 +1758,7 @@ class BSSRDFAdapter {
 
   private:
     BxDFFlags flags;
-    Float eta;
-    TransportMode mode;
+    const SeparableBSSRDF *bssrdf;
 };
 
 inline SampledSpectrum BxDFHandle::f(const Vector3f &wo, const Vector3f &wi) const {
@@ -1485,6 +1771,8 @@ inline SampledSpectrum BxDFHandle::f(const Vector3f &wo, const Vector3f &wi) con
         return Cast<ThinDielectricBxDF>()->f(wo, wi);
     case TypeIndex<SpecularReflectionBxDF>():
         return Cast<SpecularReflectionBxDF>()->f(wo, wi);
+    case TypeIndex<SpecularTransmissionBxDF>():
+        return Cast<SpecularTransmissionBxDF>()->f(wo, wi);
     case TypeIndex<MicrofacetReflectionBxDF>():
         return Cast<MicrofacetReflectionBxDF>()->f(wo, wi);
     case TypeIndex<MicrofacetTransmissionBxDF>():
@@ -1499,8 +1787,10 @@ inline SampledSpectrum BxDFHandle::f(const Vector3f &wo, const Vector3f &wi) con
         return Cast<HairBxDF>()->f(wo, wi);
     case TypeIndex<MeasuredBxDF>():
         return Cast<MeasuredBxDF>()->f(wo, wi);
-    case TypeIndex<BSSRDFAdapter>():
-        return Cast<BSSRDFAdapter>()->f(wo, wi);
+    case TypeIndex<DisneyBxDF>():
+        return Cast<DisneyBxDF>()->f(wo, wi);
+    case TypeIndex<SeparableBSSRDFAdapter>():
+        return Cast<SeparableBSSRDFAdapter>()->f(wo, wi);
     default:
         LOG_FATAL("Unhandled BxDF type");
         return {};
@@ -1518,6 +1808,8 @@ inline pstd::optional<BSDFSample> BxDFHandle::Sample_f(const Vector3f &wo, Float
         return Cast<ThinDielectricBxDF>()->Sample_f(wo, uc, u, sampleFlags);
     case TypeIndex<SpecularReflectionBxDF>():
         return Cast<SpecularReflectionBxDF>()->Sample_f(wo, uc, u, sampleFlags);
+    case TypeIndex<SpecularTransmissionBxDF>():
+        return Cast<SpecularTransmissionBxDF>()->Sample_f(wo, uc, u, sampleFlags);
     case TypeIndex<MicrofacetReflectionBxDF>():
         return Cast<MicrofacetReflectionBxDF>()->Sample_f(wo, uc, u, sampleFlags);
     case TypeIndex<MicrofacetTransmissionBxDF>():
@@ -1532,8 +1824,18 @@ inline pstd::optional<BSDFSample> BxDFHandle::Sample_f(const Vector3f &wo, Float
         return Cast<HairBxDF>()->Sample_f(wo, uc, u, sampleFlags);
     case TypeIndex<MeasuredBxDF>():
         return Cast<MeasuredBxDF>()->Sample_f(wo, uc, u, sampleFlags);
-    case TypeIndex<BSSRDFAdapter>():
-        return Cast<BSSRDFAdapter>()->Sample_f(wo, uc, u, sampleFlags);
+    case TypeIndex<DisneyBxDF>():
+        return Cast<DisneyBxDF>()->Sample_f(wo, uc, u, sampleFlags);
+    case TypeIndex<SeparableBSSRDFAdapter>(): {
+        if (!(sampleFlags & BxDFReflTransFlags::Reflection))
+            return {};
+
+        // Cosine-sample the hemisphere, flipping the direction if necessary
+        Vector3f wi = SampleCosineHemisphere(u);
+        if (wo.z < 0) wi.z *= -1;
+        return BSDFSample(f(wo, wi), wi, PDF(wo, wi, sampleFlags),
+                          BxDFFlags::DiffuseReflection);
+    }
     default:
         LOG_FATAL("Unhandled BxDF type");
         return {};
@@ -1551,6 +1853,8 @@ inline Float BxDFHandle::PDF(const Vector3f &wo, const Vector3f &wi,
         return Cast<ThinDielectricBxDF>()->PDF(wo, wi, sampleFlags);
     case TypeIndex<SpecularReflectionBxDF>():
         return Cast<SpecularReflectionBxDF>()->PDF(wo, wi, sampleFlags);
+    case TypeIndex<SpecularTransmissionBxDF>():
+        return Cast<SpecularTransmissionBxDF>()->PDF(wo, wi, sampleFlags);
     case TypeIndex<MicrofacetReflectionBxDF>():
         return Cast<MicrofacetReflectionBxDF>()->PDF(wo, wi, sampleFlags);
     case TypeIndex<MicrofacetTransmissionBxDF>():
@@ -1565,82 +1869,11 @@ inline Float BxDFHandle::PDF(const Vector3f &wo, const Vector3f &wi,
         return Cast<HairBxDF>()->PDF(wo, wi, sampleFlags);
     case TypeIndex<MeasuredBxDF>():
         return Cast<MeasuredBxDF>()->PDF(wo, wi, sampleFlags);
-    case TypeIndex<BSSRDFAdapter>():
-        return Cast<BSSRDFAdapter>()->PDF(wo, wi, sampleFlags);
-    default:
-        LOG_FATAL("Unhandled BxDF type");
-        return {};
-    }
-}
-
-template <typename RhoSampler>
-inline SampledSpectrum BxDFHandle::rho(const Vector3f &wo, RhoSampler rhoSampler,
-                                       int nSamples) const {
-    switch (Tag()) {
-    case TypeIndex<LambertianBxDF>():
-        return Cast<LambertianBxDF>()->rho(wo, rhoSampler, nSamples);
-    case TypeIndex<MixBxDF>():
-        return Cast<MixBxDF>()->rho(wo, rhoSampler, nSamples);
-
-    case TypeIndex<CoatedDiffuseBxDF>():
-    case TypeIndex<GeneralLayeredBxDF>():
-    case TypeIndex<DielectricInterfaceBxDF>():
-    case TypeIndex<ThinDielectricBxDF>():
-    case TypeIndex<SpecularReflectionBxDF>():
-    case TypeIndex<HairBxDF>():
-    case TypeIndex<MeasuredBxDF>():
-    case TypeIndex<MicrofacetReflectionBxDF>():
-    case TypeIndex<MicrofacetTransmissionBxDF>():
-    case TypeIndex<BSSRDFAdapter>(): {
-        if (wo.z == 0) return SampledSpectrum(0.f);
-        SampledSpectrum r(0.);
-        for (int i = 0; i < nSamples; ++i) {
-            RhoHemiDirSample sample = rhoSampler(i);
-            auto bs = Sample_f(wo, sample.u, sample.u2);
-            if (bs && bs->pdf > 0)
-                r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
-        }
-        return r / nSamples;
-    }
-    default:
-        LOG_FATAL("Unhandled BxDF type");
-        return {};
-    }
-}
-
-template <typename RhoSampler>
-inline SampledSpectrum BxDFHandle::rho(RhoSampler rhoSampler, int nSamples) const {
-    switch (Tag()) {
-    case TypeIndex<MixBxDF>():
-        return Cast<MixBxDF>()->rho(rhoSampler, nSamples);
-    case TypeIndex<LambertianBxDF>():
-        return Cast<LambertianBxDF>()->rho(rhoSampler, nSamples);
-
-    case TypeIndex<CoatedDiffuseBxDF>():
-    case TypeIndex<GeneralLayeredBxDF>():
-    case TypeIndex<DielectricInterfaceBxDF>():
-    case TypeIndex<ThinDielectricBxDF>():
-    case TypeIndex<SpecularReflectionBxDF>():
-    case TypeIndex<HairBxDF>():
-    case TypeIndex<MeasuredBxDF>():
-    case TypeIndex<MicrofacetReflectionBxDF>():
-    case TypeIndex<MicrofacetTransmissionBxDF>():
-    case TypeIndex<BSSRDFAdapter>(): {
-        SampledSpectrum r(0.f);
-        for (int i = 0; i < nSamples; ++i) {
-            RhoHemiHemiSample sample = rhoSampler(i);
-
-            Vector3f wo = SampleUniformHemisphere(sample.u2[0]);
-            if (wo.z == 0) continue;
-            Float pdfo = UniformHemispherePDF();
-
-            auto bs = Sample_f(wo, sample.u, sample.u2[1]);
-            if (bs && bs->pdf > 0)
-                r += bs->f * AbsCosTheta(bs->wi) * AbsCosTheta(wo) /
-                    (pdfo * bs->pdf);
-        }
-        return r / nSamples;
-    }
+    case TypeIndex<DisneyBxDF>():
+        return Cast<DisneyBxDF>()->PDF(wo, wi, sampleFlags);
+    case TypeIndex<SeparableBSSRDFAdapter>():
+        if (!(sampleFlags & BxDFReflTransFlags::Reflection)) return 0;
+        return SameHemisphere(wo, wi) ? AbsCosTheta(wi) * InvPi : 0;
     default:
         LOG_FATAL("Unhandled BxDF type");
         return {};

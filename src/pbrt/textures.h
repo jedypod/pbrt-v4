@@ -42,7 +42,6 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/base.h>
-#include <pbrt/interaction.h>
 #include <pbrt/mipmap.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/math.h>
@@ -52,7 +51,6 @@
 
 #include <initializer_list>
 #include <map>
-#include <mutex>
 #include <string>
 
 namespace pbrt {
@@ -228,7 +226,7 @@ public:
 
     static TextureMapping2DHandle Create(const ParameterDictionary &dict,
                                          const Transform &worldFromTexture,
-                                         const FileLoc *loc, Allocator alloc);
+                                         Allocator alloc);
 
     PBRT_HOST_DEVICE
     Point2f Map(const TextureEvalContext &ctx, Vector2f *dstdx,
@@ -275,7 +273,7 @@ public:
 
     static TextureMapping3DHandle Create(const ParameterDictionary &dict,
                                          const Transform &worldFromTexture,
-                                         const FileLoc *loc, Allocator alloc);
+                                         Allocator alloc);
 
     PBRT_HOST_DEVICE_INLINE
     Point3f Map(const TextureEvalContext &ctx, Vector3f *dpdx,
@@ -295,7 +293,7 @@ class alignas(8) FloatConstantTexture {
 
     static FloatConstantTexture *Create(const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc);
+                                        Allocator alloc);
 
     std::string ToString() const;
 
@@ -317,7 +315,7 @@ class alignas(8) SpectrumConstantTexture {
 
     static SpectrumConstantTexture *Create(const Transform &worldFromTexture,
                                            const TextureParameterDictionary &dict,
-                                           const FileLoc *loc, Allocator alloc);
+                                           Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -340,7 +338,7 @@ class alignas(8) FloatBilerpTexture {
 
     static FloatBilerpTexture *Create(const Transform &worldFromTexture,
                                       const TextureParameterDictionary &dict,
-                                      const FileLoc *loc, Allocator alloc);
+                                      Allocator alloc);
 
     std::string ToString() const;
 
@@ -369,7 +367,7 @@ class alignas(8) SpectrumBilerpTexture {
 
     static SpectrumBilerpTexture *Create(const Transform &worldFromTexture,
                                          const TextureParameterDictionary &dict,
-                                         const FileLoc *loc, Allocator alloc);
+                                         Allocator alloc);
 
     std::string ToString() const;
 
@@ -410,7 +408,7 @@ class alignas(8) FloatCheckerboardTexture {
 
     static FloatCheckerboardTexture *Create(const Transform &worldFromTexture,
                                             const TextureParameterDictionary &dict,
-                                            const FileLoc *loc, Allocator alloc);
+                                            Allocator alloc);
 
     std::string ToString() const;
 
@@ -444,7 +442,7 @@ class alignas(8) SpectrumCheckerboardTexture {
 
     static SpectrumCheckerboardTexture *Create(const Transform &worldFromTexture,
                                                const TextureParameterDictionary &dict,
-                                               const FileLoc *loc, Allocator alloc);
+                                               Allocator alloc);
 
     std::string ToString() const;
 
@@ -494,7 +492,7 @@ class alignas(8) FloatDotsTexture : public DotsBase {
 
     static FloatDotsTexture *Create(const Transform &worldFromTexture,
                                     const TextureParameterDictionary &dict,
-                                    const FileLoc *loc, Allocator alloc);
+                                    Allocator alloc);
 
     std::string ToString() const;
 
@@ -522,7 +520,7 @@ class alignas(8) SpectrumDotsTexture : public DotsBase {
 
     static SpectrumDotsTexture *Create(const Transform &worldFromTexture,
                                        const TextureParameterDictionary &dict,
-                                       const FileLoc *loc, Allocator alloc);
+                                       Allocator alloc);
 
     std::string ToString() const;
 
@@ -548,7 +546,7 @@ class alignas(8) FBmTexture {
 
     static FBmTexture *Create(const Transform &worldFromTexture,
                               const TextureParameterDictionary &dict,
-                              const FileLoc *loc, Allocator alloc);
+                              Allocator alloc);
 
     std::string ToString() const;
 
@@ -584,9 +582,8 @@ class ImageTextureBase {
                      const std::string &filename, const std::string &filter,
                      Float maxAniso, WrapMode wm, Float scale,
                      const ColorEncoding *encoding, Allocator alloc);
-
     static void ClearCache() {
-        textureCache.clear();
+        textures.erase(textures.begin(), textures.end());
     }
 
     TextureMapping2DHandle mapping;
@@ -601,8 +598,7 @@ class ImageTextureBase {
                               Allocator alloc);
 
     // ImageTexture Private Data
-    static std::mutex textureCacheMutex;
-    static std::map<TexInfo, std::unique_ptr<MIPMap>> textureCache;
+    static std::map<TexInfo, std::unique_ptr<MIPMap>> textures;
 };
 
 class alignas(8) FloatImageTexture : public ImageTextureBase {
@@ -629,7 +625,7 @@ class alignas(8) FloatImageTexture : public ImageTextureBase {
 
     static FloatImageTexture *Create(const Transform &worldFromTexture,
                                      const TextureParameterDictionary &dict,
-                                     const FileLoc *loc, Allocator alloc);
+                                     Allocator alloc);
 
     std::string ToString() const;
 };
@@ -649,7 +645,7 @@ class alignas(8) SpectrumImageTexture : public ImageTextureBase {
 
     static SpectrumImageTexture *Create(const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc);
+                                        Allocator alloc);
 
     std::string ToString() const;
 };
@@ -689,7 +685,7 @@ public:
 
     static GPUSpectrumImageTexture *Create(const Transform &worldFromTexture,
                                            const TextureParameterDictionary &dict,
-                                           const FileLoc *loc, Allocator alloc);
+                                           Allocator alloc);
 
     std::string ToString() const { return "GPUSpectrumImageTexture"; }
 
@@ -721,7 +717,7 @@ public:
 
     static GPUFloatImageTexture *Create(const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc);
+                                        Allocator alloc);
 
     std::string ToString() const { return "GPUFloatImageTexture"; }
 
@@ -742,7 +738,7 @@ public:
 
     static GPUSpectrumImageTexture *Create(const Transform &worldFromTexture,
                                            const TextureParameterDictionary &dict,
-                                           const FileLoc *loc, Allocator alloc) {
+                                           Allocator alloc) {
         LOG_FATAL("GPUSpectrumImageTexture::Create called in non-GPU configuration.");
         return nullptr;
     }
@@ -759,7 +755,7 @@ public:
 
     static GPUFloatImageTexture *Create(const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc) {
+                                        Allocator alloc) {
         LOG_FATAL("GPUFloatImageTexture::Create called in non-GPU configuration.");
         return nullptr;
     }
@@ -785,7 +781,7 @@ class alignas(8) MarbleTexture {
 
     static MarbleTexture *Create(const Transform &worldFromTexture,
                                  const TextureParameterDictionary &dict,
-                                 const FileLoc *loc, Allocator alloc);
+                                 Allocator alloc);
 
     std::string ToString() const;
 
@@ -813,7 +809,7 @@ class alignas(8) FloatMixTexture {
 
     static FloatMixTexture *Create(const Transform &worldFromTexture,
                                    const TextureParameterDictionary &dict,
-                                   const FileLoc *loc, Allocator alloc);
+                                   Allocator alloc);
 
     std::string ToString() const;
 
@@ -841,7 +837,7 @@ class alignas(8) SpectrumMixTexture {
 
     static SpectrumMixTexture *Create(const Transform &worldFromTexture,
                                       const TextureParameterDictionary &dict,
-                                      const FileLoc *loc, Allocator alloc);
+                                      Allocator alloc);
 
     std::string ToString() const;
 
@@ -877,7 +873,7 @@ class alignas(8) FloatPtexTexture : public PtexTextureBase {
     Float Evaluate(const TextureEvalContext &ctx) const;
     static FloatPtexTexture *Create(const Transform &worldFromTexture,
                                     const TextureParameterDictionary &dict,
-                                    const FileLoc *loc, Allocator alloc);
+                                    Allocator alloc);
     std::string ToString() const;
 };
 
@@ -893,7 +889,7 @@ class alignas(8) SpectrumPtexTexture : public PtexTextureBase {
 
     static SpectrumPtexTexture *Create(const Transform &worldFromTexture,
                                        const TextureParameterDictionary &dict,
-                                       const FileLoc *loc, Allocator alloc);
+                                       Allocator alloc);
 
     std::string ToString() const;
 };
@@ -905,7 +901,7 @@ public:
 
     static FloatTextureHandle Create(const Transform &worldFromTexture,
                                      const TextureParameterDictionary &dict,
-                                     const FileLoc *loc, Allocator alloc);
+                                     Allocator alloc);
 
     PBRT_HOST_DEVICE_INLINE
     Float Evaluate(const TextureEvalContext &ctx) const {
@@ -932,7 +928,7 @@ public:
 
     static SpectrumTextureHandle Create(const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc);
+                                        Allocator alloc);
 
     std::string ToString() const;
 
@@ -955,7 +951,7 @@ class alignas(8) UVTexture {
 
     static UVTexture *Create(const Transform &worldFromTexture,
                              const TextureParameterDictionary &dict,
-                             const FileLoc *loc, Allocator alloc);
+                             Allocator alloc);
 
     std::string ToString() const;
 
@@ -981,7 +977,7 @@ class alignas(8) WindyTexture {
 
     static WindyTexture *Create(const Transform &worldFromTexture,
                                 const TextureParameterDictionary &dict,
-                                const FileLoc *loc, Allocator alloc);
+                                Allocator alloc);
 
     std::string ToString() const;
 
@@ -1005,7 +1001,7 @@ class alignas(8) WrinkledTexture {
 
     static WrinkledTexture *Create(const Transform &worldFromTexture,
                                    const TextureParameterDictionary &dict,
-                                   const FileLoc *loc, Allocator alloc);
+                                   Allocator alloc);
 
     std::string ToString() const;
 

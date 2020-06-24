@@ -3,6 +3,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/api.h>
 #include <pbrt/bsdf.h>
 #include <pbrt/interaction.h>
 #include <pbrt/options.h>

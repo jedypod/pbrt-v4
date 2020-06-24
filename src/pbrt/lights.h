@@ -57,174 +57,6 @@
 
 namespace pbrt {
 
-class LightLiSample {
-public:
-    LightLiSample() = default;
-    PBRT_HOST_DEVICE_INLINE
-    LightLiSample(const Light *light, const SampledSpectrum &L, const Vector3f &wi,
-                  Float pdf, const Interaction &pRef, const Interaction &pLight)
-        : L(L), wi(wi), pdf(pdf), light(light), pRef(pRef), pLight(pLight) {}
-
-    bool Unoccluded(const Scene &scene) const;
-    SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
-                       SamplerHandle sampler) const;
-
-    const Light *light;
-    SampledSpectrum L;
-    Vector3f wi;
-    Float pdf;
-    Interaction pRef, pLight;
-};
-
-class LightLeSample {
-public:
-    LightLeSample() = default;
-    PBRT_HOST_DEVICE_INLINE
-    LightLeSample(const SampledSpectrum &L, const Ray &ray, Float pdfPos,
-                  Float pdfDir)
-        : L(L), ray(ray), pdfPos(pdfPos), pdfDir(pdfDir) {}
-    PBRT_HOST_DEVICE_INLINE
-    LightLeSample(const SampledSpectrum &L, const Ray &ray, const Interaction &intr,
-                  Float pdfPos, Float pdfDir)
-        : L(L), ray(ray), intr(intr), pdfPos(pdfPos), pdfDir(pdfDir) {
-        CHECK(this->intr->n != Normal3f(0, 0, 0));
-    }
-
-    PBRT_HOST_DEVICE_INLINE
-    Float AbsCosTheta(const Vector3f &w) const { return intr ? AbsDot(w, intr->n) : 1; }
-
-    SampledSpectrum L;
-    Ray ray;
-    pstd::optional<Interaction> intr;
-    Float pdfPos, pdfDir;
-};
-
-struct LightBounds {
-    LightBounds() = default;
-    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
-      : b(b), w(Normalize(w)), phi(phi), theta_o(theta_o), theta_e(theta_e),
-        cosTheta_o(std::cos(theta_o)), cosTheta_e(std::cos(theta_e)), twoSided(twoSided) {}
-    LightBounds(const Point3f &p, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
-      : b(p, p), w(Normalize(w)), phi(phi), theta_o(theta_o), theta_e(theta_e),
-        cosTheta_o(std::cos(theta_o)), cosTheta_e(std::cos(theta_e)), twoSided(twoSided) {}
-
-    // baseline: 38s in importance
-    // acos hack: 34s
-    // theta_u 0 if far away: 23s (!)
-    PBRT_HOST_DEVICE
-    Float Importance(const Interaction &intr) const {
-        //ProfilerScope _(ProfilePhase::LightDistribImportance);
-
-        Point3f pc = (b.pMin + b.pMax) / 2;
-        Float d2 = DistanceSquared(intr.p(), pc);
-        // Don't let d2 get too small if p is inside the bounds.
-        d2 = std::max(d2, Length(b.Diagonal()) / 2);
-
-        Vector3f wi = Normalize(intr.p() - pc);
-
-#if 0
-        Float cosTheta = Dot(w, wi);
-        Float theta = SafeACos(cosTheta);
-        if (twoSided && theta > Pi / 2) {
-            theta = std::max<Float>(0, Pi - theta);
-            cosTheta = std::abs(cosTheta);
-        }
-        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-
-        Float cosTheta_u = BoundSubtendedDirections(b, intr.p).cosTheta;
-        Float theta_u = SafeACos(cosTheta_u);
-
-        Float thetap = std::max<Float>(0, theta - theta_o - theta_u);
-
-        if (thetap >= theta_e)
-            return 0;
-
-        Float imp = phi * std::cos(thetap) / d2;
-        CHECK_GE(imp, -1e-3);
-
-        if (intr.n != Normal3f(0,0,0)) {
-            Float cosTheta_i = AbsDot(wi, intr.n);
-            Float theta_i = SafeACos(cosTheta_i);
-            Float thetap_i = std::max<Float>(theta_i - theta_u, 0);
-            imp *= std::cos(thetap_i);
-        }
-#else
-        Float cosTheta = Dot(w, wi);
-        if (twoSided)
-            cosTheta = std::abs(cosTheta);
-        // FIXME? unstable when cosTheta \approx 1
-        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-
-        // cos(max(0, a-b))
-        auto cosSubClamped = [](Float sinThetaA, Float cosThetaA,
-                                Float sinThetaB, Float cosThetaB) -> Float {
-                                 if (cosThetaA > cosThetaB)
-                                     // Handle the max(0, ...)
-                                     return 1;
-                                 return cosThetaA * cosThetaB + sinThetaA * sinThetaB;
-                             };
-        // sin(max(0, a-b))
-        auto sinSubClamped = [](Float sinThetaA, Float cosThetaA,
-                                Float sinThetaB, Float cosThetaB) -> Float {
-                                 if (cosThetaA > cosThetaB)
-                                     // Handle the max(0, ...)
-                                     return 0;
-                                 return sinThetaA * cosThetaB - cosThetaA * sinThetaB;
-                             };
-
-        Float cosTheta_u = BoundSubtendedDirections(b, intr.p()).cosTheta;
-        Float sinTheta_u = SafeSqrt(1 - cosTheta_u * cosTheta_u);
-
-        // Open issue: for a tri light that's axis aligned, we'd like to have
-        // very low to zero importance for points in its plane. This doesn't
-        // quite work out due to subtracting out the bounds' subtended angle.
-
-        // cos(theta_p). Compute in two steps
-        Float cosTheta_x = cosSubClamped(sinTheta, cosTheta,
-                                         SafeSqrt(1 - cosTheta_o * cosTheta_o),
-                                         cosTheta_o);
-        Float sinTheta_x = sinSubClamped(sinTheta, cosTheta,
-                                         SafeSqrt(1 - cosTheta_o * cosTheta_o),
-                                         cosTheta_o);
-        Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x,
-                                         sinTheta_u, cosTheta_u);
-
-        if (cosTheta_p <= cosTheta_e)
-            return 0;
-
-        Float imp = phi * cosTheta_p / d2;
-        DCHECK_GE(imp, -1e-3);
-
-        if (intr.n != Normal3f(0, 0, 0)) {
-            // cos(thetap_i) = cos(max(0, theta_i - theta_u))
-            // cos (a-b) = cos a cos b + sin a sin b
-            Float cosTheta_i = AbsDot(wi, intr.n);
-            Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
-            Float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i,
-                                              sinTheta_u, cosTheta_u);
-            imp *= cosThetap_i;
-        }
-#endif
-
-        return std::max<Float>(imp, 0);
-    }
-
-
-
-    std::string ToString() const;
-
-    Bounds3f b;  // TODO: rename to |bounds|?
-    Vector3f w;
-    Float phi = 0;
-    Float theta_o = 0, theta_e = 0;
-    Float cosTheta_o = 1, cosTheta_e = 1;
-    bool twoSided = false;
-};
-
-LightBounds Union(const LightBounds &a, const LightBounds &b);
-
 // PointLight Declarations
 class PointLight : public Light {
   public:
@@ -233,12 +65,12 @@ class PointLight : public Light {
                const MediumInterface &mediumInterface,
                SpectrumHandle I, Allocator alloc)
         : Light(LightType::DeltaPosition, worldFromLight, mediumInterface),
-          I(I) {}
+          I(I, alloc) {}
 
     static PointLight *Create(
         const AnimatedTransform &worldFromLight, const Medium *medium,
         const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-        const FileLoc *loc, Allocator alloc);
+        Allocator alloc);
 
     PBRT_HOST_DEVICE
     pstd::optional<LightLiSample> Sample_Li(const Interaction &ref, const Point2f &u,
@@ -271,7 +103,7 @@ class PointLight : public Light {
 
   private:
     // PointLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
 };
 
 // DistantLight Declarations
@@ -283,7 +115,7 @@ class DistantLight : public Light {
 
     static DistantLight *Create(
         const AnimatedTransform &worldFromLight, const ParameterDictionary &dict,
-        const RGBColorSpace *colorSpace, const FileLoc *loc, Allocator alloc);
+        const RGBColorSpace *colorSpace, Allocator alloc);
 
     void Preprocess(const Bounds3f &worldBounds) {
         worldBounds.BoundingSphere(&worldCenter, &worldRadius);
@@ -315,7 +147,7 @@ class DistantLight : public Light {
 
   private:
     // DistantLight Private Data
-    SpectrumHandle L;
+    DenselySampledSpectrum L;
     Point3f worldCenter;
     Float worldRadius;
 };
@@ -331,7 +163,7 @@ class ProjectionLight : public Light {
 
     static ProjectionLight *Create(
         const AnimatedTransform &worldFromLight, const Medium *medium,
-        const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc);
+        const ParameterDictionary &dict, Allocator alloc);
 
     void Preprocess(const Bounds3f &worldBounds) { }
 
@@ -382,7 +214,7 @@ class GoniometricLight : public Light {
     static GoniometricLight *Create(
         const AnimatedTransform &worldFromLight, const Medium *medium,
         const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-        const FileLoc *loc, Allocator alloc);
+        Allocator alloc);
 
     void Preprocess(const Bounds3f &worldBounds) { }
 
@@ -412,7 +244,7 @@ class GoniometricLight : public Light {
 
   private:
     // GoniometricLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
     Image image;
     const RGBColorSpace *imageColorSpace;
     WrapMode2D wrapMode;
@@ -433,7 +265,7 @@ class DiffuseAreaLight : public Light {
     static DiffuseAreaLight *Create(
         const AnimatedTransform &worldFromLight, const Medium *medium,
         const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-        const FileLoc *loc, Allocator alloc, const ShapeHandle shape);
+        Allocator alloc, const ShapeHandle shape);
 
     void Preprocess(const Bounds3f &worldBounds) { }
 
@@ -525,7 +357,7 @@ class DiffuseAreaLight : public Light {
 
   protected:
     // DiffuseAreaLight Protected Data
-    SpectrumHandle Lemit;
+    DenselySampledSpectrum Lemit;
     Float scale;
     ShapeHandle shape;
     bool twoSided;
@@ -564,7 +396,7 @@ class UniformInfiniteLight : public Light {
 
   private:
     // UniformInfiniteLight Private Data
-    SpectrumHandle L;
+    DenselySampledSpectrum L;
     Point3f worldCenter;
     Float worldRadius;
 };
@@ -658,7 +490,7 @@ class SpotLight : public Light {
     static SpotLight *Create(
         const AnimatedTransform &worldFromLight, const Medium *medium,
         const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-        const FileLoc *loc, Allocator alloc);
+        Allocator alloc);
 
     void Preprocess(const Bounds3f &worldBounds) { }
 
@@ -685,7 +517,7 @@ class SpotLight : public Light {
 
   private:
     // SpotLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
     Float cosFalloffStart, cosFalloffEnd;
 };
 
@@ -755,18 +587,12 @@ LightHandle::L(const Interaction &intr, const Vector3f &w,
 
 inline SampledSpectrum
 LightHandle::Le(const Ray &ray, const SampledWavelengths &lambda) const {
+    CHECK(((const Light *)ptr())->type == LightType::Infinite);
     switch (Tag()) {
     case TypeIndex<UniformInfiniteLight>():
         return Cast<UniformInfiniteLight>()->Le(ray, lambda);
     case TypeIndex<ImageInfiniteLight>():
         return Cast<ImageInfiniteLight>()->Le(ray, lambda);
-    case TypeIndex<PointLight>():
-    case TypeIndex<DistantLight>():
-    case TypeIndex<ProjectionLight>():
-    case TypeIndex<GoniometricLight>():
-    case TypeIndex<DiffuseAreaLight>():
-    case TypeIndex<SpotLight>():
-        return SampledSpectrum(0.f);
     default:
         LOG_FATAL("Unhandled light type");
         return {};

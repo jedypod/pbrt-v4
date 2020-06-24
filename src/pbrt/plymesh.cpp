@@ -124,8 +124,6 @@ int rply_faceindex_callback(p_ply_argument argument) {
 }
 
 pstd::optional<PLYMesh> ReadPLYMesh(const std::string &filename, Allocator alloc) {
-    ProfilerScope _(ProfilePhase::PLYLoading);
-
     PLYMesh mesh;
 
     p_ply ply = ply_open(filename.c_str(), rply_message_callback, 0, nullptr);
@@ -222,7 +220,8 @@ pstd::optional<PLYMesh> ReadPLYMesh(const std::string &filename, Allocator alloc
 
 pstd::vector<ShapeHandle> CreatePLYMesh(
     const Transform *worldFromObject, bool reverseOrientation,
-    const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+    const ParameterDictionary &dict, Allocator alloc) {
+    ProfilerScope _(ProfilePhase::PLYLoading);
     std::string filename = ResolveFilename(dict.GetOneString("plyfile", ""));
     pstd::optional<PLYMesh> plyMesh = ReadPLYMesh(filename);
     if (!plyMesh)
@@ -239,12 +238,11 @@ pstd::vector<ShapeHandle> CreatePLYMesh(
     }
 
     if (!plyMesh->quadIndices.empty()) {
-        BilinearPatchMesh *mesh =
-            alloc.new_object<BilinearPatchMesh>(*worldFromObject, reverseOrientation,
-                                                plyMesh->quadIndices, plyMesh->p, plyMesh->n,
-                                                plyMesh->uv, plyMesh->faceIndices,
-                                                nullptr /* image dist */);
-        pstd::vector<ShapeHandle> quadMesh = mesh->CreatePatches(alloc);
+        pstd::vector<ShapeHandle> quadMesh =
+            BilinearPatchMesh::Create(worldFromObject, reverseOrientation,
+                                      plyMesh->quadIndices, plyMesh->p, plyMesh->n,
+                                      plyMesh->uv, plyMesh->faceIndices,
+                                      nullptr /* image dist */, alloc);
         shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
     }
 

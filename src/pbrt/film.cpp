@@ -35,7 +35,6 @@
 #include <pbrt/film.h>
 
 #include <pbrt/bsdf.h>
-#include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/bluenoise.h>
@@ -54,76 +53,16 @@
 
 namespace pbrt {
 
-Film::Film(const Point2i &resolution, const Bounds2i &pixelBounds,
-           FilterHandle filter, Float diagonal, const std::string &filename)
-    : fullResolution(resolution),
-      diagonal(diagonal * .001),
-      filter(filter),
-      filename(filename),
-      pixelBounds(pixelBounds) {
-    CHECK(!pixelBounds.IsEmpty());
-    CHECK_GE(pixelBounds.pMin.x, 0);
-    CHECK_LE(pixelBounds.pMax.x, resolution.x);
-    CHECK_GE(pixelBounds.pMin.y, 0);
-    CHECK_LE(pixelBounds.pMax.y, resolution.y);
-    LOG_VERBOSE("Created film with full resolution %s, pixelBounds %s", resolution,
-                pixelBounds);
-}
-
-Bounds2f Film::SampleBounds() const {
-    return Bounds2f(Point2f(pixelBounds.pMin) - filter.Radius() + Vector2f(0.5f, 0.5f),
-                    Point2f(pixelBounds.pMax) + filter.Radius() - Vector2f(0.5f, 0.5f));
-}
-
-std::string Film::BaseToString() const {
-    return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
-                        "pixelBounds: %s", fullResolution, diagonal, filter,
-                        filename, pixelBounds);
-}
-
-Film::~Film() { }
-
-VisibleSurface::VisibleSurface(const SurfaceInteraction &si, const Camera &camera,
-                               const SampledWavelengths &lambda) {
-    p = camera.worldFromCamera.ApplyInverse(si.p(), time);
-    n = camera.worldFromCamera.ApplyInverse(si.n, time);
-    n = FaceForward(n, si.wo);
-    ns = camera.worldFromCamera.ApplyInverse(si.shading.n, time);
-    ns = FaceForward(ns, si.wo);
-    dzdx = camera.worldFromCamera.ApplyInverse(si.dpdx, time).z;
-    dzdy = camera.worldFromCamera.ApplyInverse(si.dpdy, time).z;
-
-    time = si.time;
-
-    bsdf = si.bsdf;
-
-    if (bsdf) {
-        int nRhoSamples = 16;
-        albedo = bsdf->rho(si.wo, [=](int i) {
-            return RhoHemiDirSample{RadicalInverse(0, i + 1),
-                                    Point2f(RadicalInverse(1, i + 1),
-                                            RadicalInverse(2, i + 1))};
-        }, nRhoSamples);
-    }
-
-    Le = si.Le(si.wo, lambda);
-}
-
-std::string VisibleSurface::ToString() const {
-    return StringPrintf("[ VisibleSurface p: %s n: %s ns: %s bsdf: %s ]",
-                        p, n, ns, bsdf ? bsdf->ToString() : std::string("(nullptr)"));
-}
-
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
 // Film Method Definitions
 RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                 FilterHandle filter, Float diagonal,
+                 pstd::unique_ptr<Filter> filt, Float diagonal,
                  const std::string &filename, Float scale,
                  const RGBColorSpace *colorSpace,
                  Float maxSampleLuminance, bool writeFP16, bool saveVariance,
                  Allocator allocator)
-    : Film(resolution, pixelBounds, filter, diagonal, filename),
+    : Film(resolution, pixelBounds, std::move(filt), diagonal, filename),
       pixels(pixelBounds, allocator),
       scale(scale),
       colorSpace(colorSpace),
@@ -132,7 +71,6 @@ RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
       saveVariance(saveVariance) {
     // Allocate film image storage
     CHECK(!pixelBounds.IsEmpty());
-    CHECK(colorSpace != nullptr);
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
 }
 
@@ -144,23 +82,23 @@ void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum v,
                        const SampledWavelengths &lambda) {
     ProfilerScope pp(ProfilePhase::SplatFilm);
 
-    XYZ xyz = v.ToXYZ(lambda);
+    XYZ xyz = v.ToXYZ(lambda, colorSpace->X, colorSpace->Y, colorSpace->Z);
     Float y = xyz.Y;
     CHECK(!v.HasNaNs());
     CHECK(!std::isinf(y));
 
     if (y > maxSampleLuminance) {
         v *= maxSampleLuminance / y;
-        xyz = v.ToXYZ(lambda);
+        xyz = v.ToXYZ(lambda, colorSpace->X, colorSpace->Y, colorSpace->Z);
     }
     RGB rgb = colorSpace->ToRGB(xyz);
 
     Point2f pDiscrete = p + Vector2f(0.5, 0.5);
-    Bounds2i splatBounds(Point2i(Floor(pDiscrete - filter.Radius())),
-                         Point2i(Floor(pDiscrete + filter.Radius())) + Vector2i(1, 1));
+    Bounds2i splatBounds(Point2i(Floor(pDiscrete - filter->radius)),
+                         Point2i(Floor(pDiscrete + filter->radius)) + Vector2i(1, 1));
     splatBounds = Intersect(splatBounds, pixelBounds);
     for (Point2i pi : splatBounds) {
-        Float wt = filter.Evaluate(Point2f(p - pi - Vector2f(0.5, 0.5)));
+        Float wt = filter->Evaluate(Point2f(p - pi - Vector2f(0.5, 0.5)));
         if (wt != 0) {
             Pixel &pixel = pixels[pi];
             for (int i = 0; i < 3; ++i) pixel.splatRGB[i].Add(wt * rgb[i]);
@@ -182,7 +120,7 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     if (saveVariance) channels.push_back("Variance");
     Image image(format, Point2i(pixelBounds.Diagonal()), channels);
 
-    Float filterIntegral = filter.Integral();
+    Float filterIntegral = filter->Integral();
 
     for (Point2i p : pixelBounds) {
         Pixel &pixel = pixels[p];
@@ -226,13 +164,14 @@ std::string RGBFilm::ToString() const {
                         *colorSpace, maxSampleLuminance, writeFP16, saveVariance);
 }
 
-RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
-                         const RGBColorSpace *colorSpace, const FileLoc *loc,
+RGBFilm *RGBFilm::Create(const ParameterDictionary &dict,
+                         pstd::unique_ptr<Filter> filter,
+                         const RGBColorSpace *colorSpace,
                          Allocator alloc) {
     std::string filename = dict.GetOneString("filename", "");
     if (PbrtOptions.imageFile) {
         if (!filename.empty())
-            Warning(loc,
+            Warning(
                 "Output filename supplied on command line, \"%s\" will override "
                 "filename provided in scene description file, \"%s\".",
                 *PbrtOptions.imageFile, filename);
@@ -252,21 +191,21 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     if (PbrtOptions.pixelBounds) {
         Bounds2i newBounds = *PbrtOptions.pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
-            Warning(loc, "Supplied pixel bounds extend beyond image resolution. Clamping.");
+            Warning("Supplied pixel bounds extend beyond image resolution. Clamping.");
         pixelBounds = Intersect(newBounds, pixelBounds);
 
         if (!pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+            Warning("Both pixel bounds and crop window were specified. Using the "
                     "crop window.");
     }
     else if (!pb.empty()) {
         if (pb.size() != 4)
-            Error(loc, "%d values supplied for \"pixelbounds\". Expected 4.",
+            Error("%d values supplied for \"pixelbounds\". Expected 4.",
                   int(pb.size()));
         else {
             Bounds2i newBounds = Bounds2i({pb[0], pb[2]}, {pb[1], pb[3]});
             if (Intersect(newBounds, pixelBounds) != newBounds)
-                Warning(loc, "Supplied pixel bounds extend beyond image resolution. Clamping.");
+                Warning("Supplied pixel bounds extend beyond image resolution. Clamping.");
             pixelBounds = Intersect(newBounds, pixelBounds);
         }
     }
@@ -282,18 +221,15 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
                              std::ceil(fullResolution.y * crop.pMax.y)));
 
         if (!cr.empty())
-            Warning(loc, "Crop window supplied on command line will override "
+            Warning("Crop window supplied on command line will override "
                     "crop window specified with Film.");
-        if (PbrtOptions.pixelBounds || !pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+        if (!pb.empty())
+            Warning("Both pixel bounds and crop window were specified. Using the "
                     "crop window.");
     } else if (!cr.empty()) {
-        if (PbrtOptions.pixelBounds)
-            Warning(loc, "Ignoring \"cropwindow\" since pixel bounds were specified "
-                    "on the command line.");
-        else if (cr.size() == 4) {
+        if (cr.size() == 4) {
             if (!pb.empty())
-                Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+                Warning("Both pixel bounds and crop window were specified. Using the "
                         "crop window.");
 
             Bounds2f crop;
@@ -310,12 +246,12 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
                                  std::ceil(fullResolution.y * crop.pMax.y)));
         }
         else
-            Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
+            Error("%d values supplied for \"cropwindow\". Expected 4.",
                   (int)cr.size());
     }
 
     if (pixelBounds.IsEmpty())
-        ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
+        ErrorExit("Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
     Float scale = dict.GetOneFloat("scale", 1.);
     Float diagonal = dict.GetOneFloat("diagonal", 35.);
@@ -323,20 +259,19 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
                                                 Infinity);
     bool writeFP16 = dict.GetOneBool("savefp16", true);
     bool saveVariance = dict.GetOneBool("savevariance", false);
-    return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, filter,
+    return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, std::move(filter),
                                      diagonal, filename, scale, colorSpace,
                                      maxSampleLuminance, writeFP16, saveVariance, alloc);
 }
 
 // Film Method Definitions
 AOVFilm::AOVFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                 FilterHandle filter, Float diagonal,
+                 pstd::unique_ptr<Filter> filt, Float diagonal,
                  const std::string &filename,
                  const RGBColorSpace *colorSpace,
-                 Float maxSampleLuminance, bool writeFP16,
-                 Allocator alloc)
-    : Film(resolution, pixelBounds, filter, diagonal, filename),
-      pixels(pixelBounds, alloc),
+                 Float maxSampleLuminance, bool writeFP16)
+    : Film(resolution, pixelBounds, std::move(filt), diagonal, filename),
+      pixels(pixelBounds),
       colorSpace(colorSpace),
       maxSampleLuminance(maxSampleLuminance),
       writeFP16(writeFP16) {
@@ -360,14 +295,14 @@ void AOVFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
         Ld = visibleSurface->Ld;
         Li = L - Ld - Le;
         // Clamp Li and Ld individually. (Allow separate thresholds?)
-        if (Ld.y(lambda) > maxSampleLuminance)
-            Ld *= maxSampleLuminance / Ld.y(lambda);
-        if (Li.y(lambda) > maxSampleLuminance)
-            Li *= maxSampleLuminance / Li.y(lambda);
+        if (Ld.y(lambda, colorSpace->Y) > maxSampleLuminance)
+            Ld *= maxSampleLuminance / Ld.y(lambda, colorSpace->Y);
+        if (Li.y(lambda, colorSpace->Y) > maxSampleLuminance)
+            Li *= maxSampleLuminance / Li.y(lambda, colorSpace->Y);
         L = Le + Ld + Li;
     } else {
-        if (L.y(lambda) > maxSampleLuminance)
-            L *= maxSampleLuminance / L.y(lambda);
+        if (L.y(lambda, colorSpace->Y) > maxSampleLuminance)
+            L *= maxSampleLuminance / L.y(lambda, colorSpace->Y);
         Li = L;
     }
 
@@ -386,8 +321,8 @@ void AOVFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     Pixel &p = pixels[pFilm];
     if (visibleSurface) {
         // Update variance estimates.
-        p.LdVarianceEstimator.Add(Ld.y(lambda));
-        p.LiVarianceEstimator.Add(Li.y(lambda));
+        p.LdVarianceEstimator.Add(Ld.y(lambda, colorSpace->Y));
+        p.LiVarianceEstimator.Add(Li.y(lambda, colorSpace->Y));
 
         p.pSum += weight * visibleSurface->p;
 
@@ -400,9 +335,31 @@ void AOVFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
         addRGB(Le, p.LeSum);
         addRGB(Ld, p.LdSum);
 
-        SampledSpectrum albedo = visibleSurface->albedo *
-            colorSpace->illuminant.Sample(lambda) * weight;
-        addRGB(albedo, p.albedoSum);
+#ifndef __CUDA_ARCH__
+        // FIXME
+        if (visibleSurface->bsdf) {
+            constexpr int nRhoSamples = 16;
+            Point2f rhoSamples[nRhoSamples];
+            Float rhoCSamples[nRhoSamples];
+            CranleyPattersonRotator rot[3] = { CranleyPattersonRotator(BlueNoise(0, pFilm.x, pFilm.y)),
+                                               CranleyPattersonRotator(BlueNoise(1, pFilm.x, pFilm.y)),
+                                               CranleyPattersonRotator(BlueNoise(2, pFilm.x, pFilm.y)) };
+            for (int i = 0; i < nRhoSamples; ++i) {
+                // FIXME: rho() always discards the first sample since rhoSamples[0][0].x == 0,
+                // since that's how Sobol' rolls and then the blue noise texture has zero for
+                // the first entry....
+                rhoCSamples[i] = SobolSampleFloat(i, 0, rot[0]);
+                rhoSamples[i] = Point2f(SobolSampleFloat(i, 1, rot[1]),
+                                        SobolSampleFloat(i, 2, rot[2]));
+            }
+
+            SampledSpectrum albedo = visibleSurface->bsdf->rho(visibleSurface->woWorld,
+                                                         rhoCSamples, rhoSamples) *
+                colorSpace->illuminant.Sample(lambda);
+            albedo *= weight;
+            addRGB(albedo, p.albedoSum);
+        }
+#endif
 
 #if 0
         if (visibleSurface->materialAttributes) {
@@ -440,23 +397,23 @@ void AOVFilm::AddSplat(const Point2f &p, SampledSpectrum v,
 
     // NOTE: same code as RGBFilm::AddSplat()...
 
-    XYZ xyz = v.ToXYZ(lambda);
+    XYZ xyz = v.ToXYZ(lambda, colorSpace->X, colorSpace->Y, colorSpace->Z);
     Float y = xyz.Y;
     CHECK(!v.HasNaNs());
     CHECK(!std::isinf(y));
 
     if (y > maxSampleLuminance) {
         v *= maxSampleLuminance / y;
-        xyz = v.ToXYZ(lambda);
+        xyz = v.ToXYZ(lambda, colorSpace->X, colorSpace->Y, colorSpace->Z);
     }
     RGB rgb = colorSpace->ToRGB(xyz);
 
     Point2f pDiscrete = p + Vector2f(0.5, 0.5);
-    Bounds2i splatBounds(Point2i(Floor(pDiscrete - filter.Radius())),
-                         Point2i(Floor(pDiscrete + filter.Radius())) + Vector2i(1, 1));
+    Bounds2i splatBounds(Point2i(Floor(pDiscrete - filter->radius)),
+                         Point2i(Floor(pDiscrete + filter->radius)) + Vector2i(1, 1));
     splatBounds = Intersect(splatBounds, pixelBounds);
     for (Point2i pi : splatBounds) {
-        Float wt = filter.Evaluate(Point2f(p - pi - Vector2f(0.5, 0.5)));
+        Float wt = filter->Evaluate(Point2f(p - pi - Vector2f(0.5, 0.5)));
         if (wt != 0) {
             Pixel &pixel = pixels[pi];
             for (int i = 0; i < 3; ++i) pixel.splatRGB[i].Add(wt * rgb[i]);
@@ -495,7 +452,7 @@ Image AOVFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc ldVarianceDesc = *image.GetChannelDesc({ "LdVariance", "LdRelativeVariance" });
     ImageChannelDesc liVarianceDesc = *image.GetChannelDesc({ "LiVariance", "LiRelativeVariance" });
 
-    Float filterIntegral = filter.Integral();
+    Float filterIntegral = filter->Integral();
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
@@ -573,13 +530,13 @@ std::string AOVFilm::ToString() const {
                         *colorSpace, maxSampleLuminance, writeFP16);
 }
 
-AOVFilm *AOVFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
-                         const RGBColorSpace *colorSpace, const FileLoc *loc,
-                         Allocator alloc) {
+std::unique_ptr<Film> AOVFilm::Create(const ParameterDictionary &dict,
+                                      pstd::unique_ptr<Filter> filter,
+                                      const RGBColorSpace *colorSpace) {
     std::string filename = dict.GetOneString("filename", "");
     if (PbrtOptions.imageFile) {
         if (!filename.empty())
-            Warning(loc,
+            Warning(
                 "Output filename supplied on command line, \"%s\" will override "
                 "filename provided in scene description file, \"%s\".",
                 *PbrtOptions.imageFile, filename);
@@ -599,21 +556,21 @@ AOVFilm *AOVFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
     if (PbrtOptions.pixelBounds) {
         Bounds2i newBounds = *PbrtOptions.pixelBounds;
         if (Intersect(newBounds, pixelBounds) != newBounds)
-            Warning(loc, "Supplied pixel bounds extend beyond image resolution. Clamping.");
+            Warning("Supplied pixel bounds extend beyond image resolution. Clamping.");
         pixelBounds = Intersect(newBounds, pixelBounds);
 
         if (!pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+            Warning("Both pixel bounds and crop window were specified. Using the "
                     "crop window.");
     }
     else if (!pb.empty()) {
         if (pb.size() != 4)
-            Error(loc, "%d values supplied for \"pixelbounds\". Expected 4.",
+            Error("%d values supplied for \"pixelbounds\". Expected 4.",
                   int(pb.size()));
         else {
             Bounds2i newBounds = Bounds2i({pb[0], pb[2]}, {pb[1], pb[3]});
             if (Intersect(newBounds, pixelBounds) != newBounds)
-                Warning(loc, "Supplied pixel bounds extend beyond image resolution. Clamping.");
+                Warning("Supplied pixel bounds extend beyond image resolution. Clamping.");
             pixelBounds = Intersect(newBounds, pixelBounds);
         }
     }
@@ -629,18 +586,15 @@ AOVFilm *AOVFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
                              std::ceil(fullResolution.y * crop.pMax.y)));
 
         if (!cr.empty())
-            Warning(loc, "Crop window supplied on command line will override "
+            Warning("Crop window supplied on command line will override "
                     "crop window specified with Film.");
-        if (PbrtOptions.pixelBounds || !pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+        if (!pb.empty())
+            Warning("Both pixel bounds and crop window were specified. Using the "
                     "crop window.");
     } else if (!cr.empty()) {
-        if (PbrtOptions.pixelBounds)
-            Warning(loc, "Ignoring \"cropwindow\" since pixel bounds were specified "
-                    "on the command line.");
-        else if (cr.size() == 4) {
+        if (cr.size() == 4) {
             if (!pb.empty())
-                Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+            Warning("Both pixel bounds and crop window were specified. Using the "
                     "crop window.");
 
             Bounds2f crop;
@@ -657,36 +611,20 @@ AOVFilm *AOVFilm::Create(const ParameterDictionary &dict, FilterHandle filter,
                                  std::ceil(fullResolution.y * crop.pMax.y)));
         }
         else
-            Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
+            Error("%d values supplied for \"cropwindow\". Expected 4.",
                   (int)cr.size());
     }
 
     if (pixelBounds.IsEmpty())
-        ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
+        ErrorExit("Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
     Float diagonal = dict.GetOneFloat("diagonal", 35.);
-    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance", Infinity);
+    Float maxSampleLuminance = dict.GetOneFloat("maxsampleluminance",
+                                                  Infinity);
     bool writeFP16 = dict.GetOneBool("savefp16", true);
-    return alloc.new_object<AOVFilm>(fullResolution, pixelBounds, filter,
+    return std::make_unique<AOVFilm>(fullResolution, pixelBounds, std::move(filter),
                                      diagonal, filename, colorSpace,
-                                     maxSampleLuminance, writeFP16, alloc);
-}
-
-Film *Film::Create(const std::string &name, const ParameterDictionary &dict,
-                   const FileLoc *loc, FilterHandle filter, Allocator alloc) {
-    Film *film = nullptr;
-    if (name == "rgb")
-        film = RGBFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
-    else if (name == "aov")
-        film = AOVFilm::Create(dict, filter, dict.ColorSpace(), loc, alloc);
-    else
-        ErrorExit(loc, "%s: film type unknown.", name);
-
-    if (!film)
-        ErrorExit(loc, "%s: unable to create film.", name);
-
-    dict.ReportUnused();
-    return film;
+                                     maxSampleLuminance, writeFP16);
 }
 
 }  // namespace pbrt

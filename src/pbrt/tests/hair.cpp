@@ -77,7 +77,7 @@ TEST(Hair, WhiteFurnace) {
                     {rng.Uniform<Float>(), rng.Uniform<Float>()});
                 sum += hair.f(wo, wi) * AbsCosTheta(wi);
             }
-            Float avg = sum.y(lambda) / (count * UniformSpherePDF());
+            Float avg = sum.y(lambda, SPDs::Y()) / (count * UniformSpherePDF());
             EXPECT_TRUE(avg >= .95 && avg <= 1.05);
         }
     }
@@ -103,7 +103,7 @@ TEST(Hair, WhiteFurnaceSampled) {
                 pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, BxDFReflTransFlags::All);
                 if (bs && bs->pdf > 0) sum += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
             }
-            Float avg = sum.y(lambda) / count;
+            Float avg = sum.y(lambda, SPDs::Y()) / count;
             EXPECT_TRUE(avg >= .99 && avg <= 1.01) << avg;
         }
     }
@@ -130,8 +130,8 @@ TEST(Hair, SamplingWeights) {
                 if (bs && bs->pdf > 0) {
                     // Verify that hair BSDF sample weight is close to 1 for
                     // _wi_
-                    EXPECT_GT(bs->f.y(lambda) * AbsCosTheta(bs->wi) / bs->pdf, 0.99);
-                    EXPECT_LT(bs->f.y(lambda) * AbsCosTheta(bs->wi) / bs->pdf, 1.01);
+                    EXPECT_GT(bs->f.y(lambda, SPDs::Y()) * AbsCosTheta(bs->wi) / bs->pdf, 0.99);
+                    EXPECT_LT(bs->f.y(lambda, SPDs::Y()) * AbsCosTheta(bs->wi) / bs->pdf, 1.01);
                 }
             }
         }
@@ -166,9 +166,9 @@ TEST(Hair, SamplingConsistency) {
                             (count * UniformSpherePDF());
             }
             // Verify consistency of estimated hair reflected radiance values
-            Float err = std::abs(fImportance.y(lambda) -
-                                 fUniform.y(lambda)) /
-                fUniform.y(lambda);
+            Float err = std::abs(fImportance.y(lambda, SPDs::Y()) -
+                                 fUniform.y(lambda, SPDs::Y())) /
+                fUniform.y(lambda, SPDs::Y());
             EXPECT_LT(err, 0.05);
         }
 }

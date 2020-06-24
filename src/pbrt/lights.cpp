@@ -35,7 +35,6 @@
 
 #include <pbrt/integrators.h>
 #include <pbrt/paramdict.h>
-#include <pbrt/samplers.h>
 #include <pbrt/scene.h>
 #include <pbrt/shapes.h>
 #include <pbrt/util/color.h>
@@ -111,7 +110,7 @@ bool LightLiSample::Unoccluded(const Scene &scene) const {
 
 SampledSpectrum LightLiSample::Tr(const Scene &scene,
                                   const SampledWavelengths &lambda,
-                                  SamplerHandle sampler) const {
+                                  Sampler &sampler) const {
     return pbrt::Tr(scene, lambda, sampler, pRef, pLight);
 }
 
@@ -149,7 +148,7 @@ std::string PointLight::ToString() const {
 PointLight *PointLight::Create(
     const AnimatedTransform &worldFromLight, const Medium *medium,
     const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     SpectrumHandle I = dict.GetOneSpectrum("I", &colorSpace->illuminant,
                                            SpectrumType::General, alloc);
     Float sc = dict.GetOneFloat("scale", 1);
@@ -170,7 +169,7 @@ PointLight *PointLight::Create(
 DistantLight::DistantLight(const AnimatedTransform &worldFromLight,
                            SpectrumHandle L, Allocator alloc)
     : Light(LightType::DeltaDirection, worldFromLight, nullptr),
-      L(L) {}
+      L(L, alloc) {}
 
 SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
     return L.Sample(lambda) * Pi * worldRadius * worldRadius;
@@ -205,7 +204,7 @@ std::string DistantLight::ToString() const {
 
 DistantLight *DistantLight::Create(
     const AnimatedTransform &worldFromLight, const ParameterDictionary &dict,
-    const RGBColorSpace *colorSpace, const FileLoc *loc, Allocator alloc) {
+    const RGBColorSpace *colorSpace, Allocator alloc) {
     SpectrumHandle L = dict.GetOneSpectrum("L", &colorSpace->illuminant,
                                            SpectrumType::General, alloc);
     Float sc = dict.GetOneFloat("scale", 1);
@@ -419,13 +418,13 @@ std::string ProjectionLight::ToString() const {
 
 ProjectionLight *ProjectionLight::Create(
     const AnimatedTransform &worldFromLight, const Medium *medium,
-    const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+    const ParameterDictionary &dict, Allocator alloc) {
     Float scale = dict.GetOneFloat("scale", 1);
     Float fov = dict.GetOneFloat("fov", 90.);
 
     std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
     if (texname.empty())
-        ErrorExit(loc, "Must provide \"imagefile\" to \"projection\" light source");
+        ErrorExit("Must provide \"imagefile\" to \"projection\" light source");
 
     pstd::optional<ImageAndMetadata> imageAndMetadata = Image::Read(texname, alloc);
     if (!imageAndMetadata)
@@ -435,7 +434,7 @@ ProjectionLight *ProjectionLight::Create(
     pstd::optional<ImageChannelDesc> channelDesc =
         imageAndMetadata->image.GetChannelDesc({ "R", "G", "B" });
     if (!channelDesc)
-        ErrorExit(loc, "Image provided to \"projection\" light must have R, G, and B channels.");
+        ErrorExit("Image provided to \"projection\" light must have R, G, and B channels.");
     Image image = imageAndMetadata->image.SelectChannels(*channelDesc, alloc);
 
     Transform flip = Scale(1, -1, 1);
@@ -454,7 +453,7 @@ GoniometricLight::GoniometricLight(const AnimatedTransform &worldFromLight,
     const MediumInterface &mediumInterface, SpectrumHandle I,
     Image im, const RGBColorSpace *imageColorSpace, Allocator alloc)
     : Light(LightType::DeltaPosition, worldFromLight, mediumInterface),
-      I(I),
+      I(I, alloc),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
       wrapMode(WrapMode::Repeat, WrapMode::Clamp),
@@ -551,43 +550,40 @@ std::string GoniometricLight::ToString() const {
 GoniometricLight *GoniometricLight::Create(
     const AnimatedTransform &worldFromLight, const Medium *medium,
     const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     SpectrumHandle I = dict.GetOneSpectrum("I", &colorSpace->illuminant,
                                             SpectrumType::General, alloc);
     Float sc = dict.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
 
-    Image image(alloc);
-    const RGBColorSpace *imageColorSpace = nullptr;
-
     std::string texname = ResolveFilename(dict.GetOneString("imagefile", ""));
-    if (!texname.empty()) {
-        pstd::optional<ImageAndMetadata> imageAndMetadata = Image::Read(texname, alloc);
-        if (imageAndMetadata) {
-            pstd::optional<ImageChannelDesc> rgbDesc = imageAndMetadata->image.GetChannelDesc({"R", "G", "B"});
-            pstd::optional<ImageChannelDesc> yDesc = imageAndMetadata->image.GetChannelDesc({"Y"});
-
-            imageColorSpace = imageAndMetadata->metadata.GetColorSpace();
-
-            if (rgbDesc) {
-                if (yDesc)
-                    ErrorExit("%s: has both \"R\", \"G\", and \"B\" or \"Y\" channels.", texname);
-                image = Image(imageAndMetadata->image.Format(),
-                              imageAndMetadata->image.Resolution(), {"Y"},
-                              imageAndMetadata->image.Encoding(), alloc);
-                for (int y = 0; y < image.Resolution().y; ++y)
-                    for (int x = 0; x < image.Resolution().x; ++x)
-                        image.SetChannel({x, y}, 0, imageAndMetadata->image.GetChannels({x, y}, *rgbDesc).Average());
-            } else if (yDesc)
-                image = imageAndMetadata->image;
-            else
-                ErrorExit(loc, "%s: has neither \"R\", \"G\", and \"B\" or \"Y\" channels.", texname);
-        } else {
-            pstd::vector<float> one = { 1.f };
-            image = Image(std::move(one), {1, 1}, { "Y" });
+    pstd::optional<ImageAndMetadata> imageAndMetadata;
+    if (!texname.empty())
+        imageAndMetadata = Image::Read(texname, alloc);
+    if (imageAndMetadata) {
+        pstd::optional<ImageChannelDesc> rgbDesc = imageAndMetadata->image.GetChannelDesc({"R", "G", "B"});
+        pstd::optional<ImageChannelDesc> yDesc = imageAndMetadata->image.GetChannelDesc({"Y"});
+        if (!rgbDesc && !yDesc)
+            ErrorExit("%s: has neither \"R\", \"G\", and \"B\" or \"Y\" channels.", texname);
+        if (rgbDesc && yDesc)
+            ErrorExit("%s: has both \"R\", \"G\", and \"B\" or \"Y\" channels.", texname);
+        if (rgbDesc) {
+            Image image(imageAndMetadata->image.Format(),
+                        imageAndMetadata->image.Resolution(), {"Y"},
+                        imageAndMetadata->image.Encoding(), alloc);
+            for (int y = 0; y < image.Resolution().y; ++y)
+                for (int x = 0; x < image.Resolution().x; ++x)
+                    image.SetChannel({x, y}, 0, imageAndMetadata->image.GetChannels({x, y}, *rgbDesc).Average());
+            imageAndMetadata->image = std::move(image);
         }
+    } else {
+        pstd::vector<float> one(alloc);
+        one.push_back(1.f);
+        imageAndMetadata->image = Image(std::move(one), {1, 1}, { "Y" });
     }
+
+    const RGBColorSpace *imageColorSpace = imageAndMetadata->metadata.GetColorSpace();
 
     const Float swapYZ[4][4] = { 1, 0, 0, 0,
                                  0, 0, 1, 0,
@@ -600,7 +596,7 @@ GoniometricLight *GoniometricLight::Create(
                                          worldFromLight.endTime);
 
     return alloc.new_object<GoniometricLight>(worldFromLightAnim, medium, I,
-                                              std::move(image),
+                                              std::move(imageAndMetadata->image),
                                               imageColorSpace, alloc);
 }
 
@@ -611,7 +607,7 @@ DiffuseAreaLight::DiffuseAreaLight(const AnimatedTransform &worldFromLight,
                                    pstd::optional<Image> im, const RGBColorSpace *imageColorSpace,
                                    bool twoSided, Allocator alloc)
     : Light(LightType::Area, worldFromLight, mediumInterface),
-      Lemit(Le),
+      Lemit(Le, alloc),
       scale(scale),
       shape(shape),
       twoSided(twoSided),
@@ -750,7 +746,7 @@ std::string DiffuseAreaLight::ToString() const {
 DiffuseAreaLight *DiffuseAreaLight::Create(
     const AnimatedTransform &worldFromLight, const Medium *medium,
     const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-    const FileLoc *loc, Allocator alloc, const ShapeHandle shape) {
+    Allocator alloc, const ShapeHandle shape) {
     SpectrumHandle L = dict.GetOneSpectrum("L", nullptr,
                                             SpectrumType::General, alloc);
     Float scale = dict.GetOneFloat("scale", 1);
@@ -761,14 +757,14 @@ DiffuseAreaLight *DiffuseAreaLight::Create(
     const RGBColorSpace *imageColorSpace = nullptr;
     if (!filename.empty()) {
         if (L != nullptr)
-            ErrorExit(loc, "Both \"L\" and \"imagefile\" specified for DiffuseAreaLight.");
+            ErrorExit("Both \"L\" and \"imagefile\" specified for DiffuseAreaLight.");
         auto im = Image::Read(filename, alloc);
         CHECK(im);
 
         pstd::optional<ImageChannelDesc> channelDesc =
             im->image.GetChannelDesc({ "R", "G", "B" });
         if (!channelDesc)
-            ErrorExit(loc, "%s: Image provided to \"diffuse\" area light must have R, G, and B channels.",
+            ErrorExit("%s: Image provided to \"diffuse\" area light must have R, G, and B channels.",
                       filename);
         image = im->image.SelectChannels(*channelDesc, alloc);
 
@@ -785,7 +781,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(
 UniformInfiniteLight::UniformInfiniteLight(const AnimatedTransform &worldFromLight,
                                            SpectrumHandle L, Allocator alloc)
     : Light(LightType::Infinite, worldFromLight, MediumInterface()),
-      L(L) { }
+      L(L, alloc) { }
 
 SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) const {
     // TODO: is there another Pi or so for the hemisphere?
@@ -973,7 +969,7 @@ SpotLight::SpotLight(const AnimatedTransform &worldFromLight,
                      SpectrumHandle I, Float totalWidth, Float falloffStart,
                      Allocator alloc)
     : Light(LightType::DeltaPosition, worldFromLight, mediumInterface),
-      I(I),
+      I(I, alloc),
       cosFalloffEnd(std::cos(Radians(totalWidth))),
       cosFalloffStart(std::cos(Radians(falloffStart))) {
     CHECK_LE(falloffStart, totalWidth);
@@ -1085,7 +1081,7 @@ std::string SpotLight::ToString() const {
 SpotLight *SpotLight::Create(
     const AnimatedTransform &worldFromLight, const Medium *medium,
     const ParameterDictionary &dict, const RGBColorSpace *colorSpace,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     SpectrumHandle I = dict.GetOneSpectrum("I", &colorSpace->illuminant,
                                            SpectrumType::General, alloc);
     Float sc = dict.GetOneFloat("scale", 1);
@@ -1184,7 +1180,7 @@ pstd::optional<LightLeSample> LightHandle::Sample_Le(const Point2f &u1, const Po
 
 void LightHandle::Pdf_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     // Note shouldn't be called for area lights..
-    CHECK((((const Light *)ptr())->type != LightType::Area));
+    CHECK(!(((const Light *)ptr())->type != LightType::Area));
 
     switch (Tag()) {
     case TypeIndex<PointLight>():
@@ -1270,24 +1266,24 @@ void LightHandle::Pdf_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
 LightHandle LightHandle::Create(const std::string &name,
                                 const ParameterDictionary &dict,
                                 const AnimatedTransform &worldFromLight,
-                                const Medium *outsideMedium, const FileLoc *loc,
+                                const Medium *outsideMedium, FileLoc loc,
                                 Allocator alloc) {
     LightHandle light = nullptr;
     if (name == "point")
         light = PointLight::Create(worldFromLight, outsideMedium, dict,
-                                   dict.ColorSpace(), loc, alloc);
+                                   dict.ColorSpace(), alloc);
     else if (name == "spot")
         light = SpotLight::Create(worldFromLight, outsideMedium, dict,
-                                  dict.ColorSpace(), loc, alloc);
+                                  dict.ColorSpace(), alloc);
     else if (name == "goniometric")
         light = GoniometricLight::Create(worldFromLight, outsideMedium,
-                                         dict, dict.ColorSpace(), loc, alloc);
+                                         dict, dict.ColorSpace(), alloc);
     else if (name == "projection")
         light = ProjectionLight::Create(worldFromLight, outsideMedium,
-                                        dict, loc, alloc);
+                                        dict, alloc);
     else if (name == "distant")
         light = DistantLight::Create(worldFromLight, dict, dict.ColorSpace(),
-                                     loc, alloc);
+                                     alloc);
     else if (name == "infinite") {
         const RGBColorSpace *colorSpace = dict.ColorSpace();
         std::vector<SpectrumHandle > L = dict.GetSpectrumArray("L", SpectrumType::General, alloc);
@@ -1302,7 +1298,7 @@ LightHandle LightHandle::Create(const std::string &name,
 
         if (!L.empty()) {
             if (!filename.empty())
-                ErrorExit(loc, "Can't specify both emission \"L\" and \"imagefile\" with InfiniteAreaLight");
+                ErrorExit(&loc, "Can't specify both emission \"L\" and \"imagefile\" with InfiniteAreaLight");
 
             if (scale != 1) {
                 SpectrumHandle Ls = alloc.new_object<ScaledSpectrum>(scale, L[0]);
@@ -1319,7 +1315,7 @@ LightHandle LightHandle::Create(const std::string &name,
             pstd::optional<ImageChannelDesc> channelDesc =
                 imageAndMetadata->image.GetChannelDesc({ "R", "G", "B" });
             if (!channelDesc)
-                ErrorExit(loc, "%s: image provided to \"infinite\" light must have R, G, and B channels.",
+                ErrorExit(&loc, "%s: image provided to \"infinite\" light must have R, G, and B channels.",
                           filename);
             Image image = imageAndMetadata->image.SelectChannels(*channelDesc, alloc);
 
@@ -1328,10 +1324,10 @@ LightHandle LightHandle::Create(const std::string &name,
         }
     }
     else
-        ErrorExit(loc, "%s: light type unknown.", name);
+        ErrorExit(&loc, "%s: light type unknown.", name);
 
     if (!light)
-        ErrorExit(loc, "%s: unable to create light.", name);
+        ErrorExit(&loc, "%s: unable to create light.", name);
 
     dict.ReportUnused();
     return light;
@@ -1341,17 +1337,17 @@ LightHandle LightHandle::CreateArea(const std::string &name,
                                     const ParameterDictionary &dict,
                                     const AnimatedTransform &worldFromLight,
                                     const MediumInterface &mediumInterface,
-                                    const ShapeHandle shape, const FileLoc *loc,
+                                    const ShapeHandle shape, FileLoc loc,
                                     Allocator alloc) {
     LightHandle area = nullptr;
     if (name == "diffuse")
         area = DiffuseAreaLight::Create(worldFromLight, mediumInterface.outside,
-                                        dict, dict.ColorSpace(), loc, alloc, shape);
+                                        dict, dict.ColorSpace(), alloc, shape);
     else
-        ErrorExit(loc, "%s: area light type unknown.", name);
+        ErrorExit(&loc, "%s: area light type unknown.", name);
 
     if (!area)
-        ErrorExit(loc, "%s: unable to create area light.", name);
+        ErrorExit(&loc, "%s: unable to create area light.", name);
 
     dict.ReportUnused();
     return area;

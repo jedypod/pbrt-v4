@@ -37,7 +37,6 @@
 #include <pbrt/base.h>
 #include <pbrt/bsdf.h>
 #include <pbrt/bssrdf.h>
-#include <pbrt/cameras.h>
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
 #include <pbrt/integrators.h>
@@ -74,9 +73,6 @@ namespace pbrt {
 
 STAT_COUNTER("Integrator/Camera rays traced", nCameraRays);
 
-// Integrator Method Definitions
-Integrator::~Integrator() {}
-
 
 // ImageTileIntegrator Method Definitions
 void ImageTileIntegrator::Render() {
@@ -94,11 +90,11 @@ void ImageTileIntegrator::Render() {
         int sampleIndex = (*c)[2];
 
         MemoryArena arena;
-        MaterialBuffer materialBuffer(16384);
-        SamplerHandle tileSampler = initialSampler.Clone(1, Allocator())[0];
-        tileSampler.StartPixelSample(pPixel, sampleIndex);
+        MaterialBuffer materialBuffer;
+        std::unique_ptr<Sampler> tileSampler = initialSampler->Clone();
+        tileSampler->StartPixelSample(pPixel, sampleIndex);
 
-        EvaluatePixelSample(pPixel, sampleIndex, tileSampler, arena, materialBuffer);
+        EvaluatePixelSample(pPixel, sampleIndex, *tileSampler, arena, materialBuffer);
 
         return;
     }
@@ -121,15 +117,14 @@ void ImageTileIntegrator::Render() {
 
     Vector2i pixelExtent = pixelBounds.Diagonal();
 
-    int spp = initialSampler.SamplesPerPixel();
+    int spp = initialSampler->samplesPerPixel;
     ProgressReporter reporter(int64_t(spp) * pixelBounds.Area(), "Rendering");
     int startWave = 0, endWave = 1, waveDelta = 1;
     std::vector<MemoryArena> arenas(MaxThreadIndex());
     std::vector<MaterialBuffer> materialBuffers(MaxThreadIndex());
-    for (auto &m : materialBuffers)
-        m = MaterialBuffer(16384);
-    std::vector<SamplerHandle> samplers =
-        initialSampler.Clone(MaxThreadIndex(), Allocator());
+    std::vector<std::unique_ptr<Sampler>> samplers(MaxThreadIndex());
+    for (auto &s : samplers)
+        s = initialSampler->Clone();
 
     pstd::optional<Image> referenceImage;
     FILE *mseOutFile = nullptr;
@@ -180,10 +175,10 @@ void ImageTileIntegrator::Render() {
                     threadSampleIndex = sampleIndex;
 
                     // Get sampler instance for tile
-                    SamplerHandle &sampler = samplers[ThreadIndex];
-                    sampler.StartPixelSample(pPixel, sampleIndex);
+                    std::unique_ptr<Sampler> &sampler = samplers[ThreadIndex];
+                    sampler->StartPixelSample(pPixel, sampleIndex);
 
-                    EvaluatePixelSample(pPixel, sampleIndex, sampler, arena,
+                    EvaluatePixelSample(pPixel, sampleIndex, *sampler, arena,
                                         materialBuffer);
 
                     // Free _MemoryArena_ memory from computing image sample
@@ -230,10 +225,10 @@ void ImageTileIntegrator::Render() {
 }
 
 void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
-                                        SamplerHandle sampler, MemoryArena &arena,
+                                        Sampler &sampler, MemoryArena &arena,
                                         MaterialBuffer &materialBuffer) {
     // Initialize _CameraSample_ for current sample
-    CameraSample cameraSample = sampler.GetCameraSample(pPixel, camera->film->filter);
+    CameraSample cameraSample = sampler.GetCameraSample(*camera->film->filter);
 
     // Sample wavelengths for the ray
     Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel.x, pPixel.y);
@@ -249,7 +244,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
     pstd::optional<VisibleSurface> visibleSurface;
     if (cameraRay) {
         Float rayDiffScale =
-            std::max<Float>(.125, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
+            std::max<Float>(.125, 1 / std::sqrt((Float)sampler.samplesPerPixel));
         if (!PbrtOptions.disablePixelJitter)
             cameraRay->ray.ScaleDifferentials(rayDiffScale);
         ++nCameraRays;
@@ -263,7 +258,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
             LOG_ERROR("Not-a-number radiance value returned for pixel (%d, %d), sample %d. "
                       "Setting to black.", pPixel.x, pPixel.y, sampleIndex);
             L = SampledSpectrum(0.f);
-        } else if (std::isinf(L.y(lambda))) {
+        } else if (std::isinf(L.y(lambda, SPDs::Y()))) {
             LOG_ERROR("Infinite radiance value returned for pixel (%d, %d), sample %d. "
                       "Setting to black.", pPixel.x, pPixel.y, sampleIndex);
             L = SampledSpectrum(0.f);
@@ -282,7 +277,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
 
 // Integrator Utility Functions
 SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
-                   SamplerHandle sampler, const Interaction &p0, const Interaction &p1) {
+                   Sampler &sampler, const Interaction &p0, const Interaction &p1) {
     Ray ray = p0.SpawnRayTo(p1);
     SampledSpectrum Tr(1.f);
     if (LengthSquared(ray.d) == 0) return Tr;
@@ -290,7 +285,7 @@ SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
     while (true) {
         pstd::optional<ShapeIntersection> si = scene.Intersect(ray, 1 - ShadowEpsilon);
         // Handle opaque surface along ray's path
-        if (si && si->intr.material)
+        if (si && *si->intr.material != nullptr)
             return SampledSpectrum(0.0f);
 
         // Update transmittance for current ray segment
@@ -307,7 +302,7 @@ SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
 
 SampledSpectrum LdSampleLights(const SurfaceInteraction &intr, const Scene &scene,
                                const SampledWavelengths &lambda,
-                               SamplerHandle sampler, MemoryArena &arena,
+                               Sampler &sampler, MemoryArena &arena,
                                const LightSampler &lightSampler,
                                bool handleMedia) {
     ProfilerScope _(ProfilePhase::DirectLighting);
@@ -359,7 +354,7 @@ SampledSpectrum LdSampleLights(const SurfaceInteraction &intr, const Scene &scen
 
 SampledSpectrum LdSampleLights(const MediumInteraction &intr, const Scene &scene,
                                const SampledWavelengths &lambda,
-                               SamplerHandle sampler, MemoryArena &arena,
+                               Sampler &sampler, MemoryArena &arena,
                                const LightSampler &lightSampler) {
     ProfilerScope _(ProfilePhase::DirectLighting);
 
@@ -404,7 +399,7 @@ SampledSpectrum LdSampleLights(const MediumInteraction &intr, const Scene &scene
 
 SampledSpectrum LdSampleLightsAndBSDF(const SurfaceInteraction &intr, const Scene &scene,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler, MemoryArena &arena,
+                                      Sampler &sampler, MemoryArena &arena,
                                       const LightSampler &lightSampler) {
     SampledSpectrum Ld = LdSampleLights(intr, scene, lambda, sampler,
                                         arena, lightSampler);
@@ -429,9 +424,8 @@ SampledSpectrum LdSampleLightsAndBSDF(const SurfaceInteraction &intr, const Scen
                 Ld += f * Le / bs->pdf;
             else {
                 // Compute MIS pdf...
-                LightHandle areaLight(si->intr.areaLight);
-                Float lightPDF = lightSampler.PDF(intr, areaLight) *
-                    areaLight.Pdf_Li(intr, wi);
+                Float lightPDF = lightSampler.PDF(intr, *si->intr.areaLight) *
+                    si->intr.areaLight->Pdf_Li(intr, wi);
                 Float bsdfPDF = intr.bsdf->PDFIsApproximate() ?
                     intr.bsdf->PDF(intr.wo, wi) : bs->pdf;
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
@@ -460,7 +454,7 @@ SampledSpectrum LdSampleLightsAndBSDF(const SurfaceInteraction &intr, const Scen
 // WhittedIntegrator Method Definitions
 SampledSpectrum WhittedIntegrator::Li(RayDifferential ray,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler,
+                                      Sampler &sampler,
                                       MemoryArena &arena,
                                       MaterialBuffer &materialBuffer,
                                       pstd::optional<VisibleSurface> *visibleSurface) const {
@@ -469,7 +463,7 @@ SampledSpectrum WhittedIntegrator::Li(RayDifferential ray,
 
 SampledSpectrum WhittedIntegrator::WhittedLi(RayDifferential ray,
                                              const SampledWavelengths &lambda,
-                                             SamplerHandle sampler,
+                                             Sampler &sampler,
                                              MemoryArena &arena,
                                              MaterialBuffer &materialBuffer,
                                              int depth) const {
@@ -530,7 +524,7 @@ std::string WhittedIntegrator::ToString() const {
 
 std::unique_ptr<WhittedIntegrator> WhittedIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     return std::make_unique<WhittedIntegrator>(maxDepth, scene, std::move(camera),
                                                std::move(sampler));
@@ -541,7 +535,7 @@ std::unique_ptr<WhittedIntegrator> WhittedIntegrator::Create(
 SimplePathIntegrator::SimplePathIntegrator(int maxDepth, bool sampleLights, bool sampleBSDF,
                                            const Scene &scene,
                                            std::unique_ptr<const Camera> c,
-                                           SamplerHandle sampler)
+                                           std::unique_ptr<Sampler> sampler)
     : RayIntegrator(scene, std::move(c), std::move(sampler)),
       maxDepth(maxDepth),
       sampleLights(sampleLights),
@@ -551,7 +545,7 @@ SimplePathIntegrator::SimplePathIntegrator(int maxDepth, bool sampleLights, bool
 
 SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray,
                                          const SampledWavelengths &lambda,
-                                         SamplerHandle sampler,
+                                         Sampler &sampler,
                                          MemoryArena &arena,
                                          MaterialBuffer &materialBuffer,
                                          pstd::optional<VisibleSurface> *visibleSurface) const {
@@ -631,8 +625,8 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray,
         if (sampleLights && !specularBounce && depth + 1 == maxDepth)
             break;
 
-        CHECK_GE(beta.y(lambda), 0.f);
-        DCHECK(!std::isinf(beta.y(lambda)));
+        CHECK_GE(beta.y(lambda, SPDs::Y()), 0.f);
+        DCHECK(!std::isinf(beta.y(lambda, SPDs::Y())));
     }
 
     return L;
@@ -645,7 +639,7 @@ std::string SimplePathIntegrator::ToString() const {
 
 std::unique_ptr<SimplePathIntegrator> SimplePathIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     bool sampleLights = dict.GetOneBool("samplelights", true);
     bool sampleBSDF = dict.GetOneBool("samplebsdf", true);
@@ -657,14 +651,14 @@ std::unique_ptr<SimplePathIntegrator> SimplePathIntegrator::Create(
 // LightPathIntegrator Method Definitions
 LightPathIntegrator::LightPathIntegrator(int maxDepth, const Scene &scene,
                                          std::unique_ptr<const Camera> c,
-                                         SamplerHandle sampler)
+                                         std::unique_ptr<Sampler> sampler)
     : ImageTileIntegrator(scene, std::move(c), std::move(sampler)),
       maxDepth(maxDepth) {
     lightSampler = std::make_unique<PowerLightSampler>(scene.lights, Allocator());
 }
 
 void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
-                                              SamplerHandle sampler, MemoryArena &arena,
+                                              Sampler &sampler, MemoryArena &arena,
                                               MaterialBuffer &materialBuffer) {
     // Eat the first two samples since they're "special"...
     (void)sampler.Get2D();
@@ -753,7 +747,7 @@ std::string LightPathIntegrator::ToString() const {
 
 std::unique_ptr<LightPathIntegrator> LightPathIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     return std::make_unique<LightPathIntegrator>(maxDepth, scene, std::move(camera),
                                                   std::move(sampler));
@@ -767,7 +761,7 @@ STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 // PathIntegrator Method Definitions
 PathIntegrator::PathIntegrator(int maxDepth, const Scene &scene,
                                std::unique_ptr<const Camera> c,
-                               SamplerHandle sampler,
+                               std::unique_ptr<Sampler> sampler,
                                Float rrThreshold,
                                const std::string &lightSampleStrategy,
                                bool regularize)
@@ -779,7 +773,7 @@ PathIntegrator::PathIntegrator(int maxDepth, const Scene &scene,
 
 SampledSpectrum PathIntegrator::Li(RayDifferential ray,
                                    const SampledWavelengths &lambda,
-                                   SamplerHandle sampler,
+                                   Sampler &sampler,
                                    MemoryArena &arena,
                                    MaterialBuffer &materialBuffer,
                                    pstd::optional<VisibleSurface> *visibleSurface) const {
@@ -810,9 +804,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
                 }
                 else {
                     // Compute MIS pdf...
-                    LightHandle areaLight(si->intr.areaLight);
-                    Float lightPDF = lightSampler->PDF(prevIntr, areaLight) *
-                        areaLight.Pdf_Li(prevIntr, ray.d);
+                    Float lightPDF = lightSampler->PDF(prevIntr, *si->intr.areaLight) *
+                        si->intr.areaLight->Pdf_Li(prevIntr, ray.d);
                     Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
                     // beta already includes 1 / bsdf pdf.
                     L += beta * weight * Le;
@@ -874,7 +867,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
                 (*visibleSurface)->Ld = beta * Ld;
             VLOG(2, "Sampled direct lighting Ld = %s", Ld);
             if (!Ld) ++zeroRadiancePaths;
-            CHECK_GE(Ld.y(lambda), 0.f);
+            CHECK_GE(Ld.y(lambda, SPDs::Y()), 0.f);
             L += beta * Ld;
         }
 
@@ -888,8 +881,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
         bsdfPDF = bsdf->PDFIsApproximate() ? bsdf->PDF(wo, bs->wi) : bs->pdf;
 
         VLOG(2, "Updated beta = %s", beta);
-        CHECK_GE(beta.y(lambda), 0.f);
-        DCHECK(!std::isinf(beta.y(lambda)));
+        CHECK_GE(beta.y(lambda, SPDs::Y()), 0.f);
+        DCHECK(!std::isinf(beta.y(lambda, SPDs::Y())));
         specularBounce = bs->IsSpecular();
         anyNonSpecularBounces |= !bs->IsSpecular();
         if (bs->IsTransmission())
@@ -898,43 +891,14 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
         ray = isect.SpawnRay(ray, bs->wi, bs->flags);
 
         // Account for subsurface scattering, if applicable
-        if (isect.bssrdf && bs->IsTransmission()) {
+        if (isect.bssrdf != nullptr && bs->IsTransmission()) {
             // Importance sample the BSSRDF
-            pstd::optional<BSSRDFProbeSegment> probeSeg =
-                isect.bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
-            if (!probeSeg)
-                break;
+            pstd::optional<BSSRDFSample> bssrdfSample =
+                isect.bssrdf->Sample_S(scene, sampler.Get1D(), sampler.Get2D(), materialBuffer);
+            if (!bssrdfSample) break;
+            beta *= bssrdfSample->S / bssrdfSample->pdf;
 
-            uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
-            WeightedReservoirSampler<SurfaceInteraction, Float> interactionSampler(seed);
-
-            // Intersect BSSRDF sampling ray against the scene geometry
-            Interaction base(probeSeg->p0, probeSeg->time, (const Medium *)nullptr);
-            while (true) {
-                Ray r = base.SpawnRayTo(probeSeg->p1);
-                if (r.d == Vector3f(0, 0, 0))
-                    break;
-
-                pstd::optional<ShapeIntersection> si = scene.Intersect(r, 1);
-                if (!si)
-                    break;
-
-                base = si->intr;
-                if (si->intr.material == isect.material)
-                    interactionSampler.Add(si->intr, 1.f);
-            }
-
-            if (!interactionSampler.HasSample())
-                break;
-
-            BSSRDFSample bssrdfSample =
-                isect.bssrdf.ProbeIntersectionToSample(interactionSampler.GetSample(),
-                                                       materialBuffer);
-            if (!bssrdfSample.S || bssrdfSample.pdf == 0)
-                break;
-            beta *= bssrdfSample.S * interactionSampler.WeightSum() / bssrdfSample.pdf;
-
-            const SurfaceInteraction &pi = bssrdfSample.si;
+            const SurfaceInteraction &pi = bssrdfSample->si;
             anyNonSpecularBounces = true;
             if (regularize) {
                 ++regularizedBSDFs;
@@ -955,7 +919,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
             if (!bs) break;
             beta *= bs->f * AbsDot(bs->wi, pi.shading.n) / bs->pdf;
             bsdfPDF = pi.bsdf->PDFIsApproximate() ? pi.bsdf->PDF(wo, bs->wi) : bs->pdf;
-            DCHECK(!std::isinf(beta.y(lambda)));
+            DCHECK(!std::isinf(beta.y(lambda, SPDs::Y())));
             specularBounce = bs->IsSpecular();
             ray = RayDifferential(pi.SpawnRay(bs->wi));
         }
@@ -968,7 +932,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray,
             Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
             if (sampler.Get1D() < q) break;
             beta /= 1 - q;
-            DCHECK(!std::isinf(beta.y(lambda)));
+            DCHECK(!std::isinf(beta.y(lambda, SPDs::Y())));
         }
     }
     ReportValue(pathLength, depth);
@@ -983,7 +947,7 @@ std::string PathIntegrator::ToString() const {
 
 std::unique_ptr<PathIntegrator> PathIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     Float rrThreshold = dict.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
@@ -1001,7 +965,7 @@ STAT_COUNTER("Integrator/Surface interactions", surfaceInteractions);
 // VolPathIntegrator Method Definitions
 SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler,
+                                      Sampler &sampler,
                                       MemoryArena &arena,
                                       MaterialBuffer &materialBuffer,
                                       pstd::optional<VisibleSurface> *visibleSurface) const {
@@ -1068,9 +1032,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
                         L += beta * Le;
                     else {
                         // Compute MIS pdf...
-                        LightHandle areaLight(si->intr.areaLight);
-                        Float lightPDF = lightSampler->PDF(prevIntr, areaLight) *
-                            areaLight.Pdf_Li(prevIntr, ray.d);
+                        Float lightPDF = lightSampler->PDF(prevIntr, *si->intr.areaLight) *
+                            si->intr.areaLight->Pdf_Li(prevIntr, ray.d);
                         Float weight = PowerHeuristic(1, scatterPDF, 1, lightPDF);
                         // beta already includes 1 / bsdf pdf.
                         L += beta * weight * Le;
@@ -1131,7 +1094,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
             VLOG(2, "Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs->f, bs->pdf, beta);
             scatterPDF = isect.bsdf->PDFIsApproximate() ? isect.bsdf->PDF(wo, bs->wi) : bs->pdf;
 
-            DCHECK(std::isinf(beta.y(lambda)) == false);
+            DCHECK(std::isinf(beta.y(lambda, SPDs::Y())) == false);
             specularBounce = bs->IsSpecular();
             anyNonSpecularBounces |= !bs->IsSpecular();
             if (bs->IsTransmission())
@@ -1140,44 +1103,14 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
             ray = isect.SpawnRay(ray, bs->wi, bs->flags);
 
             // Account for attenuated subsurface scattering, if applicable
-            if (isect.bssrdf && bs->IsTransmission()) {
+            if (isect.bssrdf != nullptr && bs->IsTransmission()) {
                 // Importance sample the BSSRDF
-                // Importance sample the BSSRDF
-                pstd::optional<BSSRDFProbeSegment> probeSeg =
-                    isect.bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
-                if (!probeSeg)
-                    break;
+                pstd::optional<BSSRDFSample> bssrdfSample =
+                    isect.bssrdf->Sample_S(scene, sampler.Get1D(), sampler.Get2D(), materialBuffer);
+                if (!bssrdfSample) break;
+                beta *= bssrdfSample->S / bssrdfSample->pdf;
 
-                uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
-                WeightedReservoirSampler<SurfaceInteraction, Float> interactionSampler(seed);
-
-                // Intersect BSSRDF sampling ray against the scene geometry
-                Interaction base(probeSeg->p0, probeSeg->time, (const Medium *)nullptr);
-                while (true) {
-                    Ray r = base.SpawnRayTo(probeSeg->p1);
-                    if (r.d == Vector3f(0, 0, 0))
-                        break;
-
-                    pstd::optional<ShapeIntersection> si = scene.Intersect(r, 1);
-                    if (!si)
-                        break;
-
-                    base = si->intr;
-                    if (si->intr.material == isect.material)
-                        interactionSampler.Add(si->intr, 1.f);
-                }
-
-                if (!interactionSampler.HasSample())
-                    break;
-
-                BSSRDFSample bssrdfSample =
-                    isect.bssrdf.ProbeIntersectionToSample(interactionSampler.GetSample(),
-                                                           materialBuffer);
-                if (!bssrdfSample.S || bssrdfSample.pdf == 0)
-                    break;
-                beta *= bssrdfSample.S * interactionSampler.WeightSum() / bssrdfSample.pdf;
-
-                const SurfaceInteraction &pi = bssrdfSample.si;
+                const SurfaceInteraction &pi = bssrdfSample->si;
                 anyNonSpecularBounces = true;
                 if (regularize) {
                     ++regularizedBSDFs;
@@ -1199,7 +1132,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
                 beta *= bs->f * AbsDot(bs->wi, pi.shading.n) / bs->pdf;
                 scatterPDF = bs->pdf;
 
-                DCHECK(!std::isinf(beta.y(lambda)));
+                DCHECK(!std::isinf(beta.y(lambda, SPDs::Y())));
                 specularBounce = bs->IsSpecular();
                 ray = RayDifferential(pi.SpawnRay(bs->wi));
             }
@@ -1214,7 +1147,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray,
             if (sampler.Get1D() < q) break;
             beta /= 1 - q;
             VLOG(2, "RR didn't happen, beta = %f", beta);
-            DCHECK(std::isinf(beta.y(lambda)) == false);
+            DCHECK(std::isinf(beta.y(lambda, SPDs::Y())) == false);
         }
     }
     ReportValue(pathLength, depth);
@@ -1229,7 +1162,7 @@ std::string VolPathIntegrator::ToString() const {
 
 std::unique_ptr<VolPathIntegrator> VolPathIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     Float rrThreshold = dict.GetOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
@@ -1244,13 +1177,13 @@ std::unique_ptr<VolPathIntegrator> VolPathIntegrator::Create(
 // AOIntegrator Method Definitions
 AOIntegrator::AOIntegrator(bool cosSample, Float maxDist, const Scene &scene,
                            std::unique_ptr<const Camera> c,
-                           SamplerHandle sampler, SpectrumHandle illuminant)
+                           std::unique_ptr<Sampler> sampler, SpectrumHandle illuminant)
     : RayIntegrator(scene, std::move(c), std::move(sampler)),
       cosSample(cosSample), maxDist(maxDist), illuminant(illuminant) {}
 
 SampledSpectrum AOIntegrator::Li(
     RayDifferential ray, const SampledWavelengths &lambda,
-    SamplerHandle sampler, MemoryArena &arena,
+    Sampler &sampler, MemoryArena &arena,
     MaterialBuffer &materialBuffer,
     pstd::optional<VisibleSurface> *visibleSurface) const {
     ProfilerScope p(ProfilePhase::RayIntegratorLi);
@@ -1305,18 +1238,20 @@ std::string AOIntegrator::ToString() const {
 
 std::unique_ptr<AOIntegrator> AOIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene, SpectrumHandle illuminant,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     bool cosSample = dict.GetOneBool("cossample", true);
     Float maxDist = dict.GetOneFloat("maxdistance", Infinity);
     return std::make_unique<AOIntegrator>(cosSample, maxDist, scene, std::move(camera),
                                           std::move(sampler), illuminant);
 }
 
+#ifdef PBRT_DISABLE_BDPT_MLT
+
 // EndpointInteraction Declarations
 struct EndpointInteraction : Interaction {
     union {
         const Camera *camera;
-        LightHandle light;
+        LightHandle *light;
     };
     // EndpointInteraction Public Methods
     EndpointInteraction() : Interaction(), light(nullptr) {}
@@ -1324,24 +1259,17 @@ struct EndpointInteraction : Interaction {
         : Interaction(it), camera(camera) {}
     EndpointInteraction(const Camera *camera, const Ray &ray)
         : Interaction(ray.o, ray.time, ray.medium), camera(camera) {}
-    EndpointInteraction(LightHandle light, const Ray &r, const Interaction &intr)
+    EndpointInteraction(LightHandle *light, const Ray &r, const Interaction &intr)
         : Interaction(intr), light(light) {
     }
-    EndpointInteraction(LightHandle light, const Ray &r)
+    EndpointInteraction(LightHandle *light, const Ray &r)
         : Interaction(r.o, r.time, r.medium), light(light) {
     }
-    EndpointInteraction(const Interaction &it, LightHandle light)
-        : Interaction(it), light(light) {
-    }
+    EndpointInteraction(const Interaction &it, LightHandle *light)
+        : Interaction(it), light(light) {}
     EndpointInteraction(const Ray &ray)
         : Interaction(ray(1), Normal3f(-ray.d), ray.time, ray.medium),
           light(nullptr) {
-    }
-
-    EndpointInteraction(const EndpointInteraction &ei)
-        : Interaction(ei), camera(ei.camera) {
-        static_assert(sizeof(LightHandle) == sizeof(Camera *),
-                      "Expect both union members have same size");
     }
 };
 
@@ -1507,7 +1435,7 @@ struct Vertex {
                 Le += light.Le(Ray(p(), -w), lambda);
             return Le;
         } else {
-            return si.areaLight ? si.areaLight.L(si, w, lambda) : SampledSpectrum(0.);
+            return si.areaLight->L(si, w, lambda);
         }
     }
 
@@ -1598,17 +1526,17 @@ struct Vertex {
             pdf = 1 / (Pi * worldRadius * worldRadius);
         } else if (IsOnSurface()) {
             if (type == VertexType::Light)
-                CHECK(ei.light.Is<DiffuseAreaLight>()); // since that's all we've got currently...
+                CHECK(ei.light->Is<DiffuseAreaLight>()); // since that's all we've got currently...
 
-            LightHandle light = (type == VertexType::Light) ? ei.light : si.areaLight;
+            LightHandle light = (type == VertexType::Light) ? *ei.light : *si.areaLight;
             Float pdfPos, pdfDir;
             light.Pdf_Le(ei, w, &pdfPos, &pdfDir);
             pdf = pdfDir * invDist2;
         } else {
             // Get pointer _light_ to the light source at the vertex
             CHECK(type == VertexType::Light);
-            CHECK(ei.light != nullptr);
-            LightHandle light = ei.light;
+            CHECK(ei.light != nullptr && *ei.light != nullptr);
+            LightHandle light = *ei.light;
 
             // Compute sampling density for non-infinite light sources
             Float pdfPos, pdfDir;
@@ -1628,9 +1556,10 @@ struct Vertex {
             return InfiniteLightDensity(scene, lightSampler, w);
         } else if (IsOnSurface()) {
             if (type == VertexType::Light)
-                CHECK(ei.light.Is<DiffuseAreaLight>()); // since that's all we've got currently...
+                CHECK(ei.light->Is<DiffuseAreaLight>()); // since that's all we've got currently...
 
-            LightHandle light = (type == VertexType::Light) ? ei.light : si.areaLight;
+            const AreaLight *light = (type == VertexType::Light) ?
+                (const AreaLight *)ei.light : si.areaLight;
             Float pdfChoice = lightSampler.PDF(light);
             Float pdfPos, pdfDir;
             light.Pdf_Le(ei, w, &pdfPos, &pdfDir);
@@ -1643,7 +1572,7 @@ struct Vertex {
             CHECK(IsLight());
             LightHandle light = type == VertexType::Light
                                      ? ei.light
-                                     : si.areaLight;
+                                     : *si.areaLight;
             CHECK(light != nullptr);
 
             // Compute the discrete probability of sampling _light_, _pdfChoice_
@@ -1656,12 +1585,12 @@ struct Vertex {
 
 int GenerateCameraSubpath(const RayDifferential &ray, const Scene &scene,
                           const SampledWavelengths &lambda,
-                          SamplerHandle sampler, MemoryArena &arena,
+                          Sampler &sampler, MemoryArena &arena,
                           MaterialBuffer &materialBuffer, int maxDepth,
                           const Camera &camera, Vertex *path, bool regularize);
 
 int GenerateLightSubpath(
-    const Scene &scene, const SampledWavelengths &lambda, SamplerHandle sampler,
+    const Scene &scene, const SampledWavelengths &lambda, Sampler &sampler,
     const Camera &camera, MemoryArena &arena, MaterialBuffer &materialBuffer,
     int maxDepth, Float time,
     const FixedLightSampler &lightSampler, Vertex *path, bool regularize);
@@ -1670,7 +1599,7 @@ SampledSpectrum ConnectBDPT(
     const Scene &scene, const SampledWavelengths &lambda,
     Vertex *lightVertices, Vertex *cameraVertices, int s,
     int t, const FixedLightSampler &lightSampler,
-    const Camera &camera, SamplerHandle sampler, pstd::optional<Point2f> *pRaster,
+    const Camera &camera, Sampler &sampler, pstd::optional<Point2f> *pRaster,
     Float *misWeight = nullptr);
 
 // Vertex Inline Method Definitions
@@ -1724,7 +1653,7 @@ inline Vertex Vertex::CreateLight(const EndpointInteraction &ei,
 
 // BDPT Forward Declarations
 int RandomWalk(const Scene &scene, const SampledWavelengths &lambda,
-               RayDifferential ray, SamplerHandle sampler, const Camera &camera,
+               RayDifferential ray, Sampler &sampler, const Camera &camera,
                MemoryArena &arena, MaterialBuffer &materialBuffer,
                SampledSpectrum beta, Float pdf,
                int maxDepth, TransportMode mode, Vertex *path,
@@ -1733,7 +1662,7 @@ int RandomWalk(const Scene &scene, const SampledWavelengths &lambda,
 // BDPT Utility Functions
 int GenerateCameraSubpath(const RayDifferential &ray, const Scene &scene,
                           const SampledWavelengths &lambda,
-                          SamplerHandle sampler, MemoryArena &arena,
+                          Sampler &sampler, MemoryArena &arena,
                           MaterialBuffer &materialBuffer, int maxDepth,
                           const Camera &camera, Vertex *path, bool regularize) {
     if (maxDepth == 0) return 0;
@@ -1753,7 +1682,7 @@ int GenerateCameraSubpath(const RayDifferential &ray, const Scene &scene,
 }
 
 int GenerateLightSubpath(
-    const Scene &scene, const SampledWavelengths &lambda, SamplerHandle sampler,
+    const Scene &scene, const SampledWavelengths &lambda, Sampler &sampler,
     const Camera &camera, MemoryArena &arena, MaterialBuffer &materialBuffer,
     int maxDepth, Float time,
     const FixedLightSampler &lightSampler, Vertex *path, bool regularize) {
@@ -1799,7 +1728,7 @@ int GenerateLightSubpath(
 }
 
 int RandomWalk(const Scene &scene, const SampledWavelengths &lambda,
-               RayDifferential ray, SamplerHandle sampler, const Camera &camera,
+               RayDifferential ray, Sampler &sampler, const Camera &camera,
                MemoryArena &arena, MaterialBuffer &materialBuffer,
                SampledSpectrum beta, Float pdf,
                int maxDepth, TransportMode mode, Vertex *path,
@@ -1891,7 +1820,7 @@ int RandomWalk(const Scene &scene, const SampledWavelengths &lambda,
     return bounces;
 }
 
-SampledSpectrum G(const Scene &scene, SamplerHandle sampler, const Vertex &v0,
+SampledSpectrum G(const Scene &scene, Sampler &sampler, const Vertex &v0,
                   const Vertex &v1, const SampledWavelengths &lambda) {
     Vector3f d = v0.p() - v1.p();
     Float g = 1 / LengthSquared(d);
@@ -1975,7 +1904,7 @@ inline int BufferIndex(int s, int t) {
 }
 
 void BDPTIntegrator::Render() {
-    lightSampler = std::make_unique<PowerLightSampler>(scene.lights, Allocator());
+    lightSampler = std::make_unique<PowerLightSampler>(scene, Allocator());
 
     // Allocate buffers for debug visualization
     if (visualizeStrategies || visualizeWeights) {
@@ -1992,7 +1921,7 @@ void BDPTIntegrator::Render() {
                 weightFilms[BufferIndex(s, t)] = std::make_unique<RGBFilm>(
                     camera->film->fullResolution,
                     Bounds2i(Point2i(0, 0), camera->film->fullResolution),
-                    new BoxFilter,  // FIXME: leak
+                    pstd::make_unique<BoxFilter>(),
                     camera->film->diagonal * 1000, filename, 1.f, RGBColorSpace::sRGB);
             }
         }
@@ -2002,7 +1931,7 @@ void BDPTIntegrator::Render() {
 
     // Write buffers for debug visualization
     if (visualizeStrategies || visualizeWeights) {
-        const Float invSampleCount = 1.0f / initialSampler.SamplesPerPixel();
+        const Float invSampleCount = 1.0f / initialSampler->samplesPerPixel;
         for (size_t i = 0; i < weightFilms.size(); ++i) {
             ImageMetadata metadata;
             if (weightFilms[i]) weightFilms[i]->WriteImage(metadata,
@@ -2014,7 +1943,7 @@ void BDPTIntegrator::Render() {
 
 SampledSpectrum BDPTIntegrator::Li(RayDifferential ray,
                                    const SampledWavelengths &lambda,
-                                   SamplerHandle sampler,
+                                   Sampler &sampler,
                                    MemoryArena &arena,
                                    MaterialBuffer &materialBuffer,
                                    pstd::optional<VisibleSurface> *visibleSurface) const {
@@ -2075,7 +2004,7 @@ SampledSpectrum ConnectBDPT(
     const Scene &scene, const SampledWavelengths &lambda,
     Vertex *lightVertices, Vertex *cameraVertices, int s,
     int t, const FixedLightSampler &lightSampler,
-    const Camera &camera, SamplerHandle sampler, pstd::optional<Point2f> *pRaster,
+    const Camera &camera, Sampler &sampler, pstd::optional<Point2f> *pRaster,
     Float *misWeightPtr) {
     ProfilerScope _(ProfilePhase::BDPTConnectSubpaths);
     SampledSpectrum L(0.f);
@@ -2166,13 +2095,13 @@ std::string BDPTIntegrator::ToString() const {
 
 std::unique_ptr<BDPTIntegrator> BDPTIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     bool visualizeStrategies = dict.GetOneBool("visualizestrategies", false);
     bool visualizeWeights = dict.GetOneBool("visualizeweights", false);
 
     if ((visualizeStrategies || visualizeWeights) && maxDepth > 5) {
-        Warning(loc,
+        Warning(
             "visualizestrategies/visualizeweights was enabled, limiting "
             "maxdepth to 5");
         maxDepth = 5;
@@ -2188,11 +2117,160 @@ std::unique_ptr<BDPTIntegrator> BDPTIntegrator::Create(
 
 STAT_PERCENT("Integrator/Acceptance rate", acceptedMutations, totalMutations);
 
-// MLTIntegrator Constants
-const int MLTIntegrator::cameraStreamIndex = 0;
-const int MLTIntegrator::lightStreamIndex = 1;
-const int MLTIntegrator::connectionStreamIndex = 2;
-const int MLTIntegrator::nSampleStreams = 3;
+// MLTSampler Declarations
+class MLTSampler : public Sampler {
+  public:
+    // MLTSampler Public Methods
+    MLTSampler(int mutationsPerPixel, int rngSequenceIndex, Float sigma,
+               Float largeStepProbability, int streamCount)
+        : Sampler(mutationsPerPixel),
+          rng(rngSequenceIndex),
+          sigma(sigma),
+          largeStepProbability(largeStepProbability),
+          streamCount(streamCount) {}
+
+    Float ImplGet1D(const SamplerState &);
+    Point2f ImplGet2D(const SamplerState &);
+    std::unique_ptr<Sampler> Clone();
+
+    void StartIteration();
+    void Accept();
+    void Reject();
+    void StartStream(int index);
+    int GetNextIndex() { return streamIndex + streamCount * sampleIndex++; }
+
+    std::string DumpState() const;
+
+    std::string ToString() const {
+        return StringPrintf("[ MLTSampler rng: %s sigma: %f largeStepProbability: %f "
+                            "streamCount: %d X: %s currentIteration: %d largeStep: %s "
+                            "lastLargeStepIteration: %d streamIndex: %d sampleIndex: %d ] ",
+                            rng, sigma, largeStepProbability, streamCount, X,
+                            currentIteration, largeStep, lastLargeStepIteration, streamIndex,
+                            sampleIndex);
+    }
+
+  protected:
+    // MLTSampler Private Declarations
+    struct PrimarySample {
+        Float value = 0;
+        // PrimarySample Public Methods
+        void Backup() {
+            valueBackup = value;
+            modifyBackup = lastModificationIteration;
+        }
+        void Restore() {
+            value = valueBackup;
+            lastModificationIteration = modifyBackup;
+        }
+
+        std::string ToString() const {
+            return StringPrintf("[ PrimarySample lastModificationIteration: %d "
+                                "valueBackup: %f modifyBackup: %d ]",
+                                lastModificationIteration, valueBackup, modifyBackup);
+        }
+
+        // PrimarySample Public Data
+        int64_t lastModificationIteration = 0;
+        Float valueBackup = 0;
+        int64_t modifyBackup = 0;
+    };
+
+    // MLTSampler Private Methods
+    void EnsureReady(int index);
+
+    // MLTSampler Private Data
+    RNG rng;
+    Float sigma, largeStepProbability;
+    int streamCount;
+    std::vector<PrimarySample> X;
+    int64_t currentIteration = 0;
+    bool largeStep = true;
+    int64_t lastLargeStepIteration = 0;
+    int streamIndex, sampleIndex;
+};
+
+// MLTSampler Constants
+static const int cameraStreamIndex = 0;
+static const int lightStreamIndex = 1;
+static const int connectionStreamIndex = 2;
+static const int nSampleStreams = 3;
+
+// MLTSampler Method Definitions
+Float MLTSampler::ImplGet1D(const SamplerState &) {
+    int index = GetNextIndex();
+    EnsureReady(index);
+    return X[index].value;
+}
+
+Point2f MLTSampler::ImplGet2D(const SamplerState &s) {
+    return {ImplGet1D(s), ImplGet1D(s)};
+}
+
+std::unique_ptr<Sampler> MLTSampler::Clone() {
+    LOG_FATAL("MLTSampler::Clone() is not implemented");
+    return nullptr;
+}
+
+void MLTSampler::StartIteration() {
+    currentIteration++;
+    largeStep = rng.Uniform<Float>() < largeStepProbability;
+}
+
+void MLTSampler::Accept() {
+    if (largeStep) lastLargeStepIteration = currentIteration;
+}
+
+void MLTSampler::EnsureReady(int index) {
+    // Enlarge _MLTSampler::X_ if necessary and get current $\VEC{X}_i$
+    if (index >= X.size()) X.resize(index + 1);
+    PrimarySample &Xi = X[index];
+
+    // Reset $\VEC{X}_i$ if a large step took place in the meantime
+    if (Xi.lastModificationIteration < lastLargeStepIteration) {
+        Xi.value = rng.Uniform<Float>();
+        Xi.lastModificationIteration = lastLargeStepIteration;
+    }
+
+    // Apply remaining sequence of mutations to _sample_
+    Xi.Backup();
+    if (largeStep) {
+        Xi.value = rng.Uniform<Float>();
+    } else {
+        int64_t nSmall = currentIteration - Xi.lastModificationIteration;
+        // Apply _nSmall_ small step mutations
+
+        // Sample the standard normal distribution $N(0, 1)$
+        Float normalSample = SampleNormal(rng.Uniform<Float>());
+
+        // Compute the effective standard deviation and apply perturbation to
+        // $\VEC{X}_i$
+        Float effSigma = sigma * std::sqrt((Float)nSmall);
+        Xi.value += normalSample * effSigma;
+        Xi.value -= std::floor(Xi.value);
+    }
+    Xi.lastModificationIteration = currentIteration;
+}
+
+void MLTSampler::Reject() {
+    for (auto &Xi : X)
+        if (Xi.lastModificationIteration == currentIteration) Xi.Restore();
+    --currentIteration;
+}
+
+void MLTSampler::StartStream(int index) {
+    CHECK_LT(index, streamCount);
+    streamIndex = index;
+    sampleIndex = 0;
+}
+
+std::string MLTSampler::DumpState() const {
+    std::string state;
+    for (const PrimarySample &Xi : X)
+        state += StringPrintf("%f,", Xi.value);
+    state += "0";
+    return state;
+}
 
 // MLT Method Definitions
 SampledSpectrum MLTIntegrator::L(MemoryArena &arena, MaterialBuffer &materialBuffer,
@@ -2207,7 +2285,7 @@ SampledSpectrum MLTIntegrator::L(MemoryArena &arena, MaterialBuffer &materialBuf
         t = 2;
     } else {
         nStrategies = depth + 2;
-        s = std::min<int>(sampler.Get1D() * nStrategies, nStrategies - 1);
+        s = sampler.GetDiscrete1D(nStrategies);
         t = nStrategies - s;
     }
 
@@ -2229,10 +2307,10 @@ SampledSpectrum MLTIntegrator::L(MemoryArena &arena, MaterialBuffer &materialBuf
     if (!crd || !crd->weight)
         return SampledSpectrum(0.f);
     Float rayDiffScale =
-        std::max<Float>(.125, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
+        std::max<Float>(.125, 1 / std::sqrt((Float)sampler.samplesPerPixel));
     crd->ray.ScaleDifferentials(rayDiffScale);
 
-    if (GenerateCameraSubpath(crd->ray, scene, *lambda, &sampler, arena, materialBuffer,
+    if (GenerateCameraSubpath(crd->ray, scene, *lambda, sampler, arena, materialBuffer,
                               t, *camera,
                               cameraVertices, regularize) != t)
         return SampledSpectrum(0.f);
@@ -2240,7 +2318,7 @@ SampledSpectrum MLTIntegrator::L(MemoryArena &arena, MaterialBuffer &materialBuf
     // Generate a light subpath with exactly _s_ vertices
     sampler.StartStream(lightStreamIndex);
     Vertex *lightVertices = arena.Alloc<Vertex[]>(s);
-    if (GenerateLightSubpath(scene, *lambda, &sampler, *camera, arena, materialBuffer, s,
+    if (GenerateLightSubpath(scene, *lambda, sampler, *camera, arena, materialBuffer, s,
                              cameraVertices[0].time(),
                              *lightSampler, lightVertices, regularize) != s)
         return SampledSpectrum(0.f);
@@ -2249,15 +2327,53 @@ SampledSpectrum MLTIntegrator::L(MemoryArena &arena, MaterialBuffer &materialBuf
     sampler.StartStream(connectionStreamIndex);
     pstd::optional<Point2f> pRasterNew;
     SampledSpectrum L = ConnectBDPT(scene, *lambda, lightVertices, cameraVertices, s, t,
-                                    *lightSampler, *camera, &sampler, &pRasterNew) *
+                                    *lightSampler, *camera, sampler, &pRasterNew) *
         nStrategies;
     if (pRasterNew.has_value())
         *pRaster = *pRasterNew;
     return L;
 }
 
+class DebugSampler : public MLTSampler {
+public:
+    static DebugSampler Create(pstd::span<const std::string> state) {
+        DebugSampler ds;
+        ds.u.resize(state.size());
+        for (size_t i = 0; i < state.size(); ++i) {
+#ifdef PBRT_FLOAT_AS_DOUBLE
+            if (!Atod(state[i], &ds.u[i]))
+#else
+            if (!Atof(state[i], &ds.u[i]))
+#endif
+                ErrorExit("Invalid value in --debugstate: %s", state[i]);
+        }
+        return ds;
+    }
+
+    Float ImplGet1D(const SamplerState &) {
+        int index = GetNextIndex();
+        CHECK_LT(index, u.size());
+        return u[index];
+    }
+
+    Point2f ImplGet2D(const SamplerState &s) {
+        return {ImplGet1D(s), ImplGet1D(s)};
+    }
+
+    std::string ToString() const {
+        return StringPrintf("[ DebugSampler %s u: %s ]",
+                            ((const MLTSampler *)this)->ToString(), u);
+    }
+
+private:
+    DebugSampler()
+        : MLTSampler(1, 0, 0.5, 0.5, nSampleStreams) { }
+
+    std::vector<Float> u;
+};
+
 void MLTIntegrator::Render() {
-    lightSampler = std::make_unique<PowerLightSampler>(scene.lights, Allocator());
+    lightSampler = std::make_unique<PowerLightSampler>(scene, Allocator());
 
     StatsSetImageResolution(camera->film->pixelBounds);
     StatsSetPixelStatsBaseName(RemoveExtension(camera->film->filename).c_str());
@@ -2274,12 +2390,12 @@ void MLTIntegrator::Render() {
 
         pstd::span<const std::string> span = pstd::MakeSpan(c);
         span.remove_prefix(1);
-        DebugMLTSampler sampler = DebugMLTSampler::Create(span, nSampleStreams);
+        DebugSampler sampler = DebugSampler::Create(span);
 
         Point2f pRaster;
         SampledWavelengths lambda;
         MemoryArena arena;
-        MaterialBuffer materialBuffer(16384);
+        MaterialBuffer materialBuffer;
         (void)L(arena, materialBuffer, sampler, depth, &pRaster, &lambda);
         return;
     }
@@ -2298,9 +2414,6 @@ void MLTIntegrator::Render() {
     if (!scene.lights.empty()) {
         std::vector<MemoryArena> bootstrapThreadArenas(MaxThreadIndex());
         std::vector<MaterialBuffer> bootstrapMaterialBuffers(MaxThreadIndex());
-        for (auto &m : bootstrapMaterialBuffers)
-            m = MaterialBuffer(16384);
-
         ParallelFor(0, nBootstrap, [&](int64_t start, int64_t end) {
             MemoryArena &arena = bootstrapThreadArenas[ThreadIndex];
             MaterialBuffer &materialBuffer = bootstrapMaterialBuffers[ThreadIndex];
@@ -2334,8 +2447,6 @@ void MLTIntegrator::Render() {
     if (!scene.lights.empty()) {
         std::vector<MemoryArena> threadArenas(MaxThreadIndex());
         std::vector<MaterialBuffer> threadMaterialBuffers(MaxThreadIndex());
-        for (auto &m : threadMaterialBuffers)
-            m = MaterialBuffer(16384);
         ParallelFor(0, nChains, [&](int i) {
             int64_t nChainMutations =
                 std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
@@ -2417,7 +2528,7 @@ std::string MLTIntegrator::ToString() const {
 
 std::unique_ptr<MLTIntegrator> MLTIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    std::unique_ptr<const Camera> camera, const FileLoc *loc) {
+    std::unique_ptr<const Camera> camera) {
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     int nBootstrap = dict.GetOneInt("bootstrapsamples", 100000);
     int64_t nChains = dict.GetOneInt("chains", 1000);
@@ -2434,6 +2545,7 @@ std::unique_ptr<MLTIntegrator> MLTIntegrator::Create(
                                            nChains, mutationsPerPixel, sigma,
                                            largeStepProbability, regularize);
 }
+#endif
 
 STAT_RATIO(
     "Stochastic Progressive Photon Mapping/Visible points checked per photon "
@@ -2527,7 +2639,9 @@ void SPPMIntegrator::Render() {
     for (int i = 0; i < MaxThreadIndex(); ++i)
         // TODO: size this
         perThreadMaterialBuffers.emplace_back(nPixels * 1024);
-    std::vector<SamplerHandle> tileSamplers = sampler.Clone(MaxThreadIndex(), Allocator());
+    std::vector<std::unique_ptr<Sampler>> tileSamplers(MaxThreadIndex());
+    for (auto &s : tileSamplers)
+        s = sampler.Clone();
 
     for (int iter = 0; iter < nIterations; ++iter) {
         SampledWavelengths lambda =
@@ -2542,14 +2656,14 @@ void SPPMIntegrator::Render() {
                 MaterialBuffer &materialBuffer = perThreadMaterialBuffers[ThreadIndex];
 
                 // Follow camera paths for _tile_ in image for SPPM
-                SamplerHandle &tileSampler = tileSamplers[ThreadIndex];
+                std::unique_ptr<Sampler> &tileSampler = tileSamplers[ThreadIndex];
 
                 for (Point2i pPixel : tileBounds) {
                     // Prepare _tileSampler_ for _pPixel_
-                    tileSampler.StartPixelSample(pPixel, iter);
+                    tileSampler->StartPixelSample(pPixel, iter);
 
                     // Generate camera ray for pixel for SPPM
-                    CameraSample cameraSample = tileSampler.GetCameraSample(pPixel, camera->film->filter);
+                    CameraSample cameraSample = tileSampler->GetCameraSample(*camera->film->filter);
 
                     pstd::optional<CameraRayDifferential> crd =
                         camera->GenerateRayDifferential(cameraSample, lambda);
@@ -2585,7 +2699,7 @@ void SPPMIntegrator::Render() {
 
                         // Compute BSDF at SPPM camera ray intersection
                         SurfaceInteraction &isect = si->intr;
-                        isect.ComputeScatteringFunctions(ray, lambda, *camera, materialBuffer, &sampler);
+                        isect.ComputeScatteringFunctions(ray, lambda, *camera, materialBuffer, sampler);
                         if (isect.bsdf == nullptr) {
                             isect.SkipIntersection(&ray, si->tHit);
                             --depth;
@@ -2609,7 +2723,7 @@ void SPPMIntegrator::Render() {
                         }
 
                         SampledSpectrum Ld =
-                            LdSampleLightsAndBSDF(isect, scene, lambda, tileSampler, arena,
+                            LdSampleLightsAndBSDF(isect, scene, lambda, *tileSampler, arena,
                                                   directLightSampler);
                         pixel.Ld += (beta * Ld).ToRGB(lambda, *colorSpace);
 
@@ -2621,9 +2735,9 @@ void SPPMIntegrator::Render() {
 
                         // Spawn ray from SPPM camera path vertex
                         if (depth < maxDepth - 1) {
-                            Float u = tileSampler.Get1D();
+                            Float u = tileSampler->Get1D();
                             pstd::optional<BSDFSample> bs =
-                                bsdf.Sample_f(wo, u, tileSampler.Get2D());
+                                bsdf.Sample_f(wo, u, tileSampler->Get2D());
                             if (!bs) break;
                             specularBounce = bs->IsSpecular();
                             anyNonSpecularBounces |= !bs->IsSpecular();
@@ -2635,7 +2749,7 @@ void SPPMIntegrator::Render() {
                             if (rrBeta.MaxComponentValue() < 1) {
                                 Float q =
                                     std::max<Float>(.05f, 1 - rrBeta.MaxComponentValue());
-                                if (tileSampler.Get1D() < q) break;
+                                if (tileSampler->Get1D() < q) break;
                                 beta /= 1 - q;
                             }
                             ray = isect.SpawnRay(ray, bs->wi, bs->flags);
@@ -2712,8 +2826,6 @@ void SPPMIntegrator::Render() {
         {
             ProfilerScope _(ProfilePhase::SPPMPhotonPass);
             std::vector<MaterialBuffer> photonShootMaterialBuffers(MaxThreadIndex());
-            for (auto &m : photonShootMaterialBuffers)
-                m = MaterialBuffer(16384);
 
             ParallelFor(0, photonsPerIteration, [&](int64_t start, int64_t end) {
                 MaterialBuffer &materialBuffer = photonShootMaterialBuffers[ThreadIndex];
@@ -2798,7 +2910,7 @@ void SPPMIntegrator::Render() {
 
                     // Compute BSDF at photon intersection point
                     isect.ComputeScatteringFunctions(photonRay, lambda, *camera, materialBuffer,
-                                                     &sampler, TransportMode::Importance);
+                                                     sampler, TransportMode::Importance);
                     if (isect.bsdf == nullptr) {
                         isect.SkipIntersection(&photonRay, si->tHit);
                         --depth;
@@ -2937,7 +3049,7 @@ std::string SPPMIntegrator::ToString() const {
 
 std::unique_ptr<SPPMIntegrator> SPPMIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
-    const RGBColorSpace *colorSpace, std::unique_ptr<const Camera> camera, const FileLoc *loc) {
+    const RGBColorSpace *colorSpace, std::unique_ptr<const Camera> camera) {
     int nIterations = dict.GetOneInt("iterations", 64);
     int maxDepth = dict.GetOneInt("maxdepth", 5);
     int photonsPerIter = dict.GetOneInt("photonsperiteration", -1);
@@ -3057,9 +3169,9 @@ void RISIntegrator::Render() {
     risIntrBytesUsed += pixelBounds.Area() * sizeof(Pixel) + pixelArena.BytesAllocated();
 
     // Camera pass
-    std::vector<SamplerHandle> threadSamplers(MaxThreadIndex());
+    std::vector<std::unique_ptr<Sampler>> threadSamplers(MaxThreadIndex());
     for (auto &sampler : threadSamplers)
-        sampler = new PMJ02BNSampler(spp);
+        sampler.reset(new PMJ02BNSampler(spp));
     std::vector<MaterialBuffer> materialBuffers;
     for (int i = 0; i < MaxThreadIndex(); ++i)
         // TODO: sizing
@@ -3074,18 +3186,18 @@ void RISIntegrator::Render() {
         MaterialBuffer &materialBuffer = materialBuffers[ThreadIndex];
         MemoryArena &reservoirArena = reservoirArenas[ThreadIndex];
         MemoryArena &lightSampleArena = lightSampleArenas[ThreadIndex];
-        SamplerHandle &sampler = threadSamplers[ThreadIndex];
+        std::unique_ptr<Sampler> &sampler = threadSamplers[ThreadIndex];
 
         for (Point2i pPixel : tileBounds) {
             RNG &rng = pixels[pPixel].rng;
 
             for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
-                sampler.StartPixelSample(pPixel, sampleIndex);
+                sampler->StartPixelSample(pPixel, sampleIndex);
 
-                CameraSample cameraSample = sampler.GetCameraSample(pPixel, camera->film->filter);
+                CameraSample cameraSample = sampler->GetCameraSample(*camera->film->filter);
                 CHECK_EQ(1.f, cameraSample.weight); // for now; make filtering to final image easy.
 
-                Float uLight = sampler.Get1D();
+                Float uLight = sampler->Get1D();
                 int stratumIndex = std::min(int(uLight * spp), spp - 1);
                 pixels[pPixel].stratumToSampleIndex[stratumIndex] = sampleIndex;
                 pixels[pPixel].sampleIndexToStratum[sampleIndex] = stratumIndex;
@@ -3112,7 +3224,7 @@ void RISIntegrator::Render() {
 
                 // Compute BSDF
                 SurfaceInteraction &isect = si->intr;
-                isect.ComputeScatteringFunctions(ray, lambda, *camera, materialBuffer, sampler);
+                isect.ComputeScatteringFunctions(ray, lambda, *camera, materialBuffer, *sampler);
                 CHECK(isect.bsdf != nullptr); /* TODO handle this */
 
                 CHECK(pixels[pPixel].pixelSamples[sampleIndex].intr.has_value() == false);
@@ -3123,7 +3235,7 @@ void RISIntegrator::Render() {
                 WeightedReservoirSampler<RISLightSample> *reservoirs =
                     pixels[pPixel].pixelSamples[sampleIndex].reservoirs;
 
-                Point2f u = sampler.Get2D();
+                Point2f u = sampler->Get2D();
 
                 for (int i = 0; i < M; ++i) {
                     // Take light samples.
@@ -3376,14 +3488,14 @@ void RISIntegrator::Render() {
             }
 
             // Perfect specular, just to see if it hits a light
-            SamplerHandle &sampler = threadSamplers[ThreadIndex];
-            sampler.StartPixelSample(pPixel, sampleIndex);
-            (void)sampler.GetCameraSample(pPixel, camera->film->filter);
-            (void)sampler.Get1D();
-            (void)sampler.Get2D();
+            std::unique_ptr<Sampler> &sampler = threadSamplers[ThreadIndex];
+            sampler->StartPixelSample(pPixel, sampleIndex);
+            (void)sampler->GetCameraSample(*camera->film->filter);
+            (void)sampler->Get1D();
+            (void)sampler->Get2D();
 
-            Float u = sampler.Get1D();
-            pstd::optional<BSDFSample> bs = intr.bsdf->Sample_f(intr.wo, u, sampler.Get2D());
+            Float u = sampler->Get1D();
+            pstd::optional<BSDFSample> bs = intr.bsdf->Sample_f(intr.wo, u, sampler->Get2D());
             if (bs && bs->pdf > 0 && bs->IsSpecular()) {
                 Ray ray = intr.SpawnRay(bs->wi);
                 pstd::optional<ShapeIntersection> si = scene.Intersect(ray);
@@ -3414,7 +3526,7 @@ std::string RISIntegrator::ToString() const {
 std::unique_ptr<RISIntegrator> RISIntegrator::Create(
     const ParameterDictionary &dict, const Scene &scene,
     std::unique_ptr<const Camera> camera,
-    SamplerHandle sampler, const FileLoc *loc) {
+    std::unique_ptr<Sampler> sampler) {
     int N = dict.GetOneInt("N", 1);
     int M = dict.GetOneInt("M", 9);
     bool mis = dict.GetOneBool("mis", true);
@@ -3430,50 +3542,13 @@ std::unique_ptr<RISIntegrator> RISIntegrator::Create(
     else if (lms == "one")
         lightMISStrategy = RISIntegrator::LightMISStrategy::One;
     else
-        ErrorExit(loc, "%s: unknown light MIS strategy", lms.c_str());
+        ErrorExit("%s: unknown light MIS strategy", lms.c_str());
 
     int nSpatioResamples = dict.GetOneInt("nresamples", 5);
 
     return std::make_unique<RISIntegrator>(N, M, nSpatioResamples, mis, lightMISStrategy,
                                            lightStrategy, scene, std::move(camera),
-                                           sampler.SamplesPerPixel());
-}
-
-std::unique_ptr<Integrator> Integrator::Create(
-        const std::string &name, const ParameterDictionary &dict,
-        const Scene &scene, std::unique_ptr<Camera> camera,
-        SamplerHandle sampler,
-        const RGBColorSpace *colorSpace, const FileLoc *loc) {
-    std::unique_ptr<Integrator> integrator;
-    if (name == "whitted")
-        integrator = WhittedIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "path")
-        integrator = PathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "simplepath")
-        integrator = SimplePathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "lightpath")
-        integrator = LightPathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "volpath")
-        integrator = VolPathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "bdpt")
-        integrator = BDPTIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "mlt")
-        integrator = MLTIntegrator::Create(dict, scene, std::move(camera), loc);
-    else if (name == "ambientocclusion")
-        integrator = AOIntegrator::Create(dict, scene, &colorSpace->illuminant,
-                                          std::move(camera), std::move(sampler), loc);
-    else if (name == "ris")
-        integrator = RISIntegrator::Create(dict, scene, std::move(camera), std::move(sampler), loc);
-    else if (name == "sppm")
-        integrator = SPPMIntegrator::Create(dict, scene, colorSpace, std::move(camera), loc);
-    else
-        ErrorExit(loc, "%s: integrator type unknown.", name);
-
-    if (!integrator)
-        ErrorExit(loc, "%s: unable to create integrator.", name);
-
-    dict.ReportUnused();
-    return integrator;
+                                           sampler->samplesPerPixel);
 }
 
 }  // namespace pbrt

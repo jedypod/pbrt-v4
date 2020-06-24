@@ -19,9 +19,218 @@
 
 namespace pbrt {
 
+#if 0
+    std::vector<PrimitiveHandle> &in =
+        renderOptions->instances[name];
+    if (in.empty()) return;
+
+    if (in.size() > 1) {
+        // Create aggregate for instance _Primitive_s
+        PrimitiveHandle accel =
+            CreateAccelerator(renderOptions->AcceleratorName, std::move(in),
+                              renderOptions->AcceleratorParams);
+        in.clear();
+        in.push_back(std::move(accel));
+    }
+    static_assert(MaxTransforms == 2,
+                  "TransformCache assumes only two transforms");
+
+    TransformSet worldFromCameraT = Inverse(renderOptions->cameraFromWorldT);
+
+    // Create _animatedWorldFromInstance_ transform for instance
+    if (CTMIsAnimated()) {
+        const Transform *WorldFromInstance[2] = {
+            transformCache.Lookup(GetCTM(0) * worldFromCameraT[0]),
+            transformCache.Lookup(GetCTM(1) * worldFromCameraT[1])
+        };
+        AnimatedTransform animatedWorldFromInstance(
+            WorldFromInstance[0], renderOptions->transformStartTime,
+            WorldFromInstance[1], renderOptions->transformEndTime);
+        PrimitiveHandle prim(
+            new AnimatedPrimitive(std::move(in[0]), animatedWorldFromInstance));
+        renderOptions->primitives.push_back(std::move(prim));
+    } else {
+        const Transform *WorldFromInstance =
+            transformCache.Lookup(GetCTM(0) * worldFromCameraT[0]);
+        PrimitiveHandle prim(new TransformedPrimitive(in[0], WorldFromInstance));
+        renderOptions->primitives.push_back(std::move(prim));
+    }
+#endif
+
+static std::unique_ptr<Medium> CreateMedium(const std::string &name,
+                                            const ParameterDictionary &dict,
+                                            const Transform &worldFromMedium, FileLoc loc,
+                                            Allocator alloc) {
+    std::unique_ptr<Medium> m;
+    if (name == "homogeneous")
+        m = HomogeneousMedium::Create(dict, alloc);
+    else if (name == "heterogeneous")
+        m = GridDensityMedium::Create(dict, worldFromMedium, alloc);
+    else
+        ErrorExit(&loc, "%s: medium unknown.", name);
+
+    if (!m)
+        ErrorExit(&loc, "%s: unable to create medium.", name);
+
+    dict.ReportUnused();
+    return m;
+}
+
+static PrimitiveHandle CreateAccelerator(
+    const std::string &name, std::vector<PrimitiveHandle> prims,
+    const ParameterDictionary &dict) {
+    PrimitiveHandle accel;
+    if (name == "bvh")
+        accel = BVHAccel::Create(std::move(prims), dict);
+    else if (name == "kdtree")
+        accel = KdTreeAccel::Create(std::move(prims), dict);
+    else
+        ErrorExit("%s: accelerator type unknown.", name);
+
+    if (!accel)
+        ErrorExit("%s: unable to create accelerator.", name);
+
+    dict.ReportUnused();
+    return accel;
+}
+
+#if 0
+    // Check if volume scattering integrator is expected but not specified.
+    if (haveScatteringMedia &&
+        IntegratorName != "volpath" &&
+        IntegratorName != "bdpt" &&
+        IntegratorName != "mlt") {
+        Warning("Scene has scattering media but \"%s\" integrator doesn't support "
+                "volume scattering. Consider using \"volpath\", \"bdpt\", or "
+                "\"mlt\".", IntegratorName);
+    }
+
+    // Warn if no light sources are defined
+    if ((*scene)->lights.empty() && IntegratorName != "ambientocclusion" &&
+        IntegratorName != "aov")
+        Warning("No light sources defined in scene; rendering a black image.");
+}
+#endif
+
+static std::unique_ptr<Camera> CreateCamera(
+    const std::string &name, const ParameterDictionary &dict,
+    const Medium *medium, const AnimatedTransform &worldFromCamera,
+    std::unique_ptr<Film> film, const FileLoc *loc) {
+    std::unique_ptr<Camera> camera;
+
+    if (name == "perspective")
+        camera.reset(PerspectiveCamera::Create(dict, worldFromCamera, std::move(film),
+                                               medium));
+    else if (name == "orthographic")
+        camera.reset(OrthographicCamera::Create(dict, worldFromCamera, std::move(film),
+                                                medium));
+    else if (name == "realistic")
+        camera.reset(RealisticCamera::Create(dict, worldFromCamera, std::move(film),
+                                             medium));
+    else if (name == "spherical")
+        camera.reset(SphericalCamera::Create(dict, worldFromCamera, std::move(film),
+                                             medium));
+    else
+        ErrorExit(loc, "%s: camera type unknown.", name);
+
+    if (!camera)
+        ErrorExit(loc, "%s: unable to create camera.", name);
+
+    dict.ReportUnused();
+    return camera;
+}
+
+static std::unique_ptr<Sampler> CreateSampler(const std::string &name,
+                                              const ParameterDictionary &dict,
+                                              const Point2i &fullResolution,
+                                              const FileLoc *loc) {
+    std::unique_ptr<Sampler> sampler;
+    if (name == "paddedsobol")
+        sampler = PaddedSobolSampler::Create(dict);
+    else if (name == "halton")
+        sampler = HaltonSampler::Create(dict, fullResolution);
+    else if (name == "sobol")
+        sampler = SobolSampler::Create(dict, fullResolution);
+    else if (name == "random")
+        sampler = RandomSampler::Create(dict);
+    else if (name == "pmj02bn")
+        sampler = PMJ02BNSampler::Create(dict);
+    else if (name == "stratified")
+        sampler = StratifiedSampler::Create(dict);
+    else
+        ErrorExit(loc, "%s: sampler type unknown.", name);
+
+    if (!sampler)
+        ErrorExit(loc, "%s: unable to create sampler.", name);
+
+    dict.ReportUnused();
+    return sampler;
+}
+
+static std::unique_ptr<Film> CreateFilm(
+    const std::string &name, const ParameterDictionary &dict, const FileLoc *loc,
+    pstd::unique_ptr<Filter> filter) {
+    std::unique_ptr<Film> film;
+    if (name == "rgb")
+        film.reset(RGBFilm::Create(dict, std::move(filter), dict.ColorSpace()));
+    else if (name == "aov")
+        film = AOVFilm::Create(dict, std::move(filter), dict.ColorSpace());
+    else
+        ErrorExit(loc, "%s: film type unknown.", name);
+
+    if (!film)
+        ErrorExit(loc, "%s: unable to create film.", name);
+
+    dict.ReportUnused();
+    return film;
+}
+
+static std::unique_ptr<Integrator> CreateIntegrator(const std::string &name,
+                                                    const ParameterDictionary &dict,
+                                                    const Scene &scene,
+                                                    std::unique_ptr<Camera> camera,
+                                                    std::unique_ptr<Sampler> sampler,
+                                                    const RGBColorSpace *colorSpace, FileLoc loc) {
+    std::unique_ptr<Integrator> integrator;
+    if (name == "whitted")
+        integrator = WhittedIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "path")
+        integrator = PathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "simplepath")
+        integrator = SimplePathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "lightpath")
+        integrator = LightPathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "volpath")
+        integrator = VolPathIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+#ifdef PBRT_DISABLE_BDPT_MLT
+    else if (name == "bdpt")
+        integrator = BDPTIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "mlt")
+        integrator = MLTIntegrator::Create(dict, scene, std::move(camera));
+#endif
+    else if (name == "ambientocclusion")
+        integrator = AOIntegrator::Create(dict, scene, &colorSpace->illuminant,
+                                          std::move(camera), std::move(sampler));
+    else if (name == "ris")
+        integrator = RISIntegrator::Create(dict, scene, std::move(camera), std::move(sampler));
+    else if (name == "sppm")
+        integrator = SPPMIntegrator::Create(dict, scene, colorSpace, std::move(camera));
+    else
+        ErrorExit(&loc, "%s: integrator type unknown.", name);
+
+    if (!integrator)
+        ErrorExit(&loc, "%s: unable to create integrator.", name);
+
+    dict.ReportUnused();
+    return integrator;
+}
+
 void CPURender(GeneralScene &genScene) {
-    ProfilerScope _(ProfilePhase::SceneConstruction);
+    ProfilerScope _(ProfilePhase::CPUSceneConstruction);
+    MemoryArena arena;  // TODO: merge with scene arena from api....
     Allocator alloc;
+
+    LOG_VERBOSE("Scene: %s", genScene);
 
     // Create media first (so have them for the camera...)
     std::map<std::string, std::unique_ptr<Medium>> media;
@@ -33,58 +242,81 @@ void CPURender(GeneralScene &genScene) {
         if (m.second.worldFromObject.IsAnimated())
             Warning(&m.second.loc, "Animated transformation provided for medium. Only the "
                     "start transform will be used.");
-        std::unique_ptr<Medium> medium(Medium::Create(type, m.second.parameters,
+        std::unique_ptr<Medium> medium = CreateMedium(type, m.second.parameters,
                                                       *m.second.worldFromObject.startTransform,
-                                                      &m.second.loc, alloc));
+                                                      m.second.loc, alloc);
         media[m.first] = std::move(medium);
     }
-
-    bool haveScatteringMedia = false;
-    auto findMedium = [&media,&haveScatteringMedia](const std::string &s,
-                                                    const FileLoc *loc) -> Medium * {
+    auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium * {
         if (s.empty())
             return nullptr;
 
         auto iter = media.find(s);
         if (iter == media.end())
             ErrorExit(loc, "%s: medium not defined", s);
-        haveScatteringMedia = true;
         return iter->second.get();
     };
 
     // Filter
-    FilterHandle filter =genScene.filter.name.empty() ?
-        FilterHandle::Create("gaussian", {}, nullptr, alloc) :
-        FilterHandle::Create(genScene.filter.name, genScene.filter.parameters,
-                             &genScene.filter.loc, alloc);
+    pstd::unique_ptr<Filter> filter(genScene.filter.name.empty() ?
+                                    Filter::Create("gaussian", {}, nullptr, alloc) :
+                                    Filter::Create(genScene.filter.name,
+                                                   genScene.filter.parameters,
+                                                   &genScene.filter.loc, alloc));
 
     // Film
     ParameterDictionary defaultFilmDict({}, RGBColorSpace::sRGB);
-    Film *film(genScene.film.name.empty() ?
-        Film::Create("rgb", defaultFilmDict, nullptr, filter, alloc) :
-        Film::Create(genScene.film.name, genScene.film.parameters, &genScene.film.loc,
-                     filter, alloc));
+    std::unique_ptr<Film> film = genScene.film.name.empty() ?
+        CreateFilm("rgb", defaultFilmDict, nullptr, std::move(filter)) :
+        CreateFilm(genScene.film.name, genScene.film.parameters, &genScene.film.loc,
+                   std::move(filter));
 
     // Camera
     const Medium *cameraMedium = findMedium(genScene.camera.medium, &genScene.camera.loc);
-    Camera *camera =
+    std::unique_ptr<Camera> camera =
         genScene.camera.name.empty() ?
-        Camera::Create("perspective", {}, nullptr, genScene.camera.worldFromCamera,
-                       film, nullptr, alloc) :
-        Camera::Create(genScene.camera.name, genScene.camera.parameters, cameraMedium,
-                       genScene.camera.worldFromCamera, film,
-                       &genScene.camera.loc, alloc);
+        CreateCamera("perspective", {}, nullptr, genScene.camera.worldFromCamera,
+                     std::move(film), nullptr) :
+        CreateCamera(genScene.camera.name, genScene.camera.parameters, cameraMedium,
+                     genScene.camera.worldFromCamera, std::move(film), &genScene.camera.loc);
 
     // Sampler
-    SamplerHandle sampler(genScene.sampler.name.empty() ?
-        SamplerHandle::Create("pmj02bn", {}, camera->film->fullResolution, nullptr, alloc) :
-        SamplerHandle::Create(genScene.sampler.name, genScene.sampler.parameters,
-                              camera->film->fullResolution, &genScene.sampler.loc, alloc));
+    std::unique_ptr<Sampler> sampler = genScene.sampler.name.empty() ?
+        CreateSampler("pmj02bn", {}, camera->film->fullResolution, nullptr) :
+        CreateSampler(genScene.sampler.name, genScene.sampler.parameters,
+                      camera->film->fullResolution, &genScene.sampler.loc);
 
     // Textures
     std::map<std::string, FloatTextureHandle> floatTextures;
     std::map<std::string, SpectrumTextureHandle> spectrumTextures;
-    genScene.CreateTextures(&floatTextures, &spectrumTextures, alloc, false);
+    for (const auto &tex : genScene.floatTextures) {
+        if (tex.second.worldFromObject.IsAnimated())
+            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
+                    "Using start transform.");
+        // TODO: Texture could hold a texture pointer...
+        Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
+
+        TextureParameterDictionary texDict(&tex.second.parameters, &floatTextures,
+                                           &spectrumTextures);
+        FloatTextureHandle t =
+            FloatTextureHandle::Create(tex.second.texName, worldFromTexture,
+                                       texDict, alloc, tex.second.loc, false);
+        floatTextures[tex.first] = std::move(t);
+    }
+    for (const auto &tex : genScene.spectrumTextures) {
+        if (tex.second.worldFromObject.IsAnimated())
+            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
+                    "Using start transform.");
+
+        Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
+
+        TextureParameterDictionary texDict(&tex.second.parameters, &floatTextures,
+                                           &spectrumTextures);
+        SpectrumTextureHandle t =
+            SpectrumTextureHandle::Create(tex.second.texName, worldFromTexture,
+                                          texDict, alloc, tex.second.loc, false);
+        spectrumTextures[tex.first] = std::move(t);
+    }
 
     // Materials
     std::map<std::string, MaterialHandle> namedMaterials;
@@ -99,7 +331,7 @@ void CPURender(GeneralScene &genScene) {
         ProfilerScope _(ProfilePhase::LightConstruction);
         const Medium *outsideMedium = findMedium(light.medium, &light.loc);
         LightHandle l = LightHandle::Create(light.name, light.parameters, light.worldFromObject,
-                                            outsideMedium, &light.loc, alloc);
+                                            outsideMedium, light.loc, Allocator{} /* FIXME: leaks*/);
         lights.push_back(l);
     }
 
@@ -128,7 +360,7 @@ void CPURender(GeneralScene &genScene) {
             pstd::vector<ShapeHandle> shapes =
                 ShapeHandle::Create(sh.name, sh.worldFromObject, sh.objectFromWorld,
                                     sh.reverseOrientation, sh.parameters,
-                                    &sh.loc, alloc);
+                                    alloc, sh.loc);
             if (shapes.empty())
                 continue;
 
@@ -161,7 +393,7 @@ void CPURender(GeneralScene &genScene) {
                     LightHandle area =
                         LightHandle::CreateArea(areaLightEntity.name, areaLightEntity.parameters,
                                                 AnimatedTransform(sh.worldFromObject),
-                                                mi, s, &areaLightEntity.loc, Allocator{} /* FIXME LEAK */);
+                                                mi, s, areaLightEntity.loc, Allocator{} /* FIXME LEAK */);
                     areaHandle = area;
                     if (area) lights.push_back(area);
                 }
@@ -187,7 +419,7 @@ void CPURender(GeneralScene &genScene) {
             pstd::vector<ShapeHandle> shapes =
                 ShapeHandle::Create(sh.name, sh.identity, sh.identity,
                                     sh.reverseOrientation, sh.parameters,
-                                    &sh.loc, alloc);
+                                    alloc, sh.loc);
             if (shapes.empty())
                 continue;
 
@@ -221,7 +453,7 @@ void CPURender(GeneralScene &genScene) {
 
                     LightHandle area =
                         LightHandle::CreateArea(areaLightEntity.name, areaLightEntity.parameters,
-                                                sh.worldFromObject, mi, s, &sh.loc, Allocator{});
+                                                sh.worldFromObject, mi, s, sh.loc, Allocator{});
                     areaHandle = area;
                     if (area) lights.push_back(area);
                 }
@@ -256,23 +488,18 @@ void CPURender(GeneralScene &genScene) {
             ErrorExit("%s: object instance redefined", inst.first);
 
         std::vector<PrimitiveHandle> instancePrimitives =
-            CreatePrimitivesForShapes(inst.second.shapes);
+            CreatePrimitivesForShapes(inst.second.first);
         std::vector<PrimitiveHandle> movingInstancePrimitives =
-            CreatePrimitivesForAnimatedShapes(inst.second.animatedShapes);
+            CreatePrimitivesForAnimatedShapes(inst.second.second);
         instancePrimitives.insert(instancePrimitives.end(),
                                   movingInstancePrimitives.begin(),
                                   movingInstancePrimitives.end());
-        if (instancePrimitives.empty()) {
-            Warning(&inst.second.loc, "Empty object instance");
-            instanceDefinitions[inst.first] = nullptr;
-        } else {
-            if (instancePrimitives.size() > 1) {
-                PrimitiveHandle bvh = new BVHAccel(std::move(instancePrimitives));
-                instancePrimitives.clear();
-                instancePrimitives.push_back(bvh);
-            }
-            instanceDefinitions[inst.first] = instancePrimitives[0];
+        if (instancePrimitives.size() != 1) {
+            PrimitiveHandle bvh = new BVHAccel(std::move(instancePrimitives));
+            instancePrimitives.clear();
+            instancePrimitives.push_back(bvh);
         }
+        instanceDefinitions[inst.first] = instancePrimitives[0];
     }
 
     // Instances
@@ -280,10 +507,6 @@ void CPURender(GeneralScene &genScene) {
         auto iter = instanceDefinitions.find(inst.name);
         if (iter == instanceDefinitions.end())
             ErrorExit(&inst.loc, "%s: object instance not defined", inst.name);
-
-        if (iter->second == nullptr)
-            // empty instance
-            continue;
 
         if (inst.worldFromInstance)
             primitives.push_back(new TransformedPrimitive(iter->second,
@@ -294,37 +517,22 @@ void CPURender(GeneralScene &genScene) {
     }
 
     // Accelerator
-    PrimitiveHandle accel = nullptr;
-    if (!primitives.empty())
-        accel = genScene.accelerator.name.empty() ?
-            new BVHAccel(std::move(primitives)) :
-            CreateAccelerator(genScene.accelerator.name, std::move(primitives),
-                              genScene.accelerator.parameters);
+    PrimitiveHandle accel = genScene.accelerator.name.empty() ?
+        new BVHAccel(std::move(primitives)) :
+        CreateAccelerator(genScene.accelerator.name, std::move(primitives),
+                          genScene.accelerator.parameters);
 
     // Scene
     Scene scene(accel, std::move(lights));
 
     // Integrator
     const RGBColorSpace *integratorColorSpace = genScene.film.parameters.ColorSpace();
-    std::unique_ptr<Integrator> integrator(genScene.integrator.name.empty() ?
-        Integrator::Create("path", {}, scene, std::unique_ptr<Camera>(camera), std::move(sampler),
-                           integratorColorSpace, {}) :
-        Integrator::Create(genScene.integrator.name, genScene.integrator.parameters,
-                           scene, std::unique_ptr<Camera>(camera), std::move(sampler),
-                           integratorColorSpace, &genScene.integrator.loc));
-
-    // Helpful warnings
-    if (haveScatteringMedia &&
-        genScene.integrator.name != "volpath" &&
-        genScene.integrator.name != "bdpt" &&
-        genScene.integrator.name != "mlt")
-        Warning("Scene has scattering media but \"%s\" integrator doesn't support "
-                "volume scattering. Consider using \"volpath\", \"bdpt\", or "
-                "\"mlt\".", genScene.integrator.name);
-
-    if (scene.lights.empty() && genScene.integrator.name != "ambientocclusion" &&
-        genScene.integrator.name != "aov")
-        Warning("No light sources defined in scene; rendering a black image.");
+    std::unique_ptr<Integrator> integrator = genScene.integrator.name.empty() ?
+        CreateIntegrator("path", {}, scene, std::move(camera), std::move(sampler),
+                         integratorColorSpace, {}) :
+        CreateIntegrator(genScene.integrator.name, genScene.integrator.parameters,
+                         scene, std::move(camera), std::move(sampler),
+                         integratorColorSpace, genScene.integrator.loc);
 
     LOG_VERBOSE("Memory used after scene creation: %d", GetCurrentRSS());
 
@@ -335,7 +543,9 @@ void CPURender(GeneralScene &genScene) {
     // hierarchical inheritance of profiling state; this is the only
     // place where that isn't the case.
     if (PbrtOptions.profile) {
-        CHECK_EQ(CurrentProfilerState(), ProfilePhaseToBits(ProfilePhase::SceneConstruction));
+        CHECK_EQ(CurrentProfilerState(), (ProfilePhaseToBits(ProfilePhase::SceneConstruction) |
+                                          ProfilePhaseToBits(ProfilePhase::ParsingAndGenScene) |
+                                          ProfilePhaseToBits(ProfilePhase::CPUSceneConstruction)));
         ProfilerState = ProfilePhaseToBits(ProfilePhase::IntegratorRender);
     }
 
@@ -346,7 +556,9 @@ void CPURender(GeneralScene &genScene) {
 
     if (PbrtOptions.profile) {
         CHECK_EQ(CurrentProfilerState(), ProfilePhaseToBits(ProfilePhase::IntegratorRender));
-        ProfilerState = ProfilePhaseToBits(ProfilePhase::SceneConstruction);
+        ProfilerState = (ProfilePhaseToBits(ProfilePhase::SceneConstruction) |
+                         ProfilePhaseToBits(ProfilePhase::ParsingAndGenScene) |
+                         ProfilePhaseToBits(ProfilePhase::CPUSceneConstruction));
     }
 
     ImageTextureBase::ClearCache();

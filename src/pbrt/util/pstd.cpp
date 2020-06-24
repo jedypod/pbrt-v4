@@ -12,8 +12,7 @@ memory_resource::~memory_resource() { }
 
 class NewDeleteResource : public memory_resource {
     void *do_allocate(size_t bytes, size_t alignment) {
-        void *ptr = pbrt::AllocAligned(bytes, alignment);
-        CHECK(ptr != nullptr);
+        void *ptr = pbrt::AllocAligned(bytes);
         CHECK_EQ(0, intptr_t(ptr) % alignment);
         return ptr;
     }

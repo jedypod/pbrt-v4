@@ -49,14 +49,14 @@ namespace pbrt {
 enum class ProfilePhase {
     SceneConstruction,
     ParsingAndGenScene,
+    CPUSceneConstruction,
     ShapeConstruction,
     LightConstruction,
     AccelConstruction,
     BVHInitialBound,
     BVHFindBestSplit,
     PLYLoading,
-    TextureConstruction,
-    ImageTextureLoading,
+    TextureLoading,
     MIPMapCreation,
 
     IntegratorRender,
@@ -117,14 +117,14 @@ ProfilePhase BitsToProfilePhase(uint64_t b);
 static const char *ProfNames[] = {
     "Scene creation",
     "Parsing and GeneralScene creation",
+    "CPU-specialized scene creation",
     "Shape creation",
     "Light creation",
     "Acceleration structure creation",
     "BVH initial bound",
     "BVH find best split",
     "PLY file loading",
-    "Texture construction",
-    "Image texture loading",
+    "Texture loading",
     "MIP map generation",
 
     "Integrator::Render()",

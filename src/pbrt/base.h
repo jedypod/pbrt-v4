@@ -39,11 +39,14 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/base.h>
+#include <pbrt/bsdf.h>
+#include <pbrt/interaction.h>
 #include <pbrt/options.h>
 #include <pbrt/ray.h>
-#include <pbrt/transform.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/array2d.h>
+#include <pbrt/transform.h>
 #include <pbrt/util/bits.h>
 #include <pbrt/util/hash.h>
 #include <pbrt/util/buffercache.h>
@@ -76,48 +79,87 @@ struct FilterSample {
     Float weight;
 };
 
-class BoxFilter;
-class GaussianFilter;
-class MitchellFilter;
-class LanczosSincFilter;
-class TriangleFilter;
+class Filter {
+  public:
+    // Filter Interface
+    virtual ~Filter();
+    Filter(const Vector2f &radius)
+        : radius(radius) {}
 
-class FilterHandle : public TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
-                                          LanczosSincFilter, TriangleFilter> {
-public:
-    using TaggedPointer::TaggedPointer;
-    FilterHandle(TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
-                               LanczosSincFilter, TriangleFilter> tp)
-        : TaggedPointer(tp) { }
-
-    static FilterHandle Create(const std::string &name,
-                               const ParameterDictionary &dict,
-                               const FileLoc *loc, Allocator alloc);
+    static Filter *Create(const std::string &name,
+                          const ParameterDictionary &dict,
+                          const FileLoc *loc, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const;
+    virtual Float Evaluate(const Point2f &p) const = 0;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const;
+    virtual FilterSample Sample(const Point2f &u) const = 0;
     PBRT_HOST_DEVICE
-    Vector2f Radius() const;
-    PBRT_HOST_DEVICE
-    Float Integral() const;
+    virtual Float Integral() const;
 
-    std::string ToString() const;
+    virtual std::string ToString() const = 0;
+
+    // Filter Public Data
+    const Vector2f radius;
 };
 
-class VisibleSurface;
+class FilterSampler {
+  public:
+    FilterSampler(const Filter *filter, int freq = 64, Allocator alloc = {});
+
+    PBRT_HOST_DEVICE_INLINE
+    FilterSample Sample(const Point2f &u) const {
+        Point2f p = distrib.SampleContinuous(u);
+        Point2f p01 = Point2f(domain.Offset(p));
+        Point2i pi(Clamp(p01.x * values.xSize() + 0.5f, 0, values.xSize() - 1),
+                   Clamp(p01.y * values.ySize() + 0.5f, 0, values.ySize() - 1));
+        return { p, values[pi] < 0 ? -1.f : 1.f };
+    }
+
+    std::string ToString() const;
+
+ private:
+    Bounds2f domain;
+    Array2D<Float> values;
+    Distribution2D distrib;
+};
+
+// Film Declarations
+// Note: AOVs only really make sense for PathIntegrator...
+// volpath: medium interactions...
+// bdpt, lightpath: Ld is partially computed via splats...
+// simplepath, whitted: want to keep it simple
+// sppm: 
+struct VisibleSurface {
+    VisibleSurface() = default;
+    VisibleSurface(const SurfaceInteraction &si, const Camera &camera,
+                   const SampledWavelengths &lambda);
+
+    std::string ToString() const;
+
+    Point3f p;
+    Float dzdx = 0, dzdy = 0; // x/y: raster space, z: camera space
+    Vector3f woWorld;
+    Normal3f n, ns;
+    Float time = 0;
+    SampledSpectrum Le, Ld;
+    BSDF *bsdf = nullptr;
+
+private:
+    Vector3f dpdx, dpdy; // world(ish) space
+};
 
 class Film {
   public:
     // Film Public Methods
     virtual ~Film();
 
-    static Film *Create(const std::string &name, const ParameterDictionary &dict,
-                        const FileLoc *loc, FilterHandle filter, Allocator alloc);
-
     PBRT_HOST_DEVICE
-    Bounds2f SampleBounds() const;
+    Bounds2f SampleBounds() const {
+        return Bounds2f(
+            Point2f(pixelBounds.pMin) - filter->radius + Vector2f(0.5f, 0.5f),
+            Point2f(pixelBounds.pMax) + filter->radius - Vector2f(0.5f, 0.5f));
+    }
 
     PBRT_HOST_DEVICE
     Bounds2f PhysicalExtent() const {
@@ -147,42 +189,52 @@ class Film {
     // Film Public Data
     Point2i fullResolution;
     Float diagonal;
-    FilterHandle filter;
+    pstd::unique_ptr<Filter> filter;
     std::string filename;
     Bounds2i pixelBounds;
 
  protected:
     Film(const Point2i &resolution, const Bounds2i &pixelBounds,
-         FilterHandle filter, Float diagonal, const std::string &filename);
-
+         pstd::unique_ptr<Filter> filt, Float diagonal,
+         const std::string &filename);
     std::string BaseToString() const;
 };
 
 // Camera Declarations
-class CameraRay;
-class CameraRayDifferential;
-class CameraWiSample;
+class CameraWiSample {
+public:
+    CameraWiSample() = default;
+    CameraWiSample(const SampledSpectrum &Wi, const Vector3f &wi, Float pdf,
+                   Point2f pRaster, const Interaction &pRef, const Interaction &pLens)
+        : Wi(Wi), wi(wi), pdf(pdf), pRaster(pRaster), pRef(pRef), pLens(pLens) {}
 
-struct CameraSample {
-    Point2f pFilm;
-    Point2f pLens;
-    Float time = 0;
-    Float weight = 1;
+    bool Unoccluded(const Scene &scene) const;
+    SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
+                       Sampler &sampler) const;
 
-    std::string ToString() const;
+    SampledSpectrum Wi;
+    Vector3f wi;
+    Float pdf;
+    Point2f pRaster;
+    Interaction pRef, pLens;
+};
+
+struct CameraRay {
+    Ray ray;
+    SampledSpectrum weight = SampledSpectrum(1);
+};
+
+struct CameraRayDifferential {
+    RayDifferential ray;
+    SampledSpectrum weight = SampledSpectrum(1);
 };
 
 class Camera {
   public:
     // Camera Interface
     Camera(const AnimatedTransform &worldFromCamera, Float shutterOpen,
-           Float shutterClose, Film *film, const Medium *medium);
+           Float shutterClose, std::unique_ptr<Film> film, const Medium *medium);
     virtual ~Camera();
-
-    static Camera *Create(const std::string &name, const ParameterDictionary &dict,
-                          const Medium *medium, const AnimatedTransform &worldFromCamera,
-                          Film *film, const FileLoc *loc,
-                          Allocator alloc);
 
     virtual pstd::optional<CameraRay>
     PBRT_HOST_DEVICE
@@ -198,13 +250,12 @@ class Camera {
     virtual void InitMetadata(ImageMetadata *metadata) const;
     virtual std::string ToString() const = 0;
 
-    PBRT_HOST_DEVICE
     void ApproximatedPdxy(const SurfaceInteraction &si) const;
 
     // Camera Public Data
     AnimatedTransform worldFromCamera;
     Float shutterOpen, shutterClose;
-    Film  *film;
+    pstd::unique_ptr<Film> film;
     const Medium *medium;
 
   protected:
@@ -216,7 +267,51 @@ class Camera {
     Vector3f minDirDifferentialX, minDirDifferentialY;
 };
 
+struct CameraSample {
+    Point2f pFilm;
+    Point2f pLens;
+    Float time = 0;
+    Float weight = 1;
+
+    std::string ToString() const;
+};
+
+class ProjectiveCamera : public Camera {
+  public:
+    // ProjectiveCamera Public Methods
+    ProjectiveCamera(const AnimatedTransform &worldFromCamera,
+                     const Transform &screenFromCamera,
+                     const Bounds2f &screenWindow, Float shutterOpen,
+                     Float shutterClose, Float lensRadius, Float focalDistance,
+                     std::unique_ptr<Film> f, const Medium *medium);
+    void InitMetadata(ImageMetadata *metadata) const;
+
+    //  protected:
+    ProjectiveCamera() = default;
+    std::string BaseToString() const;
+
+    // ProjectiveCamera Protected Data
+    Transform screenFromCamera, cameraFromRaster;
+    Transform rasterFromScreen, screenFromRaster;
+    Float lensRadius, focalDistance;
+};
+
+
 // Shape Declarations
+struct ShapeSample {
+    Interaction intr;
+    Float pdf;
+
+    std::string ToString() const;
+};
+
+struct ShapeIntersection {
+    SurfaceInteraction intr;
+    Float tHit;
+
+    std::string ToString() const;
+};
+
 class Triangle;
 class BilinearPatch;
 class Curve;
@@ -236,7 +331,7 @@ public:
     static pstd::vector<ShapeHandle> Create(
         const std::string &name, const Transform *worldFromObject,
         const Transform *objectFromWorld, bool reverseOrientation,
-        const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc);
+        const ParameterDictionary &dict, Allocator alloc, FileLoc loc);
 
     PBRT_HOST_DEVICE_INLINE
     Bounds3f WorldBound() const;
@@ -324,7 +419,7 @@ public:
     static FloatTextureHandle Create(const std::string &name,
                                      const Transform &worldFromTexture,
                                      const TextureParameterDictionary &dict,
-                                     const FileLoc *loc, Allocator alloc, bool gpu);
+                                     Allocator alloc, FileLoc loc, bool gpu);
 
     PBRT_HOST_DEVICE_INLINE
     Float Evaluate(const TextureEvalContext &ctx) const;
@@ -366,7 +461,7 @@ public:
     static SpectrumTextureHandle Create(const std::string &name,
                                         const Transform &worldFromTexture,
                                         const TextureParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc, bool gpu);
+                                        Allocator alloc, FileLoc loc, bool gpu);
 
     // This is defined in textures.h. That's kind of weird...
     PBRT_HOST_DEVICE_INLINE
@@ -413,7 +508,7 @@ public:
 
     static MaterialHandle Create(const std::string &name, const TextureParameterDictionary &dict,
                                  /*const */std::map<std::string, MaterialHandle> &namedMaterials,
-                                 const FileLoc *loc, Allocator alloc);
+                                 Allocator alloc, FileLoc loc);
 
     // -> bool Matches(std::init_list<FloatTextureHandle>, ...<SpectrumTextureHandle>
     // -> Float operator()(FloatTextureHandle tex, cont TextureEvalContext &ctx)
@@ -424,11 +519,9 @@ public:
                   const SampledWavelengths &lambda,
                   MaterialBuffer &materialBuffer, TransportMode mode) const;
 
-    template <typename TextureEvaluator>
     PBRT_HOST_DEVICE_INLINE
-    BSSRDFHandle GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                           const SampledWavelengths &lambda,
-                           MaterialBuffer &materialBuffer, TransportMode mode) const;
+    BSSRDF *GetBSSRDF(SurfaceInteraction &si, const SampledWavelengths &lambda,
+                      MaterialBuffer &materialBuffer, TransportMode mode) const;
 
     PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const;
@@ -436,82 +529,83 @@ public:
     PBRT_HOST_DEVICE_INLINE
     bool IsTransparent() const;
 
-    PBRT_HOST_DEVICE_INLINE
-    bool HasSubsurfaceScattering() const;
-
     std::string ToString() const;
 };
 
-class BSSRDFSample;
-class BSSRDFProbeSegment;
-
-class TabulatedBSSRDF;
-
-class BSSRDFHandle : public TaggedPointer<TabulatedBSSRDF> {
-public:
-    using TaggedPointer::TaggedPointer;
-    PBRT_HOST_DEVICE
-    BSSRDFHandle(TaggedPointer<TabulatedBSSRDF> tp)
-        : TaggedPointer(tp) { }
-
-    PBRT_HOST_DEVICE
-    SampledSpectrum S(const SurfaceInteraction &pi, const Vector3f &wi);
-
-    PBRT_HOST_DEVICE
-    pstd::optional<BSSRDFProbeSegment> Sample(Float u1, const Point2f &u2) const;
-
-    PBRT_HOST_DEVICE
-    BSSRDFSample ProbeIntersectionToSample(const SurfaceInteraction &si,
-                                           MaterialBuffer &materialBuffer) const;
-};
-
 // Sampler Declarations
-class HaltonSampler;
-class PaddedSobolSampler;
-class PMJ02BNSampler;
-class RandomSampler;
-class SobolSampler;
-class StratifiedSampler;
-class MLTSampler;
-class DebugMLTSampler;
-
-class SamplerHandle : public TaggedPointer<HaltonSampler, PaddedSobolSampler, PMJ02BNSampler,
-                                           RandomSampler, SobolSampler, StratifiedSampler,
-                                           MLTSampler, DebugMLTSampler> {
-public:
-    using TaggedPointer::TaggedPointer;
-    SamplerHandle(TaggedPointer<HaltonSampler, PaddedSobolSampler, PMJ02BNSampler,
-                                RandomSampler, SobolSampler, StratifiedSampler,
-                                MLTSampler, DebugMLTSampler> tp)
-        : TaggedPointer(tp) { }
-
-    static SamplerHandle Create(const std::string &name, const ParameterDictionary &dict,
-                                const Point2i &fullResolution, const FileLoc *loc,
-                                Allocator alloc);
-
+class Sampler {
+  public:
+    // Sampler Interface
     PBRT_HOST_DEVICE
-    int SamplesPerPixel() const;
+    Sampler(int samplesPerPixel);
+    PBRT_HOST_DEVICE
+    virtual ~Sampler();
 
     PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int sampleIndex);
 
     PBRT_HOST_DEVICE
     Float Get1D();
-
     PBRT_HOST_DEVICE
     Point2f Get2D();
 
     PBRT_HOST_DEVICE
-    CameraSample GetCameraSample(const Point2i &pPixel, FilterHandle filter);
+    CameraSample GetCameraSample(const Filter &filter);
 
-    PBRT_HOST_DEVICE
+    PBRT_HOST_DEVICE_INLINE
     int GetDiscrete1D(int n) {
         return std::min<int>(Get1D() * n, n - 1);
     }
 
-    std::vector<SamplerHandle> Clone(int n, Allocator alloc);
+    // Sampler Public Data
+    const int samplesPerPixel;
 
-    std::string ToString() const;
+    virtual std::unique_ptr<Sampler> Clone() = 0;
+
+    virtual std::string ToString() const = 0;
+
+  protected:
+    std::string BaseToString() const;
+
+    class SamplerState {
+      public:
+        SamplerState() = default;
+        PBRT_HOST_DEVICE_INLINE
+        SamplerState(const Point2i &p, int sampleIndex)
+            : p(p),
+              sampleIndex(sampleIndex),
+              dimension(0) { }
+
+        Point2i p{std::numeric_limits<int>::lowest(),
+                  std::numeric_limits<int>::lowest()};
+        int sampleIndex = 0;
+        int dimension = 0;
+
+        std::string ToString() const;
+
+        // Based on p and dimension, *not* sampleIndex.
+        PBRT_HOST_DEVICE_INLINE
+        uint64_t Hash() const {
+            return MixBits(((uint64_t)p.x << 48) ^ ((uint64_t)p.y << 32) ^
+                           ((uint64_t)dimension << 16)
+#ifndef __CUDA_ARCH__
+                           ^ PbrtOptions.seed
+#endif
+                           );
+        }
+    };
+
+    // Methods that Sampler implementations must provide.
+    PBRT_HOST_DEVICE
+    virtual void ImplStartPixelSample(const Point2i &p, int sampleIndex);
+    PBRT_HOST_DEVICE
+    virtual Float ImplGet1D(const SamplerState &s) = 0;
+    PBRT_HOST_DEVICE
+    virtual Point2f ImplGet2D(const SamplerState &s) = 0;
+
+  private:
+    // Sampler Private Data
+    SamplerState state;
 };
 
 // Integrator Declarations
@@ -519,13 +613,6 @@ class Integrator {
   public:
     // Integrator Interface
     virtual ~Integrator();
-
-    static std::unique_ptr<Integrator> Create(
-        const std::string &name, const ParameterDictionary &dict,
-        const Scene &scene, std::unique_ptr<Camera> camera,
-        SamplerHandle sampler,
-        const RGBColorSpace *colorSpace, const FileLoc *loc);
-
     virtual void Render() = 0;
     virtual std::string ToString() const = 0;
 
@@ -565,15 +652,9 @@ class Medium {
   public:
     // Medium Interface
     virtual ~Medium() {}
-
-    static Medium *Create(const std::string &name,
-                          const ParameterDictionary &dict,
-                          const Transform &worldFromMedium, const FileLoc *loc,
-                          Allocator alloc);
-
     virtual SampledSpectrum Tr(const Ray &ray, Float tMax, const SampledWavelengths &lambda,
-                               SamplerHandle sampler) const = 0;
-    virtual SampledSpectrum Sample(const Ray &ray, Float tMax, SamplerHandle sampler,
+                               Sampler &sampler) const = 0;
+    virtual SampledSpectrum Sample(const Ray &ray, Float tMax, Sampler &sampler,
                                    const SampledWavelengths &lambda,
                                    MemoryArena &arena,
                                    MediumInteraction *mi) const = 0;
@@ -596,10 +677,10 @@ struct MediumInterface {
 
 // LightType Declarations
 enum class LightType : int {
-    DeltaPosition,
-    DeltaDirection,
-    Area,
-    Infinite
+    DeltaPosition = 1,
+    DeltaDirection = 2,
+    Area = 4,
+    Infinite = 8
 };
 
 std::string ToString(LightType type);
@@ -610,7 +691,175 @@ bool IsDeltaLight(LightType type) {
             type == LightType::DeltaDirection);
 }
 
+struct LightBounds {
+    LightBounds() = default;
+    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float theta_o,
+                Float theta_e, bool twoSided)
+      : b(b), w(Normalize(w)), phi(phi), theta_o(theta_o), theta_e(theta_e),
+        cosTheta_o(std::cos(theta_o)), cosTheta_e(std::cos(theta_e)), twoSided(twoSided) {}
+    LightBounds(const Point3f &p, const Vector3f &w, Float phi, Float theta_o,
+                Float theta_e, bool twoSided)
+      : b(p, p), w(Normalize(w)), phi(phi), theta_o(theta_o), theta_e(theta_e),
+        cosTheta_o(std::cos(theta_o)), cosTheta_e(std::cos(theta_e)), twoSided(twoSided) {}
+
+    // baseline: 38s in importance
+    // acos hack: 34s
+    // theta_u 0 if far away: 23s (!)
+    PBRT_HOST_DEVICE
+    Float Importance(const Interaction &intr) const {
+        //ProfilerScope _(ProfilePhase::LightDistribImportance);
+
+        Point3f pc = (b.pMin + b.pMax) / 2;
+        Float d2 = DistanceSquared(intr.p(), pc);
+        // Don't let d2 get too small if p is inside the bounds.
+        d2 = std::max(d2, Length(b.Diagonal()) / 2);
+
+        Vector3f wi = Normalize(intr.p() - pc);
+
+#if 0
+        Float cosTheta = Dot(w, wi);
+        Float theta = SafeACos(cosTheta);
+        if (twoSided && theta > Pi / 2) {
+            theta = std::max<Float>(0, Pi - theta);
+            cosTheta = std::abs(cosTheta);
+        }
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+
+        Float cosTheta_u = BoundSubtendedDirections(b, intr.p).cosTheta;
+        Float theta_u = SafeACos(cosTheta_u);
+
+        Float thetap = std::max<Float>(0, theta - theta_o - theta_u);
+
+        if (thetap >= theta_e)
+            return 0;
+
+        Float imp = phi * std::cos(thetap) / d2;
+        CHECK_GE(imp, -1e-3);
+
+        if (intr.n != Normal3f(0,0,0)) {
+            Float cosTheta_i = AbsDot(wi, intr.n);
+            Float theta_i = SafeACos(cosTheta_i);
+            Float thetap_i = std::max<Float>(theta_i - theta_u, 0);
+            imp *= std::cos(thetap_i);
+        }
+#else
+        Float cosTheta = Dot(w, wi);
+        if (twoSided)
+            cosTheta = std::abs(cosTheta);
+        // FIXME? unstable when cosTheta \approx 1
+        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+
+        // cos(max(0, a-b))
+        auto cosSubClamped = [](Float sinThetaA, Float cosThetaA,
+                                Float sinThetaB, Float cosThetaB) -> Float {
+                                 if (cosThetaA > cosThetaB)
+                                     // Handle the max(0, ...)
+                                     return 1;
+                                 return cosThetaA * cosThetaB + sinThetaA * sinThetaB;
+                             };
+        // sin(max(0, a-b))
+        auto sinSubClamped = [](Float sinThetaA, Float cosThetaA,
+                                Float sinThetaB, Float cosThetaB) -> Float {
+                                 if (cosThetaA > cosThetaB)
+                                     // Handle the max(0, ...)
+                                     return 0;
+                                 return sinThetaA * cosThetaB - cosThetaA * sinThetaB;
+                             };
+
+        Float cosTheta_u = BoundSubtendedDirections(b, intr.p()).cosTheta;
+        Float sinTheta_u = SafeSqrt(1 - cosTheta_u * cosTheta_u);
+
+        // Open issue: for a tri light that's axis aligned, we'd like to have
+        // very low to zero importance for points in its plane. This doesn't
+        // quite work out due to subtracting out the bounds' subtended angle.
+
+        // cos(theta_p). Compute in two steps
+        Float cosTheta_x = cosSubClamped(sinTheta, cosTheta,
+                                         SafeSqrt(1 - cosTheta_o * cosTheta_o),
+                                         cosTheta_o);
+        Float sinTheta_x = sinSubClamped(sinTheta, cosTheta,
+                                         SafeSqrt(1 - cosTheta_o * cosTheta_o),
+                                         cosTheta_o);
+        Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x,
+                                         sinTheta_u, cosTheta_u);
+
+        if (cosTheta_p <= cosTheta_e)
+            return 0;
+
+        Float imp = phi * cosTheta_p / d2;
+        DCHECK_GE(imp, -1e-3);
+
+        if (intr.n != Normal3f(0, 0, 0)) {
+            // cos(thetap_i) = cos(max(0, theta_i - theta_u))
+            // cos (a-b) = cos a cos b + sin a sin b
+            Float cosTheta_i = AbsDot(wi, intr.n);
+            Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
+            Float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i,
+                                              sinTheta_u, cosTheta_u);
+            imp *= cosThetap_i;
+        }
+#endif
+
+        return std::max<Float>(imp, 0);
+    }
+
+
+
+    std::string ToString() const;
+
+    Bounds3f b;  // TODO: rename to |bounds|?
+    Vector3f w;
+    Float phi = 0;
+    Float theta_o = 0, theta_e = 0;
+    Float cosTheta_o = 1, cosTheta_e = 1;
+    bool twoSided = false;
+};
+
+LightBounds Union(const LightBounds &a, const LightBounds &b);
+
 // Light Declarations
+class LightLiSample {
+public:
+    LightLiSample() = default;
+    PBRT_HOST_DEVICE_INLINE
+    LightLiSample(const Light *light, const SampledSpectrum &L, const Vector3f &wi,
+                  Float pdf, const Interaction &pRef, const Interaction &pLight)
+        : L(L), wi(wi), pdf(pdf), light(light), pRef(pRef), pLight(pLight) {}
+
+    bool Unoccluded(const Scene &scene) const;
+    SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
+                       Sampler &sampler) const;
+
+    const Light *light;
+    SampledSpectrum L;
+    Vector3f wi;
+    Float pdf;
+    Interaction pRef, pLight;
+};
+
+class LightLeSample {
+public:
+    LightLeSample() = default;
+    PBRT_HOST_DEVICE_INLINE
+    LightLeSample(const SampledSpectrum &L, const Ray &ray, Float pdfPos,
+                  Float pdfDir)
+        : L(L), ray(ray), pdfPos(pdfPos), pdfDir(pdfDir) {}
+    PBRT_HOST_DEVICE_INLINE
+    LightLeSample(const SampledSpectrum &L, const Ray &ray, const Interaction &intr,
+                  Float pdfPos, Float pdfDir)
+        : L(L), ray(ray), intr(intr), pdfPos(pdfPos), pdfDir(pdfDir) {
+        CHECK(this->intr->n != Normal3f(0, 0, 0));
+    }
+
+    PBRT_HOST_DEVICE_INLINE
+    Float AbsCosTheta(const Vector3f &w) const { return intr ? AbsDot(w, intr->n) : 1; }
+
+    SampledSpectrum L;
+    Ray ray;
+    pstd::optional<Interaction> intr;
+    Float pdfPos, pdfDir;
+};
+
 class PointLight;
 class DistantLight;
 class ProjectionLight;
@@ -637,13 +886,13 @@ public:
     static LightHandle Create(const std::string &name,
                               const ParameterDictionary &dict,
                               const AnimatedTransform &worldFromLight,
-                              const Medium *outsideMedium, const FileLoc *loc,
+                              const Medium *outsideMedium, FileLoc loc,
                               Allocator alloc);
     static LightHandle CreateArea(const std::string &name,
                                   const ParameterDictionary &dict,
                                   const AnimatedTransform &worldFromLight,
                                   const MediumInterface &mediumInterface,
-                                  const ShapeHandle shape, const FileLoc *loc,
+                                  const ShapeHandle shape, FileLoc loc,
                                   Allocator alloc);
 
     // These shouldn't be called. Add these to get decent error messages

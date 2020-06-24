@@ -58,36 +58,11 @@
 
 namespace pbrt {
 
-// Film Declarations
-// Note: AOVs only really make sense for PathIntegrator...
-// volpath: medium interactions...
-// bdpt, lightpath: Ld is partially computed via splats...
-// simplepath, whitted: want to keep it simple
-// sppm: ...
-struct VisibleSurface {
-    VisibleSurface() = default;
-    PBRT_HOST_DEVICE
-    VisibleSurface(const SurfaceInteraction &si, const Camera &camera,
-                   const SampledWavelengths &lambda);
-
-    std::string ToString() const;
-
-    Point3f p;
-    Float dzdx = 0, dzdy = 0; // x/y: raster space, z: camera space
-    Normal3f n, ns;
-    Float time = 0;
-    SampledSpectrum Le, Ld, albedo;
-    BSDF *bsdf = nullptr;
-
-private:
-    Vector3f dpdx, dpdy; // world(ish) space
-};
-
 class RGBFilm final : public Film {
   public:
     RGBFilm() = default;
     RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-            FilterHandle filter, Float diagonal,
+            pstd::unique_ptr<Filter> filter, Float diagonal,
             const std::string &filename, Float scale,
             const RGBColorSpace *colorSpace,
             Float maxSampleLuminance = Infinity,
@@ -95,9 +70,9 @@ class RGBFilm final : public Film {
             Allocator allocator = {});
 
     static RGBFilm *Create(const ParameterDictionary &dict,
-                           FilterHandle filter,
+                           pstd::unique_ptr<Filter> filter,
                            const RGBColorSpace *colorSpace,
-                           const FileLoc *loc, Allocator alloc);
+                           Allocator alloc = {});
 
     PBRT_HOST_DEVICE
     SampledWavelengths SampleWavelengths(Float u) const;
@@ -108,8 +83,8 @@ class RGBFilm final : public Film {
                    const pstd::optional<VisibleSurface> &visibleSurface,
                    Float weight) {
         ProfilerScope _(ProfilePhase::AddFilmSample);
-        if (L.y(lambda) > maxSampleLuminance)
-            L *= maxSampleLuminance / L.y(lambda);
+        if (L.y(lambda, colorSpace->Y) > maxSampleLuminance)
+            L *= maxSampleLuminance / L.y(lambda, colorSpace->Y);
 
         DCHECK(InsideExclusive(pFilm, pixelBounds));
 
@@ -148,32 +123,29 @@ class RGBFilm final : public Film {
     bool writeFP16, saveVariance;
 };
 
-class AOVFilm final : public Film {
+class AOVFilm : public Film {
   public:
     AOVFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-            FilterHandle filter, Float diagonal,
-            const std::string &filename, const RGBColorSpace *colorSpace,
+            pstd::unique_ptr<Filter> filter, Float diagonal,
+            const std::string &filename,
+            const RGBColorSpace *colorSpace,
             Float maxSampleLuminance = Infinity,
-            bool writeFP16 = true,
-            Allocator alloc = {});
+            bool writeFP16 = true);
 
-    static AOVFilm *Create(const ParameterDictionary &dict, FilterHandle filter,
-                           const RGBColorSpace *colorSpace, const FileLoc *loc,
-                           Allocator alloc);
+    static std::unique_ptr<Film> Create(const ParameterDictionary &dict,
+                                        pstd::unique_ptr<Filter> filter,
+                                        const RGBColorSpace *colorSpace);
 
     PBRT_HOST_DEVICE
     SampledWavelengths SampleWavelengths(Float u) const;
-
     PBRT_HOST_DEVICE
     void AddSample(const Point2i &pFilm, SampledSpectrum L,
                    const SampledWavelengths &lambda,
                    const pstd::optional<VisibleSurface> &visibleSurface,
                    Float weight);
-
     PBRT_HOST_DEVICE
     void AddSplat(const Point2f &p, SampledSpectrum v,
                   const SampledWavelengths &lambda);
-
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
     std::string ToString() const;

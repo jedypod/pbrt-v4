@@ -408,16 +408,16 @@ static TriangleMesh *LoopSubdivide(
 
 TriangleMesh *CreateLoopSubdivMesh(
     const Transform *worldFromObject, bool reverseOrientation,
-    const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+    const ParameterDictionary &dict, Allocator alloc) {
     int nLevels = dict.GetOneInt("levels", 3);
     std::vector<int> vertexIndices = dict.GetIntArray("indices");
     std::vector<Point3f> P = dict.GetPoint3fArray("P");
     if (vertexIndices.empty()) {
-        Error(loc, "Vertex indices \"indices\" not provided for LoopSubdiv shape.");
+        Error("Vertex indices \"indices\" not provided for LoopSubdiv shape.");
         return {};
     }
     if (P.empty()) {
-        Error(loc, "Vertex positions \"P\" not provided for LoopSubdiv shape.");
+        Error("Vertex positions \"P\" not provided for LoopSubdiv shape.");
         return {};
     }
 

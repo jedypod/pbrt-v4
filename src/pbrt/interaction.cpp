@@ -38,12 +38,11 @@
 #include <pbrt/bssrdf.h>
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
+#include <pbrt/util/check.h>
+#include <pbrt/util/math.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/primitive.h>
-#include <pbrt/samplers.h>
-#include <pbrt/util/check.h>
-#include <pbrt/util/math.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/profile.h>
 #include <pbrt/util/rng.h>
@@ -86,14 +85,14 @@ std::string MediumInteraction::ToString() const {
 // SurfaceInteraction Method Definitions
 void SurfaceInteraction::ComputeScatteringFunctions(
     const RayDifferential &ray, const SampledWavelengths &lambda,
-    const Camera &camera, MaterialBuffer &materialBuffer, SamplerHandle sampler,
+    const Camera &camera, MaterialBuffer &materialBuffer, Sampler &sampler,
     TransportMode mode) {
     ComputeDifferentials(ray, camera);
 
-    if (!material)
+    if (*material == nullptr)
         return;
 
-    FloatTextureHandle displacement = material.GetDisplacement();
+    FloatTextureHandle displacement = material->GetDisplacement();
     if (displacement) {
         Vector3f dpdu, dpdv;
         CHECK(Bump(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv));
@@ -103,30 +102,21 @@ void SurfaceInteraction::ComputeScatteringFunctions(
 
     {
         ProfilerScope p(ProfilePhase::GetBSDF);
-        bsdf = material.GetBSDF(UniversalTextureEvaluator(), *this, lambda,
-                                materialBuffer, mode);
+        bsdf = material->GetBSDF(UniversalTextureEvaluator(), *this, lambda,
+                                 materialBuffer, mode);
 
-#ifdef __CUDA_ARCH__
-        if (PbrtOptionsGPU.forceDiffuse) {
-#else
+#ifndef __CUDA_ARCH__
         if (PbrtOptions.forceDiffuse) {
-#endif
-            int nRhoSamples = 16;
-            SampledSpectrum r = bsdf->rho(wo, [=](int i) {
-                return RhoHemiDirSample{RadicalInverse(0, i + 1),
-                                        Point2f(RadicalInverse(1, i + 1),
-                                                RadicalInverse(2, i + 1))};
-            }, nRhoSamples);
-
+            SampledSpectrum r = bsdf->rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
             bsdf = materialBuffer.Alloc<BSDF>(*this,
                                      materialBuffer.Alloc<LambertianBxDF>(r, SampledSpectrum(0.), 0.),
                                      bsdf->eta);
         }
+#endif
     }
     {
         ProfilerScope p(ProfilePhase::GetBSSRDF);
-        bssrdf = material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda,
-                                    materialBuffer, mode);
+        bssrdf = material->GetBSSRDF(*this, lambda, materialBuffer, mode);
     }
 }
 
@@ -187,7 +177,7 @@ fail:
 
 SampledSpectrum SurfaceInteraction::Le(const Vector3f &w,
                                        const SampledWavelengths &lambda) const {
-    return areaLight ? areaLight.L(*this, w, lambda) : SampledSpectrum(0.f);
+    return (areaLight && *areaLight) ? areaLight->L(*this, w, lambda) : SampledSpectrum(0.f);
 }
 
 RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
@@ -291,9 +281,9 @@ std::string SurfaceInteraction::ToString() const {
                         dpdu, dpdv, dndu, dndv, shading.n, shading.dpdu, shading.dpdv,
                         shading.dndu, shading.dndv,
                         bsdf ? bsdf->ToString().c_str() : "(nullptr)",
-                        bssrdf ? BSSRDFHandle(bssrdf).ToString().c_str() : "(nullptr)",
-                        material ? material.ToString().c_str() : "(nullptr)",
-                        areaLight ? areaLight.ToString().c_str() : "(nullptr)",
+                        bssrdf ? bssrdf->ToString().c_str() : "(nullptr)",
+                        material ? material->ToString().c_str() : "(nullptr)",
+                        areaLight ? areaLight->ToString().c_str() : "(nullptr)",
                         dpdx, dpdy, dudx, dvdx, dudy, dvdy, faceIndex);
 }
 

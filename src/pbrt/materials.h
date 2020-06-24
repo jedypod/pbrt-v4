@@ -121,6 +121,191 @@ bool Bump(TextureEvaluator texEval, FloatTextureHandle displacement,
     return true;
 }
 
+// DisneyMaterial Declarations
+class alignas(8) DisneyMaterial {
+  public:
+    // DisneyMaterial Public Methods
+    DisneyMaterial(SpectrumTextureHandle color,
+                   FloatTextureHandle metallic,
+                   FloatTextureHandle eta,
+                   FloatTextureHandle roughness,
+                   FloatTextureHandle specularTint,
+                   FloatTextureHandle anisotropic,
+                   FloatTextureHandle sheen,
+                   FloatTextureHandle sheenTint,
+                   FloatTextureHandle clearcoat,
+                   FloatTextureHandle clearcoatGloss,
+                   FloatTextureHandle specTrans,
+                   SpectrumTextureHandle scatterDistance,
+                   bool thin, FloatTextureHandle flatness,
+                   FloatTextureHandle diffTrans,
+                   FloatTextureHandle displacement)
+        : displacement(displacement),
+          color(color),
+          metallic(metallic),
+          eta(eta),
+          roughness(roughness),
+          specularTint(specularTint),
+          anisotropic(anisotropic),
+          sheen(sheen),
+          sheenTint(sheenTint),
+          clearcoat(clearcoat),
+          clearcoatGloss(clearcoatGloss),
+          specTrans(specTrans),
+          scatterDistance(scatterDistance),
+          thin(thin),
+          flatness(flatness),
+          diffTrans(diffTrans) {}
+
+    template <typename TextureEvaluator>
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda, MaterialBuffer &materialBuffer,
+                  TransportMode mode) const {
+        if (!texEval.Matches({metallic, eta, roughness, specularTint, anisotropic,
+                              sheen, sheenTint, clearcoat, clearcoatGloss, specTrans,
+                              flatness, diffTrans}, {color, scatterDistance}))
+            return nullptr;
+
+        // Evaluate textures for _DisneyMaterial_ material and allocate BRDF
+        DisneyDiffuseLobe *diffuseBxDF = nullptr;
+        DisneyFakeSSLobe *fakeSSBxDF = nullptr;
+        DisneyRetroLobe *retroBxDF = nullptr;
+        DisneySheenLobe *sheenBxDF = nullptr;
+        DisneyClearcoatLobe *clearcoatBxDF = nullptr;
+        MicrofacetReflectionBxDF *glossyReflectionBxDF = nullptr;
+        MicrofacetTransmissionBxDF *glossyTransmissionBxDF = nullptr;
+        LambertianBxDF *diffuseTransmissionBxDF = nullptr;
+        SpecularTransmissionBxDF *subsurfaceBxDF = nullptr;
+
+        // Diffuse
+        SampledSpectrum c = Clamp(texEval(color, si, lambda), 0, 1);
+        Float metallicWeight = texEval(metallic, si);
+        Float e = texEval(eta, si);
+        Float strans = texEval(specTrans, si);
+        Float diffuseWeight = (1 - metallicWeight) * (1 - strans);
+        Float dt = texEval(diffTrans, si) /
+            2;  // 0: all diffuse is reflected -> 1, transmitted
+        Float rough = texEval(roughness, si);
+        Float lum = c.y(lambda, SPDs::Y());
+        // normalize lum. to isolate hue+sat
+        SampledSpectrum Ctint = lum > 0 ? (c / lum) : SampledSpectrum(1.);
+
+        Float sheenWeight = texEval(sheen, si);
+        SampledSpectrum Csheen(0.);
+        if (sheenWeight > 0) {
+            Float stint = texEval(sheenTint, si);
+            Csheen = Lerp(stint, SampledSpectrum(1.), Ctint);
+        }
+
+        if (diffuseWeight > 0) {
+            if (thin) {
+                Float flat = texEval(flatness, si);
+                // Blend between DisneyDiffuse and fake subsurface based on
+                // flatness.  Additionally, weight using diffTrans.
+                diffuseBxDF = materialBuffer.Alloc<DisneyDiffuseLobe>(diffuseWeight * (1 - flat) * (1 - dt) * c);
+                fakeSSBxDF = materialBuffer.Alloc<DisneyFakeSSLobe>(diffuseWeight * flat * (1 - dt) * c, rough);
+            } else {
+                SampledSpectrum sd = texEval(scatterDistance, si, lambda);
+                if (!sd)
+                    // No subsurface scattering; use regular (Fresnel modified) diffuse.
+                    diffuseBxDF = materialBuffer.Alloc<DisneyDiffuseLobe>(diffuseWeight * c);
+                else {
+                    // Otherwise GetBSSRDF() will return a BSSRDF, but we need
+                    // to add the component for transmission into the surface.
+                    subsurfaceBxDF =
+                        materialBuffer.Alloc<SpecularTransmissionBxDF>(SampledSpectrum(1.f), e, mode);
+                }
+            }
+
+            // Retro-reflection.
+            retroBxDF = materialBuffer.Alloc<DisneyRetroLobe>(diffuseWeight * c, rough);
+
+            // Sheen (if enabled)
+            if (sheenWeight > 0)
+                sheenBxDF = materialBuffer.Alloc<DisneySheenLobe>(diffuseWeight * sheenWeight * Csheen);
+        }
+
+        // Create the microfacet distribution for metallic and/or specular
+        // transmission.
+        Float aspect = std::sqrt(1 - texEval(anisotropic, si) * .9);
+        Float ax = std::max(Float(.001), Sqr(rough) / aspect);
+        Float ay = std::max(Float(.001), Sqr(rough) * aspect);
+        MicrofacetDistributionHandle distrib =
+            materialBuffer.Alloc<DisneyMicrofacetDistribution>(ax, ay);
+
+        // Specular is Trowbridge-Reitz with a modified Fresnel function.
+        Float specTint = texEval(specularTint, si);
+        SampledSpectrum Cspec0 =
+            Lerp(metallicWeight,
+                 SchlickR0FromEta(e) * Lerp(specTint, SampledSpectrum(1.), Ctint), c);
+        FresnelHandle fresnel = materialBuffer.Alloc<DisneyFresnel>(Cspec0, metallicWeight, e);
+        glossyReflectionBxDF = materialBuffer.Alloc<MicrofacetReflectionBxDF>(distrib, fresnel);
+
+        // Clearcoat
+        Float cc = texEval(clearcoat, si);
+        if (cc > 0) {
+            Float gloss = Lerp(texEval(clearcoatGloss, si), .1, .001);
+            clearcoatBxDF = materialBuffer.Alloc<DisneyClearcoatLobe>(cc, gloss);
+        }
+
+        // BTDF
+        if (strans > 0) {
+            // Walter et al's model, with the provided transmissive term scaled
+            // by sqrt(color), so that after two refractions, we're back to the
+            // provided color.
+            SampledSpectrum T = strans * Sqrt(c);
+            if (thin) {
+                // Scale roughness based on IOR (Burley 2015, Figure 15).
+                Float rscaled = (0.65f * e - 0.35f) * rough;
+                Float ax = std::max(Float(.001), Sqr(rscaled) / aspect);
+                Float ay = std::max(Float(.001), Sqr(rscaled) * aspect);
+                MicrofacetDistributionHandle scaledDistrib =
+                    materialBuffer.Alloc<TrowbridgeReitzDistribution>(ax, ay);
+                glossyTransmissionBxDF =
+                    materialBuffer.Alloc<MicrofacetTransmissionBxDF>(T, scaledDistrib, e, mode);
+            } else
+                glossyTransmissionBxDF =
+                    materialBuffer.Alloc<MicrofacetTransmissionBxDF>(T, distrib, e, mode);
+        }
+        if (thin) {
+            // Lambertian, weighted by (1 - diffTrans)
+            diffuseTransmissionBxDF = materialBuffer.Alloc<LambertianBxDF>(SampledSpectrum(0), dt * c, 0);
+        }
+
+        DisneyBxDF *db = materialBuffer.Alloc<DisneyBxDF>(diffuseBxDF, fakeSSBxDF, retroBxDF,
+                                                          sheenBxDF, clearcoatBxDF, glossyReflectionBxDF,
+                                                          glossyTransmissionBxDF, diffuseTransmissionBxDF,
+                                                          subsurfaceBxDF);
+        return materialBuffer.Alloc<BSDF>(si, db);
+    }
+
+    PBRT_HOST_DEVICE
+    BSSRDF *GetBSSRDF(SurfaceInteraction &si,
+                      const SampledWavelengths &lambda,
+                      MaterialBuffer &materialBuffer, TransportMode mode) const;
+
+    PBRT_HOST_DEVICE_INLINE
+    FloatTextureHandle GetDisplacement() const { return displacement; }
+
+    static DisneyMaterial *Create(const TextureParameterDictionary &dict,
+                                  Allocator alloc);
+
+    std::string ToString() const;
+
+  private:
+    // DisneyMaterial Private Data
+    FloatTextureHandle displacement;
+    SpectrumTextureHandle color;
+    FloatTextureHandle metallic, eta;
+    FloatTextureHandle roughness, specularTint, anisotropic, sheen;
+    FloatTextureHandle sheenTint, clearcoat, clearcoatGloss;
+    FloatTextureHandle specTrans;
+    SpectrumTextureHandle scatterDistance;
+    bool thin;
+    FloatTextureHandle flatness, diffTrans;
+};
+
 // DielectricMaterial Declarations
 class alignas(8) DielectricMaterial {
   public:
@@ -175,7 +360,7 @@ class alignas(8) DielectricMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static DielectricMaterial *Create(const TextureParameterDictionary &dict,
-                                      const FileLoc *loc, Allocator alloc);
+                                      Allocator alloc);
 
     std::string ToString() const;
 
@@ -201,6 +386,9 @@ class alignas(8) ThinDielectricMaterial {
         CHECK((bool)etaF ^ (bool)etaS);
     }
 
+    PBRT_HOST_DEVICE
+    bool IsTransparent() const { return true; }
+
     template <typename TextureEvaluator>
     PBRT_HOST_DEVICE
     BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
@@ -224,7 +412,7 @@ class alignas(8) ThinDielectricMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static ThinDielectricMaterial *Create(const TextureParameterDictionary &dict,
-                                          const FileLoc *loc, Allocator alloc);
+                                          Allocator alloc);
 
     std::string ToString() const;
 
@@ -289,7 +477,7 @@ class alignas(8) HairMaterial {
     }
 
     static HairMaterial *Create(const TextureParameterDictionary &dict,
-                                const FileLoc *loc, Allocator alloc);
+                                Allocator alloc);
 
     PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return nullptr; }
@@ -332,7 +520,7 @@ class alignas(8) DiffuseMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static DiffuseMaterial *Create(const TextureParameterDictionary &dict,
-                                   const FileLoc *loc, Allocator alloc);
+                                   Allocator alloc);
 
     std::string ToString() const;
 
@@ -386,7 +574,7 @@ class alignas(8) ConductorMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static ConductorMaterial *Create(const TextureParameterDictionary &dict,
-                                     const FileLoc *loc, Allocator alloc);
+                                     Allocator alloc);
 
     std::string ToString() const;
 
@@ -427,7 +615,7 @@ class alignas(8) MixMaterial {
 
     static MixMaterial *Create(const TextureParameterDictionary &dict,
                                MaterialHandle m1, MaterialHandle m2,
-                               const FileLoc *loc, Allocator alloc);
+                               Allocator alloc);
 
     PBRT_HOST_DEVICE_INLINE
     // FIXME?
@@ -501,7 +689,7 @@ class alignas(8) CoatedDiffuseMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static CoatedDiffuseMaterial *Create(const TextureParameterDictionary &dict,
-                                         const FileLoc *loc, Allocator alloc);
+                                         Allocator alloc);
 
     std::string ToString() const;
 
@@ -558,7 +746,7 @@ class alignas(8) LayeredMaterial {
 
     static LayeredMaterial *Create(const TextureParameterDictionary &dict,
                                    MaterialHandle top, MaterialHandle base,
-                                   const FileLoc *loc, Allocator alloc);
+                                   Allocator alloc);
 
     std::string ToString() const;
 
@@ -585,8 +773,7 @@ class alignas(8) SubsurfaceMaterial {
                        FloatTextureHandle uRoughness,
                        FloatTextureHandle vRoughness,
                        FloatTextureHandle displacement,
-                       bool remapRoughness,
-                       Allocator alloc)
+                       bool remapRoughness)
         : displacement(displacement),
           scale(scale),
           sigma_a(sigma_a),
@@ -597,7 +784,7 @@ class alignas(8) SubsurfaceMaterial {
           vRoughness(vRoughness),
           eta(eta),
           remapRoughness(remapRoughness),
-          table(100, 64, alloc) {
+          table(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
 
@@ -623,36 +810,15 @@ class alignas(8) SubsurfaceMaterial {
         return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<DielectricInterfaceBxDF>(eta, distrib, mode), eta);
     }
 
-    template <typename TextureEvaluator>
     PBRT_HOST_DEVICE
-    BSSRDFHandle GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                           const SampledWavelengths &lambda,
-                           MaterialBuffer &materialBuffer, TransportMode mode) const {
-        SampledSpectrum sig_a, sig_s;
-        if (sigma_a && sigma_s) {
-            if (!texEval.Matches({}, {sigma_a, sigma_s}))
-                return nullptr;
-
-            sig_a = ClampZero(scale * texEval(sigma_a, si, lambda));
-            sig_s = ClampZero(scale * texEval(sigma_s, si, lambda));
-        } else {
-            DCHECK(reflectance && mfp);
-            if (!texEval.Matches({}, {mfp, reflectance}))
-                return nullptr;
-
-            SampledSpectrum mfree = ClampZero(scale * texEval(mfp, si, lambda));
-            SampledSpectrum r = Clamp(texEval(reflectance, si, lambda), 0, 1);
-            SubsurfaceFromDiffuse(table, r, mfree, &sig_a, &sig_s);
-        }
-
-        return materialBuffer.Alloc<TabulatedBSSRDF>(si, eta, mode, sig_a, sig_s, table);
-    }
+    BSSRDF *GetBSSRDF(SurfaceInteraction &si, const SampledWavelengths &lambda,
+                      MaterialBuffer &materialBuffer, TransportMode mode) const;
 
     PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static SubsurfaceMaterial *Create(const TextureParameterDictionary &dict,
-                                      const FileLoc *loc, Allocator alloc);
+                                      Allocator alloc);
 
     std::string ToString() const;
 
@@ -675,13 +841,11 @@ class alignas(8) DiffuseTransmissionMaterial {
     DiffuseTransmissionMaterial(SpectrumTextureHandle reflectance,
                                 SpectrumTextureHandle transmittance,
                                 FloatTextureHandle sigma,
-                                FloatTextureHandle displacement,
-                                Float scale)
+                                FloatTextureHandle displacement)
         : displacement(displacement),
           reflectance(reflectance),
           transmittance(transmittance),
-          sigma(sigma),
-          scale(scale) { }
+          sigma(sigma) { }
 
     template <typename TextureEvaluator>
     PBRT_HOST_DEVICE
@@ -691,8 +855,8 @@ class alignas(8) DiffuseTransmissionMaterial {
         if (!texEval.Matches({sigma}, {reflectance, transmittance}))
             return nullptr;
 
-        SampledSpectrum r = Clamp(scale * texEval(reflectance, si, lambda), 0, 1);
-        SampledSpectrum t = Clamp(scale * texEval(transmittance, si, lambda), 0, 1);
+        SampledSpectrum r = Clamp(texEval(reflectance, si, lambda), 0, 1);
+        SampledSpectrum t = Clamp(texEval(transmittance, si, lambda), 0, 1);
         Float s = texEval(sigma, si);
         return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<LambertianBxDF>(r, t, s));
     }
@@ -701,7 +865,7 @@ class alignas(8) DiffuseTransmissionMaterial {
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static DiffuseTransmissionMaterial *Create(const TextureParameterDictionary &dict,
-                                               const FileLoc *loc, Allocator alloc);
+                                               Allocator alloc);
 
     std::string ToString() const;
 
@@ -710,7 +874,6 @@ class alignas(8) DiffuseTransmissionMaterial {
     FloatTextureHandle displacement;
     SpectrumTextureHandle reflectance, transmittance;
     FloatTextureHandle sigma;
-    Float scale;
 };
 
 class alignas(8) MeasuredMaterial {
@@ -730,7 +893,7 @@ public:
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
     static MeasuredMaterial *Create(const TextureParameterDictionary &dict,
-                                    const FileLoc *loc, Allocator alloc);
+                                    Allocator alloc);
 
     std::string ToString() const;
 
@@ -758,6 +921,8 @@ MaterialHandle::GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
     case TypeIndex<DiffuseTransmissionMaterial>():
         return Cast<DiffuseTransmissionMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
 #ifndef __CUDA_ARCH__
+    case TypeIndex<DisneyMaterial>():
+        return Cast<DisneyMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
     case TypeIndex<HairMaterial>():
         return Cast<HairMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
     case TypeIndex<LayeredMaterial>():
@@ -777,14 +942,13 @@ MaterialHandle::GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
     }
 }
 
-template <typename TextureEvaluator>
-inline BSSRDFHandle
-MaterialHandle::GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                          const SampledWavelengths &lambda,
-                          MaterialBuffer &materialBuffer, TransportMode mode) const {
+inline BSSRDF *MaterialHandle::GetBSSRDF(SurfaceInteraction &si,
+                                         const SampledWavelengths &lambda,
+                                         MaterialBuffer &materialBuffer, TransportMode mode) const {
     if (Is<SubsurfaceMaterial>())
-        return Cast<SubsurfaceMaterial>()->GetBSSRDF(texEval, si, lambda,
-                                                     materialBuffer, mode);
+        return Cast<SubsurfaceMaterial>()->GetBSSRDF(si, lambda, materialBuffer, mode);
+    if (Is<DisneyMaterial>())
+        return Cast<DisneyMaterial>()->GetBSSRDF(si, lambda, materialBuffer, mode);
     return nullptr;
 }
 
@@ -792,10 +956,6 @@ inline bool MaterialHandle::IsTransparent() const {
     if (Is<ThinDielectricMaterial>())
         return true;
     return false;
-}
-
-inline bool MaterialHandle::HasSubsurfaceScattering() const {
-    return Is<SubsurfaceMaterial>();
 }
 
 inline FloatTextureHandle MaterialHandle::GetDisplacement() const {
@@ -811,6 +971,8 @@ inline FloatTextureHandle MaterialHandle::GetDisplacement() const {
     case TypeIndex<DiffuseTransmissionMaterial>():
         return Cast<DiffuseTransmissionMaterial>()->GetDisplacement();
 #ifndef __CUDA_ARCH__
+    case TypeIndex<DisneyMaterial>():
+        return Cast<DisneyMaterial>()->GetDisplacement();
     case TypeIndex<HairMaterial>():
         return Cast<HairMaterial>()->GetDisplacement();
     case TypeIndex<LayeredMaterial>():

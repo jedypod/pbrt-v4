@@ -6,17 +6,14 @@
 #include <pbrt/options.h>
 #include <pbrt/shapes.h>  // WritePlyFile
 #include <pbrt/paramdict.h>
-#include <pbrt/transform.h>
 #include <pbrt/util/args.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
-#include <pbrt/util/file.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/profile.h>
 
 #include <iostream>
-#include <mutex>
 
 namespace pbrt {
 
@@ -122,7 +119,7 @@ GeneralScene::GraphicsState::GraphicsState() {
     } while (false) /* swallow trailing semicolon */
 
 STAT_MEMORY_COUNTER("Memory/TransformCache", transformCacheBytes);
-STAT_PERCENT("Geometry/TransformCache hits", nTransformCacheHits, nTransformCacheLookups);
+STAT_PERCENT("Scene/TransformCache hits", nTransformCacheHits, nTransformCacheLookups);
 
 const Transform *TransformCache::Lookup(const Transform &t) {
     ++nTransformCacheLookups;
@@ -150,8 +147,8 @@ TransformCache::~TransformCache() {
     }
 }
 
-GeneralScene::GeneralScene(pstd::pmr::memory_resource *transformMemoryResource)
-    : transformCache(transformMemoryResource) {
+GeneralScene::GeneralScene()
+    : transformCache(Allocator(&transformMemoryResource)) {
     currentApiState = APIState::OptionsBlock;
     graphicsState = new GraphicsState;
 
@@ -161,7 +158,6 @@ GeneralScene::GeneralScene(pstd::pmr::memory_resource *transformMemoryResource)
 
     filter.name = "gaussian";
     film.name = "rgb";
-    film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
 }
 
 GeneralScene::~GeneralScene() {
@@ -179,25 +175,25 @@ void GeneralScene::Option(const std::string &name, const std::string &value,
         else if (value == "false")
             PbrtOptions.disablePixelJitter = false;
         else
-            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected \"true\" or \"false\" for option value",
+                      value);
     } else if (nName == "disablewavelengthjitter") {
         if (value == "true")
             PbrtOptions.disableWavelengthJitter = true;
         else if (value == "false")
             PbrtOptions.disableWavelengthJitter = false;
         else
-            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected \"true\" or \"false\" for option value",
+                      value);
     } else if (nName == "msereferenceimage") {
         if (value.size() < 3 || value.front() != '"' || value.back() != '"')
-            ErrorExitDeferred(&loc, "%s: expected quoted string for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected quoted string for option value",
+                      value);
         PbrtOptions.mseReferenceImage = value.substr(1, value.size() - 2);
     } else if (nName == "msereferenceout") {
         if (value.size() < 3 || value.front() != '"' || value.back() != '"')
-            ErrorExitDeferred(&loc, "%s: expected quoted string for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected quoted string for option value",
+                      value);
         PbrtOptions.mseReferenceOutput = value.substr(1, value.size() - 2);
     } else if (nName == "seed") {
         PbrtOptions.seed = std::atoi(value.c_str());
@@ -207,18 +203,18 @@ void GeneralScene::Option(const std::string &name, const std::string &value,
         else if (value == "false")
             PbrtOptions.forceDiffuse = false;
         else
-            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected \"true\" or \"false\" for option value",
+                      value);
     } else if (nName == "pixelstats") {
         if (value == "true")
             PbrtOptions.recordPixelStatistics = true;
         else if (value == "false")
             PbrtOptions.recordPixelStatistics = false;
         else
-            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
-                              value);
+            ErrorExit(&loc, "%s: expected \"true\" or \"false\" for option value",
+                      value);
     } else
-        ErrorExitDeferred(&loc, "%s: unknown option", name);
+        ErrorExit(&loc, "%s: unknown option", name);
 }
 
 void GeneralScene::Identity(FileLoc loc) {
@@ -374,17 +370,16 @@ void GeneralScene::MakeNamedMedium(const std::string &name, ParsedParameterVecto
     ParameterDictionary dict(std::move(params), graphicsState->mediumAttributes,
                              graphicsState->colorSpace);
 
-    if (media.find(name) != media.end()) {
-        ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
-        return;
-    }
+    if (media.find(name) != media.end())
+        ErrorExit(&loc, "Named medium \"%s\" redefined.", name);
 
     AnimatedTransform worldFromMedium(transformCache.Lookup(GetCTM(0)),
                                       transformStartTime,
                                       transformCache.Lookup(GetCTM(1)),
                                       transformEndTime);
 
-    media[name] = TransformedSceneEntity(name, std::move(dict), loc, worldFromMedium);
+    media[name] = TransformedSceneEntity(name, std::move(dict),
+                                                  loc, worldFromMedium);
 }
 
 void GeneralScene::MediumInterface(const std::string &insideName,
@@ -431,11 +426,11 @@ void GeneralScene::AttributeEnd(FileLoc loc) {
     pushedActiveTransformBits.pop_back();
 
     if (pushStack.back().first == 't')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open TransformBegin from %s at AttributeEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open TransformBegin from %s at AttributeEnd",
+                  pushStack.back().second);
     else if (pushStack.back().first == 'o')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open ObjectBegin from %s at AttributeEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open ObjectBegin from %s at AttributeEnd",
+                  pushStack.back().second);
     else
         CHECK_EQ(pushStack.back().first, 'a');
     pushStack.pop_back();
@@ -456,11 +451,9 @@ void GeneralScene::Attribute(const std::string &target, ParsedParameterVector at
         currentAttributes = &graphicsState->mediumAttributes;
     } else if (target == "texture") {
         currentAttributes = &graphicsState->textureAttributes;
-    } else {
-        ErrorExitDeferred(&loc, "Unknown attribute target \"%s\". Must be \"shape\", \"light\", "
-                          "\"material\", \"medium\", or \"texture\".", target);
-        return;
-    }
+    } else
+        ErrorExit(&loc, "Unknown attribute target \"%s\". Must be \"shape\", \"light\", "
+                  "\"material\", \"medium\", or \"texture\".", target);
 
     // Note that we hold on to the current color space and associate it
     // with the parameters...
@@ -490,11 +483,11 @@ void GeneralScene::TransformEnd(FileLoc loc) {
     pushedActiveTransformBits.pop_back();
 
     if (pushStack.back().first == 'a')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open AttributeBegin from %s at TransformEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open AttributeBegin from %s at TransformEnd",
+                  pushStack.back().second);
     else if (pushStack.back().first == 'o')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open ObjectBegin from %s at TransformEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open ObjectBegin from %s at TransformEnd",
+                  pushStack.back().second);
     else
         CHECK_EQ(pushStack.back().first, 't');
     pushStack.pop_back();
@@ -513,20 +506,16 @@ void GeneralScene::Texture(const std::string &name, const std::string &type,
                                        transformCache.Lookup(GetCTM(1)),
                                        transformEndTime);
 
-    if (type != "float" && type != "spectrum") {
-        ErrorExitDeferred(&loc, "%s: texture type unknown. Must be \"float\" or \"spectrum\".",
-                          type);
-        return;
-    }
+    if (type != "float" && type != "spectrum")
+        ErrorExit(&loc, "%s: texture type unknown. Must be \"float\" or \"spectrum\".",
+                  type);
 
     std::vector<std::pair<std::string, TextureSceneEntity>> &textures = (type == "float") ?
         floatTextures : spectrumTextures;
 
     for (const auto &tex : textures)
-        if (tex.first == name) {
-            ErrorExitDeferred(&loc, "Redefining texture \"%s\".", name);
-            return;
-        }
+        if (tex.first == name)
+            ErrorExit(&loc, "Redefining texture \"%s\".", name);
 
     textures.push_back(std::make_pair(name, TextureSceneEntity(texname, std::move(dict), loc,
                                                                worldFromTexture)));
@@ -549,14 +538,10 @@ void GeneralScene::MakeNamedMaterial(const std::string &name, ParsedParameterVec
     ParameterDictionary dict(std::move(params), graphicsState->materialAttributes,
                              graphicsState->colorSpace);
 
-    // Note: O(n)
-    for (const auto &nm : namedMaterials)
-        if (nm.first == name) {
-            ErrorExitDeferred(&loc, "%s: named material redefined.", name);
-            return;
-        }
+    if (namedMaterials.find(name) != namedMaterials.end())
+        ErrorExit("%s: named material redefined.", name);
 
-    namedMaterials.push_back(std::make_pair(name, GeneralSceneEntity("", std::move(dict), loc)));
+    namedMaterials[name] = GeneralSceneEntity("", std::move(dict), loc);
 }
 
 void GeneralScene::NamedMaterial(const std::string &name, FileLoc loc) {
@@ -609,7 +594,7 @@ void GeneralScene::Shape(const std::string &name, ParsedParameterVector params,
         if (currentInstance != nullptr) {
             if (!graphicsState->areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
-            as = &currentInstance->animatedShapes;
+            as = &currentInstance->second;
         }
 
         AnimatedTransform worldFromShape(transformCache.Lookup(GetCTM(0)),
@@ -631,7 +616,7 @@ void GeneralScene::Shape(const std::string &name, ParsedParameterVector params,
         if (currentInstance != nullptr) {
             if (!graphicsState->areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
-            s = &currentInstance->shapes;
+            s = &currentInstance->first;
         }
 
         const class Transform *worldFromObject = transformCache.Lookup(GetCTM(0));
@@ -671,20 +656,15 @@ void GeneralScene::ObjectBegin(const std::string &name, FileLoc loc) {
     p->AddString(name);
     Attribute("shape", std::move(params), loc);
 
-    if (currentInstance != nullptr) {
-        ErrorExitDeferred(&loc, "ObjectBegin called inside of instance definition");
-        return;
+    if (currentInstance != nullptr)
+        ErrorExit(&loc, "ObjectBegin called inside of instance definition");
+    if (instanceDefinitions.find(name) !=
+        instanceDefinitions.end()) {
+        ErrorExit(&loc, "%s: trying to redefine an object instance", name);
     }
 
-    if (instanceDefinitions.find(name) != instanceDefinitions.end()) {
-        ErrorExitDeferred(&loc, "%s: trying to redefine an object instance", name);
-        return;
-    }
-
-    instanceDefinitions[name] = InstanceDefinitionSceneEntity(name, loc);
-    // This should be safe since we're not adding anything to
-    // instanceDefinitions until after ObjectEnd... (Still makes me
-    // nervous.)
+    instanceDefinitions[name] = std::make_pair(std::vector<ShapeSceneEntity>(),
+                                               std::vector<AnimatedShapeSceneEntity>());
     currentInstance = &instanceDefinitions[name];
 }
 
@@ -692,10 +672,8 @@ STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 
 void GeneralScene::ObjectEnd(FileLoc loc) {
     VERIFY_WORLD("ObjectEnd");
-    if (currentInstance == nullptr) {
-        ErrorExitDeferred(&loc, "ObjectEnd called outside of instance definition");
-        return;
-    }
+    if (currentInstance == nullptr)
+        ErrorExit(&loc, "ObjectEnd called outside of instance definition");
     currentInstance = nullptr;
 
     // NOTE: Must keep the following consistent with AttributeEnd
@@ -710,11 +688,11 @@ void GeneralScene::ObjectEnd(FileLoc loc) {
     ++nObjectInstancesCreated;
 
     if (pushStack.back().first == 't')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open TransformBegin from %s at ObjectEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open TransformBegin from %s at ObjectEnd",
+                  pushStack.back().second);
     else if (pushStack.back().first == 'a')
-        ErrorExitDeferred(&loc, "Mismatched nesting: open AttributeBegin from %s at ObjectEnd",
-                          pushStack.back().second);
+        ErrorExit(&loc, "Mismatched nesting: open AttributeBegin from %s at ObjectEnd",
+                  pushStack.back().second);
     else
         CHECK_EQ(pushStack.back().first, 'o');
     pushStack.pop_back();
@@ -726,10 +704,8 @@ STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 void GeneralScene::ObjectInstance(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectInstance");
 
-    if (currentInstance != nullptr) {
-        ErrorExitDeferred(&loc, "ObjectInstance can't be called inside instance definition");
-        return;
-    }
+    if (currentInstance != nullptr)
+        ErrorExit(&loc, "ObjectInstance can't be called inside instance definition");
 
     TransformSet worldFromCameraT = Inverse(cameraFromWorldT);
 
@@ -759,31 +735,17 @@ void GeneralScene::WorldEnd(FileLoc loc) {
     VERIFY_WORLD("WorldEnd");
     // Ensure there are no pushed graphics states
     while (!pushedGraphicsStates.empty()) {
-        Error(&loc, "Missing end to AttributeBegin");
+        Warning(&loc, "Missing end to AttributeBegin");
         pushedGraphicsStates.pop_back();
         pushedTransforms.pop_back();
     }
     while (!pushedTransforms.empty()) {
-        Error(&loc, "Missing end to TransformBegin");
+        Warning(&loc, "Missing end to TransformBegin");
         pushedTransforms.pop_back();
-    }
-
-    if (errorExit)
-        ErrorExit("Fatal errors during scene construction");
-
-    if (PbrtOptions.profile) {
-        CHECK_EQ(CurrentProfilerState(), (ProfilePhaseToBits(ProfilePhase::SceneConstruction) |
-                                          ProfilePhaseToBits(ProfilePhase::ParsingAndGenScene)));
-        ProfilerState = 0;
     }
 
     CHECK(PbrtOptions.renderFunction != nullptr);
     PbrtOptions.renderFunction(*this);
-
-    if (PbrtOptions.profile) {
-        CHECK_EQ(CurrentProfilerState(), 0);
-        ProfilerState = ProfilePhaseToBits(ProfilePhase::ParsingAndGenScene);
-    }
 
     ForEachThread(ReportThreadStats);
 
@@ -813,20 +775,16 @@ void GeneralScene::CreateMaterials(/*const*/std::map<std::string, FloatTextureHa
     for (const auto &nm : namedMaterials) {
         const std::string &name = nm.first;
         const GeneralSceneEntity &mtl = nm.second;
-        if (namedMaterialsOut->find(name) != namedMaterialsOut->end()) {
-            ErrorExitDeferred(&mtl.loc, "%s: trying to redefined named material.", name);
-            continue;
-        }
+        if (namedMaterialsOut->find(name) != namedMaterialsOut->end())
+            ErrorExit(&mtl.loc, "%s: named material redefined.", name);
 
         std::string type = mtl.parameters.GetOneString("type", "");
-        if (type.empty()) {
-            ErrorExitDeferred(&mtl.loc, "%s: \"string type\" not provided in named material's "
-                              "parameters.", name);
-            continue;
-        }
+        if (type.empty())
+            ErrorExit(&mtl.loc, "%s: \"string type\" not provided in named material's "
+                      "parameters.", name);
         TextureParameterDictionary texDict(&mtl.parameters, &floatTextures, &spectrumTextures);
         MaterialHandle m = MaterialHandle::Create(type, texDict, *namedMaterialsOut,
-                                                  &mtl.loc, alloc);
+                                                  alloc, mtl.loc);
         (*namedMaterialsOut)[name] = m;
     }
 
@@ -835,139 +793,13 @@ void GeneralScene::CreateMaterials(/*const*/std::map<std::string, FloatTextureHa
     for (const auto &mtl : materials) {
         TextureParameterDictionary texDict(&mtl.parameters, &floatTextures, &spectrumTextures);
         MaterialHandle m = MaterialHandle::Create(mtl.name, texDict, *namedMaterialsOut,
-                                                  &mtl.loc, alloc);
+                                                  alloc, mtl.loc);
         materialsOut->push_back(m);
     }
-
-    if (errorExit)
-        ErrorExit("Fatal errors during scene construction");
-}
-
-void GeneralScene::CreateTextures(std::map<std::string, FloatTextureHandle> *floatTextureMap,
-                                  std::map<std::string, SpectrumTextureHandle> *spectrumTextureMap,
-                                  Allocator alloc, bool gpu) const {
-    std::set<std::string> seenFloatTextureFilenames, seenSpectrumTextureFilenames;
-    std::vector<size_t> parallelFloatTextures, serialFloatTextures;
-    std::vector<size_t> parallelSpectrumTextures, serialSpectrumTextures;
-
-    // Figure out which textures to load in parallel
-    // Need to be careful since two textures can use the same image file;
-    // we only want to load it once in that case...
-    for (size_t i = 0; i < floatTextures.size(); ++i) {
-        const auto &tex = floatTextures[i];
-
-        if (tex.second.worldFromObject.IsAnimated())
-            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
-                    "Using start transform.");
-
-        if (tex.second.texName != "imagemap") {
-            serialFloatTextures.push_back(i);
-            continue;
-        }
-
-        std::string filename = ResolveFilename(tex.second.parameters.GetOneString("imagefile", ""));
-        if (filename.empty())
-            continue;
-
-        if (seenFloatTextureFilenames.find(filename) == seenFloatTextureFilenames.end()) {
-            seenFloatTextureFilenames.insert(filename);
-            parallelFloatTextures.push_back(i);
-        } else
-            serialFloatTextures.push_back(i);
-    }
-    for (size_t i = 0; i < spectrumTextures.size(); ++i) {
-        const auto &tex = spectrumTextures[i];
-
-        if (tex.second.worldFromObject.IsAnimated())
-            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
-                    "Using start transform.");
-
-        if (tex.second.texName != "imagemap") {
-            serialSpectrumTextures.push_back(i);
-            continue;
-        }
-
-        std::string filename = ResolveFilename(tex.second.parameters.GetOneString("imagefile", ""));
-        if (filename.empty())
-            continue;
-
-        if (seenSpectrumTextureFilenames.find(filename) == seenSpectrumTextureFilenames.end()) {
-            seenSpectrumTextureFilenames.insert(filename);
-            parallelSpectrumTextures.push_back(i);
-        } else
-            serialSpectrumTextures.push_back(i);
-    }
-
-    LOG_VERBOSE("Loading %d,%d textures in parallel, %d,%d serially",
-                parallelFloatTextures.size(), parallelSpectrumTextures.size(),
-                serialFloatTextures.size(), serialSpectrumTextures.size());
-
-    // Load textures in parallel
-    std::mutex mutex;
-
-    ParallelFor(0, parallelFloatTextures.size(),
-    [&](int64_t i) {
-        const auto &tex = floatTextures[parallelFloatTextures[i]];
-
-        pbrt::Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
-        // Pass nullptr for the textures, since they shouldn't be accessed anyway.
-        TextureParameterDictionary texDict(&tex.second.parameters, nullptr, nullptr);
-        FloatTextureHandle t = FloatTextureHandle::Create(tex.second.texName, worldFromTexture,
-                                                          texDict, &tex.second.loc, alloc, gpu);
-        std::lock_guard<std::mutex> lock(mutex);
-        (*floatTextureMap)[tex.first] = t;
-    });
-
-    ParallelFor(0, parallelSpectrumTextures.size(),
-    [&](int64_t i) {
-        const auto &tex = spectrumTextures[parallelSpectrumTextures[i]];
-
-        pbrt::Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
-        // nullptr for the textures, as above.
-        TextureParameterDictionary texDict(&tex.second.parameters, nullptr, nullptr);
-        SpectrumTextureHandle t = SpectrumTextureHandle::Create(tex.second.texName, worldFromTexture,
-                                                                texDict, &tex.second.loc, alloc, gpu);
-        std::lock_guard<std::mutex> lock(mutex);
-        (*spectrumTextureMap)[tex.first] = t;
-    });
-
-    LOG_VERBOSE("Loading serial textures");
-    // And do the rest serially
-    for (size_t index : serialFloatTextures) {
-        const auto &tex = floatTextures[index];
-
-        pbrt::Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.second.parameters, floatTextureMap,
-                                           spectrumTextureMap);
-        FloatTextureHandle t = FloatTextureHandle::Create(tex.second.texName, worldFromTexture,
-                                                          texDict, &tex.second.loc, alloc, gpu);
-        (*floatTextureMap)[tex.first] = t;
-    }
-    for (size_t index : serialSpectrumTextures) {
-        const auto &tex = spectrumTextures[index];
-
-        if (tex.second.worldFromObject.IsAnimated())
-            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
-                    "Using start transform.");
-
-        pbrt::Transform worldFromTexture = *tex.second.worldFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.second.parameters, floatTextureMap,
-                                           spectrumTextureMap);
-        SpectrumTextureHandle t = SpectrumTextureHandle::Create(tex.second.texName, worldFromTexture,
-                                                                texDict, &tex.second.loc, alloc, gpu);
-        (*spectrumTextureMap)[tex.first] = t;
-    }
-
-    LOG_VERBOSE("Done creating textures");
 }
 
 ///////////////////////////////////////////////////////////////////////////
 // FormattingScene
-
-FormattingScene::~FormattingScene() {
-    if (errorExit)
-        ErrorExit("Fatal errors during scene updating.");
-}
 
 void FormattingScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
     std::string nName = normalizeArg(name);
@@ -1200,15 +1032,6 @@ void FormattingScene::TransformEnd(FileLoc loc) {
 void FormattingScene::Texture(const std::string &name, const std::string &type,
                               const std::string &texname, ParsedParameterVector params,
                               FileLoc loc) {
-    if (upgrade) {
-        if (definedTextures.find(name) != definedTextures.end()) {
-            static int count = 0;
-            Warning(&loc, "%s: renaming multiply-defined texture", name);
-            definedTextures[name] = StringPrintf("%s-renamed-%d", name, count++);
-        } else
-            definedTextures[name] = name;
-    }
-
     if (upgrade && texname == "scale") {
         // This is easier to do in the raw ParsedParameterVector...
         if (type == "float") {
@@ -1227,35 +1050,27 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
                     continue;
 
                 if (p->type == "rgb") {
-                    if (foundRGB) {
-                        ErrorExitDeferred(&p->loc, "Two \"rgb\" textures found for \"scale\" "
-                                          "texture \"%s\". Please manually edit the file to "
-                                          "upgrade.", name);
-                        return;
-                    }
-                    if (p->numbers.size() != 3) {
-                        ErrorExitDeferred(&p->loc, "Didn't find 3 values for \"rgb\" \"%s\".",
-                                          p->name);
-                        return;
-                    }
-                    if (p->numbers[0] != p->numbers[1] || p->numbers[1] != p->numbers[2]) {
-                        ErrorExitDeferred(&p->loc, "Non-constant \"rgb\" value found for "
-                                          "\"scale\" texture parameter \"%s\". Please manually "
-                                          "edit the file to upgrade.", p->name);
-                        return;
-                    }
+                    if (foundRGB)
+                        ErrorExit(&p->loc, "Two \"rgb\" textures found for \"scale\" "
+                                  "texture \"%s\". Please manually edit the file to "
+                                  "upgrade.", name);
+                    if (p->numbers.size() != 3)
+                        ErrorExit(&p->loc, "Didn't find 3 values for \"rgb\" \"%s\".",
+                                  p->name);
+                    if (p->numbers[0] != p->numbers[1] || p->numbers[1] != p->numbers[2])
+                        ErrorExit(&p->loc, "Non-constant \"rgb\" value found for "
+                                  "\"scale\" texture parameter \"%s\". Please manually "
+                                  "edit the file to upgrade.", p->name);
 
                     foundRGB = true;
                     p->type = "float";
                     p->name = "scale";
                     p->numbers.resize(1);
                 } else {
-                    if (foundTexture) {
-                        ErrorExitDeferred(&p->loc, "Two textures found for \"scale\" "
-                                          "texture \"%s\". Please manually edit the file to "
-                                          "upgrade.", name);
-                        return;
-                    }
+                    if (foundTexture)
+                        ErrorExit(&p->loc, "Two textures found for \"scale\" "
+                                  "texture \"%s\". Please manually edit the file to "
+                                  "upgrade.", name);
                     p->name = "tex";
                     foundTexture = true;
                 }
@@ -1264,8 +1079,6 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
     }
 
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
-    if (upgrade)
-        dict.RenameUsedTextures(definedTextures);
 
     std::string extra;
     if (upgrade) {
@@ -1300,58 +1113,76 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
         }
     }
 
-    if (upgrade) {
-        if (type == "color")
-            Printf("%sTexture \"%s\" \"spectrum\" \"%s\"\n", indent(),
-                   definedTextures[name], texname);
-        else
-            Printf("%sTexture \"%s\" \"%s\" \"%s\"\n", indent(),
-                   definedTextures[name], type, texname);
-    } else
-        Printf("%sTexture \"%s\" \"%s\" \"%s\"\n", indent(), name, type, texname);
-
+    if (upgrade && type == "color")
+        Printf("%sTexture \"%s\" \"spectrum\" \"%s\"\n", indent(),
+               name, texname);
+    else
+        Printf("%sTexture \"%s\" \"%s\" \"%s\"\n", indent(),
+               name, type, texname);
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-std::string FormattingScene::upgradeMaterialIndex(const std::string &name, ParameterDictionary *dict,
-                                                  FileLoc loc) const {
+static std::string upgradeMaterialIndex(
+    const FormattingScene &scene, const std::string &name, ParameterDictionary *dict,
+    FileLoc loc) {
     if (name != "glass" && name != "uber")
         return "";
 
     std::string tex = dict->GetTexture("index");
     if (!tex.empty()) {
-        if (!dict->GetTexture("eta").empty()) {
-            ErrorExitDeferred(&loc, R"(Material "%s" has both "index" and "eta" parameters.)",
-                              name);
-            return "";
-        }
+        if (!dict->GetTexture("eta").empty())
+            ErrorExit(&loc, R"(Material "%s" has both "index" and "eta" parameters.)",
+                      name);
 
         dict->RemoveTexture("index");
-        return indent(1) + StringPrintf("\"texture eta\" \"%s\"\n", tex);
+        return scene.indent(1) + StringPrintf("\"texture eta\" \"%s\"\n", tex);
     } else {
         auto index = dict->GetFloatArray("index");
         if (index.empty()) return "";
-        if (index.size() != 1) {
-            ErrorExitDeferred(&loc, "Multiple values provided for \"index\" parameter.");
-            return "";
-        }
-        if (!dict->GetFloatArray("eta").empty()) {
-            ErrorExitDeferred(&loc, R"(Material "%s" has both "index" and "eta" parameters.)",
-                              name);
-            return "";
-        }
+        if (index.size() != 1)
+            ErrorExit(&loc, "Multiple values provided for \"index\" parameter.");
+        if (!dict->GetFloatArray("eta").empty())
+            ErrorExit(&loc, R"(Material "%s" has both "index" and "eta" parameters.)",
+                      name);
 
         Float value = index[0];
         dict->RemoveFloat("index");
-        return indent(1) + StringPrintf("\"float eta\" [ %f ]\n", value);
+        return scene.indent(1) + StringPrintf("\"float eta\" [ %f ]\n", value);
     }
 }
 
-std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDictionary *dict,
-                                             FileLoc loc) const {
-    std::string extra = upgradeMaterialIndex(*name, dict, loc);
+static std::string upgradeMaterialBumpmap(const FormattingScene &scene,
+                                          ParameterDictionary *dict) {
+    std::string bump = dict->GetTexture("bumpmap");
+    if (bump.empty())
+        return "";
 
-    dict->RenameParameter("bumpmap", "displacement");
+    dict->RemoveTexture("bumpmap");
+    return scene.indent(1) + StringPrintf("\"texture displacement\" \"%s\"\n", bump);
+}
+
+static void upgradeUberOpacity(ParameterDictionary *dict, FileLoc loc) {
+    if (!dict->GetTexture("opacity").empty())
+        ErrorExit(&loc, "Non-opaque \"opacity\" in \"uber\" material not supported "
+                  "in pbrt-v4. Please edit the file manually.");
+
+    if (dict->GetSpectrumArray("opacity", SpectrumType::Reflectance, {}).empty())
+        return;
+
+    pstd::optional<RGB> opacity = dict->GetOneRGB("opacity");
+    if (opacity && opacity->r == 1 && opacity->g == 1 && opacity->b == 1) {
+        dict->RemoveSpectrum("opacity");
+        return;
+    }
+
+    ErrorExit(&loc, "A non-opaque \"opacity\" in the \"uber\" material is not supported "
+              "in pbrt-v4. Please edit the file manually.");
+}
+
+static std::string upgradeMaterial(const FormattingScene &scene, std::string *name,
+                                   ParameterDictionary *dict, FileLoc loc) {
+    std::string extra = upgradeMaterialIndex(scene, *name, dict, loc);
+    extra += upgradeMaterialBumpmap(scene, dict);
 
     auto removeParamSilentIfConstant = [&](const char *paramName, Float value) {
         pstd::optional<RGB> rgb = dict->GetOneRGB(paramName);
@@ -1376,39 +1207,22 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
         removeParamSilentIfConstant("Kr", 0);
         removeParamSilentIfConstant("Kt", 0);
         dict->RenameParameter("Kd", "reflectance");
-
-        if (!dict->GetTexture("opacity").empty()) {
-            ErrorExitDeferred(&loc, "Non-opaque \"opacity\" texture in \"uber\" material not supported "
-                              "in pbrt-v4. Please edit the file manually.");
-            return "";
-        }
-
-        if (dict->GetSpectrumArray("opacity", SpectrumType::Reflectance, {}).empty())
-            return "";
-
-        pstd::optional<RGB> opacity = dict->GetOneRGB("opacity");
-        if (opacity && opacity->r == 1 && opacity->g == 1 && opacity->b == 1) {
-            dict->RemoveSpectrum("opacity");
-            return "";
-        }
-
-        ErrorExitDeferred(&loc, "A non-opaque \"opacity\" in the \"uber\" material is not supported "
-                          "in pbrt-v4. Please edit the file manually.");
+        upgradeUberOpacity(dict, loc);
     } else if (*name == "mix") {
         pstd::optional<RGB> rgb = dict->GetOneRGB("amount");
         if (rgb) {
             if (rgb->r == rgb->g && rgb->g == rgb->b)
-                extra += indent(1) + StringPrintf("\"float amount\" [ %f ]\n", rgb->r);
+                extra += scene.indent(1) + StringPrintf("\"float amount\" [ %f ]\n", rgb->r);
             else {
                 Float avg = (rgb->r + rgb->g + rgb->b) / 3;
                 Warning(&loc, "Changing RGB \"amount\" (%f, %f, %f) to scalar average %f",
                         rgb->r, rgb->g, rgb->b, avg);
-                extra += indent(1) + StringPrintf("\"float amount\" [ %f ]\n", avg);
+                extra += scene.indent(1) + StringPrintf("\"float amount\" [ %f ]\n", avg);
             }
         } else if (!dict->GetSpectrumArray("amount", SpectrumType::General, {}).empty() ||
                    !dict->GetTexture("amount").empty())
-            ErrorExitDeferred(&loc, "Unable to update non-RGB spectrum \"amount\" to a scalar: %s",
-                              dict->ToParameterDefinition("amount"));
+            Error(&loc, "Unable to update non-RGB spectrum \"amount\" to a scalar: %s",
+                  dict->ToParameterDefinition("amount"));
 
         dict->RemoveSpectrum("amount");
     } else if (*name == "substrate") {
@@ -1451,9 +1265,9 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
         dict->RemoveFloat("roughness");
     } else if (*name == "mirror") {
         *name = "conductor";
-        extra += indent(1) + "\"float roughness\" [ 0 ]\n";
-        extra += indent(1) + "\"spectrum eta\" [ \"metal-Ag-eta\" ]\n";
-        extra += indent(1) + "\"spectrum k\" [ \"metal-Ag-k\" ]\n";
+        extra += scene.indent(1) + "\"float roughness\" [ 0 ]\n";
+        extra += scene.indent(1) + "\"spectrum eta\" [ \"metal-Ag-eta\" ]\n";
+        extra += scene.indent(1) + "\"spectrum k\" [ \"metal-Ag-k\" ]\n";
 
         removeParamSilentIfConstant("Kr", 0);
     }
@@ -1464,38 +1278,10 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
 void FormattingScene::Material(const std::string &name, ParsedParameterVector params,
                                FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
-    if (upgrade)
-        dict.RenameUsedTextures(definedTextures);
-
     std::string extra;
     std::string newName = name;
     if (upgrade)
-        extra = upgradeMaterial(&newName, &dict, loc);
-
-#if 0
-    // Hack for landscape upgrade
-    if (upgrade && name == "mix") {
-        ParameterDictionary dict(params, RGBColorSpace::sRGB);
-        const ParameterDictionary &d1 = namedMaterialDictionaries[dict.GetOneString("namedmaterial1", "")];
-        const ParameterDictionary &d2 = namedMaterialDictionaries[dict.GetOneString("namedmaterial2", "")];
-
-        if (!d1.GetTexture("reflectance").empty() &&
-            !d2.GetTexture("transmittance").empty()) {
-            Printf("%sMaterial \"diffusetransmission\"\n", indent());
-            Printf("%s\"texture reflectance\" \"%s\"\n", indent(1), d1.GetTexture("reflectance"));
-            Printf("%s\"texture transmittance\" \"%s\"\n", indent(1), d2.GetTexture("transmittance"));
-
-            if (!d1.GetTexture("displacement").empty())
-                Printf("%s\"texture displacement\" \"%s\"\n", indent(1), d1.GetTexture("displacement"));
-            else if (!d2.GetTexture("displacement").empty())
-                Printf("%s\"texture displacement\" \"%s\"\n", indent(1), d2.GetTexture("displacement"));
-
-            Printf("%s\"float scale\" 0.5\n", indent(1));
-
-            return;
-        }
-    }
-#endif
+        extra = upgradeMaterial(*this, &newName, &dict, loc);
 
     Printf("%sMaterial \"%s\"\n", indent(), newName);
     std::cout << extra << dict.ToParameterList(catIndentCount);
@@ -1504,31 +1290,15 @@ void FormattingScene::Material(const std::string &name, ParsedParameterVector pa
 void FormattingScene::MakeNamedMaterial(const std::string &name, ParsedParameterVector params,
                                         FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
-
-    if (upgrade) {
-        dict.RenameUsedTextures(definedTextures);
-
-        if (definedNamedMaterials.find(name) != definedNamedMaterials.end()) {
-            static int count = 0;
-            Warning(&loc, "%s: renaming multiply-defined named material", name);
-            definedNamedMaterials[name] = StringPrintf("%s-renamed-%d", name, count++);
-        } else
-            definedNamedMaterials[name] = name;
-        Printf("%sMakeNamedMaterial \"%s\"\n", indent(), definedNamedMaterials[name]);
-    } else
-        Printf("%sMakeNamedMaterial \"%s\"\n", indent(), name);
-
+    Printf("%sMakeNamedMaterial \"%s\"\n", indent(), name);
     std::string extra;
     if (upgrade) {
         std::string matName = dict.GetOneString("type", "");
-        extra = upgradeMaterial(&matName, &dict, loc);
+        extra = upgradeMaterial(*this, &matName, &dict, loc);
         dict.RemoveString("type");
         extra = indent(1) + StringPrintf("\"string type\" [ \"%s\" ]\n", matName) + extra;
     }
     std::cout << extra << dict.ToParameterList(catIndentCount);
-
-    if (upgrade)
-        namedMaterialDictionaries[definedNamedMaterials[name]] = std::move(dict);
 }
 
 void FormattingScene::NamedMaterial(const std::string &name, FileLoc loc) {
@@ -1596,30 +1366,24 @@ void FormattingScene::LightSource(const std::string &name, ParsedParameterVector
     std::string extra;
     if (upgrade) {
         Float totalScale = 1;
-        if (!upgradeRGBToScale(&dict, "scale", &totalScale)) {
-            ErrorExitDeferred(dict.loc("scale"),
-                      "In pbrt-v4, \"scale\" is a \"float\" parameter to light sources. "
+        if (!upgradeRGBToScale(&dict, "scale", &totalScale))
+            ErrorExit(dict.loc("scale"),
+                      "In pbrt-v4, \"scale\" is now a \"float\" parameter to light sources. "
                       "Please modify your scene file manually.");
-            return;
-        }
         extra += upgradeBlackbody(*this, &dict, &totalScale);
         dict.RemoveInt("nsamples");
 
         if (dict.GetOneString("mapname", "").empty() == false) {
-            if (name == "infinite" && !upgradeRGBToScale(&dict, "L", &totalScale)) {
-                ErrorExitDeferred(dict.loc("L"),
+            if (name == "infinite" && !upgradeRGBToScale(&dict, "L", &totalScale))
+                ErrorExit(dict.loc("L"),
                           "Non-constant \"L\" is no longer supported with \"mapname\" for "
                           "the \"infinite\" light source. Please upgrade your scene "
                           "file manually.");
-                return;
-            }
-        } else if (name == "projection" && !upgradeRGBToScale(&dict, "I", &totalScale)) {
-            ErrorExitDeferred(dict.loc("I"),
+        } else if (name == "projection" && !upgradeRGBToScale(&dict, "I", &totalScale))
+            ErrorExit(dict.loc("I"),
                       "\"I\" is no longer supported with \"mapname\" for "
                       "the \"projection\" light source. Please upgrade your scene "
                       "file manually.");
-            return;
-        }
 
         // Do this after we've handled infinite "L" with a map, since
         // it removes the "mapname" parameter from the dictionary.
@@ -1641,12 +1405,10 @@ void FormattingScene::AreaLightSource(const std::string &name, ParsedParameterVe
     std::string extra;
     Float totalScale = 1;
     if (upgrade) {
-        if (!upgradeRGBToScale(&dict, "scale", &totalScale)) {
-            ErrorExitDeferred(dict.loc("scale"),
-                      "In pbrt-v4, \"scale\" is a \"float\" parameter to light sources. "
+        if (!upgradeRGBToScale(&dict, "scale", &totalScale))
+            ErrorExit(dict.loc("scale"),
+                      "In pbrt-v4, \"scale\" is now a \"float\" parameter to light sources. "
                       "Please modify your scene file manually.");
-            return;
-        }
 
         extra += upgradeBlackbody(*this, &dict, &totalScale);
         if (name == "area")
@@ -1770,7 +1532,6 @@ void FormattingScene::Shape(const std::string &name, ParsedParameterVector param
         }
         if (name == "trianglemesh" || name == "plymesh") {
             dict.RemoveBool("discarddegenerateUVs");
-            dict.RemoveTexture("shadowalpha");
         }
 
         if (name == "plymesh") {
@@ -1786,6 +1547,8 @@ void FormattingScene::Shape(const std::string &name, ParsedParameterVector param
             std::cout << extra;
         }
 
+        //upgradeMaterialIndex(graphicsState->currentMaterial->name, &dict, loc);
+        upgradeMaterialBumpmap(*this, &dict);
         dict.RenameParameter("Kd", "reflectance");
     }
 
@@ -1797,16 +1560,7 @@ void FormattingScene::ReverseOrientation(FileLoc loc) {
 }
 
 void FormattingScene::ObjectBegin(const std::string &name, FileLoc loc) {
-    if (upgrade) {
-        if (definedObjectInstances.find(name) != definedObjectInstances.end()) {
-            static int count = 0;
-            Warning(&loc, "%s: renaming multiply-defined object instance", name);
-            definedObjectInstances[name] = StringPrintf("%s-renamed-%d", name, count++);
-        } else
-            definedObjectInstances[name] = name;
-        Printf("%sObjectBegin \"%s\"\n", indent(), definedObjectInstances[name]);
-    } else
-        Printf("%sObjectBegin \"%s\"\n", indent(), name);
+    Printf("%sObjectBegin \"%s\"\n", indent(), name);
 }
 
 void FormattingScene::ObjectEnd(FileLoc loc) {
@@ -1814,15 +1568,7 @@ void FormattingScene::ObjectEnd(FileLoc loc) {
 }
 
 void FormattingScene::ObjectInstance(const std::string &name, FileLoc loc) {
-    if (upgrade) {
-        if (definedObjectInstances.find(name) == definedObjectInstances.end())
-            // this is legit if we're upgrading multiple files separately...
-            Printf("%sObjectInstance \"%s\"\n", indent(), name);
-        else
-            // use the most recent renaming of it
-            Printf("%sObjectInstance \"%s\"\n", indent(), definedObjectInstances[name]);
-    } else
-        Printf("%sObjectInstance \"%s\"\n", indent(), name);
+    Printf("%sObjectInstance \"%s\"\n", indent(), name);
 }
 
 void FormattingScene::WorldEnd(FileLoc loc) {

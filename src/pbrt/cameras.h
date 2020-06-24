@@ -43,9 +43,7 @@
 
 #include <pbrt/base.h>
 #include <pbrt/film.h>
-#include <pbrt/interaction.h>
 #include <pbrt/util/profile.h>
-#include <pbrt/util/scattering.h>
 
 #include <memory>
 #include <string>
@@ -53,63 +51,14 @@
 
 namespace pbrt {
 
-class CameraWiSample {
-public:
-    CameraWiSample() = default;
-    CameraWiSample(const SampledSpectrum &Wi, const Vector3f &wi, Float pdf,
-                   Point2f pRaster, const Interaction &pRef, const Interaction &pLens)
-        : Wi(Wi), wi(wi), pdf(pdf), pRaster(pRaster), pRef(pRef), pLens(pLens) {}
-
-    bool Unoccluded(const Scene &scene) const;
-    SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
-                       SamplerHandle sampler) const;
-
-    SampledSpectrum Wi;
-    Vector3f wi;
-    Float pdf;
-    Point2f pRaster;
-    Interaction pRef, pLens;
-};
-
-struct CameraRay {
-    Ray ray;
-    SampledSpectrum weight = SampledSpectrum(1);
-};
-
-struct CameraRayDifferential {
-    RayDifferential ray;
-    SampledSpectrum weight = SampledSpectrum(1);
-};
-
-class ProjectiveCamera : public Camera {
-  public:
-    // ProjectiveCamera Public Methods
-    ProjectiveCamera(const AnimatedTransform &worldFromCamera,
-                     const Transform &screenFromCamera,
-                     const Bounds2f &screenWindow, Float shutterOpen,
-                     Float shutterClose, Float lensRadius, Float focalDistance,
-                     Film *film, const Medium *medium);
-    void InitMetadata(ImageMetadata *metadata) const;
-
-    //  protected:
-    ProjectiveCamera() = default;
-    std::string BaseToString() const;
-
-    // ProjectiveCamera Protected Data
-    Transform screenFromCamera, cameraFromRaster;
-    Transform rasterFromScreen, screenFromRaster;
-    Float lensRadius, focalDistance;
-};
-
-
 // OrthographicCamera Declarations
-class OrthographicCamera final : public ProjectiveCamera {
+class OrthographicCamera : public ProjectiveCamera {
   public:
     // OrthographicCamera Public Methods
     OrthographicCamera(const AnimatedTransform &worldFromCamera,
                        const Bounds2f &screenWindow, Float shutterOpen,
                        Float shutterClose, Float lensRadius,
-                       Float focalDistance, Film *film,
+                       Float focalDistance, std::unique_ptr<Film> film,
                        const Medium *medium)
         : ProjectiveCamera(worldFromCamera, Orthographic(0, 1), screenWindow,
                            shutterOpen, shutterClose, lensRadius, focalDistance,
@@ -125,9 +74,8 @@ class OrthographicCamera final : public ProjectiveCamera {
     }
     static OrthographicCamera *Create(const ParameterDictionary &dict,
                                       const AnimatedTransform &worldFromCamera,
-                                      Film *film,
-                                      const Medium *medium, const FileLoc *loc,
-                                      Allocator alloc = {});
+                                      std::unique_ptr<Film> film,
+                                      const Medium *medium, Allocator alloc = {});
 
     PBRT_HOST_DEVICE
     pstd::optional<CameraRay> GenerateRay(const CameraSample &sample,
@@ -150,13 +98,12 @@ class PerspectiveCamera final : public ProjectiveCamera {
     PerspectiveCamera(const AnimatedTransform &worldFromCamera,
                       const Bounds2f &screenWindow, Float shutterOpen,
                       Float shutterClose, Float lensRadius, Float focalDistance,
-                      Float fov, Film *film, const Medium *medium);
+                      Float fov, std::unique_ptr<Film> film, const Medium *medium);
 
     static PerspectiveCamera *Create(const ParameterDictionary &dict,
                                      const AnimatedTransform &worldFromCamera,
-                                     Film *film,
-                                     const Medium *medium, const FileLoc *loc,
-                                     Allocator alloc = {});
+                                     std::unique_ptr<Film> film,
+                                     const Medium *medium, Allocator alloc = {});
 
     PBRT_HOST_DEVICE_INLINE
     pstd::optional<CameraRay> GenerateRay(const CameraSample &sample,
@@ -203,13 +150,13 @@ class PerspectiveCamera final : public ProjectiveCamera {
 
 
 // SphericalCamera Declarations
-class SphericalCamera final : public Camera {
+class SphericalCamera : public Camera {
   public:
     enum Mapping { EquiRect, EquiArea };
 
     // SphericalCamera Public Methods
     SphericalCamera(const AnimatedTransform &worldFromCamera, Float shutterOpen,
-                    Float shutterClose, Film *film, const Medium *medium,
+                    Float shutterClose, std::unique_ptr<Film> film, const Medium *medium,
                     Mapping mapping)
         : Camera(worldFromCamera, shutterOpen, shutterClose, std::move(film), medium),
           mapping(mapping) {
@@ -218,9 +165,8 @@ class SphericalCamera final : public Camera {
 
     static SphericalCamera *Create(const ParameterDictionary &dict,
                                    const AnimatedTransform &worldFromCamera,
-                                   Film *film,
-                                   const Medium *medium, const FileLoc *loc,
-                                   Allocator alloc = {});
+                                   std::unique_ptr<Film> film,
+                                   const Medium *medium, Allocator alloc = {});
 
     PBRT_HOST_DEVICE
     pstd::optional<CameraRay> GenerateRay(const CameraSample &sample,
@@ -240,14 +186,13 @@ class RealisticCamera final : public Camera {
     RealisticCamera(const AnimatedTransform &worldFromCamera, Float shutterOpen,
                     Float shutterClose, Float apertureDiameter,
                     Float focusDistance, Float dispersionFactor,
-                    std::vector<Float> &lensData, Film *film,
+                    std::vector<Float> &lensData, std::unique_ptr<Film> film,
                     const Medium *medium, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &dict,
                                    const AnimatedTransform &worldFromCamera,
-                                   Film *film,
-                                   const Medium *medium, const FileLoc *loc,
-                                   Allocator alloc = {});
+                                   std::unique_ptr<Film> film,
+                                   const Medium *medium, Allocator alloc = {});
 
     PBRT_HOST_DEVICE_INLINE
     pstd::optional<CameraRay> GenerateRay(const CameraSample &sample,

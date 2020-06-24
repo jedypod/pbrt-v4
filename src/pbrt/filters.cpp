@@ -34,65 +34,70 @@
 // filters.cpp*
 #include <pbrt/filters.h>
 
+#include <pbrt/util/math.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/print.h>
-#include <pbrt/util/rng.h>
+#include <pbrt/util/sampling.h>
+
+#include <cmath>
 
 namespace pbrt {
 
-std::string FilterHandle::ToString() const {
-    switch (Tag()) {
-    case TypeIndex<BoxFilter>():
-        return Cast<BoxFilter>()->ToString();
-    case TypeIndex<GaussianFilter>():
-        return Cast<GaussianFilter>()->ToString();
-    case TypeIndex<MitchellFilter>():
-        return Cast<MitchellFilter>()->ToString();
-    case TypeIndex<LanczosSincFilter>():
-        return Cast<LanczosSincFilter>()->ToString();
-    case TypeIndex<TriangleFilter>():
-        return Cast<TriangleFilter>()->ToString();
-    default:
-        LOG_FATAL("Unhandled Filter type");
-        return {};
-    }
+// Box Filter Method Definitions
+Float BoxFilter::Evaluate(const Point2f &p) const {
+    return (std::abs(p.x) <= radius.x && std::abs(p.y) <= radius.y) ? 1 : 0;
 }
 
-// Box Filter Method Definitions
+FilterSample BoxFilter::Sample(const Point2f &u) const {
+    return { Point2f(Lerp(u[0], -radius.x, radius.x),
+                     Lerp(u[1], -radius.y, radius.y)), 1.f };
+}
+
 std::string BoxFilter::ToString() const {
     return StringPrintf("[ BoxFilter radius: %s ]", radius);
 }
 
-BoxFilter *BoxFilter::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                             Allocator alloc) {
+BoxFilter *BoxFilter::Create(const ParameterDictionary &dict, Allocator alloc) {
     Float xw = dict.GetOneFloat("xradius", 0.5f);
     Float yw = dict.GetOneFloat("yradius", 0.5f);
     return alloc.new_object<BoxFilter>(Vector2f(xw, yw));
 }
 
 // Gaussian Filter Method Definitions
+Float GaussianFilter::Evaluate(const Point2f &p) const {
+    return (std::max<Float>(0, Gaussian(p.x, 0, sigma) - expX) *
+            std::max<Float>(0, Gaussian(p.y, 0, sigma) - expY));
+}
+
+Float GaussianFilter::Integral() const {
+    return ((GaussianIntegral(-radius.x, radius.x, 0, sigma) - 2 * radius.x * expX) *
+            (GaussianIntegral(-radius.y, radius.y, 0, sigma) - 2 * radius.y * expY));
+}
+
 std::string GaussianFilter::ToString() const {
     return StringPrintf("[ GaussianFilter radius: %s sigma: %f expX: %f expY: %f sampler: %s ]",
                         radius, sigma, expX, expY, sampler);
 }
 
-GaussianFilter *GaussianFilter::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                       Allocator alloc) {
+GaussianFilter *GaussianFilter::Create(const ParameterDictionary &dict, Allocator alloc) {
     // Find common filter parameters
     Float xw = dict.GetOneFloat("xradius", 1.5f);
     Float yw = dict.GetOneFloat("yradius", 1.5f);
     Float sigma = dict.GetOneFloat("sigma", 0.5f);  // equivalent to old alpha = 2
-    return alloc.new_object<GaussianFilter>(Vector2f(xw, yw), sigma, alloc);
+    return alloc.new_object<GaussianFilter>(Vector2f(xw, yw), sigma);
 }
 
 // Mitchell Filter Method Definitions
+Float MitchellFilter::Evaluate(const Point2f &p) const {
+    return Mitchell1D(p.x / radius.x) * Mitchell1D(p.y / radius.y);
+}
+
 std::string MitchellFilter::ToString() const {
     return StringPrintf("[ MitchellFilter radius: %s B: %f C: %f sampler: %s ]",
                         radius, B, C, sampler);
 }
 
-MitchellFilter *MitchellFilter::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                       Allocator alloc) {
+MitchellFilter *MitchellFilter::Create(const ParameterDictionary &dict, Allocator alloc) {
     // Find common filter parameters
     Float xw = dict.GetOneFloat("xradius", 2.f);
     Float yw = dict.GetOneFloat("yradius", 2.f);
@@ -102,21 +107,8 @@ MitchellFilter *MitchellFilter::Create(const ParameterDictionary &dict, const Fi
 }
 
 // Sinc Filter Method Definitions
-Float LanczosSincFilter::Integral() const {
-    Float sum = 0;
-    int sqrtSamples = 64;
-    int nSamples = sqrtSamples * sqrtSamples;
-    Float area = 2 * radius.x * 2 * radius.y;
-    RNG rng;
-    for (int y = 0; y < sqrtSamples; ++y) {
-        for (int x = 0; x < sqrtSamples; ++x) {
-            Point2f u((x + rng.Uniform<Float>()) / sqrtSamples,
-                      (y + rng.Uniform<Float>()) / sqrtSamples);
-            Point2f p(Lerp(u.x, -radius.x, radius.x), Lerp(u.y, -radius.y, radius.y));
-            sum += Evaluate(p);
-        }
-    }
-    return sum / nSamples * area;
+Float LanczosSincFilter::Evaluate(const Point2f &p) const {
+    return WindowedSinc(p.x, radius.x, tau) * WindowedSinc(p.y, radius.y, tau);
 }
 
 std::string LanczosSincFilter::ToString() const {
@@ -124,8 +116,7 @@ std::string LanczosSincFilter::ToString() const {
                         radius, tau, sampler);
 }
 
-LanczosSincFilter *LanczosSincFilter::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                             Allocator alloc) {
+LanczosSincFilter *LanczosSincFilter::Create(const ParameterDictionary &dict, Allocator alloc) {
     Float xw = dict.GetOneFloat("xradius", 4.);
     Float yw = dict.GetOneFloat("yradius", 4.);
     Float tau = dict.GetOneFloat("tau", 3.f);
@@ -133,32 +124,41 @@ LanczosSincFilter *LanczosSincFilter::Create(const ParameterDictionary &dict, co
 }
 
 // Triangle Filter Method Definitions
+Float TriangleFilter::Evaluate(const Point2f &p) const {
+    return std::max<Float>(0, radius.x - std::abs(p.x)) *
+           std::max<Float>(0, radius.y - std::abs(p.y));
+}
+
+FilterSample TriangleFilter::Sample(const Point2f &u) const {
+    return { Point2f(SampleTent(u[0], radius.x),
+                     SampleTent(u[1], radius.y)), 1.f };
+}
+
 std::string TriangleFilter::ToString() const {
     return StringPrintf("[ TriangleFilter radius: %s ]", radius);
 }
 
-TriangleFilter *TriangleFilter::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                       Allocator alloc) {
+TriangleFilter *TriangleFilter::Create(const ParameterDictionary &dict, Allocator alloc) {
     // Find common filter parameters
     Float xw = dict.GetOneFloat("xradius", 2.f);
     Float yw = dict.GetOneFloat("yradius", 2.f);
     return alloc.new_object<TriangleFilter>(Vector2f(xw, yw));
 }
 
-FilterHandle FilterHandle::Create(const std::string &name,
-                                  const ParameterDictionary &dict,
-                                  const FileLoc *loc, Allocator alloc) {
-    FilterHandle filter = nullptr;
+Filter *Filter::Create(const std::string &name,
+                       const ParameterDictionary &dict,
+                       const FileLoc *loc, Allocator alloc) {
+    Filter *filter = nullptr;
     if (name == "box")
-        filter = BoxFilter::Create(dict, loc, alloc);
+        filter = BoxFilter::Create(dict, alloc);
     else if (name == "gaussian")
-        filter = GaussianFilter::Create(dict, loc, alloc);
+        filter = GaussianFilter::Create(dict, alloc);
     else if (name == "mitchell")
-        filter = MitchellFilter::Create(dict, loc, alloc);
+        filter = MitchellFilter::Create(dict, alloc);
     else if (name == "sinc")
-        filter = LanczosSincFilter::Create(dict, loc, alloc);
+        filter = LanczosSincFilter::Create(dict, alloc);
     else if (name == "triangle")
-        filter = TriangleFilter::Create(dict, loc, alloc);
+        filter = TriangleFilter::Create(dict, alloc);
     else
         ErrorExit(loc, "%s: filter type unknown.", name);
 
@@ -167,39 +167,6 @@ FilterHandle FilterHandle::Create(const std::string &name,
 
     dict.ReportUnused();
     return filter;
-}
-
-FilterSampler::FilterSampler(FilterHandle filter, int freq, Allocator alloc)
-    :  domain(Point2f(-filter.Radius()), Point2f(filter.Radius())),
-       values(int(16 * 2 * filter.Radius().x),
-              int(16 * 2 * filter.Radius().y), alloc),
-       distrib(alloc) {
-    for (int y = 0; y < values.ySize(); ++y) {
-        for (int x = 0; x < values.xSize(); ++x) {
-            Point2f p = domain.Lerp(Point2f((x + 0.5f) / values.xSize(),
-                                            (y + 0.5f) / values.ySize()));
-            values(x, y) = std::abs(filter.Evaluate(p));
-        }
-    }
-
-    distrib = std::move(Distribution2D(values, domain, alloc));
-
-    // And again without the abs() for use in Sample...
-    for (int y = 0; y < values.ySize(); ++y) {
-        for (int x = 0; x < values.xSize(); ++x) {
-            Point2f p = domain.Lerp(Point2f((x + 0.5f) / values.xSize(),
-                                            (y + 0.5f) / values.ySize()));
-            values(x, y) = filter.Evaluate(p);
-        }
-    }
-}
-
-std::string FilterSampler::ToString() const {
-#if 0
-    return StringPrintf("[ FilterSampler domain: %s values: %s distrib: %s ]",
-                        domian, values, distrib);
-#endif
-    return "[ FilterSampler TODO ]";
 }
 
 }  // namespace pbrt

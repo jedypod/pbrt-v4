@@ -40,10 +40,6 @@ namespace pbrt {
 
 Options PbrtOptions;
 
-#if defined(PBRT_HAVE_OPTIX) && defined(__CUDACC__)
-__constant__ BasicOptions PbrtOptionsGPU;
-#endif
-
 std::string Options::ToString() const {
     return StringPrintf("[ Options nThreads: %d seed: %d quickRender: %s quiet: %s "
                         "recordPixelStatistics: %s profile: %s "

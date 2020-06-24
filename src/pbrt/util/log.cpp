@@ -2,7 +2,6 @@
 #include <pbrt/util/log.h>
 
 #include <pbrt/gpu.h>
-#include <pbrt/util/error.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/parallel.h>
 
@@ -41,11 +40,8 @@ std::string TimeNow() {
 
 LogConfig LOGGING_logConfig;
 
-void InitLogging(LogConfig config) {
+void InitLogging(LogConfig config, const char *argv0) {
     LOGGING_logConfig = config;
-
-    if (config.level == LogLevel::Invalid)
-        ErrorExit("Invalid --log-level specified.");
 }
 
 #ifdef __CUDACC__

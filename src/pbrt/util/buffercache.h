@@ -46,14 +46,13 @@
 #include <pbrt/util/pstd.h>
 
 #include <cstring>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Redundant vertex and index buffers", redundantBufferBytes);
-STAT_PERCENT("Geometry/Buffer cache hits", nBufferCacheHits, nBufferCacheLookups);
+STAT_PERCENT("Scene/Buffer cache hits", nBufferCacheHits, nBufferCacheLookups);
 
 // BufferId stores a hash of the contents of a buffer as well as its size.
 // It serves as a key for the BufferCache hash table.
@@ -101,7 +100,6 @@ class BufferCache {
         // at compile time?)
         BufferId id((const char *)buf.data(), buf.size() * sizeof(T));
         ++nBufferCacheLookups;
-        std::lock_guard<std::mutex> lock(mutex);
         auto iter = cache.find(id);
         if (iter != cache.end()) {
             // Success; return the pointer to the start of already-existing
@@ -136,7 +134,6 @@ class BufferCache {
 
  private:
     Allocator alloc;
-    std::mutex mutex;
     std::unordered_map<BufferId, pstd::vector<T> *, BufferHasher> cache;
 };
 

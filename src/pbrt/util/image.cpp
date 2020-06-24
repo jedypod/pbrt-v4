@@ -1055,11 +1055,10 @@ bool Image::Write(const std::string &name, const ImageMetadata &metadata) const 
         pstd::optional<ImageChannelDesc> desc = GetChannelDesc({"R", "G", "B"});
         if (!desc)
             Warning("%s: 3-channels but doesn't have R, G, and B. "
-                    "Image may be garbled.", name);
-        else {
-            rgbImage = SelectChannels(*desc);
-            image = &rgbImage;
-        }
+                    "Image will likely be garbled.", name);
+
+        rgbImage = SelectChannels(*desc);
+        image = &rgbImage;
     }
 
     if (HasExtension(name, "pfm"))
@@ -1221,7 +1220,7 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
         file.readPixels(dw.min.y, dw.max.y);
 
         LOG_VERBOSE("Read EXR image %s (%d x %d)", name, width, height);
-        return ImageAndMetadata{std::move(image), metadata};
+        return ImageAndMetadata{image, metadata};
     } catch (const std::exception &e) {
         Error("Unable to read image file \"%s\": %s", name, e.what());
     }

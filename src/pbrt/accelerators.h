@@ -48,9 +48,6 @@
 
 namespace pbrt {
 
-PrimitiveHandle CreateAccelerator(const std::string &name, std::vector<PrimitiveHandle> prims,
-                                  const ParameterDictionary &dict);
-
 struct BVHBuildNode;
 
 // BVHAccel Forward Declarations

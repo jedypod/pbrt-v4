@@ -8,7 +8,9 @@ RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, Point2f w,
                              SpectrumHandle illum,
                              const RGBToSpectrumTable *rgbToSpectrumTable,
                              Allocator alloc)
-    : r(r), g(g), b(b), w(w), illuminant(illum, alloc),
+    : r(r), g(g), b(b), w(w),
+      illuminant(illum, alloc), X(SPDs::X(), alloc),
+      Y(SPDs::Y(), alloc), Z(SPDs::Z(), alloc),
       rgbToSpectrumTable(rgbToSpectrumTable) {
 
     /* Try n:

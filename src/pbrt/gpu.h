@@ -68,7 +68,6 @@ public:
 
     PBRT_HOST_DEVICE_INLINE
     Point3fRef at(size_t offset) {
-        DCHECK_LT(offset, n);
         return Point3fRef(&x[offset], &y[offset], &z[offset]);
     }
 
@@ -118,7 +117,6 @@ public:
 
     PBRT_HOST_DEVICE_INLINE
     Vector3fRef at(size_t offset) {
-        DCHECK_LT(offset, n);
         return Vector3fRef(&x[offset], &y[offset], &z[offset]);
     }
 

@@ -33,139 +33,143 @@
 // samplers.cpp*
 #include <pbrt/samplers.h>
 
-#include <pbrt/cameras.h>
-#include <pbrt/filters.h>
+#include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
+#include <pbrt/util/sampling.h>
+#include <pbrt/util/bluenoise.h>
 #include <pbrt/util/error.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/math.h>
+#include <pbrt/util/pmj02tables.h>
+#include <pbrt/util/primes.h>
+#include <pbrt/util/rng.h>
+#include <pbrt/util/shuffle.h>
 
-#include <string>
 
 namespace pbrt {
 
-std::vector<SamplerHandle> SamplerHandle::Clone(int n, Allocator alloc) {
-    switch (Tag()) {
-    case TypeIndex<HaltonSampler>():
-        return Cast<HaltonSampler>()->Clone(n, alloc);
-    case TypeIndex<PaddedSobolSampler>():
-        return Cast<PaddedSobolSampler>()->Clone(n, alloc);
-    case TypeIndex<PMJ02BNSampler>():
-        return Cast<PMJ02BNSampler>()->Clone(n, alloc);
-    case TypeIndex<RandomSampler>():
-        return Cast<RandomSampler>()->Clone(n, alloc);
-    case TypeIndex<SobolSampler>():
-        return Cast<SobolSampler>()->Clone(n, alloc);
-    case TypeIndex<StratifiedSampler>():
-        return Cast<StratifiedSampler>()->Clone(n, alloc);
-    case TypeIndex<MLTSampler>():
-        return Cast<MLTSampler>()->Clone(n, alloc);
-    default:
-        LOG_FATAL("Unhandled Sampler type");
-        return {};
-    }
-}
-
-std::string SamplerHandle::ToString() const {
-    switch (Tag()) {
-    case TypeIndex<HaltonSampler>():
-        return Cast<HaltonSampler>()->ToString();
-    case TypeIndex<PaddedSobolSampler>():
-        return Cast<PaddedSobolSampler>()->ToString();
-    case TypeIndex<PMJ02BNSampler>():
-        return Cast<PMJ02BNSampler>()->ToString();
-    case TypeIndex<RandomSampler>():
-        return Cast<RandomSampler>()->ToString();
-    case TypeIndex<SobolSampler>():
-        return Cast<SobolSampler>()->ToString();
-    case TypeIndex<StratifiedSampler>():
-        return Cast<StratifiedSampler>()->ToString();
-    case TypeIndex<MLTSampler>():
-        return Cast<MLTSampler>()->ToString();
-    default:
-        LOG_FATAL("Unhandled Sampler type");
-        return {};
-    }
-}
-
 // HaltonSampler Method Definitions
-HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullResolution,
-                             pstd::vector<DigitPermutation> *dp, Allocator alloc)
-    : digitPermutations(dp), samplesPerPixel(samplesPerPixel),
-    haltonPixelIndexer(fullResolution) {
+HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullResolution, int seed)
+    : Sampler(samplesPerPixel), haltonPixelIndexer(fullResolution) {
     // Generate random digit permutations for Halton sampler
-    if (!dp)
-        digitPermutations = ComputeRadicalInversePermutations(0, alloc);
+    digitPermutations = ComputeRadicalInversePermutations(seed);
+    ownDigitPermutations = true;
+    digitPermutationsSeed = seed;
 }
 
-std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    HaltonSampler *samplerMem = (HaltonSampler *)alloc.allocate_object<HaltonSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
+HaltonSampler::~HaltonSampler() {
+    if (ownDigitPermutations)
+        digitPermutations->get_allocator().delete_object(digitPermutations);
+}
+
+void HaltonSampler::ImplStartPixelSample(const Point2i &p, int pixelSample) {
+    if (p != pixelForIndex) {
+        // Compute Halton sample offset for _currentPixel_
+        haltonPixelIndexer.SetPixel(p);
+        pixelForIndex = p;
     }
-    return samplers;
+    haltonPixelIndexer.SetPixelSample(pixelSample);
+
+    rng.SetSequence(p.x + p.y * 65536);
+    rng.Advance(pixelSample * 65536);
+}
+
+Float HaltonSampler::ImplGet1D(const SamplerState &s) {
+    if (s.dimension >= PrimeTableSize)
+        return rng.Uniform<Float>();
+
+    // Note (for book): it's about 5x faster to use precomputed tables than
+    // to generate the permutations on the fly...
+    // TODO: check on GPU though...
+    return ScrambledRadicalInverse(s.dimension, haltonPixelIndexer.SampleIndex(),
+                                   (*digitPermutations)[s.dimension]);
+}
+
+Point2f HaltonSampler::ImplGet2D(const SamplerState &s) {
+    if (s.dimension == 0)
+        return haltonPixelIndexer.SampleFirst2D();
+    else {
+        if (s.dimension + 1 >= PrimeTableSize)
+            return {rng.Uniform<Float>(), rng.Uniform<Float>()};
+
+        return {ScrambledRadicalInverse(s.dimension, haltonPixelIndexer.SampleIndex(),
+                                        (*digitPermutations)[s.dimension]),
+                ScrambledRadicalInverse(s.dimension + 1, haltonPixelIndexer.SampleIndex(),
+                                        (*digitPermutations)[s.dimension + 1])};
+    }
+}
+
+std::unique_ptr<Sampler> HaltonSampler::Clone() {
+    std::unique_ptr<HaltonSampler> s = std::make_unique<HaltonSampler>(*this);
+    s->ownDigitPermutations = false;
+    return s;
 }
 
 std::string HaltonSampler::ToString() const {
-    return StringPrintf("[ HaltonSampler digitPermutations: %p haltonPixelIndexer: %s "
-                        "pixel: %s sampleIndex: %d dimension: %d samplesPerPixel: %d "
-                        "rng: %s ]", digitPermutations, haltonPixelIndexer, pixel, sampleIndex,
-                        dimension, samplesPerPixel, rng);
+    return StringPrintf("[ HaltonSampler %s digitPermutations: (elided) "
+                        "digitPermutationsSeed: %d ownDigitPermutations: %s "
+                        "haltonPixelIndexer: %s pixelForIndex: %s rng: %s ]",
+                        BaseToString(), digitPermutationsSeed, ownDigitPermutations,
+                        haltonPixelIndexer, pixelForIndex, rng);
 }
 
-HaltonSampler *HaltonSampler::Create(const ParameterDictionary &dict, const Point2i &fullResolution,
-                                     const FileLoc *loc, Allocator alloc) {
+std::unique_ptr<HaltonSampler> HaltonSampler::Create(
+    const ParameterDictionary &dict, const Point2i &fullResolution) {
     int nsamp = dict.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.pixelSamples)
         nsamp = *PbrtOptions.pixelSamples;
     int seed = dict.GetOneInt("seed", PbrtOptions.seed);
     if (PbrtOptions.quickRender) nsamp = 1;
-
-    auto digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
-    return alloc.new_object<HaltonSampler>(nsamp, fullResolution, digitPermutations);
+    return std::make_unique<HaltonSampler>(nsamp, fullResolution, seed);
 }
 
-std::vector<SamplerHandle> SobolSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    SobolSampler *samplerMem = (SobolSampler *)alloc.allocate_object<SobolSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
-    }
-    return samplers;
-}
 
 // PaddedSobolSampler Method Definitions
-PaddedSobolSampler::PaddedSobolSampler(int spp, RandomizeStrategy randomizer)
-    : samplesPerPixel(RoundUpPow2(spp)), randomizeStrategy(randomizer) {
-    if (!IsPowerOf2(spp))
+PaddedSobolSampler::PaddedSobolSampler(int samplesPerPixel, RandomizeStrategy randomizer)
+    : Sampler(RoundUpPow2(samplesPerPixel)), randomizeStrategy(randomizer) {
+    if (!IsPowerOf2(samplesPerPixel))
         Warning(
             "Pixel samples being rounded up to power of 2 (from %d to %d).",
-            spp, samplesPerPixel);
+            samplesPerPixel, RoundUpPow2(samplesPerPixel));
+}
+
+Float PaddedSobolSampler::ImplGet1D(const SamplerState &s) {
+    uint64_t hash = s.Hash();
+    int index = PermutationElement(s.sampleIndex, samplesPerPixel, hash);
+
+    if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
+        return SampleGeneratorMatrix(CVanDerCorput, index,
+                                     CranleyPattersonRotator(BlueNoise(s.dimension, s.p.x, s.p.y)));
+    else
+        return generateSample(CVanDerCorput, index, hash >> 32);
+}
+
+Point2f PaddedSobolSampler::ImplGet2D(const SamplerState &s) {
+    uint64_t hash = s.Hash();
+    int index = PermutationElement(s.sampleIndex, samplesPerPixel, hash);
+
+    if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
+        return {SampleGeneratorMatrix(CSobol[0], index,
+                                      CranleyPattersonRotator(BlueNoise(s.dimension, s.p.x, s.p.y))),
+                SampleGeneratorMatrix(CSobol[1], index,
+                                      CranleyPattersonRotator(BlueNoise(s.dimension + 1, s.p.x, s.p.y)))};
+    else
+        // Note: we're reusing the low 32 bits of the hash both for the permutation and
+        // for the random scrambling in the first dimension. This should(?) be fine.
+        return {generateSample(CSobol[0], index, hash >> 8), generateSample(CSobol[1], index, hash >> 32)};
 }
 
 std::string PaddedSobolSampler::ToString() const {
-    return StringPrintf("[ PaddedSobolSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "samplesPerPixel: %d randomizeStrategy: %s ]",
-                        pixel, sampleIndex, dimension, samplesPerPixel,
-                        randomizeStrategy);
+    return StringPrintf("[ PaddedSobolSampler %s randomizeStrategy: %s ]",
+                        BaseToString(), randomizeStrategy);
 }
 
-std::vector<SamplerHandle> PaddedSobolSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    PaddedSobolSampler *samplerMem =
-        (PaddedSobolSampler *)alloc.allocate_object<PaddedSobolSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
-    }
-    return samplers;
+std::unique_ptr<Sampler> PaddedSobolSampler::Clone() {
+    return std::make_unique<PaddedSobolSampler>(*this);
 }
 
-PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                               Allocator alloc) {
+std::unique_ptr<PaddedSobolSampler> PaddedSobolSampler::Create(
+    const ParameterDictionary &dict) {
     int nsamp = dict.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.pixelSamples)
         nsamp = *PbrtOptions.pixelSamples;
@@ -183,9 +187,9 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &dict, 
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
-        ErrorExit(loc, "%s: unknown randomization strategy given to PaddedSobolSampler", s);
+        ErrorExit("%s: unknown randomization strategy given to PaddedSobolSampler", s);
 
-    return alloc.new_object<PaddedSobolSampler>(nsamp, randomizer);
+    return std::make_unique<PaddedSobolSampler>(nsamp, randomizer);
 }
 
 
@@ -202,78 +206,152 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &dict, 
 */
 
 PMJ02BNSampler::PMJ02BNSampler(int samplesPerPixel, Allocator alloc)
-    : samplesPerPixel(samplesPerPixel) {
+    : Sampler(samplesPerPixel) {
     if (!IsPowerOf4(samplesPerPixel))
         Warning("PMJ02BNSampler results are best with power-of-4 samples per pixel (1, 4, 16, 64, ...)");
 
     pixelSamples = GetSortedPMJ02BNPixelSamples(samplesPerPixel, alloc, &pixelTileSize);
 }
 
-std::vector<SamplerHandle> PMJ02BNSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    PMJ02BNSampler *samplerMem =
-        (PMJ02BNSampler *)alloc.allocate_object<PMJ02BNSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
+void PMJ02BNSampler::ImplStartPixelSample(const Point2i &p, int pixelSample) {
+    pmjInstance = 0;
+}
+
+Float PMJ02BNSampler::ImplGet1D(const SamplerState &s) {
+    uint64_t hash = s.Hash();
+    int index = PermutationElement(s.sampleIndex, samplesPerPixel, hash);
+    Float cpOffset = BlueNoise(s.dimension, s.p.x, s.p.y);
+    Float u = (index + cpOffset) / samplesPerPixel;
+    if (u >= 1) u -= 1;
+    return std::min(u, OneMinusEpsilon);
+}
+
+Point2f PMJ02BNSampler::ImplGet2D(const SamplerState &s) {
+    // Don't start permuting until the second time through: when we
+    // permute, that breaks the progressive part of the pattern and in
+    // turn, convergence is similar to random until the very end. This way,
+    // we generally do well for intermediate images as well.
+    int sampleIndex = (pmjInstance >= nPMJ02bnSets) ?
+        PermutationElement(s.sampleIndex, samplesPerPixel, s.Hash()) :
+        s.sampleIndex;
+    if (s.dimension == 0) {
+        // special case the pixel sample
+        int offset = pixelSampleOffset(Point2i(s.p));
+        return (*pixelSamples)[offset + sampleIndex];
+    } else {
+        Vector2f cpOffset(BlueNoise(s.dimension, s.p.x, s.p.y),
+                          BlueNoise(s.dimension + 1, s.p.x, s.p.y));
+        Point2f u = GetPMJ02BNSample(pmjInstance++, sampleIndex) + cpOffset;
+        if (u.x >= 1) u.x -= 1;
+        if (u.y >= 1) u.y -= 1;
+        return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
     }
-    return samplers;
+}
+
+std::unique_ptr<Sampler> PMJ02BNSampler::Clone() {
+    return std::make_unique<PMJ02BNSampler>(*this);
 }
 
 std::string PMJ02BNSampler::ToString() const {
-    return StringPrintf("[ PMJ02BNSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "samplesPerPixel: %d pixelTileSize: %d pmjInstance: %d "
-                        " pixelSamples: %p ]",
-                        pixel, sampleIndex, dimension, samplesPerPixel,
-                        pixelTileSize, pmjInstance, pixelSamples);
+    return StringPrintf("[ PMJ02BNSampler %s pixelTileSize: %d pmjInstance: %d "
+                        " pixelSamples: (elided)]",
+                        BaseToString(), pixelTileSize, pmjInstance);
 }
 
-PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                       Allocator alloc) {
+std::unique_ptr<PMJ02BNSampler> PMJ02BNSampler::Create(const ParameterDictionary &dict) {
     int nsamp = dict.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.pixelSamples)
         nsamp = *PbrtOptions.pixelSamples;
     if (PbrtOptions.quickRender) nsamp = 1;
-    return alloc.new_object<PMJ02BNSampler>(nsamp, alloc);
+    return std::make_unique<PMJ02BNSampler>(nsamp);
+}
+
+
+RandomSampler::RandomSampler(int ns, int seed) : Sampler(ns), seed(seed) {}
+
+Float RandomSampler::ImplGet1D(const SamplerState &s) {
+    return rng.Uniform<Float>();
+}
+
+Point2f RandomSampler::ImplGet2D(const SamplerState &s) {
+    return {rng.Uniform<Float>(), rng.Uniform<Float>()};
+}
+
+void RandomSampler::ImplStartPixelSample(const Point2i &p, int pixelSample) {
+    rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
+    // Assume we won't use more than 64k sample dimensions in a pixel...
+    rng.Advance(pixelSample * 65536);
 }
 
 std::string RandomSampler::ToString() const {
-    return StringPrintf("[ RandomSampler samplesPerPixel: %d seed: %d rng: %s ]",
-                        samplesPerPixel, seed, rng);
+    return StringPrintf("[ RandomSampler %s seed: %d rng: %s ]",
+                        BaseToString(), seed, rng);
 }
 
-std::vector<SamplerHandle> RandomSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    RandomSampler *samplerMem =
-        (RandomSampler *)alloc.allocate_object<RandomSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
-    }
-    return samplers;
+std::unique_ptr<Sampler> RandomSampler::Clone() {
+    return std::make_unique<RandomSampler>(*this);
 }
 
-RandomSampler *RandomSampler::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                     Allocator alloc) {
+std::unique_ptr<RandomSampler> RandomSampler::Create(const ParameterDictionary &dict) {
     int ns = dict.GetOneInt("pixelsamples", 4);
     if (PbrtOptions.pixelSamples)
         ns = *PbrtOptions.pixelSamples;
     int seed = dict.GetOneInt("seed", PbrtOptions.seed);
-    return alloc.new_object<RandomSampler>(ns, seed);
+    return std::make_unique<RandomSampler>(ns, seed);
 }
+
 
 // SobolSampler Method Definitions
-std::string SobolSampler::ToString() const {
-    return StringPrintf("[ SobolSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "samplesPerPixel: %d resolution: %d sequenceIndex: %d "
-                        "rng: %s randomizeStrategy: %s ]",
-                        pixel, sampleIndex, dimension, samplesPerPixel, resolution,
-                        sequenceIndex, rng, randomizeStrategy);
+void SobolSampler::ImplStartPixelSample(const Point2i &p, int pixelSample) {
+    if (p != pixelForIndex || pixelSample != pixelSampleForIndex) {
+        sequenceIndex = SobolIntervalToIndex(log2Resolution, pixelSample, p);
+        pixelForIndex = p;
+        pixelSampleForIndex = pixelSample;
+    }
+    rng.SetSequence(p.x + p.y * 65536);
+    rng.Advance(pixelSample * 65536);
 }
 
-SobolSampler *SobolSampler::Create(const ParameterDictionary &dict,
-                                   const Point2i &fullResolution, const FileLoc *loc,
-                                   Allocator alloc) {
+Float SobolSampler::ImplGet1D(const SamplerState &s) {
+    if (s.dimension >= NSobolDimensions)
+        return rng.Uniform<Float>();
+
+    return sampleDimension(s.dimension);
+}
+
+Point2f SobolSampler::ImplGet2D(const SamplerState &s) {
+    if (s.dimension + 1 >= NSobolDimensions)
+        return {rng.Uniform<Float>(), rng.Uniform<Float>()};
+
+    Point2f u = {sampleDimension(s.dimension), sampleDimension(s.dimension + 1)};
+
+    if (s.dimension == 0) {
+        // Remap Sobol$'$ dimensions used for pixel samples
+        for (int dim = 0; dim < 2; ++dim) {
+            u[dim] = u[dim] * resolution;
+            CHECK_RARE(1e-7, u[dim] - s.p[dim] < 0);
+            CHECK_RARE(1e-7, u[dim] - s.p[dim] > 1);
+            u[dim] = Clamp(u[dim] - s.p[dim], (Float)0, OneMinusEpsilon);
+        }
+    }
+    return u;
+}
+
+std::unique_ptr<Sampler> SobolSampler::Clone() {
+    return std::make_unique<SobolSampler>(*this);
+}
+
+std::string SobolSampler::ToString() const {
+    return StringPrintf("[ SobolSampler %s fullResolution: %s resolution: %d "
+                        "log2Resolution: %d pixelForIndex: %s pixelSampleForIndex: %d "
+                        "sequenceIndex: %d rng: %s randomizeStrategy: %s]",
+                        BaseToString(), fullResolution, resolution, log2Resolution,
+                        pixelForIndex, pixelSampleForIndex, sequenceIndex, rng,
+                        randomizeStrategy);
+}
+
+std::unique_ptr<SobolSampler> SobolSampler::Create(const ParameterDictionary &dict,
+                                                   const Point2i &fullResolution) {
     int nsamp = dict.GetOneInt("pixelsamples", 16);
     if (PbrtOptions.pixelSamples)
         nsamp = *PbrtOptions.pixelSamples;
@@ -290,160 +368,53 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &dict,
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
-        ErrorExit(loc, "%s: unknown randomization strategy given to SobolSampler", s);
+        ErrorExit("%s: unknown randomization strategy given to SobolSampler", s);
 
-    return alloc.new_object<SobolSampler>(nsamp, fullResolution, randomizer);
+    return std::make_unique<SobolSampler>(nsamp, fullResolution, randomizer);
 }
+
 
 // StratifiedSampler Method Definitions
+void StratifiedSampler::ImplStartPixelSample(const Point2i &p, int pixelSample) {
+    rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
+    // Assume we won't use more than 64k sample dimensions in a pixel...
+    rng.Advance(pixelSample * 65536);
+}
+
+Float StratifiedSampler::ImplGet1D(const SamplerState &s) {
+    int stratum = PermutationElement(s.sampleIndex, samplesPerPixel, s.Hash());
+    Float delta = jitter ? rng.Uniform<Float>() : 0.5f;
+    return (stratum + delta) / samplesPerPixel;
+}
+
+Point2f StratifiedSampler::ImplGet2D(const SamplerState &s) {
+    int stratum = PermutationElement(s.sampleIndex, samplesPerPixel, s.Hash());
+    int x = stratum % xPixelSamples;
+    int y = stratum / xPixelSamples;
+    Float dx = jitter ? rng.Uniform<Float>() : 0.5f;
+    Float dy = jitter ? rng.Uniform<Float>() : 0.5f;
+    return {(x + dx) / xPixelSamples, (y + dy) / yPixelSamples};
+}
+
 std::string StratifiedSampler::ToString() const {
-    return StringPrintf("[ StratifiedSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "xPixelSamples: %d yPixelSamples: %d jitter: %s seed: %d rng: %s ]",
-                        pixel, sampleIndex, dimension, xPixelSamples, yPixelSamples, jitter,
-                        seed, rng);
+    return StringPrintf("[ StratifiedSampler %s xPixelSamples: %d "
+                        "yPixelSamples: %d jitter: %s rng: %s ]",
+                        BaseToString(), xPixelSamples, yPixelSamples, jitter,
+                        rng);
 }
 
-std::vector<SamplerHandle> StratifiedSampler::Clone(int n, Allocator alloc) {
-    std::vector<SamplerHandle> samplers(n);
-    StratifiedSampler *samplerMem =
-        (StratifiedSampler *)alloc.allocate_object<StratifiedSampler>(n);
-    for (int i = 0; i < n; ++i) {
-        alloc.construct(&samplerMem[i], *this);
-        samplers[i] = &samplerMem[i];
-    }
-    return samplers;
+std::unique_ptr<Sampler> StratifiedSampler::Clone() {
+    return std::make_unique<StratifiedSampler>(*this);
 }
 
-StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                             Allocator alloc) {
+std::unique_ptr<StratifiedSampler> StratifiedSampler::Create(
+    const ParameterDictionary &dict) {
     bool jitter = dict.GetOneBool("jitter", true);
     int xsamp = dict.GetOneInt("xsamples", 4);
     int ysamp = dict.GetOneInt("ysamples", 4);
     if (PbrtOptions.quickRender) xsamp = ysamp = 1;
     int seed = dict.GetOneInt("seed", PbrtOptions.seed);
-    return alloc.new_object<StratifiedSampler>(xsamp, ysamp, jitter, seed);
-}
-
-// MLTSampler Method Definitions
-Float MLTSampler::Get1D() {
-    int index = GetNextIndex();
-    EnsureReady(index);
-    return X[index].value;
-}
-
-Point2f MLTSampler::Get2D() {
-    return {Get1D(), Get1D()};
-}
-
-std::vector<SamplerHandle> MLTSampler::Clone(int n, Allocator alloc) {
-    LOG_FATAL("MLTSampler::Clone() is not implemented");
-    return {};
-}
-
-void MLTSampler::StartIteration() {
-    currentIteration++;
-    largeStep = rng.Uniform<Float>() < largeStepProbability;
-}
-
-void MLTSampler::Accept() {
-    if (largeStep) lastLargeStepIteration = currentIteration;
-}
-
-void MLTSampler::EnsureReady(int index) {
-#ifdef __CUDA_ARCH__
-    LOG_FATAL("MLTSampler not supported on GPU--needs vector resize...");
-    return;
-#else
-    // Enlarge _MLTSampler::X_ if necessary and get current $\VEC{X}_i$
-    if (index >= X.size()) X.resize(index + 1);
-    PrimarySample &Xi = X[index];
-
-    // Reset $\VEC{X}_i$ if a large step took place in the meantime
-    if (Xi.lastModificationIteration < lastLargeStepIteration) {
-        Xi.value = rng.Uniform<Float>();
-        Xi.lastModificationIteration = lastLargeStepIteration;
-    }
-
-    // Apply remaining sequence of mutations to _sample_
-    Xi.Backup();
-    if (largeStep) {
-        Xi.value = rng.Uniform<Float>();
-    } else {
-        int64_t nSmall = currentIteration - Xi.lastModificationIteration;
-        // Apply _nSmall_ small step mutations
-
-        // Sample the standard normal distribution $N(0, 1)$
-        Float normalSample = SampleNormal(rng.Uniform<Float>());
-
-        // Compute the effective standard deviation and apply perturbation to
-        // $\VEC{X}_i$
-        Float effSigma = sigma * std::sqrt((Float)nSmall);
-        Xi.value += normalSample * effSigma;
-        Xi.value -= std::floor(Xi.value);
-    }
-    Xi.lastModificationIteration = currentIteration;
-#endif
-}
-
-void MLTSampler::Reject() {
-    for (auto &Xi : X)
-        if (Xi.lastModificationIteration == currentIteration) Xi.Restore();
-    --currentIteration;
-}
-
-void MLTSampler::StartStream(int index) {
-    CHECK_LT(index, streamCount);
-    streamIndex = index;
-    sampleIndex = 0;
-}
-
-std::string MLTSampler::DumpState() const {
-    std::string state;
-    for (const PrimarySample &Xi : X)
-        state += StringPrintf("%f,", Xi.value);
-    state += "0";
-    return state;
-}
-
-DebugMLTSampler DebugMLTSampler::Create(pstd::span<const std::string> state,
-                                        int nSampleStreams) {
-    DebugMLTSampler ds(nSampleStreams);
-    ds.u.resize(state.size());
-    for (size_t i = 0; i < state.size(); ++i) {
-#ifdef PBRT_FLOAT_AS_DOUBLE
-        if (!Atod(state[i], &ds.u[i]))
-#else
-        if (!Atof(state[i], &ds.u[i]))
-#endif
-                ErrorExit("Invalid value in --debugstate: %s", state[i]);
-    }
-    return ds;
-}
-
-SamplerHandle SamplerHandle::Create(const std::string &name, const ParameterDictionary &dict,
-                                    const Point2i &fullResolution, const FileLoc *loc,
-                                    Allocator alloc) {
-    SamplerHandle sampler = nullptr;
-    if (name == "paddedsobol")
-        sampler = PaddedSobolSampler::Create(dict, loc, alloc);
-    else if (name == "halton")
-        sampler = HaltonSampler::Create(dict, fullResolution, loc, alloc);
-    else if (name == "sobol")
-        sampler = SobolSampler::Create(dict, fullResolution, loc, alloc);
-    else if (name == "random")
-        sampler = RandomSampler::Create(dict, loc, alloc);
-    else if (name == "pmj02bn")
-        sampler = PMJ02BNSampler::Create(dict, loc, alloc);
-    else if (name == "stratified")
-        sampler = StratifiedSampler::Create(dict, loc, alloc);
-    else
-        ErrorExit(loc, "%s: sampler type unknown.", name);
-
-    if (!sampler)
-        ErrorExit(loc, "%s: unable to create sampler.", name);
-
-    dict.ReportUnused();
-    return sampler;
+    return std::make_unique<StratifiedSampler>(xsamp, ysamp, jitter, seed);
 }
 
 }  // namespace pbrt

@@ -69,7 +69,7 @@ TEST(Spectrum, XYZ) {
         int n = 100;
         for (Float u : Stratified1D(n)) {
             SampledWavelengths lambda = SampledWavelengths::SampleEqui(u, 360, 830);
-            XYZ xyz = SampledSpectrum(1.).ToXYZ(lambda);
+            XYZ xyz = SampledSpectrum(1.).ToXYZ(lambda, SPDs::X(), SPDs::Y(), SPDs::Z());
             for (int c = 0; c < 3; ++c)
                 xyzSum[c] += xyz[c];
         }

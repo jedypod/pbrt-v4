@@ -105,7 +105,7 @@ std::string ToString(RandomizeStrategy r) {
     case RandomizeStrategy::CranleyPatterson: return "CranleyPatterson";
     case RandomizeStrategy::Xor: return "Xor";
     case RandomizeStrategy::Owen: return "Owen";
-    default: LOG_FATAL("Unhandled RandomizeStrategy"); return "";
+    default: LOG_FATAL("Unhandled RandomizeStrategy");
     }
 }
 

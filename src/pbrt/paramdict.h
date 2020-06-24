@@ -142,9 +142,7 @@ public:
     void RemoveString(const std::string &);
     void RemoveTexture(const std::string &);
     void RemoveSpectrum(const std::string &);
-
     void RenameParameter(const std::string &before, const std::string &after);
-    void RenameUsedTextures(const std::map<std::string, std::string> &m);
 
     void ReportUnused() const;
 

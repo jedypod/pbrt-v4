@@ -23,6 +23,9 @@ IF (PBRT_FLOAT_AS_DOUBLE)
   ADD_DEFINITIONS ( -D PBRT_FLOAT_AS_DOUBLE )
 ENDIF()
 
+# TODO: detect this at configuration time, e.g. https://stackoverflow.com/a/4049562
+ADD_DEFINITIONS ( -D PBRT_L1_CACHE_LINE_SIZE=64 )
+
 ENABLE_TESTING()
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -141,7 +144,7 @@ if (CMAKE_CUDA_COMPILER)
         #    'output_var', which can then be added to cmake targets.
         macro(cuda_compile_and_embed output_var cuda_file)
           set(c_var_name ${output_var})
-          CUDA_COMPILE_PTX(ptx_files ${cuda_file} OPTIONS "-O3" ${PBRT_CUDA_DIAG_FLAGS} "--gpu-architecture=${ARCH}")
+          CUDA_COMPILE_PTX(ptx_files ${cuda_file} OPTIONS "-O3" ${PBRT_CUDA_DIAG_FLAGS})
           list(GET ptx_files 0 ptx_file)
           set(embedded_file ${ptx_file}_embedded.c)
         #  message("adding rule to compile and embed ${cuda_file} to \"const char ${var_name}[];\"")
@@ -153,6 +156,10 @@ if (CMAKE_CUDA_COMPILER)
             )
           set(${output_var} ${embedded_file})
         endmacro()
+
+        # TODO: is this really needed??
+        add_definitions(-D__CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__=1)
+
     endif()
 else()
     message(STATUS "CUDA not found")
@@ -477,6 +484,8 @@ INCLUDE_DIRECTORIES ( src/ext )
 
 SET ( PBRT_SOURCE
   src/pbrt/accelerators.cpp
+  src/pbrt/api.cpp
+  src/pbrt/base.cpp
   src/pbrt/bsdf.cpp
   src/pbrt/bssrdf.cpp
   src/pbrt/cameras.cpp
@@ -487,6 +496,7 @@ SET ( PBRT_SOURCE
   src/pbrt/gpu.cpp
   src/pbrt/integrators.cpp
   src/pbrt/interaction.cpp
+  src/pbrt/kdwarp.cpp
   src/pbrt/lights.cpp
   src/pbrt/lightsampling.cpp
   src/pbrt/loopsubdiv.cpp
@@ -496,7 +506,6 @@ SET ( PBRT_SOURCE
   src/pbrt/options.cpp
   src/pbrt/paramdict.cpp
   src/pbrt/parser.cpp
-  src/pbrt/pbrt.cpp
   src/pbrt/plymesh.cpp
   src/pbrt/primitive.cpp
   src/pbrt/ray.cpp
@@ -545,6 +554,8 @@ if (PBRT_CUDA_ENABLED)
 
  SET_SOURCE_FILES_PROPERTIES (
 #  src/pbrt/accelerators.cpp
+#  src/pbrt/api.cpp
+  src/pbrt/base.cpp
   src/pbrt/bsdf.cpp
   src/pbrt/bssrdf.cpp
   src/pbrt/cameras.cpp
@@ -555,16 +566,16 @@ if (PBRT_CUDA_ENABLED)
   src/pbrt/gpu.cpp
 #  src/pbrt/integrators.cpp
   src/pbrt/interaction.cpp
+#  src/pbrt/kdwarp.cpp
   src/pbrt/lights.cpp
   src/pbrt/lightsampling.cpp
 #  src/pbrt/loopsubdiv.cpp
   src/pbrt/materials.cpp
-  src/pbrt/media.cpp
+#  src/pbrt/media.cpp
   src/pbrt/mipmap.cpp
-  src/pbrt/options.cpp
+#  src/pbrt/options.cpp
 #  src/pbrt/paramdict.cpp
 #  src/pbrt/parser.cpp
-  src/pbrt/pbrt.cpp
 #  src/pbrt/plymesh.cpp
   src/pbrt/primitive.cpp
   src/pbrt/ray.cpp
@@ -707,6 +718,7 @@ SET ( PBRT_TEST_SOURCE
   src/pbrt/tests/hair.cpp
   src/pbrt/tests/hash.cpp
   src/pbrt/tests/image.cpp
+  src/pbrt/tests/kdwarp.cpp
   src/pbrt/tests/lights.cpp
   src/pbrt/tests/lightsampling.cpp
   src/pbrt/tests/main.cpp

@@ -52,7 +52,7 @@ STAT_COUNTER("Texture/Texture map EWA lookups", nEWALookups);
 STAT_COUNTER("Texture/Texture map trilinear lookups", nTrilinearLookups);
 STAT_COUNTER("Texture/Texture map bilinear lookups", nBilinearLookups);
 STAT_COUNTER("Texture/Texture map point lookups", nPointLookups);
-STAT_MEMORY_COUNTER("Memory/Image maps", imageMapBytes);
+STAT_MEMORY_COUNTER("Memory/Preloaded image maps", imageMapMemory);
 
 ///////////////////////////////////////////////////////////////////////////
 // MIPMap Helper Declarations
@@ -119,7 +119,7 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace,
     pyramid = Image::GenerateMIPMap(std::move(image), wrapMode, alloc);
 
     std::for_each(pyramid.begin(), pyramid.end(),
-                  [](const Image &im) { imageMapBytes += im.BytesUsed(); });
+                  [](const Image &im) { imageMapMemory += im.BytesUsed(); });
 }
 
 std::unique_ptr<MIPMap> MIPMap::CreateFromFile(

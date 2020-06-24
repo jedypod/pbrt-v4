@@ -19,7 +19,7 @@ struct LogConfig {
     int vlogLevel = 0;
 };
 
-void InitLogging(LogConfig config);
+void InitLogging(LogConfig config, const char *argv0);
 
 #ifdef PBRT_HAVE_OPTIX
 void InitGPULogging();

@@ -43,103 +43,47 @@
 
 #include <pbrt/base.h>
 #include <pbrt/util/math.h>
-#include <pbrt/util/sampling.h>
 
-#include <cmath>
 #include <memory>
 #include <string>
 
 namespace pbrt {
 
-class FilterSampler {
-  public:
-    FilterSampler(FilterHandle filter, int freq = 64, Allocator alloc = {});
-
-    PBRT_HOST_DEVICE_INLINE
-    FilterSample Sample(const Point2f &u) const {
-        Point2f p = distrib.SampleContinuous(u);
-        Point2f p01 = Point2f(domain.Offset(p));
-        Point2i pi(Clamp(p01.x * values.xSize() + 0.5f, 0, values.xSize() - 1),
-                   Clamp(p01.y * values.ySize() + 0.5f, 0, values.ySize() - 1));
-        return { p, values[pi] < 0 ? -1.f : 1.f };
-    }
-
-    std::string ToString() const;
-
- private:
-    Bounds2f domain;
-    Array2D<Float> values;
-    Distribution2D distrib;
-};
-
 // Box Filter Declarations
-class FilterBase {
-public:
-    PBRT_HOST_DEVICE
-    Vector2f Radius() const { return radius; }
-
-protected:
-    FilterBase(Vector2f radius) : radius(radius) { }
-    Vector2f radius;
-};
-
-class BoxFilter : public FilterBase {
+class BoxFilter final : public Filter {
   public:
-    BoxFilter(const Vector2f &radius = Vector2f(0.5, 0.5))
-        : FilterBase(radius) {}
+    BoxFilter(const Vector2f &radius = Vector2f(0.5, 0.5)) : Filter(radius) {}
 
-    static BoxFilter *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                             Allocator alloc);
+    static BoxFilter *Create(const ParameterDictionary &dict, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const {
-        return (std::abs(p.x) <= radius.x && std::abs(p.y) <= radius.y) ? 1 : 0;
-    }
-
+    Float Evaluate(const Point2f &p) const;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const {
-        return { Point2f(Lerp(u[0], -radius.x, radius.x),
-                         Lerp(u[1], -radius.y, radius.y)), 1.f };
-    }
-
+    FilterSample Sample(const Point2f &u) const;
     PBRT_HOST_DEVICE
-    Float Integral() const {
-        return 2 * radius.x * 2 * radius.y;
-    }
+    Float Integral() const final { return 2 * radius.x * 2 * radius.y; }
 
     std::string ToString() const;
 };
 
 // Gaussian Filter Declarations
-class GaussianFilter : public FilterBase {
+class GaussianFilter final : public Filter {
   public:
     // GaussianFilter Public Methods
-    GaussianFilter(const Vector2f &radius, Float sigma = 0.5f, Allocator alloc = {})
-        : FilterBase(radius),
+    GaussianFilter(const Vector2f &radius, Float sigma = 0.5f)
+        : Filter(radius),
           sigma(sigma),
           expX(Gaussian(radius.x, 0, sigma)),
           expY(Gaussian(radius.y, 0, sigma)),
-          sampler(this, 64, alloc) { }
-
-    static GaussianFilter *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                  Allocator alloc);
+          sampler(this) { }
+    static GaussianFilter *Create(const ParameterDictionary &dict, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const {
-        return (std::max<Float>(0, Gaussian(p.x, 0, sigma) - expX) *
-                std::max<Float>(0, Gaussian(p.y, 0, sigma) - expY));
-    }
-
+    Float Evaluate(const Point2f &p) const;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const {
-        return sampler.Sample(u);
-    }
-
+    FilterSample Sample(const Point2f &u) const final { return sampler.Sample(u); }
     PBRT_HOST_DEVICE
-    Float Integral() const {
-        return ((GaussianIntegral(-radius.x, radius.x, 0, sigma) - 2 * radius.x * expX) *
-                (GaussianIntegral(-radius.y, radius.y, 0, sigma) - 2 * radius.y * expY));
-    }
+    Float Integral() const;
 
     std::string ToString() const;
 
@@ -152,24 +96,17 @@ class GaussianFilter : public FilterBase {
 
 
 // Mitchell Filter Declarations
-class MitchellFilter : public FilterBase {
+class MitchellFilter final : public Filter {
   public:
     // MitchellFilter Public Methods
     MitchellFilter(const Vector2f &radius, Float B = 1.f/3.f, Float C = 1.f/3.f)
-        : FilterBase(radius), B(B), C(C), sampler(this) { }
-    static MitchellFilter *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                  Allocator alloc);
+        : Filter(radius), B(B), C(C), sampler(this) { }
+    static MitchellFilter *Create(const ParameterDictionary &dict, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const {
-        return Mitchell1D(p.x / radius.x) * Mitchell1D(p.y / radius.y);
-    }
-
+    Float Evaluate(const Point2f &p) const;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const {
-        return sampler.Sample(u);
-    }
-
+    FilterSample Sample(const Point2f &u) const final { return sampler.Sample(u); }
     PBRT_HOST_DEVICE
     Float Integral() const {
         // integrate filters.nb
@@ -200,27 +137,17 @@ class MitchellFilter : public FilterBase {
 
 
 // Sinc Filter Declarations
-class LanczosSincFilter : public FilterBase {
+class LanczosSincFilter final : public Filter {
   public:
     // LanczosSincFilter Public Methods
     LanczosSincFilter(const Vector2f &radius, Float tau = 3.f)
-        : FilterBase(radius), tau(tau), sampler(this) { }
-
-    static LanczosSincFilter *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                     Allocator alloc);
+        : Filter(radius), tau(tau), sampler(this) { }
+    static LanczosSincFilter *Create(const ParameterDictionary &dict, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const {
-        return WindowedSinc(p.x, radius.x, tau) * WindowedSinc(p.y, radius.y, tau);
-    }
-
+    Float Evaluate(const Point2f &p) const;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const {
-        return sampler.Sample(u);
-    }
-
-    PBRT_HOST_DEVICE
-    Float Integral() const;
+    FilterSample Sample(const Point2f &u) const final { return sampler.Sample(u); }
 
     std::string ToString() const;
 
@@ -230,104 +157,20 @@ class LanczosSincFilter : public FilterBase {
 };
 
 // Triangle Filter Declarations
-class TriangleFilter : public FilterBase {
+class TriangleFilter final : public Filter {
   public:
-    TriangleFilter(const Vector2f &radius) : FilterBase(radius) {}
-
-    static TriangleFilter *Create(const ParameterDictionary &dict, const FileLoc *loc,
-                                  Allocator alloc);
+    TriangleFilter(const Vector2f &radius) : Filter(radius) {}
+    static TriangleFilter *Create(const ParameterDictionary &dict, Allocator alloc);
 
     PBRT_HOST_DEVICE
-    Float Evaluate(const Point2f &p) const {
-        return std::max<Float>(0, radius.x - std::abs(p.x)) *
-            std::max<Float>(0, radius.y - std::abs(p.y));
-    }
-
+    Float Evaluate(const Point2f &p) const;
     PBRT_HOST_DEVICE
-    FilterSample Sample(const Point2f &u) const {
-        return { Point2f(SampleTent(u[0], radius.x),
-                         SampleTent(u[1], radius.y)), 1.f };
-    }
-
+    FilterSample Sample(const Point2f &u) const;
     PBRT_HOST_DEVICE
-    Float Integral() const {
-        return radius.x * radius.x * radius.y * radius.y;
-    }
+    Float Integral() const final { return radius.x * radius.x * radius.y * radius.y; }
 
     std::string ToString() const;
 };
-
-inline Float FilterHandle::Evaluate(const Point2f &p) const {
-    switch (Tag()) {
-    case TypeIndex<BoxFilter>():
-        return Cast<BoxFilter>()->Evaluate(p);
-    case TypeIndex<GaussianFilter>():
-        return Cast<GaussianFilter>()->Evaluate(p);
-    case TypeIndex<MitchellFilter>():
-        return Cast<MitchellFilter>()->Evaluate(p);
-    case TypeIndex<LanczosSincFilter>():
-        return Cast<LanczosSincFilter>()->Evaluate(p);
-    case TypeIndex<TriangleFilter>():
-        return Cast<TriangleFilter>()->Evaluate(p);
-    default:
-        LOG_FATAL("Unhandled Filter type");
-        return {};
-    }
-}
-
-inline FilterSample FilterHandle::Sample(const Point2f &u) const {
-    switch (Tag()) {
-    case TypeIndex<BoxFilter>():
-        return Cast<BoxFilter>()->Sample(u);
-    case TypeIndex<GaussianFilter>():
-        return Cast<GaussianFilter>()->Sample(u);
-    case TypeIndex<MitchellFilter>():
-        return Cast<MitchellFilter>()->Sample(u);
-    case TypeIndex<LanczosSincFilter>():
-        return Cast<LanczosSincFilter>()->Sample(u);
-    case TypeIndex<TriangleFilter>():
-        return Cast<TriangleFilter>()->Sample(u);
-    default:
-        LOG_FATAL("Unhandled Filter type");
-        return {};
-    }
-}
-
-inline Vector2f FilterHandle::Radius() const {
-    switch (Tag()) {
-    case TypeIndex<BoxFilter>():
-        return Cast<BoxFilter>()->Radius();
-    case TypeIndex<GaussianFilter>():
-        return Cast<GaussianFilter>()->Radius();
-    case TypeIndex<MitchellFilter>():
-        return Cast<MitchellFilter>()->Radius();
-    case TypeIndex<LanczosSincFilter>():
-        return Cast<LanczosSincFilter>()->Radius();
-    case TypeIndex<TriangleFilter>():
-        return Cast<TriangleFilter>()->Radius();
-    default:
-        LOG_FATAL("Unhandled Filter type");
-        return {};
-    }
-}
-
-inline Float FilterHandle::Integral() const {
-    switch (Tag()) {
-    case TypeIndex<BoxFilter>():
-        return Cast<BoxFilter>()->Integral();
-    case TypeIndex<GaussianFilter>():
-        return Cast<GaussianFilter>()->Integral();
-    case TypeIndex<MitchellFilter>():
-        return Cast<MitchellFilter>()->Integral();
-    case TypeIndex<LanczosSincFilter>():
-        return Cast<LanczosSincFilter>()->Integral();
-    case TypeIndex<TriangleFilter>():
-        return Cast<TriangleFilter>()->Integral();
-    default:
-        LOG_FATAL("Unhandled Filter type");
-        return {};
-    }
-}
 
 }  // namespace pbrt
 

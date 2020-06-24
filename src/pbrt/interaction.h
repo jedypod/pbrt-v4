@@ -41,9 +41,7 @@
 // core/interaction.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base.h>
 #include <pbrt/ray.h>
-#include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 
 #include <limits>
@@ -247,7 +245,7 @@ class SurfaceInteraction : public Interaction {
     PBRT_HOST_DEVICE
     void ComputeScatteringFunctions(
         const RayDifferential &ray, const SampledWavelengths &lambda,
-        const Camera &camera, MaterialBuffer &materialBuffer, SamplerHandle sampler,
+        const Camera &camera, MaterialBuffer &materialBuffer, Sampler &sampler,
         TransportMode mode = TransportMode::Radiance);
     PBRT_HOST_DEVICE
     void ComputeDifferentials(const RayDifferential &r,
@@ -273,9 +271,9 @@ class SurfaceInteraction : public Interaction {
         Normal3f dndu, dndv;
     } shading;
     BSDF *bsdf = nullptr;
-    BSSRDFHandle bssrdf;
-    MaterialHandle material;
-    LightHandle areaLight;
+    BSSRDF *bssrdf = nullptr;
+    const MaterialHandle *material = nullptr;
+    const LightHandle *areaLight = nullptr;
 
     mutable Vector3f dpdx, dpdy;
     mutable Float dudx = 0, dvdx = 0, dudy = 0, dvdy = 0;

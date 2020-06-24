@@ -61,8 +61,7 @@ struct PLYMesh {
 pstd::optional<PLYMesh> ReadPLYMesh(const std::string &filename, Allocator alloc = {});
 
 pstd::vector<ShapeHandle> CreatePLYMesh(const Transform *worldFromObject, bool reverseOrientation,
-                                        const ParameterDictionary &dict, const FileLoc *loc,
-                                        Allocator alloc);
+                                        const ParameterDictionary &dict, Allocator alloc);
 
 }  // namespace pbrt
 

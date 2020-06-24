@@ -118,7 +118,6 @@ class AtomicDouble {
         bits = FloatToBits(v);
 #endif
     }
-
     PBRT_HOST_DEVICE_INLINE
     operator double() const {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
@@ -127,7 +126,6 @@ class AtomicDouble {
         return BitsToFloat(bits);
 #endif
     }
-
     PBRT_HOST_DEVICE_INLINE
     double operator=(double v) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
@@ -138,8 +136,7 @@ class AtomicDouble {
         return v;
 #endif
     }
-
-    PBRT_HOST_DEVICE_INLINE
+    PBRT_HOST
     void Add(double v) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         atomicAdd(&value, v);

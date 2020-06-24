@@ -35,6 +35,7 @@
 #include <pbrt/pbrt.h>
 
 
+#include <pbrt/api.h>
 #include <pbrt/cpurender.h>
 #include <pbrt/genscene.h>
 #include <pbrt/gpu.h>
@@ -185,6 +186,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    logConfig.level = LogLevelFromString(logLevel);
+    if (logConfig.level == LogLevel::Invalid)
+        ErrorExit("%s: --log-level unknown", logLevel);
+
+    InitLogging(logConfig, argv[0]);
+
     // Print welcome banner
     if (!options.quiet && !format && !toPly && !options.upgrade) {
         printf("pbrt version 4 (built %s at %s)\n", __DATE__, __TIME__);
@@ -216,22 +223,13 @@ int main(int argc, char *argv[]) {
         options.renderFunction = GPURender;
 #endif
 
-    logConfig.level = LogLevelFromString(logLevel);
-
-    InitPBRT(options, logConfig);
+    pbrtInit(options);
 
     std::unique_ptr<GeneralSceneBase> scene;
     if (format || toPly || options.upgrade)
         scene = std::make_unique<FormattingScene>(toPly, options.upgrade);
-    else {
-#ifdef PBRT_HAVE_OPTIX
-        if (gpu) {
-            static CUDAMemoryResource memoryResource;
-            scene = std::make_unique<GeneralScene>(&memoryResource);
-        } else
-#endif
-            scene = std::make_unique<GeneralScene>(pstd::pmr::get_default_resource());
-    }
+    else
+        scene = std::make_unique<GeneralScene>();
 
     // Process scene description
     if (filenames.empty()) {
@@ -243,6 +241,6 @@ int main(int argc, char *argv[]) {
             ParseFile(scene.get(), f);
     }
 
-    CleanupPBRT();
+    pbrtCleanup();
     return 0;
 }

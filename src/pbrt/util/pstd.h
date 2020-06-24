@@ -95,7 +95,7 @@ template <typename T> class optional {
     PBRT_HOST_DEVICE_INLINE
     optional(const T &v) : optionalValue(v), set(true) { }
     PBRT_HOST_DEVICE_INLINE
-    optional(T &&v) : optionalValue(std::move(v)), set(true) { }
+    optional(T &&v) : optionalValue(v), set(true) { }
 
     PBRT_HOST_DEVICE_INLINE
     optional &operator=(const T &v) {
@@ -105,12 +105,7 @@ template <typename T> class optional {
     }
     PBRT_HOST_DEVICE_INLINE
     optional &operator=(T &&v) {
-        if (set) {
-            optionalValue.~T();
-            new (&optionalValue) T(v);
-        } else
-            optionalValue = std::move(v);
-
+        optionalValue = v;
         set = true;
         return *this;
     }
@@ -908,7 +903,7 @@ public:
         if (nAlloc == nStored)
             reserve(nAlloc == 0 ? 4 : 2 * nAlloc);
 
-        alloc.construct(ptr + nStored, std::move(value));
+        alloc.construct(ptr + nStored, value);
         ++nStored;
     }
     void pop_back() {

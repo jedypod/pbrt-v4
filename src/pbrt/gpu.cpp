@@ -7,12 +7,14 @@
 #include <pbrt/cameras.h>
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
+#include <pbrt/genscene.h>
 #include <pbrt/gpu/optix.h>
 #include <pbrt/gpu/accel.h>
 #include <pbrt/lights.h>
 #include <pbrt/lightsampling.h>
 #include <pbrt/materials.h>
-#include <pbrt/samplers.h>
+#include <pbrt/plymesh.h>
+#include <pbrt/shapes.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/bluenoise.h>
 #include <pbrt/util/color.h>
@@ -26,13 +28,12 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/taggedptr.h>
 
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <map>
 #include <typeinfo>
 #include <typeindex>
-
-#include <cuda/std/atomic>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -262,27 +263,17 @@ void GPUInit() {
 
         size_t stackSize;
         CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
-        size_t printfFIFOSize;
-        CUDA_CHECK(cudaDeviceGetLimit(&printfFIFOSize, cudaLimitPrintfFifoSize));
 
         LOG_VERBOSE("CUDA device %d (%s) with %f MiB, %d SMs running at %f MHz "
-                    "with shader model  %d.%d, max stack %d printf FIFO %d", i,
+                    "with shader model  %d.%d, max stack %d", i,
                     deviceProperties.name, deviceProperties.totalGlobalMem / (1024.*1024.),
                     deviceProperties.multiProcessorCount,
                     deviceProperties.clockRate / 1000., deviceProperties.major,
-                    deviceProperties.minor, stackSize, printfFIFOSize);
+                    deviceProperties.minor, stackSize);
     }
 
     CUDA_CHECK(cudaSetDevice(0));
     LOG_VERBOSE("Selected device %d", 0);
-
-#ifndef NDEBUG
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
-    size_t stackSize;
-    CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
-    LOG_VERBOSE("Reset stack size to %d", stackSize);
-#endif
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 32*1024*1024));
 
     CUDA_CHECK(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
 }
@@ -304,50 +295,102 @@ inline Float RadicalInverseSpecialized(uint64_t a) {
     return std::min(reversedDigits * invBaseN, OneMinusEpsilon);
 }
 
+struct SampleState {
+    Point2i pPixel;
+    int sampleIndex;  // which pixel sample
+    int dimension;
+};
+
+class GPUHaltonSampler {
+public:
+    PBRT_HOST_DEVICE_INLINE
+    GPUHaltonSampler(SampleState *sampleState,
+                     const pstd::vector<DigitPermutation> &permutations)
+        : permutations(permutations) {
+        indexer.SetPixel(sampleState->pPixel);
+        indexer.SetPixelSample(sampleState->sampleIndex);
+        dimensionPointer = &sampleState->dimension;
+        dimension = *dimensionPointer;
+    }
+
+    PBRT_HOST_DEVICE_INLINE
+    ~GPUHaltonSampler() {
+        *dimensionPointer = dimension;
+    }
+
+    PBRT_HOST_DEVICE_INLINE
+    Point2f Get2D() {
+        Point2f u;
+        if (dimension == 0)
+            u = indexer.SampleFirst2D();
+        else
+            u = Point2f(ScrambledRadicalInverse(dimension, indexer.SampleIndex(),
+                                                permutations[dimension]),
+                        ScrambledRadicalInverse(dimension + 1, indexer.SampleIndex(),
+                                                permutations[dimension + 1]));
+        dimension += 2;
+        return u;
+    }
+
+    PBRT_HOST_DEVICE_INLINE
+    Float Get1D() {
+        Float u = ScrambledRadicalInverse(dimension, indexer.SampleIndex(),
+                                          permutations[dimension]);
+        ++dimension;
+        return u;
+    }
+
+private:
+    Halton128PixelIndexer indexer;
+    int dimension;
+    int *dimensionPointer;
+    const pstd::vector<DigitPermutation> &permutations;
+};
+
 template <typename Camera>
 __device__ void generateCameraRays(const Camera *camera,
-                                   int pixelIndex, int sampleIndex,
-                                   Point2i *pPixelArray,
-                                   SamplerHandle *samplerArray,
-                                   FilterHandle filter,
+                                   int pixelIndex,
+                                   SampleState *sampleState,
+                                   const FilterSampler *filterSampler,
                                    SampledWavelengths *lambdaArray,
-                                   cuda::std::atomic<int> *numActiveRays,
+                                   int *numActiveRays,
                                    int *rayIndexToPixelIndex,
                                    Point3fSOA *rayo,
                                    Vector3fSOA *rayd,
-                                   Float *tMaxArray,
                                    SampledSpectrumSOA *cameraRayWeight,
-                                   Float *filterSampleWeight) {
-    Point2i pPixel = pPixelArray[pixelIndex];
-    if (!InsideExclusive(pPixel, camera->film->pixelBounds))
+                                   Float *filterSampleWeight,
+                                   const pstd::vector<DigitPermutation> &permutations) {
+    if (!InsideExclusive(sampleState[pixelIndex].pPixel, camera->film->pixelBounds))
         return;
 
-    SamplerHandle sampler = samplerArray[pixelIndex];
+    GPUHaltonSampler sampler(&sampleState[pixelIndex], permutations);
 
-    CameraSample cameraSample = sampler.GetCameraSample(pPixel, filter);
+    FilterSample fs = filterSampler->Sample(sampler.Get2D());
 
-    Float lu = RadicalInverseSpecialized<3>(sampleIndex) + BlueNoise(47, pPixel.x, pPixel.y);
+    CameraSample sample;
+    sample.pFilm = Point2f(sampleState[pixelIndex].pPixel) + Vector2f(fs.p) + Vector2f(0.5f, 0.5f);
+    sample.pLens = sampler.Get2D();
+
+    Float lu = RadicalInverseSpecialized<3>(sampleState[pixelIndex].sampleIndex) +
+        BlueNoise(47, sampleState[pixelIndex].pPixel.x, sampleState[pixelIndex].pPixel.y);
     if (lu >= 1) lu -= 1;
-    if (PbrtOptionsGPU.disableWavelengthJitter)
-        lu = 0.5f;
     SampledWavelengths lambda = SampledWavelengths::SampleImportance(lu);
 
-    pstd::optional<CameraRay> cr = camera->GenerateRay(cameraSample, lambda);
+    pstd::optional<CameraRay> cr = camera->GenerateRay(sample, lambda);
     if (!cr) {
         cameraRayWeight->at(pixelIndex) = SampledSpectrum(0);
         return;
     }
 
     // EnqueueRay...
-    int rayIndex = numActiveRays->fetch_add(1, cuda::std::memory_order_relaxed);
+    int rayIndex = atomicAdd(numActiveRays, 1);
     rayIndexToPixelIndex[rayIndex] = pixelIndex;
     rayo->at(rayIndex) = cr->ray.o;
     rayd->at(rayIndex) = cr->ray.d;
-    tMaxArray[rayIndex] = 1e20f;
 
     // It's sort of a hack to do this here...
     lambdaArray[pixelIndex] = lambda;
-    filterSampleWeight[pixelIndex] = cameraSample.weight;
+    filterSampleWeight[pixelIndex] = fs.weight;
     cameraRayWeight->at(pixelIndex) = cr->weight;
 }
 
@@ -355,6 +398,7 @@ struct PathState {
     SampledSpectrum L;
     SampledSpectrum beta;
     Float etaScale;
+    RNG rng;
 };
 
 struct BSDFSlice {
@@ -363,41 +407,25 @@ struct BSDFSlice {
 };
 
 struct KernelParameters {
-    KernelParameters(int nPixels, Point2i fullResolution, int spp, Allocator alloc) {
-        pPixelArray = alloc.allocate_object<Point2i>(nPixels);
-        for (int i = 0; i < nPixels; ++i) alloc.construct(&pPixelArray[i]);
+    KernelParameters(int nPixels, Allocator alloc) {
+        sampleStateArray = alloc.allocate_object<SampleState>(nPixels);
+        for (int i = 0; i < nPixels; ++i) alloc.construct(&sampleStateArray[i]);
 
         lambdaArray = alloc.allocate_object<SampledWavelengths>(nPixels);
         for (int i = 0; i < nPixels; ++i) alloc.construct(&lambdaArray[i]);
 
-        numActiveRays[0] = alloc.new_object<cuda::std::atomic<int>>(0);
-        numActiveRays[1] = alloc.new_object<cuda::std::atomic<int>>(0);
+        numActiveRays[0] = alloc.new_object<int>(0);
+        numActiveRays[1] = alloc.new_object<int>(0);
         rayIndexToPixelIndex[0] = alloc.allocate_object<int>(nPixels);
         rayIndexToPixelIndex[1] = alloc.allocate_object<int>(nPixels);
 
         rayoSOA = alloc.new_object<Point3fSOA>(alloc, nPixels);
         raydSOA = alloc.new_object<Vector3fSOA>(alloc, nPixels);
 
-        pixelIndexToIndirectRayIndex = alloc.allocate_object<int>(nPixels);  // just for subsurf...
-        for (int i = 0; i < nPixels; ++i)
-            pixelIndexToIndirectRayIndex[i] = -1000000000;
-
-        numShadowRays = alloc.new_object<cuda::std::atomic<int>>(0);
+        numShadowRays = alloc.new_object<int>(0);
         shadowRayIndexToPixelIndex = alloc.allocate_object<int>(nPixels);
         shadowRayoSOA = alloc.new_object<Point3fSOA>(alloc, nPixels);
         shadowRaydSOA = alloc.new_object<Vector3fSOA>(alloc, nPixels);
-
-        numSubsurfaceRays = alloc.new_object<cuda::std::atomic<int>>(0);
-        subsurfaceMaterialArray = alloc.allocate_object<MaterialHandle>(nPixels);
-        subsurfaceRayIndexToPathRayIndex = alloc.allocate_object<int>(nPixels);
-        for (int i = 0; i < nPixels; ++i)
-            subsurfaceRayIndexToPathRayIndex[i] = -1000000000;
-        subsurfaceRayoSOA = alloc.new_object<Point3fSOA>(alloc, nPixels);
-        subsurfaceRaydSOA = alloc.new_object<Vector3fSOA>(alloc, nPixels);
-        subsurfaceReservoirSamplerArray =
-            alloc.allocate_object<WeightedReservoirSampler<SurfaceInteraction, Float>>(nPixels);
-        for (int i = 0; i < nPixels; ++i)
-            alloc.construct(&subsurfaceReservoirSamplerArray[i]);
 
         cameraRayWeightsSOA = alloc.new_object<SampledSpectrumSOA>(alloc, nPixels);
 
@@ -410,11 +438,10 @@ struct KernelParameters {
 
         filterSampleWeightsArray = alloc.allocate_object<Float>(nPixels);
         bsdfPDFArray = alloc.allocate_object<Float>(nPixels);
-        sampledTransmissionArray = alloc.allocate_object<int>(nPixels);
         tMaxArray = alloc.allocate_object<Float>(nPixels);
-        occludedArray = alloc.allocate_object<int>(nPixels);
+        occludedArray = alloc.allocate_object<uint8_t>(nPixels);
 
-        LiSOAArray = alloc.new_object<SampledSpectrumSOA>(alloc, nPixels);
+        LiArray = alloc.allocate_object<SampledSpectrum>(nPixels);
 
         pathStateArray = alloc.allocate_object<PathState>(nPixels);
         for (int i = 0; i < nPixels; ++i) alloc.construct(&pathStateArray[i]);
@@ -423,73 +450,54 @@ struct KernelParameters {
         for (int i = 0; i < nPixels; ++i) sampledLightArray[i] = nullptr;
         sampledLightPDFArray = alloc.allocate_object<Float>(nPixels);
 
-        constexpr int materialBufferSize = 512;
-        uint8_t *materialBufferMemory =
+        materialBuffers =
             alloc.allocate_object<uint8_t>(nPixels * materialBufferSize);
-        materialBufferArray = alloc.allocate_object<MaterialBuffer>(nPixels);
-        for (int i = 0; i < nPixels; ++i)
-            materialBufferArray[i] =
-                MaterialBuffer(materialBufferMemory + i * materialBufferSize,
-                               materialBufferSize);
 
-        bsdfSlices = alloc.allocate_object<BSDFSlice>(BxDFHandle::MaxTag() + 1);
-        for (int i = 0; i < BxDFHandle::MaxTag() + 1; ++i)
+        permutations = ComputeRadicalInversePermutations(6502 /* seed */, alloc);
+
+        bsdfSlices = alloc.allocate_object<BSDFSlice>(BxDFHandle::MaxTag());
+        for (int i = 0; i < BxDFHandle::MaxTag(); ++i)
             bsdfSlices[i].bsdfIndexToRayIndex = alloc.allocate_object<int>(nPixels);
-
-        visibleSurfaceArray = alloc.allocate_object<pstd::optional<VisibleSurface>>(nPixels);
-        for (int i = 0; i < nPixels; ++i)
-            alloc.construct(&visibleSurfaceArray[i]);
-
-        samplerArray = alloc.allocate_object<SamplerHandle>(nPixels);
     }
 
-    Point2i *pPixelArray;
+    static constexpr int materialBufferSize = 256;
+
+    SampleState *sampleStateArray;
     SampledWavelengths *lambdaArray;
-    cuda::std::atomic<int> *numActiveRays[2];
+    int *numActiveRays[2];
     int *rayIndexToPixelIndex[2];
     Point3fSOA *rayoSOA;
     Vector3fSOA *raydSOA;
-    int *pixelIndexToIndirectRayIndex;
-
-    cuda::std::atomic<int> *numShadowRays;
+    int *numShadowRays;
     int *shadowRayIndexToPixelIndex;
     Point3fSOA *shadowRayoSOA;
     Vector3fSOA *shadowRaydSOA;
-
-    cuda::std::atomic<int> *numSubsurfaceRays;
-    MaterialHandle *subsurfaceMaterialArray;
-    int *subsurfaceRayIndexToPathRayIndex;
-    Point3fSOA *subsurfaceRayoSOA;
-    Vector3fSOA *subsurfaceRaydSOA;
-    WeightedReservoirSampler<SurfaceInteraction, Float> *subsurfaceReservoirSamplerArray;
-
     SampledSpectrumSOA *cameraRayWeightsSOA;
     SurfaceInteraction *intersectionsArray[2];
     Float *filterSampleWeightsArray;
     Float *bsdfPDFArray;
-    int *sampledTransmissionArray;
     Float *tMaxArray;
-    int *occludedArray;
-    SampledSpectrumSOA *LiSOAArray;
+    uint8_t *occludedArray;
+    SampledSpectrum *LiArray;
     PathState *pathStateArray;
     LightHandle *sampledLightArray;
     Float *sampledLightPDFArray;
-    MaterialBuffer *materialBufferArray;
+    uint8_t *materialBuffers;
+    pstd::vector<DigitPermutation> *permutations;
     BSDFSlice *bsdfSlices;
-    pstd::optional<VisibleSurface> *visibleSurfaceArray;
-    SamplerHandle *samplerArray;
 };
 
 template <typename BxDF>
-void SampleDirect(int nPixels, const char *name, KernelParameters *kp, int depth) {
+void SampleDirect(int nPixels, const char *name, LightHandle light, Float lightChoicePDF,
+                  KernelParameters *kp, int depth) {
     auto EnqueueShadowRay = [=] __device__ (Point3f p, Vector3f w, Float t,
                                             SampledSpectrum L, int pixelIndex) {
-        int shadowRayIndex = kp->numShadowRays->fetch_add(1, cuda::std::memory_order_relaxed);
-        DCHECK(shadowRayIndex >= 0 && shadowRayIndex < nPixels);
+        int shadowRayIndex = atomicAdd(kp->numShadowRays, 1);
+        SampledSpectrum *shadowRayLi = &kp->LiArray[shadowRayIndex];
         kp->shadowRayIndexToPixelIndex[shadowRayIndex] = pixelIndex;
         kp->shadowRayoSOA->at(shadowRayIndex) = p;
         kp->shadowRaydSOA->at(shadowRayIndex) = w;
-        kp->LiSOAArray->at(shadowRayIndex) = L;
+        *shadowRayLi = L;
         kp->tMaxArray[shadowRayIndex] = t;
     };
 
@@ -504,61 +512,55 @@ void SampleDirect(int nPixels, const char *name, KernelParameters *kp, int depth
         int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
         SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
         const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
+        SampleState *sampleState = &kp->sampleStateArray[pixelIndex];
         PathState *pathState = &kp->pathStateArray[pixelIndex];
 
         SampledSpectrum beta = pathState->beta;
         if (!beta || !intersection.material)
             return;
 
-        LightHandle light = kp->sampledLightArray[pixelIndex];
-        if (!light)
-            return;
-
-        SamplerHandle sampler = kp->samplerArray[pixelIndex];
+        GPUHaltonSampler sampler(sampleState, *kp->permutations);
         Point2f u = sampler.Get2D();
-        Float lightChoicePDF = kp->sampledLightPDFArray[pixelIndex];
 
-        pstd::optional<LightLiSample> ls = light.Sample_Li(intersection, u, lambda);
-        if (!ls || ls->pdf == 0 || !ls->L)
-            return;
+        LightHandle localLight = light;
+        Float localLightChoicePDF = lightChoicePDF;
+        if (!light) {
+            localLight = kp->sampledLightArray[pixelIndex];
+            localLightChoicePDF = kp->sampledLightPDFArray[pixelIndex];
 
-        BSDF *bsdf = intersection.bsdf;
-        Vector3f wo = intersection.wo;
-        SampledSpectrum f = bsdf->f<BxDF>(wo, ls->wi);
-        if (!f)
-            return;
-
-        Float cosTheta = AbsDot(ls->wi, intersection.shading.n);
-        Float lightPDF = ls->pdf * lightChoicePDF;
-        Float weight = 1;
-        if (!IsDeltaLight(light->type)) {
-            Float bsdfPDF = bsdf->PDF<BxDF>(wo, ls->wi);
-            weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
+            if (!localLight)
+                return;
         }
 
-        SampledSpectrum Li = beta * ls->L * f * (weight * cosTheta / lightPDF);
-        DCHECK(!Li.HasNaNs());
-        Ray ray = intersection.SpawnRayTo(ls->pLight);
-        EnqueueShadowRay(ray.o, ray.d, 1 - ShadowEpsilon, Li, pixelIndex);
+        pstd::optional<LightLiSample> ls = localLight.Sample_Li(intersection, u, lambda);
+        if (ls && ls->pdf > 0 && ls->L) {
+            BSDF *bsdf = intersection.bsdf;
+            Vector3f wo = intersection.wo;
+            SampledSpectrum f = bsdf->f<BxDF>(wo, ls->wi);
+            if (f) {
+                Float cosTheta = AbsDot(ls->wi, intersection.shading.n);
+                Float lightPDF = ls->pdf * localLightChoicePDF;
+                Float weight = 1;
+                if (!IsDeltaLight(localLight->type)) {
+                    Float bsdfPDF = bsdf->PDF<BxDF>(wo, ls->wi);
+                    weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
+                }
+
+                SampledSpectrum Li = beta * ls->L * f * (weight * cosTheta / lightPDF);
+                Ray ray = intersection.SpawnRayTo(ls->pLight);
+                EnqueueShadowRay(ray.o, ray.d, 1 - ShadowEpsilon, Li, pixelIndex);
+            }
+        }
     });
 }
 
 template <typename BxDF>
-void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int depth, bool overrideRay = false) {
-    auto EnqueueRay = [=] __device__ (Point3f p, Vector3f w, int pixelIndex, int rayIndex, int bsdfEvalIndex) {
-        int newRayIndex;
-        if (overrideRay)
-            newRayIndex = kp->pixelIndexToIndirectRayIndex[pixelIndex];
-        else {
-            newRayIndex = kp->numActiveRays[(depth & 1) ^ 1]->fetch_add(1, cuda::std::memory_order_relaxed);
-            kp->pixelIndexToIndirectRayIndex[pixelIndex] = newRayIndex;
-        }
-        DCHECK(newRayIndex >= 0 && newRayIndex < nPixels);
-
+void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int depth) {
+    auto EnqueueRay = [=] __device__ (Point3f p, Vector3f w, int pixelIndex) {
+        int newRayIndex = atomicAdd(kp->numActiveRays[(depth & 1) ^ 1], 1);
         kp->rayoSOA->at(newRayIndex) = p;
         kp->raydSOA->at(newRayIndex) = w;
         kp->rayIndexToPixelIndex[(depth & 1) ^ 1][newRayIndex] = pixelIndex;
-        kp->tMaxArray[newRayIndex] = 1e20f;
     };
 
     int bxdfTag = BxDFHandle::TypeIndex<BxDF>();
@@ -572,6 +574,7 @@ void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int dep
         int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
         SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
         const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
+        SampleState *sampleState = &kp->sampleStateArray[pixelIndex];
         PathState *pathState = &kp->pathStateArray[pixelIndex];
 
         SampledSpectrum beta = pathState->beta;
@@ -581,7 +584,7 @@ void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int dep
         BSDF *bsdf = intersection.bsdf;
         Vector3f wo = intersection.wo;
 
-        SamplerHandle sampler = kp->samplerArray[pixelIndex];
+        GPUHaltonSampler sampler(sampleState, *kp->permutations);
         Point2f u = sampler.Get2D();
         Float uc = sampler.Get1D();
 
@@ -591,12 +594,9 @@ void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int dep
             return;
         }
         beta *= bs->f * (AbsDot(intersection.shading.n, bs->wi) / bs->pdf);
-        DCHECK(!beta.HasNaNs());
 
         kp->bsdfPDFArray[pixelIndex] = bs->IsSpecular() ? -1 :
             (bsdf->PDFIsApproximate() ? bsdf->PDF(wo, bs->wi) : bs->pdf);
-
-        kp->sampledTransmissionArray[pixelIndex] = bs->IsTransmission();
 
         if (bs->IsTransmission())
             // Update the term that tracks radiance scaling for refraction.
@@ -611,83 +611,75 @@ void SampleIndirect(int nPixels, const char *name, KernelParameters *kp, int dep
                 return;
             }
             beta /= 1 - q;
-            DCHECK(!beta.HasNaNs());
         }
 
-        EnqueueRay(intersection.OffsetRayOrigin(bs->wi), bs->wi, pixelIndex, rayIndex, bsdfEvalIndex);
+        EnqueueRay(intersection.OffsetRayOrigin(bs->wi), bs->wi, pixelIndex);
 
         pathState->beta = beta;
     });
 }
 
-static inline __device__ RhoHemiDirSample rhoSample(int i) {
-    RhoHemiDirSample sample;
-    sample.u = RadicalInverse(0, i + 1);
-    sample.u2 = Point2f(RadicalInverse(1, i + 1),
-                        RadicalInverse(2, i + 1));
-    return sample;
-}
-
 void GPURender(GeneralScene &scene) {
-    ProfilerScope _(ProfilePhase::SceneConstruction);
-
     // Get GPU stuff ready to go...
     StatRegisterer::CallInitializationCallbacks();
 
     pstd::pmr::polymorphic_allocator<pstd::byte> alloc(&cudaMemoryResource);
 
-    FilterHandle filter = FilterHandle::Create(scene.filter.name, scene.filter.parameters,
-                                               &scene.filter.loc, alloc);
+    pstd::unique_ptr<Filter> filter(Filter::Create(scene.filter.name, scene.filter.parameters,
+                                                   &scene.filter.loc, alloc));
+    FilterSampler *filterSampler = alloc.new_object<FilterSampler>(filter.get(), 64, alloc);
+    CHECK_EQ(scene.film.name, "rgb");
 
     const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;
-    Film *film = Film::Create(scene.film.name, scene.film.parameters, &scene.film.loc,
-                              filter, alloc);
-    RGBFilm *rgbFilm = dynamic_cast<RGBFilm *>(film);
-    AOVFilm *aovFilm = dynamic_cast<AOVFilm *>(film);
-    CHECK(rgbFilm || aovFilm);
+    RGBFilm *film = RGBFilm::Create(scene.film.parameters, std::move(filter),
+                                    colorSpace, alloc);
 
-    SamplerHandle sampler = SamplerHandle::Create(scene.sampler.name, scene.sampler.parameters,
-                                                  film->fullResolution, &scene.sampler.loc,
-                                                  alloc);
-    int spp = sampler.SamplesPerPixel();
+    auto gpuize = [&alloc](const AnimatedTransform &at) {
+        const Transform *t[2] = {
+                                 alloc.new_object<Transform>(*at.startTransform),
+                                 alloc.new_object<Transform>(*at.endTransform)
+        };
+        return AnimatedTransform(t[0], at.startTime,
+                                 t[1], at.endTime);
+    };
+
+    int spp = scene.sampler.parameters.GetOneInt("pixelsamples", 16);
+    if (PbrtOptions.pixelSamples)
+        spp = *PbrtOptions.pixelSamples;
     int maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
 
-    Camera *camera = Camera::Create(scene.camera.name, scene.camera.parameters,
-                                    nullptr /* medium */, scene.camera.worldFromCamera,
-                                    film, &scene.camera.loc, alloc);
-    PerspectiveCamera *perspectiveCamera = dynamic_cast<PerspectiveCamera *>(camera);
-    OrthographicCamera *orthographicCamera = dynamic_cast<OrthographicCamera *>(camera);
-    RealisticCamera *realisticCamera = dynamic_cast<RealisticCamera *>(camera);
-    SphericalCamera *sphericalCamera = dynamic_cast<SphericalCamera *>(camera);
+    AnimatedTransform wfcGPU = gpuize(scene.camera.worldFromCamera);
+    PerspectiveCamera *pc = nullptr;
+    RealisticCamera *rc = nullptr;
+    if (scene.camera.name == "perspective")
+        pc = PerspectiveCamera::Create(scene.camera.parameters,
+                                       wfcGPU, std::unique_ptr<Film>(film),
+                                       nullptr /* medium */, alloc);
+    else if (scene.camera.name == "realistic")
+        rc = RealisticCamera::Create(scene.camera.parameters,
+                                     wfcGPU, std::unique_ptr<Film>(film),
+                                     nullptr /* medium */, alloc);
+    else
+        LOG_FATAL("\"%s\" camera not yet supported", scene.camera.name);
 
-    UniformInfiniteLight *uniformEnvLight = nullptr;
-    ImageInfiniteLight *imageEnvLight = nullptr;
-    pstd::vector<LightHandle> allLights(alloc);
-    {
-    ProfilerScope _(ProfilePhase::LightConstruction);
-
+    // Env light, if specified.
+    ImageInfiniteLight *envLight = nullptr;
+    pstd::vector<LightHandle> allLights(alloc);  // except for env... (and should skip distant...)
     for (const auto &light : scene.lights) {
-        LightHandle l = LightHandle::Create(light.name, light.parameters, light.worldFromObject,
-                                            nullptr /* Medium * */, &light.loc, alloc);
-        if (l.Is<UniformInfiniteLight>()) {
-            if (uniformEnvLight)
-                Warning(&light.loc, "Multiple uniform infinite lights provided. Using this one.");
-            uniformEnvLight = l.Cast<UniformInfiniteLight>();
-        }
-        if (l.Is<ImageInfiniteLight>()) {
-            if (imageEnvLight)
-                Warning(&light.loc, "Multiple image infinite lights provided. Using this one.");
-            imageEnvLight = l.Cast<ImageInfiniteLight>();
-        }
+        LightHandle l = LightHandle::Create(light.name, light.parameters,
+                                            gpuize(light.worldFromObject),
+                                            nullptr /* Medium * */, light.loc,
+                                            alloc);
+        if (light.name == "infinite")
+            // TODO: warn if already have one...
+            envLight = l.CastOrNullptr<ImageInfiniteLight>();
+        else
+            allLights.push_back(l);
+    }
 
-        allLights.push_back(l);
-    }
-    }
 
     // Area lights...
-    std::map<int, pstd::vector<LightHandle> *> shapeIndexToAreaLights;
-    {
-    ProfilerScope _(ProfilePhase::LightConstruction);
+    std::map<int, pstd::vector<LightHandle *> *> shapeIndexToAreaLights;
     for (size_t i = 0; i < scene.shapes.size(); ++i) {
         const auto &shape = scene.shapes[i];
         if (shape.lightIndex == -1)
@@ -697,69 +689,60 @@ void GPURender(GeneralScene &scene) {
         AnimatedTransform worldFromLight(shape.worldFromObject);
 
         pstd::vector<ShapeHandle> shapeHandles =
-            ShapeHandle::Create(shape.name, shape.worldFromObject, shape.objectFromWorld,
-                                shape.reverseOrientation, shape.parameters,
-                                &shape.loc, alloc);
+            ShapeHandle::Create(shape.name,
+                                alloc.new_object<Transform>(*shape.worldFromObject),
+                                alloc.new_object<Transform>(*shape.objectFromWorld),
+                                shape.reverseOrientation, shape.parameters, alloc,
+                                shape.loc);
 
         if (shapeHandles.empty())
             continue;
 
-        pstd::vector<LightHandle> *lightsForShape =
-            alloc.new_object<pstd::vector<LightHandle>>(alloc);
+        pstd::vector<LightHandle *> *lightsForShape =
+            alloc.new_object<pstd::vector<LightHandle *>>(alloc);
         for (ShapeHandle sh : shapeHandles) {
             DiffuseAreaLight *area =
-                DiffuseAreaLight::Create(worldFromLight, nullptr /*mediumInterface.outside*/,
+                DiffuseAreaLight::Create(gpuize(worldFromLight), nullptr /*mediumInterface.outside*/,
                                          areaLightEntity.parameters,
                                          areaLightEntity.parameters.ColorSpace(),
-                                         &areaLightEntity.loc, alloc, sh);
+                                         alloc, sh);
             allLights.push_back(area);
-            lightsForShape->push_back(area);
+            lightsForShape->push_back(alloc.new_object<LightHandle>(area));
         }
         shapeIndexToAreaLights[i] = lightsForShape;
     }
-    }
-
     LOG_VERBOSE("%d lights", allLights.size());
+
     GPUAccel accel(scene, nullptr /* cuda stream */, shapeIndexToAreaLights);
 
     // preprocess...
+    if (envLight)
+        envLight->Preprocess(accel.Bounds());
     for (LightHandle light : allLights)
         light.Preprocess(accel.Bounds());
-
-    if (allLights.size() == 0)
-        ErrorExit("No light sources specified");
 
     BVHLightSampler *lightSampler = alloc.new_object<BVHLightSampler>(allLights, alloc);
 
     ///////////////////////// Render!
 
-    // Same hack as in cpurender.cpp...
-    if (PbrtOptions.profile) {
-        CHECK_EQ(CurrentProfilerState(), ProfilePhaseToBits(ProfilePhase::SceneConstruction));
-        ProfilerState = ProfilePhaseToBits(ProfilePhase::IntegratorRender);
-    }
-
     Vector2i resolution = film->pixelBounds.Diagonal();
     int nPixels = resolution.x * resolution.y;
 
-    KernelParameters *kp = alloc.new_object<KernelParameters>(nPixels, film->fullResolution,
-                                                              spp, alloc);
+    KernelParameters *kp = alloc.new_object<KernelParameters>(nPixels, alloc);
     KernelParameters *kpHost = new KernelParameters(*kp);
-
-    std::vector<SamplerHandle> clonedSamplers = sampler.Clone(nPixels, alloc);
-    for (int i = 0; i < nPixels; ++i)
-        kp->samplerArray[i] = clonedSamplers[i];
 
     Timer timer;
 
     // Initialize state for the first sample
-    GPUParallelFor(nPixels, "Initialize pPixelArray",
+    GPUParallelFor(nPixels, "Initialize SampleState",
     [=] __device__ (int pixelIndex, Point2i pMin, Point2i resolution) {
-        kp->pPixelArray[pixelIndex] = Point2i(pMin.x + pixelIndex % resolution.x,
-                                              pMin.y + pixelIndex / resolution.x);
-    }, film->pixelBounds.pMin, Point2i(resolution));
+            SampleState &sampleState = kp->sampleStateArray[pixelIndex];
 
-    ProgressReporter progress(spp, "Rendering", true /* GPU */);
+            sampleState.pPixel = Point2i(pMin.x + pixelIndex % resolution.x,
+                                         pMin.y + pixelIndex / resolution.x);
+            sampleState.sampleIndex = 0;
+            sampleState.dimension = 0;
+    }, film->pixelBounds.pMin, Point2i(resolution));
 
     for (int pixelSample = 0; pixelSample < spp; ++pixelSample) {
         // Generate camera rays
@@ -770,48 +753,26 @@ void GPURender(GeneralScene &scene) {
 
         GPUParallelFor(nPixels, "Reset sampler dimension",
         [=] __device__ (int pixelIndex) {
-            SamplerHandle sampler = kp->samplerArray[pixelIndex];
-            sampler.StartPixelSample(kp->pPixelArray[pixelIndex], pixelSample);
+            SampleState &sampleState = kp->sampleStateArray[pixelIndex];
+            sampleState.dimension = 0;
         });
 
-        if (perspectiveCamera)
+        if (pc)
             GPUParallelFor(nPixels, "Generate PerspectiveCamera rays",
                 [=] __device__ (int pixelIndex) {
-                    generateCameraRays(perspectiveCamera, pixelIndex, pixelSample, kp->pPixelArray,
-                                       kp->samplerArray, filter,
-                                       kp->lambdaArray, kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
-                                       kp->rayoSOA, kp->raydSOA, kp->tMaxArray, kp->cameraRayWeightsSOA,
-                                       kp->filterSampleWeightsArray);
+                    generateCameraRays(pc, pixelIndex, kp->sampleStateArray, filterSampler, kp->lambdaArray,
+                                       kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
+                                       kp->rayoSOA, kp->raydSOA, kp->cameraRayWeightsSOA,
+                                       kp->filterSampleWeightsArray, *kp->permutations);
                 });
-        else if (orthographicCamera)
-            GPUParallelFor(nPixels, "Generate OrthographicCamera rays",
-                [=] __device__ (int pixelIndex) {
-                    generateCameraRays(orthographicCamera, pixelIndex, pixelSample, kp->pPixelArray,
-                                       kp->samplerArray, filter,
-                                       kp->lambdaArray, kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
-                                       kp->rayoSOA, kp->raydSOA, kp->tMaxArray, kp->cameraRayWeightsSOA,
-                                       kp->filterSampleWeightsArray);
-                });
-        else if (sphericalCamera)
-            GPUParallelFor(nPixels, "Generate SphericalCamera rays",
-                [=] __device__ (int pixelIndex) {
-                    generateCameraRays(sphericalCamera, pixelIndex, pixelSample, kp->pPixelArray,
-                                       kp->samplerArray, filter,
-                                       kp->lambdaArray, kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
-                                       kp->rayoSOA, kp->raydSOA, kp->tMaxArray, kp->cameraRayWeightsSOA,
-                                       kp->filterSampleWeightsArray);
-                });
-        else {
-            CHECK(realisticCamera != nullptr);
+        else
             GPUParallelFor(nPixels, "Generate RealisticCamera rays",
                 [=] __device__ (int pixelIndex) {
-                    generateCameraRays(realisticCamera, pixelIndex, pixelSample, kp->pPixelArray,
-                                       kp->samplerArray, filter,
-                                       kp->lambdaArray, kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
-                                       kp->rayoSOA, kp->raydSOA, kp->tMaxArray, kp->cameraRayWeightsSOA,
-                                       kp->filterSampleWeightsArray);
+                    generateCameraRays(rc, pixelIndex, kp->sampleStateArray, filterSampler, kp->lambdaArray,
+                                       kp->numActiveRays[0], kp->rayIndexToPixelIndex[0],
+                                       kp->rayoSOA, kp->raydSOA, kp->cameraRayWeightsSOA,
+                                       kp->filterSampleWeightsArray, *kp->permutations);
                 });
-        }
 
         // path tracing
         GPUParallelFor(nPixels, "Initialize PathState",
@@ -822,27 +783,27 @@ void GPURender(GeneralScene &scene) {
             pathState.L = SampledSpectrum(0.f);
             pathState.beta = SampledSpectrum(1.f);
             pathState.etaScale = 1.f;
+
+            const SampleState &sampleState = kp->sampleStateArray[pixelIndex];
+            pathState.rng.SetSequence(13 * pixelIndex ^ (sampleState.sampleIndex << 8));
         });
 
         for (int depth = 0; true; ++depth) {
             GPUParallelFor(nPixels, "Clear intersections",
             [=] __device__ (int pixelIndex) {
-                kp->intersectionsArray[depth & 1][pixelIndex].bsdf = nullptr;
-                kp->intersectionsArray[depth & 1][pixelIndex].bssrdf = nullptr;
                 kp->intersectionsArray[depth & 1][pixelIndex].material = nullptr;
                 kp->intersectionsArray[depth & 1][pixelIndex].areaLight = nullptr;
             });
 
             auto events = accel.IntersectClosest(nPixels, kpHost->numActiveRays[depth & 1],
                              kpHost->rayIndexToPixelIndex[depth & 1], kpHost->rayoSOA,
-                             kpHost->raydSOA, kpHost->tMaxArray,
-                             kpHost->intersectionsArray[depth & 1]);
+                             kpHost->raydSOA, kpHost->intersectionsArray[depth & 1]);
             struct IsectHack { };
             GetGPUKernelStats<IsectHack>("Path tracing closest hit rays").launchEvents.push_back(events);
 
             GPUParallelFor(nPixels, "Handle ray-found emission",
             [=] __device__ (int rayIndex) {
-                if (rayIndex >= kp->numActiveRays[depth & 1]->load(cuda::std::memory_order_relaxed))
+                if (rayIndex >= *kp->numActiveRays[depth & 1])
                     return;
 
                 int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
@@ -850,61 +811,42 @@ void GPURender(GeneralScene &scene) {
                 const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
                 PathState *pathState = &kp->pathStateArray[pixelIndex];
 
-                Point3f o = kp->rayoSOA->at(rayIndex);
-
                 SampledSpectrum beta = pathState->beta;
                 if (!beta)
                     return;
 
                 auto rayd = kp->raydSOA->at(rayIndex);
 
-                // Hit something; add surface emission if there is any
-                if (intersection.areaLight) {
-                    Vector3f wo = -Vector3f(rayd);
-                    const DiffuseAreaLight *light = intersection.areaLight.Cast<const DiffuseAreaLight>();
-                    SampledSpectrum Le = light->L(intersection, wo, lambda);
-                    if (Le) {
-                        Float weight;
-                        if (depth == 0 || kp->bsdfPDFArray[pixelIndex] < 0 /* specular */)
-                            weight = 1;
-                        else {
-                            const SurfaceInteraction &prevIntr =
-                                kp->intersectionsArray[(depth & 1) ^ 1][pixelIndex];
-                            // Compute MIS pdf...
-                            Float lightChoicePDF = lightSampler->PDFSingle(prevIntr, intersection.areaLight);
-                            Float lightPDF = lightChoicePDF * light->Pdf_Li(prevIntr, rayd);
-                            Float bsdfPDF = kp->bsdfPDFArray[pixelIndex];
-                            weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                        }
-                        pathState->L += beta * weight * Le;
-                    }
-                }
-
-                if (intersection.material)
-                    return;
-
-                if (uniformEnvLight) {
-                    auto rayo = kp->rayoSOA->at(rayIndex);
-                    SampledSpectrum Le = uniformEnvLight->Le(Ray(rayo, rayd), lambda);
-                    if (Le) {
-                        if (depth == 0 || kp->bsdfPDFArray[pixelIndex] < 0 /* aka specular */)
-                            pathState->L += beta * Le;
-                        else {
-                            const SurfaceInteraction &prevIntersection =
-                                kp->intersectionsArray[(depth & 1) ^ 1][pixelIndex];
-                            // Compute MIS pdf...
-                            Float lightPDF = /*lightSampler->PDF(prevIntr, *light) * */
-                                uniformEnvLight->Pdf_Li(prevIntersection, rayd);
-                            Float bsdfPDF = kp->bsdfPDFArray[pixelIndex];
-                            Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                            // beta already includes 1 / bsdf pdf.
+                if (intersection.material) {
+                    // Hit something; add surface emission if there is any
+                    if (intersection.areaLight && *intersection.areaLight) {
+                        printf("wot hai area light\n");
+                        Vector3f wo = -Vector3f(rayd);
+                        const DiffuseAreaLight *light = intersection.areaLight->Cast<const DiffuseAreaLight>();
+                        SampledSpectrum Le = light->L(intersection, wo, lambda);
+                        if (Le) {
+                            Float weight;
+                            if (depth == 0 || kp->bsdfPDFArray[pixelIndex] < 0 /* specular */)
+                                weight = 1;
+                            else {
+                                const SurfaceInteraction &prevIntr =
+                                    kp->intersectionsArray[(depth & 1) ^ 1][pixelIndex];
+                                // Compute MIS pdf...
+                                Float lightChoicePDF = lightSampler->PDF(prevIntr, *intersection.areaLight);
+                                Float lightPDF = lightChoicePDF * light->Pdf_Li(prevIntr, rayd);
+                                Float bsdfPDF = kp->bsdfPDFArray[pixelIndex];
+                                weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+                            }
                             pathState->L += beta * weight * Le;
                         }
                     }
+                    return;
                 }
-                if (imageEnvLight) {
-                    auto rayo = kp->rayoSOA->at(rayIndex);
-                    SampledSpectrum Le = imageEnvLight->Le(Ray(rayo, rayd), lambda);
+
+                auto rayo = kp->rayoSOA->at(rayIndex);
+
+                if (envLight) {
+                    SampledSpectrum Le = envLight->Le(Ray(rayo, rayd), lambda);
                     if (Le) {
                         if (depth == 0 || kp->bsdfPDFArray[pixelIndex] < 0 /* aka specular */)
                             pathState->L += beta * Le;
@@ -913,7 +855,7 @@ void GPURender(GeneralScene &scene) {
                                 kp->intersectionsArray[(depth & 1) ^ 1][pixelIndex];
                             // Compute MIS pdf...
                             Float lightPDF = /*lightSampler->PDF(prevIntr, *light) * */
-                                imageEnvLight->Pdf_Li(prevIntersection, rayd);
+                                envLight->Pdf_Li(prevIntersection, rayd);
                             Float bsdfPDF = kp->bsdfPDFArray[pixelIndex];
                             Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
                             // beta already includes 1 / bsdf pdf.
@@ -922,20 +864,6 @@ void GPURender(GeneralScene &scene) {
                     }
                 }
             });
-
-            if (depth == 1 && aovFilm) {
-                // Set Ld in the visible surface
-                GPUParallelFor(nPixels, "Initialize VisibleSurface.Ld",
-                [=] __device__ (int pixelIndex) {
-                    SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
-
-                    if (intersection.material) {
-                        PathState &pathState = kp->pathStateArray[pixelIndex];
-                        kp->visibleSurfaceArray[pixelIndex]->Ld =
-                            pathState.L - kp->visibleSurfaceArray[pixelIndex]->Le;
-                    }
-                });
-            }
 
             if (depth == maxDepth)
                 break;
@@ -944,13 +872,13 @@ void GPURender(GeneralScene &scene) {
             [=] __device__ (int) {
                 *kp->numShadowRays = 0;
                 *kp->numActiveRays[(depth & 1) ^ 1] = 0;
-                for (int i = 0; i < BxDFHandle::MaxTag() + 1; ++i)
+                for (int i = 0; i < BxDFHandle::MaxTag(); ++i)
                     kp->bsdfSlices[i].count = 0;
             });
 
-            GPUParallelFor(nPixels, "Bump and Material::GetBSDF/GetBSSRDF",
+            GPUParallelFor(nPixels, "Bump and Material::GetBSDF",
             [=] __device__ (int rayIndex) {
-                if (rayIndex >= kp->numActiveRays[depth & 1]->load(cuda::std::memory_order_relaxed))
+                if (rayIndex >= *kp->numActiveRays[depth & 1])
                     return;
 
                 int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
@@ -961,7 +889,7 @@ void GPURender(GeneralScene &scene) {
                 if (!pathState->beta || !intersection.material)
                     return;
 
-                FloatTextureHandle displacement = intersection.material.GetDisplacement();
+                FloatTextureHandle displacement = intersection.material->GetDisplacement();
                 if (displacement) {
                     Vector3f dpdu, dpdv;
                     Bump(BasicTextureEvaluator(), //UniversalTextureEvaluator(),
@@ -971,47 +899,18 @@ void GPURender(GeneralScene &scene) {
                 }
 
                 // rayIndex?
-                MaterialBuffer &materialBuffer = kp->materialBufferArray[pixelIndex];
-                materialBuffer.Reset();
+                MaterialBuffer materialBuffer(kp->materialBuffers + pixelIndex * kp->materialBufferSize,
+                                              kp->materialBufferSize);
 
-                intersection.bsdf = intersection.material.GetBSDF(BasicTextureEvaluator(),
-                                                                  //UniversalTextureEvaluator(),
-                                                                  intersection, lambda,
-                                                                  materialBuffer, TransportMode::Radiance);
+                intersection.bsdf = intersection.material->GetBSDF(BasicTextureEvaluator(),
+                                                                   //UniversalTextureEvaluator(),
+                                                                   intersection, lambda,
+                                                                   materialBuffer, TransportMode::Radiance);
 
-                if (intersection.bsdf) {
-                    if (PbrtOptionsGPU.forceDiffuse) {
-                        int nRhoSamples = 16;
-                        SampledSpectrum r = intersection.bsdf->rho(intersection.wo, rhoSample, nRhoSamples);
-
-                        intersection.bsdf = materialBuffer.Alloc<BSDF>(intersection,
-                                     materialBuffer.Alloc<LambertianBxDF>(r, SampledSpectrum(0.), 0.),
-                                     intersection.bsdf->eta);
-                    }
-
-                    int tag = intersection.bsdf->GetBxDF().Tag();
-                    int bsdfIndex = atomicAdd(&kp->bsdfSlices[tag].count, 1);
-                    DCHECK(bsdfIndex >= 0 && bsdfIndex < nPixels);
-                    kp->bsdfSlices[tag].bsdfIndexToRayIndex[bsdfIndex] = rayIndex;
-                }
-
-                intersection.bssrdf = intersection.material.GetBSSRDF(BasicTextureEvaluator(), intersection,
-                                                                      lambda, materialBuffer,
-                                                                      TransportMode::Radiance);
+                int tag = intersection.bsdf->GetBxDF().Tag();
+                int bsdfIndex = atomicAdd(&kp->bsdfSlices[tag].count, 1);
+                kp->bsdfSlices[tag].bsdfIndexToRayIndex[bsdfIndex] = rayIndex;
             });
-
-            if (depth == 0 && aovFilm) {
-                // Set the pixel's VisibleSurface for the first visible point.
-                GPUParallelFor(nPixels, "Initialize VisibleSurface",
-                [=] __device__ (int pixelIndex) {
-                    SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
-                    const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
-                    PathState *pathState = &kp->pathStateArray[pixelIndex];
-
-                    if (intersection.material)
-                        kp->visibleSurfaceArray[pixelIndex] = VisibleSurface(intersection, *camera, lambda);
-                });
-            }
 
             auto TraceShadowRays = [=]() {
                 GPUParallelFor(nPixels, "Clear occludedArray",
@@ -1029,13 +928,11 @@ void GPURender(GeneralScene &scene) {
                 // TODO: fold this into the optix code?
                 GPUParallelFor(nPixels, "Incorporate shadow ray contribution",
                 [=] __device__ (int shadowRayIndex) {
-                    if (shadowRayIndex > kp->numShadowRays->load(cuda::std::memory_order_relaxed) ||
-                        kp->occludedArray[shadowRayIndex])
+                    if (shadowRayIndex > *kp->numShadowRays || kp->occludedArray[shadowRayIndex])
                         return;
 
-                    SampledSpectrum Li = kp->LiSOAArray->at(shadowRayIndex);
+                    const SampledSpectrum &Li = kp->LiArray[shadowRayIndex];
                     int pixelIndex = kp->shadowRayIndexToPixelIndex[shadowRayIndex];
-                    DCHECK(pixelIndex >= 0 && pixelIndex < nPixels);
                     PathState &pathState = kp->pathStateArray[pixelIndex];
                     pathState.L += Li;
                 });
@@ -1046,59 +943,74 @@ void GPURender(GeneralScene &scene) {
                 });
             };
 
-            GPUParallelFor(nPixels, "Sample Light BVH",
-            [=] __device__ (int rayIndex) {
-                if (rayIndex >= kp->numActiveRays[depth & 1]->load(cuda::std::memory_order_relaxed))
-                    return;
-
-                int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
-                SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
-                PathState *pathState = &kp->pathStateArray[pixelIndex];
-
-                if (!pathState->beta || !intersection.material || !intersection.bsdf)
-                    return;
-
-                if (intersection.bsdf->IsSpecular() &&
-                    !intersection.bsdf->IsNonSpecular()) { // TODO: is the second check needed?
-                    kp->sampledLightArray[pixelIndex] = nullptr;
-                    return;
-                }
-
-                SamplerHandle sampler = kp->samplerArray[pixelIndex];
-
-                struct CandidateLight {
-                    LightHandle light;
-                    Float pdf;
-                };
-
-                uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
-                WeightedReservoirSampler<CandidateLight, float> wrs(seed);
-                lightSampler->SampleSingle(intersection, sampler.Get1D(),
-                    [&](LightHandle light, Float pdf) {
-                        wrs.Add(CandidateLight{light, pdf}, 1.f);
-                    });
-
-                if (wrs.HasSample()) {
-                    kp->sampledLightArray[pixelIndex] = wrs.GetSample().light;
-                    kp->sampledLightPDFArray[pixelIndex] = wrs.GetSample().pdf / wrs.WeightSum();
-                } else
-                    kp->sampledLightArray[pixelIndex] = nullptr;
-           });
-
             // TODO: can we synthesize these calls automatically?
-            SampleDirect<LambertianBxDF>(nPixels, "Lambertian", kp, depth);
-            SampleDirect<CoatedDiffuseBxDF>(nPixels, "CoatedDiffuse", kp, depth);
-            SampleDirect<GeneralLayeredBxDF>(nPixels, "GeneralLayered", kp, depth);
-            SampleDirect<DielectricInterfaceBxDF>(nPixels, "DielectricInterface", kp, depth);
-            SampleDirect<ThinDielectricBxDF>(nPixels, "ThinDielectric", kp, depth);
-            SampleDirect<SpecularReflectionBxDF>(nPixels, "SpecularReflection", kp, depth);
-            SampleDirect<HairBxDF>(nPixels, "Hair", kp, depth);
-            SampleDirect<MeasuredBxDF>(nPixels, "Measured", kp, depth);
-            SampleDirect<MixBxDF>(nPixels, "Mix", kp, depth);
-            SampleDirect<MicrofacetReflectionBxDF>(nPixels, "MicrofacetReflection", kp, depth);
-            SampleDirect<MicrofacetTransmissionBxDF>(nPixels, "MicrofacetTransmission", kp, depth);
+            // TODO: SeparableBSSRDFAdapter
 
-            TraceShadowRays();
+            if (envLight) {
+                SampleDirect<LambertianBxDF>(nPixels, "Lambertian", envLight, 1.f, kp, depth);
+                SampleDirect<CoatedDiffuseBxDF>(nPixels, "CoatedDiffuse", envLight, 1.f, kp, depth);
+                SampleDirect<GeneralLayeredBxDF>(nPixels, "GeneralLayered", envLight, 1.f, kp, depth);
+                SampleDirect<DielectricInterfaceBxDF>(nPixels, "DielectricInterface", envLight, 1.f, kp, depth);
+                SampleDirect<ThinDielectricBxDF>(nPixels, "ThinDielectric", envLight, 1.f, kp, depth);
+                SampleDirect<SpecularReflectionBxDF>(nPixels, "SpecularReflection", envLight, 1.f, kp, depth);
+                SampleDirect<SpecularTransmissionBxDF>(nPixels, "SpecularTransmission", envLight, 1.f, kp, depth);
+                SampleDirect<HairBxDF>(nPixels, "Hair", envLight, 1.f, kp, depth);
+                SampleDirect<MeasuredBxDF>(nPixels, "Measured", envLight, 1.f, kp, depth);
+                SampleDirect<MixBxDF>(nPixels, "Mix", envLight, 1.f, kp, depth);
+                SampleDirect<MicrofacetReflectionBxDF>(nPixels, "MicrofacetReflection", envLight, 1.f, kp, depth);
+                SampleDirect<MicrofacetTransmissionBxDF>(nPixels, "MicrofacetTransmission", envLight, 1.f, kp, depth);
+                SampleDirect<DisneyBxDF>(nPixels, "Disney", envLight, 1.f, kp, depth);
+
+                TraceShadowRays();
+            }
+
+            if (!allLights.empty()) {
+                GPUParallelFor(nPixels, "Sample Light BVH",
+                [=] __device__ (int pixelIndex) {
+                    SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
+                    PathState *pathState = &kp->pathStateArray[pixelIndex];
+
+                    if (!pathState->beta || !intersection.material)
+                        return;
+
+                    GPUHaltonSampler sampler(&kp->sampleStateArray[pixelIndex], *kp->permutations);
+
+                    struct CandidateLight {
+                        LightHandle light;
+                        Float pdf;
+                    };
+                    WeightedReservoirSampler<CandidateLight, float> wrs(pathState->rng.Uniform<uint32_t>());
+                    // TODO: better sampling pattern
+                    lightSampler->Sample(intersection, sampler.Get1D(),
+                        [&](LightHandle light, Float pdf) {
+                            wrs.Add(CandidateLight{light, pdf}, 1.f);
+                        });
+
+                    if (wrs.HasSample()) {
+                        kp->sampledLightArray[pixelIndex] = wrs.GetSample().light;
+                        kp->sampledLightPDFArray[pixelIndex] = wrs.GetSample().pdf / wrs.WeightSum();
+                    } else
+                        kp->sampledLightArray[pixelIndex] = nullptr;
+               });
+
+
+                LightHandle light = nullptr;
+                SampleDirect<LambertianBxDF>(nPixels, "Lambertian", light, 0.f, kp, depth);
+                SampleDirect<CoatedDiffuseBxDF>(nPixels, "CoatedDiffuse", light, 0.f, kp, depth);
+                SampleDirect<GeneralLayeredBxDF>(nPixels, "GeneralLayered", light, 0.f, kp, depth);
+                SampleDirect<DielectricInterfaceBxDF>(nPixels, "DielectricInterface", light, 0.f, kp, depth);
+                SampleDirect<ThinDielectricBxDF>(nPixels, "ThinDielectric", light, 0.f, kp, depth);
+                SampleDirect<SpecularReflectionBxDF>(nPixels, "SpecularReflection", light, 0.f, kp, depth);
+                SampleDirect<SpecularTransmissionBxDF>(nPixels, "SpecularTransmission", light, 0.f, kp, depth);
+                SampleDirect<HairBxDF>(nPixels, "Hair", light, 0.f, kp, depth);
+                SampleDirect<MeasuredBxDF>(nPixels, "Measured", light, 0.f, kp, depth);
+                SampleDirect<MixBxDF>(nPixels, "Mix", light, 0.f, kp, depth);
+                SampleDirect<MicrofacetReflectionBxDF>(nPixels, "MicrofacetReflection", light, 0.f, kp, depth);
+                SampleDirect<MicrofacetTransmissionBxDF>(nPixels, "MicrofacetTransmission", light, 0.f, kp, depth);
+                SampleDirect<DisneyBxDF>(nPixels, "Disney", light, 0.f, kp, depth);
+
+                TraceShadowRays();
+            }
 
             SampleIndirect<LambertianBxDF>(nPixels, "Lambertian", kp, depth);
             SampleIndirect<CoatedDiffuseBxDF>(nPixels, "CoatedDiffuse", kp, depth);
@@ -1106,167 +1018,50 @@ void GPURender(GeneralScene &scene) {
             SampleIndirect<DielectricInterfaceBxDF>(nPixels, "DielectricInterface", kp, depth);
             SampleIndirect<ThinDielectricBxDF>(nPixels, "ThinDielectric", kp, depth);
             SampleIndirect<SpecularReflectionBxDF>(nPixels, "SpecularReflection", kp, depth);
+            SampleIndirect<SpecularTransmissionBxDF>(nPixels, "SpecularTransmission", kp, depth);
             SampleIndirect<HairBxDF>(nPixels, "Hair", kp, depth);
             SampleIndirect<MeasuredBxDF>(nPixels, "Measured", kp, depth);
             SampleIndirect<MixBxDF>(nPixels, "Mix", kp, depth);
             SampleIndirect<MicrofacetReflectionBxDF>(nPixels, "MicrofacetReflection", kp, depth);
             SampleIndirect<MicrofacetTransmissionBxDF>(nPixels, "MicrofacetTransmission", kp, depth);
-
-            // Subsurface scattering
-            // TODO: skip this entirely if there are no subsurface materials in the scene...
-            GPUParallelFor(1, "Reset num subsurface rays",
-            [=] __device__ (int) {
-                *kp->numSubsurfaceRays = 0;
-            });
-
-            GPUParallelFor(nPixels, "Sample subsurface scattering",
-            [=] __device__ (int rayIndex) {
-                if (rayIndex >= kp->numActiveRays[depth & 1]->load(cuda::std::memory_order_relaxed))
-                    return;
-
-                int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
-                SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
-                PathState *pathState = &kp->pathStateArray[pixelIndex];
-
-                if (!pathState->beta || !intersection.material || !intersection.bsdf ||
-                    !intersection.bssrdf || !kp->sampledTransmissionArray[pixelIndex])
-                    return;
-
-                SamplerHandle sampler = kp->samplerArray[pixelIndex];
-                pstd::optional<BSSRDFProbeSegment> probeSeg =
-                    intersection.bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
-                if (!probeSeg)
-                    return;
-
-                // Enqueue ray
-                int ssRayIndex = kp->numSubsurfaceRays->fetch_add(1, cuda::std::memory_order_relaxed);
-                DCHECK(ssRayIndex >= 0 && ssRayIndex < nPixels);
-                kp->subsurfaceMaterialArray[ssRayIndex] = intersection.material;
-                kp->subsurfaceRayIndexToPathRayIndex[ssRayIndex] = rayIndex;
-                kp->subsurfaceRayoSOA->at(ssRayIndex) = probeSeg->p0;
-                kp->subsurfaceRaydSOA->at(ssRayIndex) = probeSeg->p1 - probeSeg->p0;
-                kp->tMaxArray[ssRayIndex] = 1;
-
-                kp->subsurfaceReservoirSamplerArray[ssRayIndex].Reset();
-                uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
-                kp->subsurfaceReservoirSamplerArray[ssRayIndex].Seed(seed);
-            });
-
-            events = accel.IntersectOneRandom(nPixels, kpHost->numSubsurfaceRays,
-                                              kpHost->subsurfaceMaterialArray,
-                                              kpHost->subsurfaceRayoSOA, kpHost->subsurfaceRaydSOA,
-                                              kpHost->tMaxArray, kpHost->subsurfaceReservoirSamplerArray);
-            struct IsectRandomHack { };
-            GetGPUKernelStats<IsectRandomHack>(
-                "Tracing subsurface scattering probe rays").launchEvents.push_back(events);
-
-            GPUParallelFor(nPixels, "Incorporate subsurface S factor",
-            [=] __device__ (int ssRayIndex) {
-                if (ssRayIndex >= kp->numSubsurfaceRays->load(cuda::std::memory_order_relaxed))
-                    return;
-
-                int rayIndex = kp->subsurfaceRayIndexToPathRayIndex[ssRayIndex]; // incident ray
-                int pixelIndex = kp->rayIndexToPixelIndex[depth & 1][rayIndex];
-                PathState *pathState = &kp->pathStateArray[pixelIndex];
-                if (!pathState->beta)
-                    return;
-
-                WeightedReservoirSampler<SurfaceInteraction, Float> &interactionSampler =
-                    kp->subsurfaceReservoirSamplerArray[ssRayIndex];
-
-                if (!interactionSampler.HasSample())
-                    return;
-
-                SurfaceInteraction &intersection = kp->intersectionsArray[depth & 1][pixelIndex];
-                MaterialBuffer &materialBuffer = kp->materialBufferArray[pixelIndex];
-                BSSRDFSample bssrdfSample =
-                    intersection.bssrdf.ProbeIntersectionToSample(interactionSampler.GetSample(),
-                                                                  materialBuffer);
-
-                if (!bssrdfSample.S || bssrdfSample.pdf == 0) {
-                    pathState->beta = SampledSpectrum(0.);
-                    return;
-                }
-                pathState->beta *= bssrdfSample.S * interactionSampler.WeightSum() /
-                    bssrdfSample.pdf;
-                DCHECK(!pathState->beta.HasNaNs());
-
-                // This copy is annoying, but it us reuse SampleDirect and
-                // SampleIndirect...
-                intersection.pi = bssrdfSample.si.pi;
-                intersection.dpdu = bssrdfSample.si.dpdu;
-                intersection.dpdv = bssrdfSample.si.dpdv;
-                intersection.dndu = bssrdfSample.si.dndu;
-                intersection.dndv = bssrdfSample.si.dndv;
-                intersection.n = bssrdfSample.si.n;
-                intersection.uv = bssrdfSample.si.uv;
-                intersection.wo = bssrdfSample.si.wo;
-                intersection.shading = bssrdfSample.si.shading;
-                intersection.bsdf = bssrdfSample.si.bsdf; // important!
-
-                int tag = intersection.bsdf->GetBxDF().Tag();
-                DCHECK(tag == BxDFHandle::TypeIndex<BSSRDFAdapter>());
-                int bsdfIndex = atomicAdd(&kp->bsdfSlices[tag].count, 1);
-                DCHECK(bsdfIndex < nPixels);
-                kp->bsdfSlices[tag].bsdfIndexToRayIndex[bsdfIndex] = rayIndex;
-            });
-
-            SampleDirect<BSSRDFAdapter>(nPixels, "BSSRDFAdapter", kp, depth);
-
-            TraceShadowRays();
-
-            SampleIndirect<BSSRDFAdapter>(nPixels, "BSSRDFAdapter", kp, depth, true);
+            SampleIndirect<DisneyBxDF>(nPixels, "Disney", kp, depth);
         }
 
         // Update film
-        if (rgbFilm) {
-            GPUParallelFor(nPixels, "Update RGBFilm",
-            [=] __device__ (int pixelIndex) {
-                const PathState &pathState = kp->pathStateArray[pixelIndex];
-                const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
+        GPUParallelFor(nPixels, "Update film",
+        [=] __device__ (int pixelIndex) {
+            const SampleState &sampleState = kp->sampleStateArray[pixelIndex];
+            const PathState &pathState = kp->pathStateArray[pixelIndex];
+            const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
 
-                SampledSpectrum Lw = pathState.L * kp->cameraRayWeightsSOA->at(pixelIndex);
-                // NOTE: assumes that no more than one thread is
-                // working on each pixel.
-                rgbFilm->AddSample(kp->pPixelArray[pixelIndex], Lw, lambda, {},
-                                   kp->filterSampleWeightsArray[pixelIndex]);
-            });
-        } else {
-            CHECK(aovFilm != nullptr);
+            SampledSpectrum Lw = pathState.L * kp->cameraRayWeightsSOA->at(pixelIndex);
+            // NOTE: assumes that no more than one thread is
+            // working on each pixel.
+            film->AddSample(sampleState.pPixel, Lw, lambda, {},
+                            kp->filterSampleWeightsArray[pixelIndex]);
+        });
 
-            GPUParallelFor(nPixels, "Update AOVFilm",
-            [=] __device__ (int pixelIndex) {
-                const PathState &pathState = kp->pathStateArray[pixelIndex];
-                const SampledWavelengths &lambda = kp->lambdaArray[pixelIndex];
-
-                SampledSpectrum Lw = pathState.L * kp->cameraRayWeightsSOA->at(pixelIndex);
-                // NOTE: assumes that no more than one thread is
-                // working on each pixel.
-                aovFilm->AddSample(kp->pPixelArray[pixelIndex], Lw, lambda,
-                                   kp->visibleSurfaceArray[pixelIndex],
-                                   kp->filterSampleWeightsArray[pixelIndex]);
+        // Get ready for the next round
+        if (pixelSample < spp - 1) {
+            GPUParallelFor(nPixels, "Increment sampleIndex",
+            [=] __device__ (int tid) {
+                SampleState &sampleState = kp->sampleStateArray[tid];
+                ++sampleState.sampleIndex;
             });
         }
-
-        progress.Update();
     }
-    progress.Done();
     CUDA_CHECK(cudaDeviceSynchronize());
 
     LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
-
-    if (PbrtOptions.profile) {
-        CHECK_EQ(CurrentProfilerState(), ProfilePhaseToBits(ProfilePhase::IntegratorRender));
-        ProfilerState = ProfilePhaseToBits(ProfilePhase::SceneConstruction);
-    }
 
     ReportKernelStats();
 
     ImageMetadata metadata;
     metadata.renderTimeSeconds = timer.ElapsedSeconds();
-    metadata.samplesPerPixel = spp;
+    // metadata.samplesPerPixel =
+    // pixelBounds / fullResolution
+    // cameraFromWorld/ ndcFromWorld...
     metadata.colorSpace = colorSpace;
-    camera->InitMetadata(&metadata);
 
 #if 0
     std::vector<GPULogItem> logs = ReadGPULogs();
@@ -1281,9 +1076,6 @@ void GPURender(GeneralScene &scene) {
 #endif
 
     film->WriteImage(metadata);
-
-    // Cleanup
-    ShapeHandle::FreeBufferCaches();
 }
 
 }  // namespace pbrt

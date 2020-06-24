@@ -35,7 +35,6 @@
 #include <pbrt/shapes.h>
 
 #include <pbrt/base.h>
-#include <pbrt/bsdf.h>
 #include <pbrt/loopsubdiv.h>
 #include <pbrt/plymesh.h>
 #include <pbrt/util/check.h>
@@ -107,7 +106,7 @@ std::string Sphere::ToString() const {
 Sphere *Sphere::Create(const Transform *worldFromObject,
                        const Transform *objectFromWorld, bool reverseOrientation,
                        const ParameterDictionary &dict,
-                       const FileLoc *loc, Allocator alloc) {
+                       Allocator alloc) {
     Float radius = dict.GetOneFloat("radius", 1.f);
     Float zmin = dict.GetOneFloat("zmin", -radius);
     Float zmax = dict.GetOneFloat("zmax", radius);
@@ -138,7 +137,7 @@ std::string Disk::ToString() const {
 
 Disk *Disk::Create(const Transform *worldFromObject,
                    const Transform *objectFromWorld, bool reverseOrientation,
-                   const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+                   const ParameterDictionary &dict, Allocator alloc) {
     Float height = dict.GetOneFloat("height", 0.);
     Float radius = dict.GetOneFloat("radius", 1);
     Float innerRadius = dict.GetOneFloat("innerradius", 0);
@@ -161,9 +160,11 @@ std::string Cylinder::ToString() const {
                         phiMax);
 }
 
-Cylinder *Cylinder::Create(const Transform *worldFromObject, const Transform *objectFromWorld,
-                           bool reverseOrientation, const ParameterDictionary &dict,
-                           const FileLoc *loc, Allocator alloc) {
+Cylinder *Cylinder::Create(
+    const Transform *worldFromObject,
+    const Transform *objectFromWorld, bool reverseOrientation,
+    const ParameterDictionary &dict,
+    Allocator alloc) {
     Float radius = dict.GetOneFloat("radius", 1);
     Float zmin = dict.GetOneFloat("zmin", -1);
     Float zmax = dict.GetOneFloat("zmax", 1);
@@ -173,8 +174,6 @@ Cylinder *Cylinder::Create(const Transform *worldFromObject, const Transform *ob
 }
 
 STAT_PIXEL_RATIO("Intersections/Ray-Triangle intersection tests", nTriHits, nTriTests);
-STAT_RATIO("Geometry/Triangles per mesh", nTris, nTriMeshes);
-STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
 // Triangle Local Definitions
 std::string TriangleIntersection::ToString() const {
@@ -211,6 +210,8 @@ std::string TriangleMesh::ToString() const {
                         uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : nullptr,
                         faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nTriangles)) : nullptr);
 }
+
+STAT_RATIO("Triangles/Triangles per mesh", nTris, nTriMeshes);
 
 TriangleMesh::TriangleMesh(
     const Transform &worldFromObject, bool reverseOrientation,
@@ -278,7 +279,6 @@ pstd::vector<ShapeHandle> TriangleMesh::CreateTriangles(Allocator alloc) {
         tris[i] = &t[i];
     }
 
-    triangleBytes += nTriangles * sizeof(Triangle);
     return tris;
 }
 
@@ -714,9 +714,9 @@ std::string Triangle::ToString() const {
                         meshIndex, triIndex, p0, p1, p2);
 }
 
-TriangleMesh *TriangleMesh::Create(const Transform *worldFromObject, bool reverseOrientation,
-                                   const ParameterDictionary &dict, const FileLoc *loc,
-                                   Allocator alloc) {
+TriangleMesh *TriangleMesh::Create(
+    const Transform *worldFromObject, bool reverseOrientation,
+    const ParameterDictionary &dict, Allocator alloc) {
     std::vector<int> vi = dict.GetIntArray("indices");
     std::vector<Point3f> P = dict.GetPoint3fArray("P");
     std::vector<Point2f> uvs = dict.GetPoint2fArray("uv");
@@ -725,42 +725,42 @@ TriangleMesh *TriangleMesh::Create(const Transform *worldFromObject, bool revers
         if (P.size() == 3)
             vi = { 0, 1, 2 };
         else {
-            Error(loc, "Vertex indices \"indices\" must be provided with triangle mesh.");
+            Error("Vertex indices \"indices\" must be provided with triangle mesh.");
             return {};
         }
     } else if ((vi.size() % 3) != 0u) {
-        Error(loc, "Number of vertex indices %d not a multiple of 3. Discarding %d excess.",
+        Error("Number of vertex indices %d not a multiple of 3. Discarding %d excess.",
               int(vi.size()), int(vi.size() % 3));
         while ((vi.size() % 3) != 0u) vi.pop_back();
     }
 
     if (P.empty()) {
-        Error(loc, "Vertex positions \"P\" must be provided with triangle mesh.");
+        Error("Vertex positions \"P\" must be provided with triangle mesh.");
         return {};
     }
 
     if (!uvs.empty() && uvs.size() != P.size()) {
-        Error(loc, "Number of \"uv\"s for triangle mesh must match \"P\"s. "
+        Error("Number of \"uv\"s for triangle mesh must match \"P\"s. "
               "Discarding uvs.");
         uvs = {};
     }
 
     std::vector<Vector3f> S = dict.GetVector3fArray("S");
     if (!S.empty() && S.size() != P.size()) {
-        Error(loc, "Number of \"S\"s for triangle mesh must match \"P\"s. "
+        Error("Number of \"S\"s for triangle mesh must match \"P\"s. "
               "Discarding \"S\"s.");
         S = {};
     }
     std::vector<Normal3f> N = dict.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
-        Error(loc, "Number of \"N\"s for triangle mesh must match \"P\"s. "
+        Error("Number of \"N\"s for triangle mesh must match \"P\"s. "
               "Discarding \"N\"s.");
         N = {};
     }
 
     for (size_t i = 0; i < vi.size(); ++i)
         if (vi[i] >= P.size()) {
-            Error(loc,
+            Error(
                 "trianglemesh has out of-bounds vertex index %d (%d \"P\" "
                 "values were given. Discarding this mesh.",
                 vi[i], (int)P.size());
@@ -769,7 +769,7 @@ TriangleMesh *TriangleMesh::Create(const Transform *worldFromObject, bool revers
 
     std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vi.size() / 3) {
-        Error(loc, "Number of face indices %d does not match number of triangles %d. "
+        Error("Number of face indices %d does not match number of triangles %d. "
               "Discarding face indices.",
               int(faceIndices.size()), int(vi.size() / 3));
         faceIndices = {};
@@ -785,8 +785,8 @@ TriangleMesh *TriangleMesh::Create(const Transform *worldFromObject, bool revers
 STAT_MEMORY_COUNTER("Memory/Curves", curveBytes);
 STAT_PERCENT("Intersections/Ray-curve intersection tests", nCurveHits, nCurveTests);
 STAT_INT_DISTRIBUTION("Intersections/Curve refinement level", refinementLevel);
-STAT_COUNTER("Geometry/Curves", nCurves);
-STAT_COUNTER("Geometry/Split curves", nSplitCurves);
+STAT_COUNTER("Scene/Curves", nCurves);
+STAT_COUNTER("Scene/Split curves", nSplitCurves);
 
 // Curve Method Definitions
 std::string ToString(CurveType type) {
@@ -1137,21 +1137,21 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
                                         const Transform *objectFromWorld,
                                         bool reverseOrientation,
                                         const ParameterDictionary &dict,
-                                        const FileLoc *loc, Allocator alloc) {
+                                        Allocator alloc) {
     Float width = dict.GetOneFloat("width", 1.f);
     Float width0 = dict.GetOneFloat("width0", width);
     Float width1 = dict.GetOneFloat("width1", width);
 
     int degree = dict.GetOneInt("degree", 3);
     if (degree != 2 && degree != 3) {
-        Error(loc, "Invalid degree %d: only degree 2 and 3 curves are supported.",
+        Error("Invalid degree %d: only degree 2 and 3 curves are supported.",
               degree);
         return {};
     }
 
     std::string basis = dict.GetOneString("basis", "bezier");
     if (basis != "bezier" && basis != "bspline") {
-        Error(loc, "Invalid basis \"%s\": only \"bezier\" and \"bspline\" are "
+        Error("Invalid basis \"%s\": only \"bezier\" and \"bspline\" are "
               "supported.", basis);
         return {};
     }
@@ -1163,7 +1163,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
         // subsequent segments reuse the last control point of the previous
         // one and then use degree more control points.
         if (((cp.size() - 1 - degree) % degree) != 0) {
-            Error(loc, "Invalid number of control points %d: for the degree %d "
+            Error("Invalid number of control points %d: for the degree %d "
                   "Bezier basis %d + n * %d are required, for n >= 0.",
                   (int)cp.size(), degree, degree + 1, degree);
             return {};
@@ -1171,7 +1171,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
         nSegments = (cp.size() - 1) / degree;
     } else {
         if (cp.size() < degree + 1) {
-            Error(loc, "Invalid number of control points %d: for the degree %d "
+            Error("Invalid number of control points %d: for the degree %d "
                   "b-spline basis, must have >= %d.", int(cp.size()), degree,
                   degree + 1);
             return {};
@@ -1189,7 +1189,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
     else if (curveType == "cylinder")
         type = CurveType::Cylinder;
     else {
-        Error(loc, R"(Unknown curve type "%s".  Using "cylinder".)", curveType);
+        Error(R"(Unknown curve type "%s".  Using "cylinder".)", curveType);
         type = CurveType::Cylinder;
     }
 
@@ -1199,13 +1199,13 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
             Warning("Curve normals are only used with \"ribbon\" type curves.");
             n = {};
         } else if (n.size() != nSegments + 1) {
-            Error(loc,
+            Error(
                 "Invalid number of normals %d: must provide %d normals for ribbon "
                 "curves with %d segments.", int(n.size()), nSegments + 1, nSegments);
             return {};
         }
     } else if (type == CurveType::Ribbon) {
-        Error(loc,
+        Error(
             "Must provide normals \"N\" at curve endpoints with ribbon "
             "curves.");
         return {};
@@ -1214,7 +1214,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
     int sd = dict.GetOneInt("splitdepth", 3);
 
     if (type == CurveType::Ribbon && n.empty()) {
-        Error(loc,
+        Error(
             "Must provide normals \"N\" at curve endpoints with ribbon "
             "curves.");
         return {};
@@ -1267,7 +1267,12 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *worldFromObject,
 
 
 STAT_PIXEL_RATIO("Intersections/Ray-bilinear patch intersection tests", nBLPHits, nBLPTests);
-STAT_RATIO("Geometry/Bilinear patches per mesh", nBlps, nBilinearMeshes);
+STAT_MEMORY_COUNTER("Memory/Bilinear patch indices", blpIndexBytes);
+STAT_MEMORY_COUNTER("Memory/Bilinear patch vertex positions", blpPositionBytes);
+STAT_MEMORY_COUNTER("Memory/Bilinear patch normals", blpNormalBytes);
+STAT_MEMORY_COUNTER("Memory/Bilinear patch uvs", blpUVBytes);
+STAT_MEMORY_COUNTER("Memory/Bilinear patch face indices", blpFaceIndexBytes);
+STAT_RATIO("Bilinear patches/Patches per mesh", nBlps, nBilinearMeshes);
 STAT_MEMORY_COUNTER("Memory/Bilinear patches", blpBytes);
 
 // BilinearPatch Method Definitions
@@ -1333,10 +1338,10 @@ std::string BilinearPatchMesh::ToString() const {
                         faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nPatches)) : nullptr);
 }
 
-BilinearPatchMesh *BilinearPatchMesh::Create(const Transform *worldFromObject,
-                                             bool reverseOrientation,
-                                             const ParameterDictionary &dict,
-                                             const FileLoc *loc, Allocator alloc) {
+pstd::vector<ShapeHandle> BilinearPatchMesh::Create(const Transform *worldFromObject,
+                                                    bool reverseOrientation,
+                                                    const ParameterDictionary &dict,
+                                                    Allocator alloc) {
     std::vector<int> vertexIndices = dict.GetIntArray("indices");
     std::vector<Point3f> P = dict.GetPoint3fArray("P");
     std::vector<Point2f> uv = dict.GetPoint2fArray("uv");
@@ -1346,36 +1351,36 @@ BilinearPatchMesh *BilinearPatchMesh::Create(const Transform *worldFromObject,
             // single patch
             vertexIndices = { 0, 1, 2, 3 };
         else {
-            Error(loc, "Vertex indices \"indices\" must be provided with bilinear patch mesh shape.");
+            Error("Vertex indices \"indices\" must be provided with bilinear patch mesh shape.");
             return {};
         }
     } else if ((vertexIndices.size() % 4) != 0u) {
-        Error(loc, "Number of vertex indices %d not a multiple of 4. Discarding %d excess.",
+        Error("Number of vertex indices %d not a multiple of 4. Discarding %d excess.",
               int(vertexIndices.size()), int(vertexIndices.size() % 4));
         while ((vertexIndices.size() % 4) != 0u) vertexIndices.pop_back();
     }
 
     if (P.empty()) {
-        Error(loc, "Vertex positions \"P\" must be provided with bilinear patch mesh shape.");
+        Error("Vertex positions \"P\" must be provided with bilinear patch mesh shape.");
         return {};
     }
 
     if (!uv.empty() && uv.size() != P.size()) {
-        Error(loc, "Number of \"uv\"s for bilinear patch mesh must match \"P\"s. "
+        Error("Number of \"uv\"s for bilinear patch mesh must match \"P\"s. "
               "Discarding uvs.");
         uv = {};
     }
 
     std::vector<Normal3f> N = dict.GetNormal3fArray("N");
     if (!N.empty() && N.size() != P.size()) {
-        Error(loc, "Number of \"N\"s for bilinear patch mesh must match \"P\"s. "
+        Error("Number of \"N\"s for bilinear patch mesh must match \"P\"s. "
               "Discarding \"N\"s.");
         N = {};
     }
 
     for (size_t i = 0; i < vertexIndices.size(); ++i)
         if (vertexIndices[i] >= P.size()) {
-            Error(loc,
+            Error(
                 "Bilinear patch mesh has out of-bounds vertex index %d (%d \"P\" "
                 "values were given. Discarding this mesh.",
                 vertexIndices[i], (int)P.size());
@@ -1384,7 +1389,7 @@ BilinearPatchMesh *BilinearPatchMesh::Create(const Transform *worldFromObject,
 
     std::vector<int> faceIndices = dict.GetIntArray("faceIndices");
     if (!faceIndices.empty() && faceIndices.size() != vertexIndices.size() / 4) {
-        Error(loc, "Number of face indices %d does not match number of bilinear patches %d. "
+        Error("Number of face indices %d does not match number of bilinear patches %d. "
               "Discarding face indices.",
               int(faceIndices.size()), int(vertexIndices.size() / 4));
         faceIndices = {};
@@ -1405,21 +1410,35 @@ BilinearPatchMesh *BilinearPatchMesh::Create(const Transform *worldFromObject,
         imageDist = alloc.new_object<Distribution2D>(d, domain);
     }
 
-    return alloc.new_object<BilinearPatchMesh>(*worldFromObject, reverseOrientation,
-                                               std::move(vertexIndices), std::move(P),
-                                               std::move(N), std::move(uv),
-                                               std::move(faceIndices), imageDist);
+    return Create(worldFromObject, reverseOrientation, std::move(vertexIndices), std::move(P),
+                  std::move(N), std::move(uv), std::move(faceIndices), std::move(imageDist),
+                  alloc);
 }
 
-pstd::vector<ShapeHandle> BilinearPatchMesh::CreatePatches(Allocator alloc) {
+pstd::vector<ShapeHandle>
+BilinearPatchMesh::Create(const Transform *worldFromObject,
+                          bool reverseOrientation,
+                          std::vector<int> indices, std::vector<Point3f> p,
+                          std::vector<Normal3f> n, std::vector<Point2f> uv,
+                          std::vector<int> faceIndices,
+                          Distribution2D *imageDist,
+                          Allocator alloc) {
     CHECK_LT(allMeshes->size(), 1 << 31);
     int meshIndex = int(allMeshes->size());
 
-    allMeshes->push_back(this);
+    // Grab this before we std::move(indices)
+    CHECK_EQ(0, indices.size() % 4);
+    int nBlps = indices.size() / 4;
 
-    pstd::vector<ShapeHandle> blps(nPatches, alloc);
-    BilinearPatch *patches = alloc.allocate_object<BilinearPatch>(nPatches);
-    for (int i = 0; i < nPatches; ++i) {
+    // Create the mesh first so the BilinearPatch constructor can call GetMesh().
+    BilinearPatchMesh *mesh = alloc.new_object<BilinearPatchMesh>(
+        *worldFromObject, reverseOrientation, std::move(indices), std::move(p),
+        std::move(n), std::move(uv), std::move(faceIndices), imageDist);
+    allMeshes->push_back(mesh);
+
+    pstd::vector<ShapeHandle> blps(nBlps, alloc);
+    BilinearPatch *patches = alloc.allocate_object<BilinearPatch>(nBlps);
+    for (int i = 0; i < nBlps; ++i) {
         alloc.construct(&patches[i], meshIndex, i);
         blps[i] = &patches[i];
     }
@@ -1492,6 +1511,69 @@ Bounds3f BilinearPatch::WorldBound() const {
     return Union(Bounds3f(p00, p01), Bounds3f(p10, p11));
 }
 
+pstd::optional<BilinearIntersection> BilinearPatch::Intersect(const Ray &ray, Float tMax,
+                                                        const Point3f &p00, const Point3f &p10,
+                                                        const Point3f &p01, const Point3f &p11) {
+    ++nBLPTests;
+
+    Vector3f qn = Cross(p10-p00, p01-p11);
+    Vector3f e10 = p10 - p00; // p01------u--------p11
+    Vector3f e11 = p11 - p10; // |                   |
+    Vector3f e00 = p01 - p00; // v e00           e11 v
+                              // |        e10        |
+                              // p00------u--------p10
+    Vector3f q00 = p00 - ray.o;
+    Vector3f q10 = p10 - ray.o;
+    Float a = Dot(Cross(q00, ray.d), e00); // the equation is
+    Float c = Dot(qn, ray.d);              // a + b u + c u^2
+    Float b = Dot(Cross(q10, ray.d), e11); // first compute a+b+c
+    b -= a + c;                                    // and then b
+    Float det = b*b - 4*a*c;
+    if (det < 0) return {};
+    det = std::sqrt(det);
+    Float u1, u2;             // two roots (u parameter)
+    Float t = tMax, u, v; // need solution for the smallest t > 0
+    if (c == 0) {                        // if c == 0, it is a trapezoid
+        u1  = -a/b; u2 = -1;              // and there is only one root
+    } else {                             // (c != 0 in Stanford models)
+        u1  = (-b - copysignf(det, b))/2; // numerically "stable" root
+        u2  = a/u1;                       // Viete's formula for u1*u2
+        u1 /= c;
+    }
+    if (0 <= u1 && u1 <= 1) {                // is it inside the patch?
+        Vector3f pa = Lerp(u1, q00, q10);       // point on edge e10 (Figure 8.4)
+        Vector3f pb = Lerp(u1, e00, e11);       // it is, actually, pb - pa
+        Vector3f n  = Cross(ray.d, pb);
+        det = Dot(n, n);
+        n = Cross(n, pa);
+        Float t1 = Dot(n, pb);
+        Float v1 = Dot(n, ray.d);     // no need to check t1 < t
+        if (t1 > 0 && 0 <= v1 && v1 <= det) { // if t1 > ray.tmax,
+            t = t1/det; u = u1; v = v1/det;    // it will be rejected
+        }                                     // in rtPotentialIntersection
+    }
+    if (0 <= u2 && u2 <= 1) {                // it is slightly different,
+        Vector3f pa = Lerp(u2, q00, q10);       // since u1 might be good
+        Vector3f pb = Lerp(u2, e00, e11);       // and we need 0 < t2 < t1
+        Vector3f n  = Cross(ray.d, pb);
+        det = Dot(n, n);
+        n = Cross(n, pa);
+        Float t2 = Dot(n, pb)/det;
+        Float v2 = Dot(n, ray.d);
+        if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
+            t = t2; u = u2; v = v2/det;
+        }
+    }
+
+    // TODO: reject hits with sufficiently small t that we're not sure.
+
+    if (t >= tMax)
+        return {};
+
+    ++nBLPHits;
+    return BilinearIntersection{{u, v}, t};
+}
+
 pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray, Float tMax) const {
     ProfilerScope _(ProfilePhase::ShapeIntersect);
 
@@ -1503,15 +1585,123 @@ pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray, Float
     const Point3f &p01 = mesh->p[v[2]];
     const Point3f &p11 = mesh->p[v[3]];
 
-    pstd::optional<BilinearIntersection> blpIsect = Intersect(ray, tMax, p00, p10, p01, p11);
+    pstd::optional<BilinearIntersection> blpIsect =
+        Intersect(ray, tMax, p00, p10, p01, p11);
     if (!blpIsect)
         return {};
 
     // Found a hit.
-    SurfaceInteraction intr = mesh->InteractionFromIntersection(blpIndex, blpIsect->uv,
-                                                                ray.time, -ray.d);
+    Point2f uv = blpIsect->uv;
+    Point3f pHit = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
 
-    return ShapeIntersection{intr, blpIsect->t};
+    Vector3f dpdu = Lerp(uv[1], p10, p11) - Lerp(uv[1], p00, p01);
+    Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
+
+    // Interpolate texture coordinates, if provided
+    if (mesh->uv != nullptr) {
+        const Point2f &uv00 = mesh->uv[v[0]];
+        const Point2f &uv10 = mesh->uv[v[1]];
+        const Point2f &uv01 = mesh->uv[v[2]];
+        const Point2f &uv11 = mesh->uv[v[3]];
+
+        Float dsdu = -uv00[0] + uv10[0] + uv[1] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
+        Float dsdv = -uv00[0] + uv01[0] + uv[0] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
+        Float dtdu = -uv00[1] + uv10[1] + uv[1] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
+        Float dtdv = -uv00[1] + uv01[1] + uv[0] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
+
+        Float duds = std::abs(dsdu) < 1e-8f ? 0 : 1 / dsdu;
+        Float dvds = std::abs(dsdv) < 1e-8f ? 0 : 1 / dsdv;
+        Float dudt = std::abs(dtdu) < 1e-8f ? 0 : 1 / dtdu;
+        Float dvdt = std::abs(dtdv) < 1e-8f ? 0 : 1 / dtdv;
+
+        // actually this is st (and confusing)
+        uv = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
+
+        // dpds = dpdu * duds + dpdv * dvds, etc
+        // duds = 1/dsdu
+        Vector3f dpds = dpdu * duds + dpdv * dvds;
+        Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
+
+        // These end up as zero-vectors of the mapping is degenerate...
+        if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
+            dpdu = dpds;
+            dpdv = dpdt;
+        }
+    }
+
+    // Compute coefficients for fundamental forms
+    Float E = Dot(dpdu, dpdu);
+    Float F = Dot(dpdu, dpdv);
+    Float G = Dot(dpdv, dpdv);
+    Vector3f N = Normalize(Cross(dpdu, dpdv));
+    Float e = 0;  // 2nd derivative d2p/du2 == 0
+    Vector3f d2Pduv(p00.x - p01.x - p10.x + p11.x,
+                    p00.y - p01.y - p10.y + p11.y,
+                    p00.z - p01.z - p10.z + p11.z);
+    Float f = Dot(N, d2Pduv);
+    Float g = 0;  // samesies
+
+    // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
+    Float EGF2 = DifferenceOfProducts(E, G, F, F);
+    Normal3f dndu, dndv;
+    if (EGF2 != 0) {
+        Float invEGF2 = 1 / EGF2;
+        Normal3f dndu = Normal3f(DifferenceOfProducts(f, F, e, G) * invEGF2 * dpdu +
+                                 DifferenceOfProducts(e, F, f, E) * invEGF2 * dpdv);
+        Normal3f dndv = Normal3f(DifferenceOfProducts(g, F, f, G) * invEGF2 * dpdu +
+                                 DifferenceOfProducts(f, F, g, E) * invEGF2 * dpdv);
+    }
+
+    // Two lerps; each is gamma(3). TODO: double check.
+    Vector3f pError = gamma(6) *
+        Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
+
+    // Initialize _SurfaceInteraction_ from parametric information
+    int faceIndex = mesh->faceIndices != nullptr ? mesh->faceIndices[blpIndex] : 0;
+    Point3fi pe(pHit, pError);
+    SurfaceInteraction isect(pe, uv, -ray.d, dpdu, dpdv, dndu, dndv,
+                             ray.time, OrientationIsReversed() ^ TransformSwapsHandedness(),
+                             faceIndex);
+
+    if (mesh->n != nullptr) {
+        const Normal3f &n00 = mesh->n[v[0]];
+        const Normal3f &n10 = mesh->n[v[1]];
+        const Normal3f &n01 = mesh->n[v[2]];
+        const Normal3f &n11 = mesh->n[v[3]];
+        Normal3f dndu = Lerp(blpIsect->uv[1], n10, n11) - Lerp(blpIsect->uv[1], n00, n01);
+        Normal3f dndv = Lerp(blpIsect->uv[0], n01, n11) - Lerp(blpIsect->uv[0], n00, n10);
+
+        Normal3f ns = Lerp(blpIsect->uv[0],
+                           Lerp(blpIsect->uv[1], n00, n01),
+                           Lerp(blpIsect->uv[1], n10, n11));
+        if (LengthSquared(ns) > 0) {
+            ns = Normalize(ns);
+            Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
+            Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
+            if (LengthSquared(axis) > .0001f) {
+                axis = Normalize(axis);
+                // The shading normal is different enough.
+                //
+                // Don't worry about if ns == -n; that, too, is handled
+                // naturally by the following.
+                //
+                // Rotate dpdu and dpdv around the axis perpendicular to the
+                // plane defined by n and ns by the angle between them -> their
+                // dot product will equal ns.
+                Float cosTheta = Dot(n, ns), sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+                Transform r = Rotate(sinTheta, cosTheta, axis);
+                Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
+
+                if (mesh->reverseOrientation) {
+                    ns = -ns;
+                    sdpdv = -sdpdv;
+                }
+                isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
+            }
+        }
+    }
+
+    return ShapeIntersection{isect, blpIsect->t};
 }
 
 bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
@@ -1812,56 +2002,44 @@ std::string BilinearPatch::ToString() const {
                         meshIndex, blpIndex, area);
 }
 
-STAT_COUNTER("Geometry/Spheres", nSpheres);
-STAT_COUNTER("Geometry/Cylinders", nCylinders);
-STAT_COUNTER("Geometry/Disks", nDisks);
-
 pstd::vector<ShapeHandle> ShapeHandle::Create(
         const std::string &name, const Transform *worldFromObject,
         const Transform *objectFromWorld, bool reverseOrientation,
-        const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+        const ParameterDictionary &dict, Allocator alloc, FileLoc loc) {
     pstd::vector<ShapeHandle> shapes(alloc);
-    if (name == "sphere") {
+    if (name == "sphere")
         shapes = {Sphere::Create(worldFromObject, objectFromWorld, reverseOrientation,
-                                 dict, loc, alloc)};
-        ++nSpheres;
-    }
+                                 dict, alloc)};
     // Create remaining single _Shape_ types
-    else if (name == "cylinder") {
+    else if (name == "cylinder")
         shapes = {Cylinder::Create(worldFromObject, objectFromWorld, reverseOrientation,
-                                   dict, loc, alloc)};
-        ++nCylinders;
-    }
-    else if (name == "disk") {
+                                   dict, alloc)};
+    else if (name == "disk")
         shapes = {Disk::Create(worldFromObject, objectFromWorld, reverseOrientation,
-                               dict, loc, alloc)};
-        ++nDisks;
-    }
-    else if (name == "bilinearmesh") {
-        BilinearPatchMesh *mesh = BilinearPatchMesh::Create(worldFromObject, reverseOrientation,
-                                                            dict, loc, alloc);
-        shapes = mesh->CreatePatches(alloc);
-    }
+                               dict, alloc)};
+    else if (name == "bilinearmesh")
+        shapes = BilinearPatchMesh::Create(worldFromObject, reverseOrientation,
+                                           dict, alloc);
     // Create multiple-_Shape_ types
     else if (name == "curve")
         shapes = Curve::Create(worldFromObject, objectFromWorld, reverseOrientation,
-                               dict, loc, alloc);
+                               dict, alloc);
     else if (name == "trianglemesh") {
         TriangleMesh *mesh = TriangleMesh::Create(worldFromObject, reverseOrientation, dict,
-                                                  loc, alloc);
+                                                  alloc);
         shapes = mesh->CreateTriangles(alloc);
     } else if (name == "plymesh")
         shapes = CreatePLYMesh(worldFromObject, reverseOrientation,
-                               dict, loc, alloc);
+                               dict, alloc);
     else if (name == "loopsubdiv") {
         TriangleMesh *mesh = CreateLoopSubdivMesh(worldFromObject, reverseOrientation,
-                                                  dict, loc, alloc);
+                                                  dict, alloc);
         shapes = mesh->CreateTriangles(alloc);
     } else
-        ErrorExit(loc, "%s: shape type unknown.", name);
+        ErrorExit(&loc, "%s: shape type unknown.", name);
 
     if (shapes.empty())
-        ErrorExit(loc, "%s: unable to create shape.", name);
+        ErrorExit(&loc, "%s: unable to create shape.", name);
 
     return shapes;
 }
@@ -1883,76 +2061,6 @@ std::string ShapeHandle::ToString() const {
         LOG_FATAL("Unhandled case");
         return {};
     }
-}
-
-STAT_MEMORY_COUNTER("Memory/Mesh indices", meshIndexBytes);
-STAT_MEMORY_COUNTER("Memory/Mesh vertex positions", meshPositionBytes);
-STAT_MEMORY_COUNTER("Memory/Mesh normals", meshNormalBytes);
-STAT_MEMORY_COUNTER("Memory/Mesh uvs", meshUVBytes);
-STAT_MEMORY_COUNTER("Memory/Mesh tangents", meshTangentBytes);
-STAT_MEMORY_COUNTER("Memory/Mesh face indices", meshFaceIndexBytes);
-
-BufferCache<int> *ShapeHandle::indexBufferCache;
-BufferCache<Point3f> *ShapeHandle::pBufferCache;
-BufferCache<Normal3f> *ShapeHandle::nBufferCache;
-BufferCache<Point2f> *ShapeHandle::uvBufferCache;
-BufferCache<Vector3f> *ShapeHandle::sBufferCache;
-BufferCache<int> *ShapeHandle::faceIndexBufferCache;
-
-void ShapeHandle::InitBufferCaches(Allocator alloc) {
-    CHECK(indexBufferCache == nullptr);
-    indexBufferCache = alloc.new_object<BufferCache<int>>(alloc);
-    pBufferCache = alloc.new_object<BufferCache<Point3f>>(alloc);
-    nBufferCache = alloc.new_object<BufferCache<Normal3f>>(alloc);
-    uvBufferCache = alloc.new_object<BufferCache<Point2f>>(alloc);
-    sBufferCache = alloc.new_object<BufferCache<Vector3f>>(alloc);
-    faceIndexBufferCache = alloc.new_object<BufferCache<int>>(alloc);
-}
-
-void ShapeHandle::FreeBufferCaches() {
-    LOG_VERBOSE("index buffer bytes: %d", indexBufferCache->BytesUsed());
-    meshIndexBytes += indexBufferCache->BytesUsed();
-    indexBufferCache->Clear();
-
-    LOG_VERBOSE("p bytes: %d", pBufferCache->BytesUsed());
-    meshPositionBytes += pBufferCache->BytesUsed();
-    pBufferCache->Clear();
-
-    LOG_VERBOSE("n bytes: %d", nBufferCache->BytesUsed());
-    meshNormalBytes += nBufferCache->BytesUsed();
-    nBufferCache->Clear();
-    LOG_VERBOSE("uv bytes: %d", uvBufferCache->BytesUsed());
-    meshUVBytes += uvBufferCache->BytesUsed();
-    uvBufferCache->Clear();
-
-    LOG_VERBOSE("s bytes: %d", sBufferCache->BytesUsed());
-    meshTangentBytes += sBufferCache->BytesUsed();
-    sBufferCache->Clear();
-
-    LOG_VERBOSE("face index bytes: %d", faceIndexBufferCache->BytesUsed());
-    meshFaceIndexBytes += faceIndexBufferCache->BytesUsed();
-    faceIndexBufferCache->Clear();
-}
-
-// Shape Method Definitions
-std::string ShapeSample::ToString() const {
-    return StringPrintf("[ ShapeSample intr: %s pdf: %f ]", intr, pdf);
-}
-
-std::string ShapeIntersection::ToString() const {
-    return StringPrintf("[ ShapeIntersection intr: %s tHit: %f ]", intr, tHit);
-}
-
-Float ShapeHandle::SampledSolidAngle(const Point3f &p, int nSamples) const {
-    Interaction ref(p, 0, (const Medium *)nullptr);
-    double solidAngle = 0;
-    for (int i = 0; i < nSamples; ++i) {
-        Point2f u{RadicalInverse(0, i), RadicalInverse(1, i)};
-        pstd::optional<ShapeSample> ss = Sample(ref, u);
-        if (ss && ss->pdf > 0 && !IntersectP(Ray(p, ss->intr.p() - p), .999f))
-            solidAngle += 1 / ss->pdf;
-    }
-    return solidAngle / nSamples;
 }
 
 }  // namespace pbrt

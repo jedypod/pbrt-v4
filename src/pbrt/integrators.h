@@ -63,38 +63,38 @@ namespace pbrt {
 
 SampledSpectrum LdSampleLights(const SurfaceInteraction &intr, const Scene &scene,
                                const SampledWavelengths &lambda,
-                               SamplerHandle sampler, MemoryArena &arena,
+                               Sampler &sampler, MemoryArena &arena,
                                const LightSampler &lightSampler,
                                bool handleMedia = false);
 SampledSpectrum LdSampleLights(const MediumInteraction &intr, const Scene &scene,
                                const SampledWavelengths &lambda,
-                               SamplerHandle sampler, MemoryArena &arena,
+                               Sampler &sampler, MemoryArena &arena,
                                const LightSampler &lightSampler);
 SampledSpectrum LdSampleLightsAndBSDF(const SurfaceInteraction &intr, const Scene &scene,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler, MemoryArena &arena,
+                                      Sampler &sampler, MemoryArena &arena,
                                       const LightSampler &lightSampler);
 
 SampledSpectrum Tr(const Scene &scene, const SampledWavelengths &lambda,
-                   SamplerHandle sampler, const Interaction &p0, const Interaction &p1);
+                   Sampler &sampler, const Interaction &p0, const Interaction &p1);
 
 class ImageTileIntegrator : public Integrator {
 public:
     ImageTileIntegrator(const Scene &scene,
                         std::unique_ptr<const Camera> c,
-                        SamplerHandle sampler)
+                        std::unique_ptr<Sampler> sampler)
         : Integrator(scene), camera(std::move(c)), initialSampler(std::move(sampler))
     {}
 
     void Render();
     virtual void EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
-                                     SamplerHandle sampler, MemoryArena &arena,
+                                     Sampler &sampler, MemoryArena &arena,
                                      MaterialBuffer &materialBuffer) = 0;
 
   protected:
     // ImageTileIntegrator Protected Data
     std::unique_ptr<const Camera> camera;
-    SamplerHandle initialSampler;
+    std::unique_ptr<Sampler> initialSampler;
 };
 
 // RayIntegrator Declarations
@@ -103,16 +103,16 @@ class RayIntegrator : public ImageTileIntegrator {
     // RayIntegrator Public Methods
     RayIntegrator(const Scene &scene,
                   std::unique_ptr<const Camera> c,
-                  SamplerHandle sampler)
+                  std::unique_ptr<Sampler> sampler)
         : ImageTileIntegrator(scene, std::move(c), std::move(sampler))
     {}
 
     void EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
-                             SamplerHandle sampler, MemoryArena &arena,
+                             Sampler &sampler, MemoryArena &arena,
                              MaterialBuffer &materialBuffer) final;
     virtual SampledSpectrum Li(RayDifferential ray,
                                const SampledWavelengths &lambda,
-                               SamplerHandle sampler,
+                               Sampler &sampler,
                                MemoryArena &arena,
                                MaterialBuffer &materialBuffer,
                                pstd::optional<VisibleSurface> *visibleSurface = nullptr) const = 0;
@@ -124,27 +124,26 @@ class WhittedIntegrator : public RayIntegrator {
     // WhittedIntegrator Public Methods
     WhittedIntegrator(int maxDepth, const Scene &scene,
                       std::unique_ptr<const Camera> c,
-                      SamplerHandle sampler)
+                      std::unique_ptr<Sampler> sampler)
         : RayIntegrator(scene, std::move(c), std::move(sampler)),
           maxDepth(maxDepth) {}
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler,
+                       Sampler &sampler,
                        MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface = nullptr) const;
 
     static std::unique_ptr<WhittedIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler,
-        const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
   private:
     SampledSpectrum WhittedLi(RayDifferential ray,
                               const SampledWavelengths &lambda,
-                              SamplerHandle sampler,
+                              Sampler &sampler,
                               MemoryArena &arena,
                               MaterialBuffer &materialBuffer,
                               int depth) const;
@@ -159,18 +158,18 @@ class SimplePathIntegrator : public RayIntegrator {
     // SimplePathIntegrator Public Methods
     SimplePathIntegrator(int maxDepth, bool sampleLights, bool sampleBSDF,
                          const Scene &scene, std::unique_ptr<const Camera> camera,
-                         SamplerHandle sampler);
+                         std::unique_ptr<Sampler> sampler);
 
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler,
+                       Sampler &sampler,
                        MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface) const;
 
     static std::unique_ptr<SimplePathIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -187,15 +186,15 @@ class LightPathIntegrator : public ImageTileIntegrator {
     // LightPathIntegrator Public Methods
     LightPathIntegrator(int maxDepth, const Scene &scene,
                         std::unique_ptr<const Camera> camera,
-                        SamplerHandle sampler);
+                        std::unique_ptr<Sampler> sampler);
 
     void EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
-                             SamplerHandle sampler, MemoryArena &arena,
+                             Sampler &sampler, MemoryArena &arena,
                              MaterialBuffer &materialBuffer);
 
     static std::unique_ptr<LightPathIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -211,21 +210,21 @@ class PathIntegrator : public RayIntegrator {
     // PathIntegrator Public Methods
     PathIntegrator(int maxDepth, const Scene &scene,
                    std::unique_ptr<const Camera> camera,
-                   SamplerHandle sampler,
+                   std::unique_ptr<Sampler> sampler,
                    Float rrThreshold = 1,
                    const std::string &lightSampleStrategy = "bvh",
                    bool regularize = true);
 
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler,
+                       Sampler &sampler,
                        MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface) const;
 
     static std::unique_ptr<PathIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -243,7 +242,7 @@ class VolPathIntegrator : public RayIntegrator {
     // VolPathIntegrator Public Methods
     VolPathIntegrator(int maxDepth, const Scene &scene,
                       std::unique_ptr<const Camera> c,
-                      SamplerHandle sampler,
+                      std::unique_ptr<Sampler> sampler,
                       Float rrThreshold = 1,
                       const std::string &lightSampleStrategy = "bvh",
                       bool regularize = true)
@@ -256,13 +255,13 @@ class VolPathIntegrator : public RayIntegrator {
 
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler, MemoryArena &arena,
+                       Sampler &sampler, MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface) const;
 
     static std::unique_ptr<VolPathIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -280,17 +279,17 @@ class AOIntegrator : public RayIntegrator {
     // AOIntegrator Public Methods
     AOIntegrator(bool cosSample, Float maxDist, const Scene &scene,
                  std::unique_ptr<const Camera> camera,
-                 SamplerHandle sampler, SpectrumHandle illuminant);
+                 std::unique_ptr<Sampler> sampler, SpectrumHandle illuminant);
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler, MemoryArena &arena,
+                       Sampler &sampler, MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface) const;
 
     static std::unique_ptr<AOIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
         SpectrumHandle illuminant,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -300,12 +299,13 @@ class AOIntegrator : public RayIntegrator {
     SpectrumHandle illuminant;
 };
 
+#if 0
 // BDPT Declarations
 class BDPTIntegrator : public RayIntegrator {
   public:
     // BDPTIntegrator Public Methods
     BDPTIntegrator(const Scene &scene, std::unique_ptr<const Camera> c,
-                   SamplerHandle sampler, int maxDepth,
+                   std::unique_ptr<Sampler> sampler, int maxDepth,
                    bool visualizeStrategies, bool visualizeWeights,
                    const std::string &lightSampleStrategy = "power",
                    bool regularize = true)
@@ -319,14 +319,14 @@ class BDPTIntegrator : public RayIntegrator {
     void Render();
     SampledSpectrum Li(RayDifferential ray,
                        const SampledWavelengths &lambda,
-                       SamplerHandle sampler,
+                       Sampler &sampler,
                        MemoryArena &arena,
                        MaterialBuffer &materialBuffer,
                        pstd::optional<VisibleSurface> *visibleSurface) const;
 
     static std::unique_ptr<BDPTIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     std::string ToString() const;
 
@@ -364,16 +364,11 @@ class MLTIntegrator : public Integrator {
 
     static std::unique_ptr<MLTIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera);
 
     std::string ToString() const;
 
   private:
-    static const int cameraStreamIndex;
-    static const int lightStreamIndex;
-    static const int connectionStreamIndex;
-    static const int nSampleStreams;
-
     SampledSpectrum L(MemoryArena &arena, MaterialBuffer &materialBuffer,
                       MLTSampler &sampler, int k,
                       Point2f *pRaster, SampledWavelengths *lambda);
@@ -388,6 +383,7 @@ class MLTIntegrator : public Integrator {
     std::unique_ptr<FixedLightSampler> lightSampler;
     bool regularize;
 };
+#endif
 
 // SPPM Declarations
 class SPPMIntegrator : public Integrator {
@@ -413,7 +409,7 @@ class SPPMIntegrator : public Integrator {
 
     static std::unique_ptr<SPPMIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        const RGBColorSpace *colorSpace, std::unique_ptr<const Camera> camera, const FileLoc *loc);
+        const RGBColorSpace *colorSpace, std::unique_ptr<const Camera> camera);
 
     std::string ToString() const;
 
@@ -441,7 +437,7 @@ class RISIntegrator : public Integrator {
 
     static std::unique_ptr<RISIntegrator> Create(
         const ParameterDictionary &dict, const Scene &scene,
-        std::unique_ptr<const Camera> camera, SamplerHandle sampler, const FileLoc *loc);
+        std::unique_ptr<const Camera> camera, std::unique_ptr<Sampler> sampler);
 
     void Render();
     std::string ToString() const;

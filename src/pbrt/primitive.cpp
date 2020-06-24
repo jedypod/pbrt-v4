@@ -49,8 +49,6 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Primitives", primitiveMemory);
 
-Primitive::~Primitive() {}
-
 Bounds3f PrimitiveHandle::WorldBound() const {
     switch (Tag()) {
     case TypeIndex<SimplePrimitive>():
@@ -199,8 +197,8 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
         return siNext;
     }
 
-    si->intr.areaLight = areaLight;
-    si->intr.material = material;
+    si->intr.areaLight = &areaLight;
+    si->intr.material = &material;
 
     CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0.);
     // Initialize _SurfaceInteraction::mediumInterface_ after _Shape_
@@ -235,7 +233,7 @@ pstd::optional<ShapeIntersection> SimplePrimitive::Intersect(const Ray &r,
 
     CHECK_LT(si->tHit, 1.001 * tMax);
     si->intr.areaLight = nullptr;
-    si->intr.material = material;
+    si->intr.material = &material;
 
     CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0.);
     si->intr.medium = r.medium;

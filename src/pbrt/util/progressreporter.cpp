@@ -34,7 +34,6 @@
 // core/progressreporter.cpp*
 #include <pbrt/util/progressreporter.h>
 
-#include <pbrt/gpu.h>
 #include <pbrt/options.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
@@ -61,59 +60,42 @@ std::string Timer::ToString() const {
 }
 
 // ProgressReporter Method Definitions
-ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title, bool gpu)
+ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title)
     : totalWork(std::max<int64_t>(1, totalWork)),
       title(title),
       quiet(PbrtOptions.quiet) {
     workDone = 0;
     exitThread = false;
-
-#ifdef PBRT_HAVE_OPTIX
-    if (gpu) {
-        gpuEventsLaunchedOffset = 0;
-        gpuEventsFinishedOffset = 0;
-
-        gpuEvents.resize(totalWork);
-        for (cudaEvent_t &event : gpuEvents)
-            CUDA_CHECK(cudaEventCreate(&event));
-    }
-#else
-    CHECK(gpu == false);
-#endif
-
     // Launch thread to periodically update progress bar
-    if (!quiet)
-        launchThread();
-}
-
-void ProgressReporter::launchThread() {
-    // We need to temporarily disable the profiler before launching
-    // the update thread here, through the time the thread calls
-    // ProfilerWorkerThreadInit(). Otherwise, there's a potential
-    // deadlock if the profiler interrupt fires in the progress
-    // reporter's thread and we try to access the thread-local
-    // ProfilerState variable in the signal handler for the first
-    // time. (Which in turn calls malloc, which isn't allowed in a
-    // signal handler.)
-    SuspendProfiler();
-    Barrier *barrier = new Barrier(2);
-    updateThread = std::thread([this, barrier]() {
-        ProfilerWorkerThreadInit();
-        ProfilerState = 0;
+    if (!quiet) {
+        // We need to temporarily disable the profiler before launching
+        // the update thread here, through the time the thread calls
+        // ProfilerWorkerThreadInit(). Otherwise, there's a potential
+        // deadlock if the profiler interrupt fires in the progress
+        // reporter's thread and we try to access the thread-local
+        // ProfilerState variable in the signal handler for the first
+        // time. (Which in turn calls malloc, which isn't allowed in a
+        // signal handler.)
+        SuspendProfiler();
+        Barrier *barrier = new Barrier(2);
+        updateThread = std::thread([this, barrier]() {
+            ProfilerWorkerThreadInit();
+            ProfilerState = 0;
+            if (barrier->Block()) delete barrier;
+            PrintBar();
+        });
+        // Wait for the thread to get past the ProfilerWorkerThreadInit()
+        // call.
         if (barrier->Block()) delete barrier;
-        printBar();
-    });
-    // Wait for the thread to get past the ProfilerWorkerThreadInit()
-    // call.
-    if (barrier->Block()) delete barrier;
-    ResumeProfiler();
+        ResumeProfiler();
+    }
 }
 
 ProgressReporter::~ProgressReporter() {
     Done();
 }
 
-void ProgressReporter::printBar() {
+void ProgressReporter::PrintBar() {
     int barLength = TerminalWidth() - 28;
     int totalPlusses = std::max<int>(2, barLength - title.size());
     int plussesPrinted = 0;
@@ -131,19 +113,10 @@ void ProgressReporter::printBar() {
     fputs(buf.get(), stdout);
     fflush(stdout);
 
-#ifdef PBRT_HAVE_OPTIX
-    std::chrono::milliseconds sleepDuration(gpuEvents.size() ? 50 : 250);
-#else
     std::chrono::milliseconds sleepDuration(250);
-#endif
-
     int iterCount = 0;
-    bool reallyExit = false;  // make sure we do one more go-round to get the final report
-    while (!reallyExit) {
-        if (exitThread)
-            reallyExit = true;
-        else
-            std::this_thread::sleep_for(sleepDuration);
+    while (!exitThread) {
+        std::this_thread::sleep_for(sleepDuration);
 
         // Periodically increase sleepDuration to reduce overhead of
         // updates.
@@ -157,21 +130,6 @@ void ProgressReporter::printBar() {
         else if (iterCount == 520)
             // After 15m, jump up to 5s intervals
             sleepDuration *= 5;
-
-#ifdef PBRT_HAVE_OPTIX
-        if (gpuEvents.size()) {
-            while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
-                cudaError_t err = cudaEventQuery(gpuEvents[gpuEventsFinishedOffset]);
-                if (err == cudaSuccess)
-                    ++gpuEventsFinishedOffset;
-                else if (err == cudaErrorNotReady)
-                    break;
-                else
-                    LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
-            }
-            workDone = gpuEventsFinishedOffset;
-        }
-#endif
 
         Float percentDone = Float(workDone) / Float(totalWork);
         int plussesNeeded = std::round(totalPlusses * percentDone);
@@ -196,18 +154,6 @@ void ProgressReporter::printBar() {
 
 void ProgressReporter::Done() {
     if (!quiet) {
-#ifdef PBRT_HAVE_OPTIX
-        if (gpuEvents.size()) {
-            CHECK_EQ(gpuEventsLaunchedOffset.load(), gpuEvents.size());
-            while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
-                cudaError_t err = cudaEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
-                if (err != cudaSuccess)
-                    LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
-            }
-            workDone = gpuEventsFinishedOffset;
-        }
-#endif
-
         // Only let one thread shut things down.
         bool fa = false;
         if (exitThread.compare_exchange_strong(fa, true)) {

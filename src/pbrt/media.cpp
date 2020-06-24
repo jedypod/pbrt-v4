@@ -55,15 +55,6 @@
 
 namespace pbrt {
 
-std::string MediumInterface::ToString() const {
-    return StringPrintf("[ MediumInterface inside: %s outside: %s ]",
-                        inside ? inside->ToString().c_str() : "(nullptr)",
-                        outside ? outside->ToString().c_str() : "(nullptr)");
-}
-
-// Media Definitions
-PhaseFunction::~PhaseFunction() {}
-
 // HenyeyGreenstein Method Definitions
 std::string HenyeyGreenstein::ToString() const {
     return StringPrintf("[ HenyeyGreenstein g: %f ]", g);
@@ -147,13 +138,13 @@ bool GetMediumScatteringProperties(const std::string &name,
 }
 
 // HomogeneousMedium Method Definitions
-HomogeneousMedium *HomogeneousMedium::Create(
-    const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
+std::unique_ptr<HomogeneousMedium> HomogeneousMedium::Create(
+    const ParameterDictionary &dict, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
     std::string preset = dict.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
-            Warning(loc, "Material preset \"%s\" not found.", preset);
+            Warning("Material preset \"%s\" not found.", preset);
     }
     if (sig_a == nullptr) {
         sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General,
@@ -180,18 +171,18 @@ HomogeneousMedium *HomogeneousMedium::Create(
 
     Float g = dict.GetOneFloat("g", 0.0f);
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, g);
+    return std::make_unique<HomogeneousMedium>(sig_a, sig_s, g);
 }
 
 SampledSpectrum HomogeneousMedium::Tr(const Ray &ray, Float tMax,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler) const {
+                                      Sampler &sampler) const {
     ProfilerScope _(ProfilePhase::MediumTr);
     SampledSpectrum sigma_t = sigma_a.Sample(lambda) + sigma_s.Sample(lambda);
     return Exp(-sigma_t * std::min(tMax * Length(ray.d), MaxFloat));
 }
 
-SampledSpectrum HomogeneousMedium::Sample(const Ray &ray, Float tMax, SamplerHandle sampler,
+SampledSpectrum HomogeneousMedium::Sample(const Ray &ray, Float tMax, Sampler &sampler,
                                           const SampledWavelengths &lambda,
                                           MemoryArena &arena,
                                           MediumInteraction *mi) const {
@@ -344,14 +335,14 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
     }
 }
 
-GridDensityMedium *GridDensityMedium::Create(
+std::unique_ptr<GridDensityMedium> GridDensityMedium::Create(
         const ParameterDictionary &dict,
-        const Transform &worldFromMedium, const FileLoc *loc, Allocator alloc) {
+        const Transform &worldFromMedium, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
     std::string preset = dict.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
-            Warning(loc, "Material preset \"%s\" not found.", preset);
+            Warning("Material preset \"%s\" not found.", preset);
     }
 
     if (sig_a == nullptr) {
@@ -377,7 +368,7 @@ GridDensityMedium *GridDensityMedium::Create(
 
     std::vector<Float> density = dict.GetFloatArray("density");
     if (density.empty()) {
-        Error(loc, "No \"density\" values provided for heterogeneous medium?");
+        Error("No \"density\" values provided for heterogeneous medium?");
         return nullptr;
     }
     int nx = dict.GetOneInt("nx", 1);
@@ -386,7 +377,7 @@ GridDensityMedium *GridDensityMedium::Create(
     Point3f p0 = dict.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = dict.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
     if (density.size() != nx * ny * nz) {
-        Error(loc,
+        Error(
               "GridDensityMedium has %d density values; expected nx*ny*nz = "
               "%d",
               (int)density.size(), nx * ny * nz);
@@ -395,7 +386,7 @@ GridDensityMedium *GridDensityMedium::Create(
 
     Transform MediumFromData = Translate(Vector3f(p0)) *
         Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-    return alloc.new_object<GridDensityMedium>(
+    return std::make_unique<GridDensityMedium>(
         sig_a, sig_s, g, nx, ny, nz, worldFromMedium * MediumFromData, std::move(density),
         alloc);
 }
@@ -417,7 +408,7 @@ Float GridDensityMedium::Density(const Point3f &p) const {
     return Lerp(d.z, d0, d1);
 }
 
-SampledSpectrum GridDensityMedium::Sample(const Ray &rWorld, Float raytMax, SamplerHandle sampler,
+SampledSpectrum GridDensityMedium::Sample(const Ray &rWorld, Float raytMax, Sampler &sampler,
                                           const SampledWavelengths &lambda,
                                           MemoryArena &arena,
                                           MediumInteraction *mi) const {
@@ -546,7 +537,7 @@ SampledSpectrum GridDensityMedium::Sample(const Ray &rWorld, Float raytMax, Samp
 
 SampledSpectrum GridDensityMedium::Tr(const Ray &rWorld, Float raytMax,
                                       const SampledWavelengths &lambda,
-                                      SamplerHandle sampler) const {
+                                      Sampler &sampler) const {
     ProfilerScope _(ProfilePhase::MediumTr);
     ++nTrCalls;
 
@@ -633,25 +624,6 @@ std::string GridDensityMedium::ToString() const {
                         " nx: %d ny: %d nz: %d mediumFromWorld: %s root maxDensity: %f ]",
                         sigma_a_spec, sigma_s_spec, nx, ny, nz, mediumFromWorld,
                         maxDensity);
-}
-
-Medium *Medium::Create(const std::string &name,
-                       const ParameterDictionary &dict,
-                       const Transform &worldFromMedium,
-                       const FileLoc *loc, Allocator alloc) {
-    Medium *m = nullptr;
-    if (name == "homogeneous")
-        m = HomogeneousMedium::Create(dict, loc, alloc);
-    else if (name == "heterogeneous")
-        m = GridDensityMedium::Create(dict, worldFromMedium, loc, alloc);
-    else
-        ErrorExit(loc, "%s: medium unknown.", name);
-
-    if (!m)
-        ErrorExit(loc, "%s: unable to create medium.", name);
-
-    dict.ReportUnused();
-    return m;
 }
 
 }  // namespace pbrt

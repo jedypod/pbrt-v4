@@ -44,15 +44,13 @@
 #include <pbrt/util/profile.h>
 #include <pbrt/util/stats.h>
 
-#include <mutex>
-
 #include <Ptexture.h>
 
 namespace pbrt {
 
 TextureMapping2DHandle TextureMapping2DHandle::Create(const ParameterDictionary &dict,
                                                       const Transform &worldFromTexture,
-                                                      const FileLoc *loc, Allocator alloc) {
+                                                      Allocator alloc) {
     std::string type = dict.GetOneString("mapping", "uv");
     if (type == "uv") {
         Float su = dict.GetOneFloat("uscale", 1.);
@@ -69,14 +67,14 @@ TextureMapping2DHandle TextureMapping2DHandle::Create(const ParameterDictionary 
                                                  dict.GetOneVector3f("v2", Vector3f(0, 1, 0)),
                                                  dict.GetOneFloat("udelta", 0.f), dict.GetOneFloat("vdelta", 0.f));
     else {
-        Error(loc, "2D texture mapping \"%s\" unknown", type);
+        Error("2D texture mapping \"%s\" unknown", type);
         return alloc.new_object<UVMapping2D>();
     }
 }
 
 TextureMapping3DHandle TextureMapping3DHandle::Create(const ParameterDictionary &dict,
                                                       const Transform &worldFromTexture,
-                                                      const FileLoc *loc, Allocator alloc) {
+                                                      Allocator alloc) {
     return alloc.new_object<TransformMapping3D>(Inverse(worldFromTexture));
 }
 
@@ -349,7 +347,7 @@ std::string FloatConstantTexture::ToString() const {
 
 FloatConstantTexture *FloatConstantTexture::Create(const Transform &worldFromTexture,
                                                    const TextureParameterDictionary &dict,
-                                                   const FileLoc *loc, Allocator alloc) {
+                                                   Allocator alloc) {
     return alloc.new_object<FloatConstantTexture>(dict.GetOneFloat("value", 1.f));
 }
 
@@ -359,7 +357,7 @@ std::string SpectrumConstantTexture::ToString() const {
 
 SpectrumConstantTexture *SpectrumConstantTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     SpectrumHandle c = dict.GetOneSpectrum("value", SPDs::One(), SpectrumType::Reflectance, alloc);
     return alloc.new_object<SpectrumConstantTexture>(c);
 }
@@ -367,9 +365,9 @@ SpectrumConstantTexture *SpectrumConstantTexture::Create(
 // BilerpTexture Method Definitions
 FloatBilerpTexture *FloatBilerpTexture::Create(const Transform &worldFromTexture,
                                                const TextureParameterDictionary &dict,
-                                               const FileLoc *loc, Allocator alloc) {
+                                               Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     return alloc.new_object<FloatBilerpTexture>(map, dict.GetOneFloat("v00", 0.f),
                                                 dict.GetOneFloat("v01", 1.f),
@@ -384,9 +382,9 @@ std::string FloatBilerpTexture::ToString() const {
 
 SpectrumBilerpTexture *SpectrumBilerpTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     return alloc.new_object<SpectrumBilerpTexture>(
         map,
@@ -456,17 +454,17 @@ pstd::array<Float, 2> Checkerboard(AAMethod aaMethod,
 
 FloatCheckerboardTexture *FloatCheckerboardTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     int dim = dict.GetOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
-        Error(loc, "%d dimensional checkerboard texture not supported", dim);
+        Error("%d dimensional checkerboard texture not supported", dim);
         return nullptr;
     }
     FloatTextureHandle tex1 = dict.GetFloatTexture("tex1", 1.f, alloc);
     FloatTextureHandle tex2 = dict.GetFloatTexture("tex2", 0.f, alloc);
     if (dim == 2) {
         // Initialize 2D texture mapping _map_ from _tp_
-        TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
         // Compute _aaMethod_ for _CheckerboardTexture_
         std::string aa = dict.GetOneString("aamode", "closedform");
@@ -476,7 +474,7 @@ FloatCheckerboardTexture *FloatCheckerboardTexture::Create(
         else if (aa == "closedform")
             aaMethod = AAMethod::ClosedForm;
         else {
-            Warning(loc,
+            Warning(
                 "Antialiasing mode \"%s\" not understood by "
                 "Checkerboard2DTexture; using \"closedform\"",
                 aa);
@@ -487,7 +485,7 @@ FloatCheckerboardTexture *FloatCheckerboardTexture::Create(
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         TextureMapping3DHandle map =
-            TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+            TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
         return alloc.new_object<FloatCheckerboardTexture>(
             nullptr, map, tex1, tex2, AAMethod::None);
     }
@@ -504,10 +502,10 @@ std::string FloatCheckerboardTexture::ToString() const {
 
 SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     int dim = dict.GetOneInt("dimension", 2);
     if (dim != 2 && dim != 3) {
-        Error(loc, "%d dimensional checkerboard texture not supported", dim);
+        Error("%d dimensional checkerboard texture not supported", dim);
         return nullptr;
     }
 
@@ -517,7 +515,7 @@ SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
         dict.GetSpectrumTexture("tex2", SPDs::Zero(), SpectrumType::Reflectance, alloc);
     if (dim == 2) {
         // Initialize 2D texture mapping _map_ from _tp_
-        TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
         // Compute _aaMethod_ for _CheckerboardTexture_
         std::string aa = dict.GetOneString("aamode", "closedform");
@@ -527,7 +525,7 @@ SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
         else if (aa == "closedform")
             aaMethod = AAMethod::ClosedForm;
         else {
-            Warning(loc,
+            Warning(
                 "Antialiasing mode \"%s\" not understood by "
                 "Checkerboard2DTexture; using \"closedform\"",
                 aa);
@@ -538,7 +536,7 @@ SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         TextureMapping3DHandle map =
-            TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+            TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
         return alloc.new_object<SpectrumCheckerboardTexture>(
             nullptr, map, tex1, tex2, AAMethod::None);
     }
@@ -557,9 +555,9 @@ std::string SpectrumCheckerboardTexture::ToString() const {
 // DotsTexture Method Definitions
 FloatDotsTexture *FloatDotsTexture::Create(const Transform &worldFromTexture,
                                            const TextureParameterDictionary &dict,
-                                           const FileLoc *loc, Allocator alloc) {
+                                           Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     return alloc.new_object<FloatDotsTexture>(map, dict.GetFloatTexture("inside", 1.f, alloc),
                                               dict.GetFloatTexture("outside", 0.f, alloc));
@@ -572,9 +570,9 @@ std::string FloatDotsTexture::ToString() const {
 
 SpectrumDotsTexture *SpectrumDotsTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<SpectrumDotsTexture>(
         map, dict.GetSpectrumTexture("inside", SPDs::One(), SpectrumType::Reflectance, alloc),
         dict.GetSpectrumTexture("outside", SPDs::Zero(), SpectrumType::Reflectance, alloc));
@@ -588,10 +586,10 @@ std::string SpectrumDotsTexture::ToString() const {
 // FBmTexture Method Definitions
 FBmTexture *FBmTexture::Create(const Transform &worldFromTexture,
                                const TextureParameterDictionary &dict,
-                               const FileLoc *loc, Allocator alloc) {
+                               Allocator alloc) {
     // Initialize 3D texture mapping _map_ from _tp_
     TextureMapping3DHandle map =
-        TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<FBmTexture>(map, dict.GetOneInt("octaves", 8),
                                         dict.GetOneFloat("roughness", .5f));
 }
@@ -617,14 +615,11 @@ MIPMap *ImageTextureBase::GetTexture(const std::string &filename,
                                      Allocator alloc) {
     // Return _MIPMap_ from texture cache if present
     TexInfo texInfo(filename, filter, maxAniso, wrap, encoding);
-    std::unique_lock<std::mutex> lock(textureCacheMutex);
-    if (textureCache.find(texInfo) != textureCache.end())
-        return textureCache[texInfo].get();
-    else
-        lock.unlock();
+    if (textures.find(texInfo) != textures.end())
+        return textures[texInfo].get();
 
     // Create _MIPMap_ for _filename_
-    ProfilerScope _(ProfilePhase::ImageTextureLoading);
+    ProfilerScope _(ProfilePhase::TextureLoading);
     MIPMapFilterOptions options;
     options.maxAnisotropy = maxAniso;
 
@@ -637,14 +632,8 @@ MIPMap *ImageTextureBase::GetTexture(const std::string &filename,
     std::unique_ptr<MIPMap> mipmap =
         MIPMap::CreateFromFile(filename, options, wrap, encoding, alloc);
     if (mipmap) {
-        lock.lock();
-        // This is actually ok, but if it hits, it means we've wastefully
-        // loaded this texture. (Note that in that case, should just return
-        // the one that's already in there and not replace it.)
-        CHECK(textureCache.find(texInfo) == textureCache.end());
-        textureCache[texInfo] = std::move(mipmap);
-
-        return textureCache[texInfo].get();
+        textures[texInfo] = std::move(mipmap);
+        return textures[texInfo].get();
     } else
         return nullptr;
 }
@@ -686,14 +675,13 @@ std::string TexInfo::ToString() const {
                         maxAniso, wrapMode, *encoding);
 }
 
-std::mutex ImageTextureBase::textureCacheMutex;
-std::map<TexInfo, std::unique_ptr<MIPMap>> ImageTextureBase::textureCache;
+std::map<TexInfo, std::unique_ptr<MIPMap>> ImageTextureBase::textures;
 
 FloatImageTexture *FloatImageTexture::Create(const Transform &worldFromTexture,
                                              const TextureParameterDictionary &dict,
-                                             const FileLoc *loc, Allocator alloc) {
+                                             Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     // Initialize _ImageTexture_ parameters
     Float maxAniso = dict.GetOneFloat("maxanisotropy", 8.f);
@@ -716,9 +704,9 @@ FloatImageTexture *FloatImageTexture::Create(const Transform &worldFromTexture,
 
 SpectrumImageTexture *SpectrumImageTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     // Initialize _ImageTexture_ parameters
     Float maxAniso = dict.GetOneFloat("maxanisotropy", 8.f);
@@ -783,10 +771,10 @@ std::string MarbleTexture::ToString() const {
 
 MarbleTexture *MarbleTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     // Initialize 3D texture mapping _map_ from _tp_
     TextureMapping3DHandle map =
-        TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<MarbleTexture>(
         map, dict.GetOneInt("octaves", 8),
         dict.GetOneFloat("roughness", .5f), dict.GetOneFloat("scale", 1.f),
@@ -807,7 +795,7 @@ std::string SpectrumMixTexture::ToString() const {
 
 FloatMixTexture *FloatMixTexture::Create(const Transform &worldFromTexture,
                                          const TextureParameterDictionary &dict,
-                                         const FileLoc *loc, Allocator alloc) {
+                                         Allocator alloc) {
     return alloc.new_object<FloatMixTexture>(dict.GetFloatTexture("tex1", 0.f, alloc),
                                              dict.GetFloatTexture("tex2", 1.f, alloc),
                                              dict.GetFloatTexture("amount", 0.5f, alloc));
@@ -815,7 +803,7 @@ FloatMixTexture *FloatMixTexture::Create(const Transform &worldFromTexture,
 
 SpectrumMixTexture *SpectrumMixTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     return alloc.new_object<SpectrumMixTexture>(
         dict.GetSpectrumTexture("tex1", SPDs::Zero(), SpectrumType::Reflectance, alloc),
         dict.GetSpectrumTexture("tex2", SPDs::One(), SpectrumType::Reflectance, alloc),
@@ -973,7 +961,7 @@ SampledSpectrum SpectrumPtexTexture::Evaluate(const TextureEvalContext &ctx,
 
 FloatPtexTexture *FloatPtexTexture::Create(const Transform &worldFromTexture,
                                            const TextureParameterDictionary &dict,
-                                           const FileLoc *loc, Allocator alloc) {
+                                           Allocator alloc) {
     std::string filename =
         ResolveFilename(dict.GetOneString("imagefile", ""));
     std::string encodingString = dict.GetOneString("encoding", "gamma 2.2");
@@ -983,7 +971,7 @@ FloatPtexTexture *FloatPtexTexture::Create(const Transform &worldFromTexture,
 
 SpectrumPtexTexture *SpectrumPtexTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     std::string filename =
         ResolveFilename(dict.GetOneString("imagefile", ""));
     std::string encodingString = dict.GetOneString("encoding", "gamma 2.2");
@@ -1003,7 +991,7 @@ std::string SpectrumScaledTexture::ToString() const {
 
 FloatTextureHandle FloatScaledTexture::Create(const Transform &worldFromTexture,
                                               const TextureParameterDictionary &dict,
-                                              const FileLoc *loc, Allocator alloc) {
+                                              Allocator alloc) {
     FloatTextureHandle tex = dict.GetFloatTexture("tex", 1.f, alloc);
     FloatTextureHandle scale = dict.GetFloatTexture("scale", 1.f, alloc);
 
@@ -1039,7 +1027,7 @@ FloatTextureHandle FloatScaledTexture::Create(const Transform &worldFromTexture,
 
 SpectrumTextureHandle SpectrumScaledTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     SpectrumTextureHandle tex =
         dict.GetSpectrumTexture("tex", SPDs::One(), SpectrumType::Reflectance, alloc);
     FloatTextureHandle scale = dict.GetFloatTexture("scale", 1.f, alloc);
@@ -1091,9 +1079,9 @@ std::string UVTexture::ToString() const {
 
 UVTexture *UVTexture::Create(const Transform &worldFromTexture,
                              const TextureParameterDictionary &dict,
-                             const FileLoc *loc, Allocator alloc) {
+                             Allocator alloc) {
     // Initialize 2D texture mapping _map_ from _tp_
-    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+    TextureMapping2DHandle map = TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<UVTexture>(map);
 }
 
@@ -1105,10 +1093,10 @@ std::string WindyTexture::ToString() const {
 
 WindyTexture *WindyTexture::Create(const Transform &worldFromTexture,
                                    const TextureParameterDictionary &dict,
-                                   const FileLoc *loc, Allocator alloc) {
+                                   Allocator alloc) {
     // Initialize 3D texture mapping _map_ from _tp_
     TextureMapping3DHandle map =
-        TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<WindyTexture>(map);
 }
 
@@ -1120,33 +1108,18 @@ std::string WrinkledTexture::ToString() const {
 
 WrinkledTexture *WrinkledTexture::Create(const Transform &worldFromTexture,
                                          const TextureParameterDictionary &dict,
-                                         const FileLoc *loc, Allocator alloc) {
+                                         Allocator alloc) {
     // Initialize 3D texture mapping _map_ from _tp_
     TextureMapping3DHandle map =
-        TextureMapping3DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping3DHandle::Create(dict, worldFromTexture, alloc);
     return alloc.new_object<WrinkledTexture>(map, dict.GetOneInt("octaves", 8),
                                              dict.GetOneFloat("roughness", .5f));
 }
 
 #if defined(PBRT_HAVE_OPTIX) && defined(__NVCC__)
 
-struct LuminanceTextureCacheItem {
-    cudaArray_t array;
-    cudaTextureReadMode readMode;
-    bool originallySingleChannel;
-};
-struct RGBTextureCacheItem {
-    cudaArray_t array;
-    cudaTextureReadMode readMode;
-    const RGBColorSpace *colorSpace;
-};
-
-static std::mutex textureCacheMutex;
-static std::map<std::string, LuminanceTextureCacheItem> lumTextureCache;
-static std::map<std::string, RGBTextureCacheItem> rgbTextureCache;
-
-
-STAT_MEMORY_COUNTER("Memory/ImageTextures", gpuImageTextureBytes);
+static std::map<std::string, cudaArray_t> rgbTextureArrayCache;
+static std::map<std::string, cudaArray_t> lumTextureArrayCache;
 
 static cudaArray_t createSingleChannelTextureArray(const Image &image) {
     CHECK_EQ(1, image.NChannels());
@@ -1168,7 +1141,6 @@ static cudaArray_t createSingleChannelTextureArray(const Image &image) {
         pitch = image.Resolution().x * sizeof(float);
         break;
     }
-    gpuImageTextureBytes += pitch * image.Resolution().y;
 
     CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
                                image.Resolution().x, image.Resolution().y));
@@ -1193,7 +1165,7 @@ static cudaTextureAddressMode convertAddressMode(const std::string &mode) {
 
 GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     const Transform &worldFromTexture, const TextureParameterDictionary &dict,
-    const FileLoc *loc, Allocator alloc) {
+    Allocator alloc) {
     /*
       Float maxAniso = dict.GetOneFloat("maxanisotropy", 8.f);
       std::string filter = dict.GetOneString("filter", "bilinear");
@@ -1201,151 +1173,116 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
       std::string encodingString = dict.GetOneString("encoding", defaultEncoding);
       const ColorEncoding *encoding = ColorEncoding::Get(encodingString);
     */
+    Float scale = dict.GetOneFloat("scale", 1.f);
 
     std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    auto immeta = Image::Read(filename);
+    if (!immeta)
+        ErrorExit("%s: unable to read image", filename);
 
-    // These have to be initialized one way or another in the below
+    Image &image = immeta->image;
+
+    // This has to be initialized one way or another in the below
     cudaArray_t texArray;
-    cudaTextureReadMode readMode;
-    const RGBColorSpace *colorSpace = nullptr;
     bool isSingleChannel = false;
 
-    textureCacheMutex.lock();
-    auto rgbIter = rgbTextureCache.find(filename);
-    if (rgbIter != rgbTextureCache.end()) {
+    if (rgbTextureArrayCache.find(filename) != rgbTextureArrayCache.end()) {
         LOG_VERBOSE("Found %s in RGB tex array cache!", filename);
-        texArray = rgbIter->second.array;
-        readMode = rgbIter->second.readMode;
-        colorSpace = rgbIter->second.colorSpace;
-        textureCacheMutex.unlock();
+        texArray = rgbTextureArrayCache[filename];
+    } else if (lumTextureArrayCache.find(filename) != lumTextureArrayCache.end()) {
+        LOG_VERBOSE("Found %s in luminance tex array cache!", filename);
+        texArray = lumTextureArrayCache[filename];
+        isSingleChannel = true;
     } else {
-        auto lumIter = lumTextureCache.find(filename);
-        // We don't want to take it if it was originally an RGB texture and GPUFloatImageTexture
-        // converted it to single channel
-        if (lumIter != lumTextureCache.end() && lumIter->second.originallySingleChannel) {
-            LOG_VERBOSE("Found %s in luminance tex array cache!", filename);
-            texArray = lumIter->second.array;
-            readMode = lumIter->second.readMode;
-            colorSpace = RGBColorSpace::sRGB;
-            textureCacheMutex.unlock();
+        pstd::optional<ImageChannelDesc> rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (rgbDesc) {
+            image = image.SelectChannels(*rgbDesc);
+
+            switch (image.Format()) {
+            case PixelFormat::U256: {
+                std::vector<uint8_t> rgba(4 * image.Resolution().x * image.Resolution().y);
+                size_t offset = 0;
+                for (int y = 0; y < image.Resolution().y; ++y)
+                    for (int x = 0; x < image.Resolution().x; ++x) {
+                        for (int c = 0; c < 3; ++c)
+                            rgba[offset++] = ((uint8_t *)image.RawPointer({x, y}))[c];
+                        rgba[offset++] = 255;
+                    }
+
+                cudaChannelFormatDesc channelDesc =
+                    cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+
+                CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
+                                           image.Resolution().x, image.Resolution().y));
+
+                int pitch = image.Resolution().x * 4 * sizeof(uint8_t);
+                CUDA_CHECK(cudaMemcpy2DToArray(texArray,
+                                               /* offset */ 0, 0, rgba.data(), pitch,
+                                               pitch, image.Resolution().y,
+                                               cudaMemcpyHostToDevice));
+                break;
+            }
+            case PixelFormat::Half: {
+                std::vector<Half> rgba(4 * image.Resolution().x * image.Resolution().y);
+
+                size_t offset = 0;
+                for (int y = 0; y < image.Resolution().y; ++y)
+                    for (int x = 0; x < image.Resolution().x; ++x) {
+                        for (int c = 0; c < 3; ++c)
+                            rgba[offset++] = Half(image.GetChannel({x, y}, c));
+                        rgba[offset++] = Half(1.f);
+                    }
+
+                cudaChannelFormatDesc channelDesc =
+                    cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindFloat);
+
+                CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
+                                           image.Resolution().x, image.Resolution().y));
+
+                int pitch = image.Resolution().x * 4 * sizeof(Half);
+                CUDA_CHECK(cudaMemcpy2DToArray(texArray,
+                                               /* offset */ 0, 0, rgba.data(), pitch,
+                                               pitch, image.Resolution().y,
+                                               cudaMemcpyHostToDevice));
+                break;
+            }
+            case PixelFormat::Float: {
+                std::vector<float> rgba(4 * image.Resolution().x * image.Resolution().y);
+
+                size_t offset = 0;
+                for (int y = 0; y < image.Resolution().y; ++y)
+                    for (int x = 0; x < image.Resolution().x; ++x) {
+                        for (int c = 0; c < 3; ++c)
+                            rgba[offset++] = image.GetChannel({x, y}, c);
+                        rgba[offset++] = 1.f;
+                    }
+
+                cudaChannelFormatDesc channelDesc =
+                    cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+
+                CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
+                                           image.Resolution().x, image.Resolution().y));
+
+                int pitch = image.Resolution().x * 4 * sizeof(float);
+                CUDA_CHECK(cudaMemcpy2DToArray(texArray,
+                                               /* offset */ 0, 0, rgba.data(), pitch,
+                                               pitch, image.Resolution().y,
+                                               cudaMemcpyHostToDevice));
+                break;
+            }
+            default:
+                LOG_FATAL("Unexpected PixelFormat");
+            }
+
+            rgbTextureArrayCache[filename] = texArray;
+        } else if (image.NChannels() == 1) {
+            texArray = createSingleChannelTextureArray(image);
+
+            lumTextureArrayCache[filename] = texArray;
             isSingleChannel = true;
         } else {
-            textureCacheMutex.unlock();
-
-            {
-            ProfilerScope _(ProfilePhase::ImageTextureLoading);
-
-            pstd::optional<ImageAndMetadata> immeta = Image::Read(filename);
-            if (!immeta)
-                ErrorExit(loc, "%s: unable to read image", filename);
-            Image &image = immeta->image;
-
-            readMode = image.Format() == PixelFormat::U256 ? cudaReadModeNormalizedFloat :
-                cudaReadModeElementType;
-            colorSpace = immeta->metadata.GetColorSpace();
-
-            pstd::optional<ImageChannelDesc> rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-            if (rgbDesc) {
-                image = image.SelectChannels(*rgbDesc);
-
-                switch (image.Format()) {
-                case PixelFormat::U256: {
-                    std::vector<uint8_t> rgba(4 * image.Resolution().x * image.Resolution().y);
-                    size_t offset = 0;
-                    for (int y = 0; y < image.Resolution().y; ++y)
-                        for (int x = 0; x < image.Resolution().x; ++x) {
-                            for (int c = 0; c < 3; ++c)
-                                rgba[offset++] = ((uint8_t *)image.RawPointer({x, y}))[c];
-                            rgba[offset++] = 255;
-                        }
-
-                    cudaChannelFormatDesc channelDesc =
-                        cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
-
-                    CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
-                                               image.Resolution().x, image.Resolution().y));
-
-                    int pitch = image.Resolution().x * 4 * sizeof(uint8_t);
-                    gpuImageTextureBytes += pitch * image.Resolution().y;
-
-                    CUDA_CHECK(cudaMemcpy2DToArray(texArray,
-                                                   /* offset */ 0, 0, rgba.data(), pitch,
-                                                   pitch, image.Resolution().y,
-                                                   cudaMemcpyHostToDevice));
-                    break;
-                }
-                case PixelFormat::Half: {
-                    std::vector<Half> rgba(4 * image.Resolution().x * image.Resolution().y);
-
-                    size_t offset = 0;
-                    for (int y = 0; y < image.Resolution().y; ++y)
-                        for (int x = 0; x < image.Resolution().x; ++x) {
-                            for (int c = 0; c < 3; ++c)
-                                rgba[offset++] = Half(image.GetChannel({x, y}, c));
-                            rgba[offset++] = Half(1.f);
-                        }
-
-                    cudaChannelFormatDesc channelDesc =
-                        cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindFloat);
-
-                    CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
-                                               image.Resolution().x, image.Resolution().y));
-
-                    int pitch = image.Resolution().x * 4 * sizeof(Half);
-                    gpuImageTextureBytes += pitch * image.Resolution().y;
-
-                    CUDA_CHECK(cudaMemcpy2DToArray(texArray,
-                                                   /* offset */ 0, 0, rgba.data(), pitch,
-                                                   pitch, image.Resolution().y,
-                                                   cudaMemcpyHostToDevice));
-                    break;
-                }
-                case PixelFormat::Float: {
-                    std::vector<float> rgba(4 * image.Resolution().x * image.Resolution().y);
-
-                    size_t offset = 0;
-                    for (int y = 0; y < image.Resolution().y; ++y)
-                        for (int x = 0; x < image.Resolution().x; ++x) {
-                            for (int c = 0; c < 3; ++c)
-                                rgba[offset++] = image.GetChannel({x, y}, c);
-                            rgba[offset++] = 1.f;
-                        }
-
-                    cudaChannelFormatDesc channelDesc =
-                        cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
-
-                    CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc,
-                                               image.Resolution().x, image.Resolution().y));
-
-                    int pitch = image.Resolution().x * 4 * sizeof(float);
-                    gpuImageTextureBytes += pitch * image.Resolution().y;
-
-                    CUDA_CHECK(cudaMemcpy2DToArray(texArray,
-                                                   /* offset */ 0, 0, rgba.data(), pitch,
-                                                   pitch, image.Resolution().y,
-                                                   cudaMemcpyHostToDevice));
-                    break;
-                }
-                default:
-                    LOG_FATAL("Unexpected PixelFormat");
-                }
-
-                textureCacheMutex.lock();
-                rgbTextureCache[filename] =
-                    RGBTextureCacheItem{texArray, readMode, colorSpace};
-                textureCacheMutex.unlock();
-            } else if (image.NChannels() == 1) {
-                texArray = createSingleChannelTextureArray(image);
-
-                textureCacheMutex.lock();
-                lumTextureCache[filename] = LuminanceTextureCacheItem{texArray, readMode, true};
-                textureCacheMutex.unlock();
-                isSingleChannel = true;
-            } else {
-                Warning(loc, "%s: unable to decypher image format", filename);
-                return nullptr;
-            }
-            } // profile scope
+            Warning("%s: unable to decypher image format", filename);
+            return nullptr;
         }
     }
 
@@ -1358,7 +1295,8 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     texDesc.addressMode[0] = convertAddressMode(wrap);
     texDesc.addressMode[1] = convertAddressMode(wrap);
     texDesc.filterMode = cudaFilterModeLinear;
-    texDesc.readMode = readMode;
+    texDesc.readMode = image.Format() == PixelFormat::U256 ? cudaReadModeNormalizedFloat :
+        cudaReadModeElementType;
     texDesc.normalizedCoords = 1;
     texDesc.maxAnisotropy = 1;
     texDesc.maxMipmapLevelClamp = 99;
@@ -1372,17 +1310,15 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     CUDA_CHECK(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
 
     TextureMapping2DHandle mapping =
-        TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
-
-    Float scale = dict.GetOneFloat("scale", 1.f);
+        TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     return alloc.new_object<GPUSpectrumImageTexture>(mapping, texObj, scale, isSingleChannel,
-                                                     colorSpace);
+                                                     immeta->metadata.GetColorSpace());
 }
 
 GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTexture,
                                                    const TextureParameterDictionary &dict,
-                                                   const FileLoc *loc, Allocator alloc) {
+                                                   Allocator alloc) {
     /*
       Float maxAniso = dict.GetOneFloat("maxanisotropy", 8.f);
       std::string filter = dict.GetOneString("filter", "bilinear");
@@ -1391,26 +1327,18 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTex
       const ColorEncoding *encoding = ColorEncoding::Get(encodingString);
     */
     std::string filename = ResolveFilename(dict.GetOneString("imagefile", ""));
+    auto immeta = Image::Read(filename);
+    if (!immeta)
+        ErrorExit("%s: unable to read image", filename);
+
+    Image &image = immeta->image;
 
     cudaArray_t texArray;
-    cudaTextureReadMode readMode;
 
-    textureCacheMutex.lock();
-    auto iter = lumTextureCache.find(filename);
-    if (iter != lumTextureCache.end()) {
+    if (lumTextureArrayCache.find(filename) != lumTextureArrayCache.end()) {
         LOG_VERBOSE("Found %s in luminance tex array cache!", filename);
-        texArray = iter->second.array;
-        readMode = iter->second.readMode;
-        textureCacheMutex.unlock();
+        texArray = lumTextureArrayCache[filename];
     } else {
-        textureCacheMutex.unlock();
-
-        ProfilerScope _(ProfilePhase::ImageTextureLoading);
-        pstd::optional<ImageAndMetadata> immeta = Image::Read(filename);
-        if (!immeta)
-            ErrorExit(loc, "%s: unable to read image", filename);
-
-        Image &image = immeta->image;
         pstd::optional<ImageChannelDesc> rgbDesc = image.GetChannelDesc({"R", "G", "B"});
         if (rgbDesc) {
             // Convert to one channel
@@ -1424,13 +1352,6 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTex
         }
 
         texArray = createSingleChannelTextureArray(image);
-        readMode = (image.Format() == PixelFormat::U256) ?
-            cudaReadModeNormalizedFloat : cudaReadModeElementType;
-
-        textureCacheMutex.lock();
-        lumTextureCache[filename] =
-            LuminanceTextureCacheItem{texArray, readMode, rgbDesc.has_value() == false};
-        textureCacheMutex.unlock();
     }
 
     cudaResourceDesc resDesc = {};
@@ -1442,7 +1363,8 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTex
     texDesc.addressMode[0] = convertAddressMode(wrap);
     texDesc.addressMode[1] = convertAddressMode(wrap);
     texDesc.filterMode = cudaFilterModeLinear;
-    texDesc.readMode = readMode;
+    texDesc.readMode = image.Format() == PixelFormat::U256 ? cudaReadModeNormalizedFloat :
+        cudaReadModeElementType;
     texDesc.normalizedCoords = 1;
     texDesc.maxAnisotropy = 1;
     texDesc.maxMipmapLevelClamp = 99;
@@ -1456,7 +1378,7 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTex
     CUDA_CHECK(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
 
     TextureMapping2DHandle mapping =
-        TextureMapping2DHandle::Create(dict, worldFromTexture, loc, alloc);
+        TextureMapping2DHandle::Create(dict, worldFromTexture, alloc);
 
     Float scale = dict.GetOneFloat("scale", 1.f);
 
@@ -1465,50 +1387,44 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(const Transform &worldFromTex
 
 #endif // Optix && NVCC
 
-STAT_COUNTER("Scene/Textures", nTextures);
-
 FloatTextureHandle FloatTextureHandle::Create(
         const std::string &name, const Transform &worldFromTexture,
-        const TextureParameterDictionary &dict, const FileLoc *loc, Allocator alloc,
+        const TextureParameterDictionary &dict, Allocator alloc, FileLoc loc,
         bool gpu) {
-    ProfilerScope _(ProfilePhase::TextureConstruction);
-
     FloatTextureHandle tex;
     if (name == "constant")
-        tex = FloatConstantTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatConstantTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "scale")
-        tex = FloatScaledTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatScaledTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "mix")
-        tex = FloatMixTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatMixTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "bilerp")
-        tex = FloatBilerpTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatBilerpTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "imagemap") {
         if (gpu)
-            tex = GPUFloatImageTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = GPUFloatImageTexture::Create(worldFromTexture, dict, alloc);
         else
-            tex = FloatImageTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = FloatImageTexture::Create(worldFromTexture, dict, alloc);
     } else if (name == "checkerboard")
-        tex = FloatCheckerboardTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatCheckerboardTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "dots")
-        tex = FloatDotsTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FloatDotsTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "fbm")
-        tex = FBmTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = FBmTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "wrinkled")
-        tex = WrinkledTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = WrinkledTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "windy")
-        tex = WindyTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = WindyTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "ptex") {
         if (gpu)
-            ErrorExit(loc, "ptex texture is not supported on the GPU.");
+            ErrorExit(&loc, "ptex texture is not supported on the GPU.");
         else
-            tex = FloatPtexTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = FloatPtexTexture::Create(worldFromTexture, dict, alloc);
     } else
-        ErrorExit(loc, "%s: float texture type unknown.", name);
+        ErrorExit(&loc, "%s: float texture type unknown.", name);
 
     if (!tex)
-        ErrorExit(loc, "%s: unable to create texture.", name);
-
-    ++nTextures;
+        ErrorExit(&loc, "%s: unable to create texture.", name);
 
     // FIXME: reenable this once we handle all the same image texture parameters
 //CO    dict.ReportUnused();
@@ -1517,44 +1433,40 @@ FloatTextureHandle FloatTextureHandle::Create(
 
 SpectrumTextureHandle SpectrumTextureHandle::Create(
         const std::string &name, const Transform &worldFromTexture,
-        const TextureParameterDictionary &dict, const FileLoc *loc, Allocator alloc,
+        const TextureParameterDictionary &dict, Allocator alloc, FileLoc loc,
         bool gpu) {
-    ProfilerScope _(ProfilePhase::TextureConstruction);
-
     SpectrumTextureHandle tex;
     if (name == "constant")
-        tex = SpectrumConstantTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumConstantTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "scale")
-        tex = SpectrumScaledTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumScaledTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "mix")
-        tex = SpectrumMixTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumMixTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "bilerp")
-        tex = SpectrumBilerpTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumBilerpTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "imagemap") {
         if (gpu)
-            tex = GPUSpectrumImageTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = GPUSpectrumImageTexture::Create(worldFromTexture, dict, alloc);
         else
-            tex = SpectrumImageTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = SpectrumImageTexture::Create(worldFromTexture, dict, alloc);
     } else if (name == "uv")
-        tex = UVTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = UVTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "checkerboard")
-        tex = SpectrumCheckerboardTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumCheckerboardTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "dots")
-        tex = SpectrumDotsTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = SpectrumDotsTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "marble")
-        tex = MarbleTexture::Create(worldFromTexture, dict, loc, alloc);
+        tex = MarbleTexture::Create(worldFromTexture, dict, alloc);
     else if (name == "ptex") {
         if (gpu)
-            ErrorExit(loc, "ptex texture is not supported on the GPU.");
+            ErrorExit(&loc, "ptex texture is not supported on the GPU.");
         else
-            tex = SpectrumPtexTexture::Create(worldFromTexture, dict, loc, alloc);
+            tex = SpectrumPtexTexture::Create(worldFromTexture, dict, alloc);
     } else
-        ErrorExit(loc, "%s: spectrum texture type unknown.", name);
+        ErrorExit(&loc, "%s: spectrum texture type unknown.", name);
 
     if (!tex)
-        ErrorExit(loc, "%s: unable to create texture.", name);
-
-    ++nTextures;
+        ErrorExit(&loc, "%s: unable to create texture.", name);
 
     // FIXME: reenable this once we handle all the same image texture parameters
 //CO    dict.ReportUnused();

@@ -36,14 +36,12 @@
 
 #include <pbrt/base.h>
 #include <pbrt/bsdf.h>
-#include <pbrt/filters.h>
-#include <pbrt/paramdict.h>
-#include <pbrt/integrators.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/math.h>
+#include <pbrt/paramdict.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/profile.h>
 #include <pbrt/util/stats.h>
@@ -51,240 +49,6 @@
 #include <algorithm>
 
 namespace pbrt {
-
-// Camera Method Definitions
-Camera::~Camera() { }
-
-Camera::Camera(const AnimatedTransform &worldFromCamera, Float shutterOpen,
-               Float shutterClose, Film *film, const Medium *medium)
-    : worldFromCamera(worldFromCamera),
-      shutterOpen(shutterOpen),
-      shutterClose(shutterClose),
-      film(film),
-      medium(medium) {
-    if (worldFromCamera.HasScale())
-        Warning(
-            "Scaling detected in world-to-camera transformation!\n"
-            "The system has numerous assumptions, implicit and explicit,\n"
-            "that this transform will have no scale factors in it.\n"
-            "Proceed at your own risk; your image may have errors or\n"
-            "the system may crash as a result of this.");
-}
-
-pstd::optional<CameraRayDifferential> Camera::GenerateRayDifferential(
-    const CameraSample &sample, const SampledWavelengths &lambda) const {
-    pstd::optional<CameraRay> cr = GenerateRay(sample, lambda);
-    if (!cr) return {};
-    RayDifferential rd(cr->ray);
-
-    // Find camera ray after shifting a fraction of a pixel in the $x$ direction
-    pstd::optional<CameraRay> rx;
-    for (Float eps : { .05, -.05 }) {
-        CameraSample sshift = sample;
-        sshift.pFilm.x += eps;
-        rx = GenerateRay(sshift, lambda);
-        if (!rx) continue;
-        rd.rxOrigin = rd.o + (rx->ray.o - rd.o) / eps;
-        rd.rxDirection = rd.d + (rx->ray.d - rd.d) / eps;
-        break;
-    }
-    if (!rx)
-        return {};
-
-    // Find camera ray after shifting a fraction of a pixel in the $y$ direction
-    pstd::optional<CameraRay> ry;
-    for (Float eps : { .05, -.05 }) {
-        CameraSample sshift = sample;
-        sshift.pFilm.y += eps;
-        ry = GenerateRay(sshift, lambda);
-        if (!ry) continue;
-        rd.ryOrigin = rd.o + (ry->ray.o - rd.o) / eps;
-        rd.ryDirection = rd.d + (ry->ray.d - rd.d) / eps;
-        break;
-    }
-    if (!ry)
-        return {};
-
-    rd.hasDifferentials = true;
-    return CameraRayDifferential{rd, cr->weight};
-}
-
-SampledSpectrum Camera::We(const Ray &ray, const SampledWavelengths &lambda,
-                           Point2f *raster) const {
-    LOG_FATAL("Camera::We() is not implemented!");
-    return SampledSpectrum(0.f);
-}
-
-void Camera::Pdf_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
-    LOG_FATAL("Camera::Pdf_We() is not implemented!");
-}
-
-pstd::optional<CameraWiSample> Camera::Sample_Wi(const Interaction &ref, const Point2f &u,
-                                                 const SampledWavelengths &lambda) const {
-    LOG_FATAL("Camera::Sample_Wi() is not implemented!");
-    return {};
-}
-
-void Camera::InitMetadata(ImageMetadata *metadata) const {
-    metadata->cameraFromWorld =
-        worldFromCamera.Interpolate(shutterOpen).GetInverseMatrix();
-}
-
-void Camera::FindMinimumDifferentials() {
-    minPosDifferentialX = minPosDifferentialY =
-        minDirDifferentialX = minDirDifferentialY =
-        Vector3f(Infinity, Infinity, Infinity);
-
-    CameraSample sample;
-    sample.pLens = Point2f(0.5, 0.5);
-    sample.time = 0.5;
-    SampledWavelengths lambda = SampledWavelengths::SampleImportance(0.5);
-
-    int n = 512;
-    for (int i = 0; i < n; ++i) {
-        sample.pFilm.x = Float(i) / (n - 1) * film->fullResolution.x;
-        sample.pFilm.y = Float(i) / (n - 1) * film->fullResolution.y;
-
-        pstd::optional<CameraRayDifferential> crd =
-            GenerateRayDifferential(sample, lambda);
-        if (!crd)
-            continue;
-
-        RayDifferential &ray = crd->ray;
-        Vector3f dox = worldFromCamera.ApplyInverse(ray.rxOrigin - ray.o, ray.time);
-        if (Length(dox) < Length(minPosDifferentialX))
-            minPosDifferentialX = dox;
-        Vector3f doy = worldFromCamera.ApplyInverse(ray.ryOrigin - ray.o, ray.time);
-        if (Length(doy) < Length(minPosDifferentialY))
-            minPosDifferentialY = doy;
-
-        ray.d = Normalize(ray.d);
-        ray.rxDirection = Normalize(ray.rxDirection);
-        ray.ryDirection = Normalize(ray.ryDirection);
-
-        Frame f = Frame::FromZ(ray.d);
-        Vector3f df = f.ToLocal(ray.d);  // should be (0, 0, 1);
-        Vector3f dxf = Normalize(f.ToLocal(ray.rxDirection));
-        Vector3f dyf = Normalize(f.ToLocal(ray.ryDirection));
-
-        if (Length(dxf - df) < Length(minDirDifferentialX))
-            minDirDifferentialX = dxf - df;
-        if (Length(dyf - df) < Length(minDirDifferentialY))
-            minDirDifferentialY = dyf - df;
-    }
-
-    LOG_VERBOSE("Camera min pos differentials: %s, %s", minPosDifferentialX,
-                minPosDifferentialY);
-    LOG_VERBOSE("Camera min dir differentials: %s, %s", minDirDifferentialX,
-                minDirDifferentialY);
-}
-
-void Camera::ApproximatedPdxy(const SurfaceInteraction &si) const {
-    Point3f pc = worldFromCamera.ApplyInverse(si.p(), si.time);
-    Float dist = Distance(pc, Point3f(0, 0, 0));
-
-    Frame f = Frame::FromZ(si.n);
-    // ray plane:
-    // (0,0,0) + minPosDifferential + ((0,0,1) + minDirDifferantial)) * t = (x, x, dist)
-    Float tx = (dist - minPosDifferentialX.z) / (1 + minDirDifferentialX.z);
-    // 0.5 factor to sharpen them up slightly (could be / should be based
-    // on spp?)
-    si.dpdx = .5f * f.FromLocal(minPosDifferentialX + tx * minDirDifferentialX);
-    Float ty = (dist - minPosDifferentialY.z) / (1 + minDirDifferentialY.z);
-    si.dpdy = .5f * f.FromLocal(minPosDifferentialY + ty * minDirDifferentialY);
-}
-
-std::string Camera::BaseToString() const {
-    return StringPrintf("worldFromCamera: %s shutterOpen: %f shutterClose: %f film: %s "
-                        "medium: %s minPosDifferentialX: %s minPosDifferentialY: %s "
-                        "minDirDifferentialX: %s minDirDifferentialY: %s",
-                        worldFromCamera, shutterOpen, shutterClose, *film,
-                        medium ? medium->ToString().c_str() : "(nullptr)",
-                        minPosDifferentialX, minPosDifferentialY,
-                        minDirDifferentialX, minDirDifferentialY);
-}
-
-std::string CameraSample::ToString() const {
-    return StringPrintf("[ pFilm: %s pLens: %s time: %f weight: %f ]",
-                        pFilm, pLens, time, weight);
-}
-
-ProjectiveCamera::ProjectiveCamera(const AnimatedTransform &worldFromCamera,
-                                   const Transform &screenFromCamera,
-                                   const Bounds2f &screenWindow, Float shutterOpen,
-                                   Float shutterClose, Float lensRadius, Float focalDistance,
-                                   Film *film, const Medium *medium)
-    : Camera(worldFromCamera, shutterOpen, shutterClose, film, medium),
-      screenFromCamera(screenFromCamera),
-      lensRadius(lensRadius),
-      focalDistance(focalDistance) {
-    // Compute projective camera transformations
-
-    // Compute projective camera screen transformations
-    rasterFromScreen =
-        Scale(film->fullResolution.x, film->fullResolution.y, 1) *
-        Scale(1 / (screenWindow.pMax.x - screenWindow.pMin.x),
-              1 / (screenWindow.pMin.y - screenWindow.pMax.y), 1) *
-        Translate(Vector3f(-screenWindow.pMin.x, -screenWindow.pMax.y, 0));
-    screenFromRaster = Inverse(rasterFromScreen);
-    cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
-}
-
-void ProjectiveCamera::InitMetadata(ImageMetadata *metadata) const {
-    metadata->cameraFromWorld =
-        worldFromCamera.Interpolate(shutterOpen).GetInverseMatrix();
-
-    // TODO: double check this
-    Transform NDCFromWorld = Translate(Vector3f(0.5, 0.5, 0.5)) * Scale(0.5, 0.5, 0.5) *
-        screenFromCamera * *metadata->cameraFromWorld;
-    metadata->NDCFromWorld = NDCFromWorld.GetMatrix();
-
-    Camera::InitMetadata(metadata);
-}
-
-std::string ProjectiveCamera::BaseToString() const {
-    return Camera::BaseToString() +
-        StringPrintf("screenFromCamera: %s cameraFromRaster: %s "
-                     "rasterFromScreen: %s screenFromRaster: %s "
-                     "lensRadius: %f focalDistance: %f",
-                     screenFromCamera, cameraFromRaster, rasterFromScreen,
-                     screenFromRaster, lensRadius, focalDistance);
-}
-
-SampledSpectrum CameraWiSample::Tr(const Scene &scene, const SampledWavelengths &lambda,
-                                   SamplerHandle sampler) const {
-    return pbrt::Tr(scene, lambda, sampler, pRef, pLens);
-}
-
-bool CameraWiSample::Unoccluded(const Scene &scene) const {
-    return !scene.IntersectP(pRef.SpawnRayTo(pLens), 1);
-}
-
-Camera *Camera::Create(const std::string &name, const ParameterDictionary &dict,
-                       const Medium *medium, const AnimatedTransform &worldFromCamera,
-                       Film *film, const FileLoc *loc, Allocator alloc) {
-    Camera *camera = nullptr;
-    if (name == "perspective")
-        camera = PerspectiveCamera::Create(dict, worldFromCamera, film,
-                                           medium, loc, alloc);
-    else if (name == "orthographic")
-        camera = OrthographicCamera::Create(dict, worldFromCamera, film,
-                                            medium, loc, alloc);
-    else if (name == "realistic")
-        camera = RealisticCamera::Create(dict, worldFromCamera, film,
-                                         medium, loc, alloc);
-    else if (name == "spherical")
-        camera = SphericalCamera::Create(dict, worldFromCamera, film,
-                                         medium, loc, alloc);
-    else
-        ErrorExit(loc, "%s: camera type unknown.", name);
-
-    if (!camera)
-        ErrorExit(loc, "%s: unable to create camera.", name);
-
-    dict.ReportUnused();
-    return camera;
-}
 
 // OrthographicCamera Definitions
 pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
@@ -366,13 +130,12 @@ std::string OrthographicCamera::ToString() const {
 
 OrthographicCamera *OrthographicCamera::Create(
         const ParameterDictionary &dict, const AnimatedTransform &worldFromCamera,
-        Film *film, const Medium *medium, const FileLoc *loc,
-        Allocator alloc) {
+        std::unique_ptr<Film> film, const Medium *medium, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
     Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
+        Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
@@ -405,7 +168,7 @@ OrthographicCamera *OrthographicCamera::Create(
     }
     return alloc.new_object<OrthographicCamera>(
         worldFromCamera, screen, shutteropen, shutterclose, lensradius, focaldistance,
-        film, medium);
+        std::move(film), medium);
 }
 
 // PerspectiveCamera Method Definitions
@@ -413,17 +176,18 @@ PerspectiveCamera::PerspectiveCamera(const AnimatedTransform &worldFromCamera,
                                      const Bounds2f &screenWindow,
                                      Float shutterOpen, Float shutterClose,
                                      Float lensRadius, Float focalDistance,
-                                     Float fov, Film *film, const Medium *medium)
+                                     Float fov, std::unique_ptr<Film> f,
+                                     const Medium *medium)
     : ProjectiveCamera(worldFromCamera, Perspective(fov, 1e-2f, 1000.f),
                        screenWindow, shutterOpen, shutterClose, lensRadius,
-                       focalDistance, film, medium) {
+                       focalDistance, std::move(f), medium) {
     // Compute differential changes in origin for perspective camera rays
     dxCamera =
         (cameraFromRaster(Point3f(1, 0, 0)) - cameraFromRaster(Point3f(0, 0, 0)));
     dyCamera =
         (cameraFromRaster(Point3f(0, 1, 0)) - cameraFromRaster(Point3f(0, 0, 0)));
 
-    Point3f pCornerRaster = Point3f(-film->filter.Radius().x, -film->filter.Radius().y, 0.f);
+    Point3f pCornerRaster = Point3f(-film->filter->radius.x, -film->filter->radius.y, 0.f);
     Vector3f wCornerCamera = Normalize(Vector3f(cameraFromRaster(pCornerRaster)));
     cosTotalWidth = wCornerCamera.z;
     DCHECK_LT(.9999 * cosTotalWidth, std::cos(Radians(fov / 2)));
@@ -573,13 +337,12 @@ std::string PerspectiveCamera::ToString() const {
 
 PerspectiveCamera *PerspectiveCamera::Create(
         const ParameterDictionary &dict, const AnimatedTransform &worldFromCamera,
-        Film *film, const Medium *medium, const FileLoc *loc,
-        Allocator alloc) {
+        std::unique_ptr<Film> film, const Medium *medium, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
     Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
+        Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
@@ -608,12 +371,12 @@ PerspectiveCamera *PerspectiveCamera::Create(
             screen.pMin.y = sw[2];
             screen.pMax.y = sw[3];
         } else
-            Error(loc, "\"screenwindow\" should have four values");
+            Error("\"screenwindow\" should have four values");
     }
     Float fov = dict.GetOneFloat("fov", 90.);
     return alloc.new_object<PerspectiveCamera>(
         worldFromCamera, screen, shutteropen, shutterclose, lensradius, focaldistance,
-        fov, film, medium);
+        fov, std::move(film), medium);
 }
 
 // SphericalCamera Method Definitions
@@ -641,13 +404,12 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(
 
 SphericalCamera *SphericalCamera::Create(
         const ParameterDictionary &dict, const AnimatedTransform &worldFromCamera,
-        Film *film, const Medium *medium, const FileLoc *loc,
-        Allocator alloc) {
+        std::unique_ptr<Film> film, const Medium *medium, Allocator alloc) {
     // Extract common camera parameters from _ParameterDictionary_
     Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
+        Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
@@ -676,7 +438,7 @@ SphericalCamera *SphericalCamera::Create(
             screen.pMin.y = sw[2];
             screen.pMax.y = sw[3];
         } else
-            Error(loc, "\"screenwindow\" should have four values");
+            Error("\"screenwindow\" should have four values");
     }
     (void)lensradius;     // don't need this
     (void)focaldistance;  // don't need this
@@ -688,10 +450,10 @@ SphericalCamera *SphericalCamera::Create(
     else if (m == "equirect")
         mapping = EquiRect;
     else
-        ErrorExit(loc, "%s: unknown mapping for spherical camera. (Must be \"equiarea\" or \"equirect\".)", m);
+        ErrorExit("%s: unknown mapping for spherical camera. (Must be \"equiarea\" or \"equirect\".)", m);
 
     return alloc.new_object<SphericalCamera>(
-        worldFromCamera, shutteropen, shutterclose, film, medium, mapping);
+        worldFromCamera, shutteropen, shutterclose, std::move(film), medium, mapping);
 }
 
 std::string SphericalCamera::ToString() const {
@@ -713,8 +475,9 @@ RealisticCamera::RealisticCamera(const AnimatedTransform &worldFromCamera,
                                  Float shutterOpen, Float shutterClose,
                                  Float apertureDiameter, Float focusDistance,
                                  Float dispersionFactor, std::vector<Float> &lensData,
-                                 Film *film, const Medium *medium, Allocator alloc)
-    : Camera(worldFromCamera, shutterOpen, shutterClose, film, medium),
+                                 std::unique_ptr<Film> f, const Medium *medium,
+                                 Allocator alloc)
+    : Camera(worldFromCamera, shutterOpen, shutterClose, std::move(f), medium),
       dispersionFactor(dispersionFactor), elementInterfaces(alloc),
       exitPupilBounds(alloc) {
     for (int i = 0; i < (int)lensData.size(); i += 4) {
@@ -1260,12 +1023,11 @@ std::string RealisticCamera::ToString() const {
 
 RealisticCamera *RealisticCamera::Create(
         const ParameterDictionary &dict, const AnimatedTransform &worldFromCamera,
-        Film *film, const Medium *medium, const FileLoc *loc,
-        Allocator alloc) {
+        std::unique_ptr<Film> film, const Medium *medium, Allocator alloc) {
     Float shutteropen = dict.GetOneFloat("shutteropen", 0.f);
     Float shutterclose = dict.GetOneFloat("shutterclose", 1.f);
     if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
+        Warning("Shutter close time [%f] < shutter open [%f].  Swapping them.",
                 shutterclose, shutteropen);
         pstd::swap(shutterclose, shutteropen);
     }
@@ -1277,17 +1039,17 @@ RealisticCamera *RealisticCamera::Create(
     Float dispersionFactor = dict.GetOneFloat("dispersionfactor", 0.);
 
     if (lensFile.empty()) {
-        Error(loc, "No lens description file supplied!");
+        Error("No lens description file supplied!");
         return nullptr;
     }
     // Load element data from lens description file
     pstd::optional<std::vector<Float>> lensData = ReadFloatFile(lensFile);
     if (!lensData) {
-        Error(loc, "Error reading lens specification file \"%s\".", lensFile);
+        Error("Error reading lens specification file \"%s\".", lensFile);
         return nullptr;
     }
     if (lensData->size() % 4 != 0) {
-        Error(loc, "%s: excess values in lens specification file; "
+        Error("%s: excess values in lens specification file; "
               "must be multiple-of-four values, read %d.",
               lensFile, (int)lensData->size());
         return nullptr;
@@ -1295,7 +1057,7 @@ RealisticCamera *RealisticCamera::Create(
 
     return alloc.new_object<RealisticCamera>(
         worldFromCamera, shutteropen, shutterclose, apertureDiameter, focusDistance,
-        dispersionFactor, *lensData, film, medium, alloc);
+        dispersionFactor, *lensData, std::move(film), medium, alloc);
 }
 
 }  // namespace pbrt

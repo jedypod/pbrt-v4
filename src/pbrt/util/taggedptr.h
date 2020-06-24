@@ -228,27 +228,6 @@ using ApplyConstVisitor = ApplyConstVisitor1<
 
 } // namespace detail
 
-template <typename... Ts> class TaggedPointer;
-
-class RawTaggedPointer {
-public:
-    RawTaggedPointer() = default;
-    RawTaggedPointer(std::nullptr_t np) { bits = 0; }
-
-    template <typename... Ts>
-    RawTaggedPointer &operator=(TaggedPointer<Ts...> tp);
-
-    operator bool() const { return bits != 0; }
-
-private:
-    template <typename... Ts> friend class TaggedPointer;
-
-    RawTaggedPointer(uintptr_t bits)
-        : bits(bits) { }
-
-    uintptr_t bits = 0;
-};
-
 // Based on/extracted from DiscriminatedPtr in Facebook's folly library.
 template <typename... Ts>
 class TaggedPointer {
@@ -266,14 +245,6 @@ class TaggedPointer {
         bits = iptr | ((uintptr_t)type << tagShift);
     }
     PBRT_HOST_DEVICE_INLINE
-    TaggedPointer(RawTaggedPointer rawPtr) {
-        bits = rawPtr.bits;
-        // Will catch some cases of different typed tagged pointer being
-        // passed in...
-        CHECK_LT(Tag(), MaxTag());
-    }
-
-    PBRT_HOST_DEVICE_INLINE
     TaggedPointer(std::nullptr_t np) { }
 
     PBRT_HOST_DEVICE_INLINE
@@ -284,11 +255,6 @@ class TaggedPointer {
     TaggedPointer &operator=(const TaggedPointer &t) {
         bits = t.bits;
         return *this;
-    }
-
-    PBRT_HOST_DEVICE_INLINE
-    operator RawTaggedPointer() const {
-        return RawTaggedPointer(bits);
     }
 
     template <typename T>
@@ -393,8 +359,6 @@ class TaggedPointer {
 #endif
 
  private:
-    friend class RawTaggedPointer;
-
     static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
 
     static constexpr bool useLowBits = sizeof...(Ts) < 7;  // 0 used for null
@@ -447,12 +411,6 @@ struct DeleteTaggedPointer<T, Ts...> {
 };
 
 } // namespace detail
-
-template <typename... Ts>
-inline RawTaggedPointer &RawTaggedPointer::operator=(TaggedPointer<Ts...> tp) {
-    bits = tp.bits;
-    return *this;
-}
 
 } // namespace pbrt
 

@@ -36,7 +36,6 @@
 
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
-#include <pbrt/shapes.h>
 #include <pbrt/util/bits.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/log.h>
@@ -164,7 +163,7 @@ BVHAccel::BVHAccel(std::vector<PrimitiveHandle> p,
       splitMethod(splitMethod),
       primitives(std::move(p)) {
     ProfilerScope _(ProfilePhase::AccelConstruction);
-    CHECK(!primitives.empty());
+    if (primitives.empty()) return;
     // Build BVH from _primitives_
 
     // Initialize _primitiveInfo_ array for primitives
@@ -205,8 +204,7 @@ BVHAccel::BVHAccel(std::vector<PrimitiveHandle> p,
 }
 
 Bounds3f BVHAccel::WorldBound() const {
-    CHECK(nodes != nullptr);
-    return nodes[0].bounds;
+    return nodes != nullptr ? nodes[0].bounds : Bounds3f();
 }
 
 struct BucketInfo {
@@ -1180,23 +1178,6 @@ KdTreeAccel *KdTreeAccel::Create(std::vector<PrimitiveHandle> prims,
     int maxDepth = dict.GetOneInt("maxdepth", -1);
     return new KdTreeAccel(std::move(prims), isectCost, travCost,
                            emptyBonus, maxPrims, maxDepth);
-}
-
-PrimitiveHandle CreateAccelerator(const std::string &name, std::vector<PrimitiveHandle> prims,
-                                  const ParameterDictionary &dict) {
-    PrimitiveHandle accel = nullptr;
-    if (name == "bvh")
-        accel = BVHAccel::Create(std::move(prims), dict);
-    else if (name == "kdtree")
-        accel = KdTreeAccel::Create(std::move(prims), dict);
-    else
-        ErrorExit("%s: accelerator type unknown.", name);
-
-    if (!accel)
-        ErrorExit("%s: unable to create accelerator.", name);
-
-    dict.ReportUnused();
-    return accel;
 }
 
 }  // namespace pbrt

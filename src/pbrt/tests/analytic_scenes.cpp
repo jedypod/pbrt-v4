@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <pbrt/accelerators.h>
+#include <pbrt/api.h>
 #include <pbrt/cameras.h>
 #include <pbrt/filters.h>
 #include <pbrt/integrators.h>
@@ -247,33 +248,37 @@ std::vector<TestScene> GetScenes() {
     return scenes;
 }
 
-std::vector<std::pair<SamplerHandle, std::string>> GetSamplers(
+std::vector<std::pair<std::unique_ptr<Sampler>, std::string>> GetSamplers(
     const Point2i &resolution) {
-    std::vector<std::pair<SamplerHandle, std::string>> samplers;
+    std::vector<std::pair<std::unique_ptr<Sampler>, std::string>> samplers;
 
     samplers.push_back(std::make_pair(
-        new HaltonSampler(256, resolution), "Halton 256"));
+        std::make_unique<HaltonSampler>(256, resolution), "Halton 256"));
     samplers.push_back(std::make_pair(
-        new PaddedSobolSampler(256, RandomizeStrategy::Xor),
+        std::make_unique<PaddedSobolSampler>(256, RandomizeStrategy::Xor),
         "Padded Sobol 256"));
     samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::None),
+        std::make_unique<SobolSampler>(256, resolution, RandomizeStrategy::None),
         "Sobol 256 Not Randomized"));
     samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::CranleyPatterson),
+        std::make_unique<SobolSampler>(256, resolution,
+                                       RandomizeStrategy::CranleyPatterson),
         "Sobol 256 Cranley Patterson Randomization"));
     samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::Xor),
+        std::make_unique<SobolSampler>(256, resolution,
+                                       RandomizeStrategy::Xor),
         "Sobol 256 XOR Scramble"));
     samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::Owen),
+        std::make_unique<SobolSampler>(256, resolution, RandomizeStrategy::Owen),
         "Sobol 256 Owen Scramble"));
     samplers.push_back(
-        std::make_pair(new RandomSampler(256), "Random 256"));
+        std::make_pair(std::make_unique<RandomSampler>(256), "Random 256"));
     samplers.push_back(
-        std::make_pair(new StratifiedSampler(16, 16, true), "Stratified 16x16"));
+        std::make_pair(std::make_unique<StratifiedSampler>(16, 16, true),
+                       "Stratified 16x16"));
     samplers.push_back(
-        std::make_pair(new PMJ02BNSampler(256), "PMJ02bn 256"));
+        std::make_pair(std::make_unique<PMJ02BNSampler>(256),
+                       "PMJ02bn 256"));
 
     return samplers;
 }
@@ -288,16 +293,17 @@ std::vector<TestIntegrator> GetIntegrators() {
     for (const auto &scene : GetScenes()) {
         // Path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
-            const Film *filmp = camera->film;
+            const Film *filmp = camera->film.get();
             Integrator *integrator =
                 new PathIntegrator(8, *scene.scene, std::move(camera), std::move(sampler.first));
             integrators.push_back({integrator, filmp,
@@ -308,15 +314,16 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
 
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
-                    1., 0., 10., film, nullptr);
-            const Film *filmp = camera->film;
+                    1., 0., 10., std::move(film), nullptr);
+            const Film *filmp = camera->film.get();
 
             Integrator *integrator =
                 new PathIntegrator(8, *scene.scene, std::move(camera), std::move(sampler.first));
@@ -328,15 +335,16 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // Volume path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
-            const Film *filmp = camera->film;
+                    0., 10., 45, std::move(film), nullptr);
+            const Film *filmp = camera->film.get();
 
             Integrator *integrator =
                 new VolPathIntegrator(8, *scene.scene, std::move(camera), std::move(sampler.first));
@@ -347,15 +355,16 @@ std::vector<TestIntegrator> GetIntegrators() {
                                    scene});
         }
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<OrthographicCamera>(
                     identity, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0.,
-                    1., 0., 10., film, nullptr);
-            const Film *filmp = camera->film;
+                    1., 0., 10., std::move(film), nullptr);
+            const Film *filmp = camera->film.get();
 
             Integrator *integrator =
                 new VolPathIntegrator(8, *scene.scene, std::move(camera), std::move(sampler.first));
@@ -368,16 +377,17 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // Simple path (perspective only, still sample light and BSDFs). Yolo
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
+                    0., 10., 45, std::move(film), nullptr);
 
-            const Film *filmp = camera->film;
+            const Film *filmp = camera->film.get();
             Integrator *integrator =
                 new SimplePathIntegrator(8, true, true, *scene.scene,
                                          std::move(camera), std::move(sampler.first));
@@ -388,17 +398,19 @@ std::vector<TestIntegrator> GetIntegrators() {
                                    scene});
         }
 
+#ifdef PBRT_DISABLE_BDPT_MLT
         // BDPT
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
-            const Film *filmp = camera->film;
+                    0., 10., 45, std::move(film), nullptr);
+            const Film *filmp = camera->film.get();
 
             Integrator *integrator =
                 new BDPTIntegrator(*scene.scene, std::move(camera), std::move(sampler.first), 6, false, false,
@@ -412,15 +424,16 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // MLT
         {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                          filter, 1., inTestDir("test.exr"), 1.,
+            pstd::unique_ptr<Filter> filter = pstd::make_unique<BoxFilter>(Vector2f(0.5, 0.5));
+            std::unique_ptr<RGBFilm> film =
+                std::make_unique<RGBFilm>(resolution, Bounds2i(Point2i(0, 0), resolution),
+                                          std::move(filter), 1., inTestDir("test.exr"), 1.,
                                           RGBColorSpace::sRGB);
             std::unique_ptr<Camera> camera =
                 std::make_unique<PerspectiveCamera>(
                     identity, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 1.,
-                    0., 10., 45, film, nullptr);
-            const Film *filmp = camera->film;
+                    0., 10., 45, std::move(film), nullptr);
+            const Film *filmp = camera->film.get();
 
             Integrator *integrator = new MLTIntegrator(
                 *scene.scene, std::move(camera), 8 /* depth */, 100000 /* n bootstrap */,
@@ -430,6 +443,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             integrators.push_back({integrator, filmp,
                  "MLT, depth 8, Perspective, " + scene.description, scene});
         }
+#endif
     }
 
     return integrators;

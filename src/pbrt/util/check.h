@@ -57,14 +57,14 @@ namespace pbrt {
 #else
 
 #define CHECK(x)                                \
-    !(!(x) && (LOG_FATAL("Check failed: %s", #x), true))
+    !(!(x) && (LOG_FATAL("Check failed: " #x), true))
 
 #define CHECK_IMPL(a, b, op)                    \
     do {                                        \
         auto va = a;                            \
         auto vb = b;                            \
         if (!(va op vb)) { \
-            LOG_FATAL("Check failed: %s " #op " %s with %s = %s, %s = %s", #a, #b, #a, va, #b, vb); \
+            LOG_FATAL("Check failed: " #a " " #op " " #b " with " #a " = %s, " #b " = %s.", va, vb); \
         } \
     } while (false) /* swallow semicolon */
 

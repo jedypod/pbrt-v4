@@ -69,6 +69,7 @@ class RGBColorSpace {
 
     Point2f r, g, b, w;  // xy chromaticities
     const DenselySampledSpectrum illuminant;
+    const DenselySampledSpectrum X, Y, Z;
 
     std::string ToString() const;
 
