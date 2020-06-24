@@ -258,7 +258,8 @@ class PointLight : public LightBase {
     // PointLight Public Methods
     PointLight(const AnimatedTransform &worldFromLight,
                const MediumInterface &mediumInterface, SpectrumHandle I, Allocator alloc)
-        : LightBase(LightType::DeltaPosition, worldFromLight, mediumInterface), I(I) {}
+        : LightBase(LightType::DeltaPosition, worldFromLight, mediumInterface),
+          I(I, alloc) {}
 
     static PointLight *Create(const AnimatedTransform &worldFromLight,
                               MediumHandle medium, const ParameterDictionary &parameters,
@@ -301,7 +302,7 @@ class PointLight : public LightBase {
 
   private:
     // PointLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
 };
 
 // DistantLight Declarations
@@ -354,7 +355,7 @@ class DistantLight : public LightBase {
 
   private:
     // DistantLight Private Data
-    SpectrumHandle Lemit;
+    DenselySampledSpectrum Lemit;
     Point3f sceneCenter;
     Float sceneRadius;
 };
@@ -466,7 +467,7 @@ class GoniometricLight : public LightBase {
 
   private:
     // GoniometricLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
     Image image;
     const RGBColorSpace *imageColorSpace;
     WrapMode2D wrapMode;
@@ -588,7 +589,7 @@ class DiffuseAreaLight : public LightBase {
 
   protected:
     // DiffuseAreaLight Protected Data
-    SpectrumHandle Lemit;
+    DenselySampledSpectrum Lemit;
     Float scale;
     ShapeHandle shape;
     bool twoSided;
@@ -637,7 +638,7 @@ class UniformInfiniteLight : public LightBase {
 
   private:
     // UniformInfiniteLight Private Data
-    SpectrumHandle Lemit;
+    DenselySampledSpectrum Lemit;
     Point3f sceneCenter;
     Float sceneRadius;
 };
@@ -868,7 +869,7 @@ class SpotLight : public LightBase {
 
   private:
     // SpotLight Private Data
-    SpectrumHandle I;
+    DenselySampledSpectrum I;
     Float cosFalloffStart, cosFalloffEnd;
 };
 

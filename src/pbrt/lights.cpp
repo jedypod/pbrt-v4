@@ -122,7 +122,7 @@ PointLight *PointLight::Create(const AnimatedTransform &worldFromLight,
 DistantLight::DistantLight(const AnimatedTransform &worldFromLight, SpectrumHandle Lemit,
                            Allocator alloc)
     : LightBase(LightType::DeltaDirection, worldFromLight, MediumInterface()),
-      Lemit(Lemit) {}
+      Lemit(Lemit, alloc) {}
 
 SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
     return Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
@@ -401,7 +401,7 @@ GoniometricLight::GoniometricLight(const AnimatedTransform &worldFromLight,
                                    SpectrumHandle I, Image im,
                                    const RGBColorSpace *imageColorSpace, Allocator alloc)
     : LightBase(LightType::DeltaPosition, worldFromLight, mediumInterface),
-      I(I),
+      I(I, alloc),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
       wrapMode(WrapMode::Repeat, WrapMode::Clamp),
@@ -556,7 +556,7 @@ DiffuseAreaLight::DiffuseAreaLight(const AnimatedTransform &worldFromLight,
                                    const RGBColorSpace *imageColorSpace, bool twoSided,
                                    Allocator alloc)
     : LightBase(LightType::Area, worldFromLight, mediumInterface),
-      Lemit(Le),
+      Lemit(Le, alloc),
       scale(scale),
       shape(shape),
       twoSided(twoSided),
@@ -731,7 +731,8 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const AnimatedTransform &worldFromLig
 // UniformInfiniteLight Method Definitions
 UniformInfiniteLight::UniformInfiniteLight(const AnimatedTransform &worldFromLight,
                                            SpectrumHandle Lemit, Allocator alloc)
-    : LightBase(LightType::Infinite, worldFromLight, MediumInterface()), Lemit(Lemit) {}
+    : LightBase(LightType::Infinite, worldFromLight, MediumInterface()),
+      Lemit(Lemit, alloc) {}
 
 SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) const {
     // TODO: is there another Pi or so for the hemisphere?
@@ -1164,7 +1165,7 @@ SpotLight::SpotLight(const AnimatedTransform &worldFromLight,
                      const MediumInterface &mediumInterface, SpectrumHandle I,
                      Float totalWidth, Float falloffStart, Allocator alloc)
     : LightBase(LightType::DeltaPosition, worldFromLight, mediumInterface),
-      I(I),
+      I(I, alloc),
       cosFalloffEnd(std::cos(Radians(totalWidth))),
       cosFalloffStart(std::cos(Radians(falloffStart))) {
     CHECK_LE(falloffStart, totalWidth);
