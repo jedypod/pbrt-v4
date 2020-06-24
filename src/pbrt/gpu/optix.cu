@@ -17,6 +17,7 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
+#include <pbrt/util/color.cpp>          // :-(
 #include <pbrt/util/colorspace.cpp>     // :-(
 #include <pbrt/util/log.cpp>            // :-(
 #include <pbrt/util/sobolmatrices.cpp>  // :-(

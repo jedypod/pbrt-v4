@@ -164,6 +164,8 @@ class alignas(8) GridDensityMedium {
 
         MediumSample mediumSample;
 
+#if 0
+#else
         TraverseOctree(&densityOctree, ray.o, ray.d, raytMax,
             [&](const OctreeNode &node, Float t0, Float t1) {
                 if (node.maxDensity == 0)
@@ -202,15 +204,8 @@ class alignas(8) GridDensityMedium {
                     CHECK_LE(density.r, node.maxDensity);
                     CHECK_LE(density.g, node.maxDensity);
                     CHECK_LE(density.b, node.maxDensity);
-#if 0
                     SampledSpectrum spec =
-#ifdef PBRT_IS_GPU_CODE
-                        RGBSpectrum(*RGBColorSpace_sRGB, density).Sample(lambda);
-#else
-                        RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
-#endif
-#endif
-                    SampledSpectrum spec((density.r + density.g + density.b) / 3);
+                        RGBSpectrum(*colorSpace, density).Sample(lambda);
                     sigma_a *= spec;
                     sigma_s *= spec;
                 }
@@ -221,7 +216,7 @@ class alignas(8) GridDensityMedium {
                 mediumSample = MediumSample(intr, t, Tmaj);
                 return OctreeTraversal::Abort;
             });
-
+#endif
         return mediumSample;
     }
 
