@@ -162,10 +162,37 @@ class alignas(8) GridDensityMedium {
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
 
+#ifdef PBRT_IS_GPU_CODE
+        SampledSpectrum sigma_maj(sigma_t * densityOctree.maxDensity);
+
+        Float t = tMin + SampleExponential(u, sigma_maj[0]);
+        if (t >= tMax)
+            // Nothing before the geom intersection; get out of here
+            return MediumSample(FastExp(-sigma_maj * (tMax - tMin)));
+
+        // Scattering event (of some sort)
+        Point3f p = ray(t);
+        SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - tMin));
+
+        if (densityGrid) {
+            Float density = densityGrid->Lookup(p);
+            sigma_a *= density;
+            sigma_s *= density;
+        } else {
+            RGB density = rgbDensityGrid->Lookup(p);
+            SampledSpectrum spec =
+                RGBSpectrum(*colorSpace, density).Sample(lambda);
+            sigma_a *= spec;
+            sigma_s *= spec;
+        }
+
+        MediumInteraction intr(worldFromMedium(p), -Normalize(rWorld.d), rWorld.time,
+                               sigma_a, sigma_s, sigma_maj, Le(p, lambda), this,
+                               &phase);
+        return MediumSample(intr, t, Tmaj);
+#else
         MediumSample mediumSample;
 
-#if 0
-#else
         TraverseOctree(&densityOctree, ray.o, ray.d, raytMax,
             [&](const OctreeNode &node, Float t0, Float t1) {
                 if (node.maxDensity == 0)
@@ -216,8 +243,8 @@ class alignas(8) GridDensityMedium {
                 mediumSample = MediumSample(intr, t, Tmaj);
                 return OctreeTraversal::Abort;
             });
-#endif
         return mediumSample;
+#endif
     }
 
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
