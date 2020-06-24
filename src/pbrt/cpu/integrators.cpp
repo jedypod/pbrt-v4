@@ -1101,6 +1101,7 @@ SampledSpectrum VolPathIntegrator::Li(
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
                 if (depth < maxDepth)
+                    // FIXME: beta?
                     L += intr.Le * sigma_a / intr.sigma_maj[0];
 
                 Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
@@ -1117,13 +1118,10 @@ SampledSpectrum VolPathIntegrator::Li(
                     // absorption; done
                     // beta *= Tmaj * sigma_a;
                     // pdfUni *= Tmaj * sigma_a;
-                    ReportValue(pathLength, depth);
                     return L;
                 } else if (mode == 1) {
-                    if (depth >= maxDepth) {
-                        ReportValue(pathLength, depth);
+                    if (depth >= maxDepth)
                         return L;
-                    }
 
                     // scatter
                     beta *= Tmaj * sigma_s;
@@ -1432,6 +1430,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr,
                 MediumSample mediumSample =
                     lightRay.medium.Sample_Tmaj(lightRay, 1.f, u, lambda, nullptr);
                 if (!mediumSample.intr)
+                    // FIXME: include last Tmaj?
                     break;
 
                 const SampledSpectrum &Tmaj = mediumSample.Tmaj;

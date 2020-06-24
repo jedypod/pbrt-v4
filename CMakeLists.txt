@@ -158,7 +158,7 @@ if (CMAKE_CUDA_COMPILER)
         macro (cuda_compile_and_embed output_var cuda_file)
           set (c_var_name ${output_var})
           cuda_compile_ptx (ptx_files ${cuda_file}
-                            OPTIONS --std=c++17 -O3 ${PBRT_CUDA_DIAG_FLAGS}
+                            OPTIONS --std=c++17 -O3 ${PBRT_CUDA_DIAG_FLAGS} -DNDEBUG
                                     --gpu-architecture=${ARCH} -D PBRT_BUILD_GPU_RENDERER)
           list (GET ptx_files 0 ptx_file)
           set (embedded_file ${ptx_file}_embedded.c)
@@ -184,20 +184,11 @@ endif ()
 
 INCLUDE(CheckCXXCompilerFlag)
 
-check_cxx_compiler_flag ("-std=gnu++17" COMPILER_SUPPORTS_STD_GNU17)
-check_cxx_compiler_flag ("-std=c++17" COMPILER_SUPPORTS_STD_CXX17)
-
-if (COMPILER_SUPPORTS_STD_GNU17)
-  list (APPEND PBRT_CXX_FLAGS -std=gnu++17)
-elseif (COMPILER_SUPPORTS_STD_CXX17)
-  list (APPEND PBRT_CXX_FLAGS -std=c++17)
-endif ()
-
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND NOT PBRT_CUDA_ENABLED)
   list (APPEND PBRT_CXX_FLAGS -march=native)
 endif ()
-# TODO: how to specify this on wondows?
+# TODO: how to specify this on windows?
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   list(APPEND PBRT_CXX_FLAGS -std=c++17)

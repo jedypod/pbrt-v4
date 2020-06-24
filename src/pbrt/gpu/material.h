@@ -25,7 +25,7 @@ void GPUPathIntegrator::EvaluateMaterial(TextureEvaluator texEval, int depth) {
             if (rayIndex >= *numActiveRays)
                 return;
 
-            if (interactionType[rayIndex] != InteractionType::Surface)
+            if (interactionType[depth & 1][rayIndex] != InteractionType::Surface)
                 return;
 
             PixelIndex pixelIndex = rayIndexToPixelIndex[depth & 1][rayIndex];

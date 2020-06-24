@@ -51,7 +51,7 @@ namespace pbrt {
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
 
 GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
-    : allLights(alloc), cameraRayWeights(alloc), shadowRayLd(alloc) {
+    : allLights(alloc), cameraRayWeights(alloc) {
     std::map<std::string, MediumHandle> media = scene.CreateMedia(alloc);
 
     // Slightly conservative, but...
@@ -243,13 +243,18 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
         mediumInteractions[1] = pstd::MakeSpan(mediumIntrs[1], pixelsPerPass);
     }
 
-    InteractionType *it = alloc.allocate_object<InteractionType>(pixelsPerPass);
-    interactionType = pstd::MakeSpan(it, pixelsPerPass);
+    InteractionType *it[2];
+    it[0] = alloc.allocate_object<InteractionType>(pixelsPerPass);
+    it[1] = alloc.allocate_object<InteractionType>(pixelsPerPass);
+    interactionType[0] = pstd::MakeSpan(it[0], pixelsPerPass);
+    interactionType[1] = pstd::MakeSpan(it[1], pixelsPerPass);
 
-    SampledSpectrum *str = alloc.allocate_object<SampledSpectrum>(pixelsPerPass);
-    shadowTr = pstd::MakeSpan(str, pixelsPerPass);
-
-    shadowRayLd = SampledSpectrumSOA<ShadowRayIndex>(alloc, pixelsPerPass);
+    SampledSpectrum *sld = alloc.allocate_object<SampledSpectrum>(pixelsPerPass);
+    shadowRayLd = pstd::MakeSpan(sld, pixelsPerPass);
+    SampledSpectrum *spu = alloc.allocate_object<SampledSpectrum>(pixelsPerPass);
+    shadowRayPDFUni = pstd::MakeSpan(spu, pixelsPerPass);
+    SampledSpectrum *spl = alloc.allocate_object<SampledSpectrum>(pixelsPerPass);
+    shadowRayPDFLight = pstd::MakeSpan(spl, pixelsPerPass);
 
     PathState *pathState = alloc.allocate_object<PathState>(pixelsPerPass);
     for (int i = 0; i < pixelsPerPass; ++i)
@@ -306,10 +311,12 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
 void GPUPathIntegrator::TraceShadowRays() {
     std::pair<cudaEvent_t, cudaEvent_t> events;
     if (haveMedia)
-        events = accel->IntersectShadowTr(shadowRayQueue, pixelsPerPass, shadowTr,
+        events = accel->IntersectShadowTr(shadowRayQueue, pixelsPerPass, shadowRayLd,
+                                          shadowRayPDFUni, shadowRayPDFLight,
                                           shadowRayIndexToPixelIndex, lambdas, rngs);
     else
-        events = accel->IntersectShadow(shadowRayQueue, pixelsPerPass, shadowTr);
+        events = accel->IntersectShadow(shadowRayQueue, pixelsPerPass, shadowRayLd,
+                                        shadowRayPDFUni, shadowRayPDFLight);
     struct IsectShadowHack {};
     GetGPUKernelStats<IsectShadowHack>("Path tracing shadow rays")
         .launchEvents.push_back(events);
@@ -318,14 +325,17 @@ void GPUPathIntegrator::TraceShadowRays() {
     GPUParallelFor(
         "Incorporate shadow ray contribution", pixelsPerPass,
         [=] PBRT_GPU(ShadowRayIndex shadowRayIndex) {
-            if (shadowRayIndex >= shadowRayQueue->Size() || !shadowTr[shadowRayIndex])
+            if (shadowRayIndex >= shadowRayQueue->Size())
                 return;
 
-            SampledSpectrum Ld =
-                SampledSpectrum(shadowRayLd[shadowRayIndex]) * shadowTr[shadowRayIndex];
+            // We're kind of overloading Ld: it goes into shadow ray tracing with
+            // one meaning and comes out with another. FIXME?
+            if (!shadowRayLd[shadowRayIndex])
+                return;
+
             PixelIndex pixelIndex = shadowRayIndexToPixelIndex[shadowRayIndex];
             PathState &pathState = pathStates[pixelIndex];
-            pathState.L += Ld;
+            pathState.L += shadowRayLd[shadowRayIndex];
         });
 
     GPUDo("Reset shadowRayQueue", shadowRayQueue->Reset(););
@@ -418,6 +428,8 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
                                PathState &pathState = pathStates[pixelIndex];
                                pathState.L = SampledSpectrum(0.f);
                                pathState.beta = SampledSpectrum(1.f);
+                               pathState.pdfUni = SampledSpectrum(1.f);
+                               pathState.pdfNEE = SampledSpectrum(1.f);
                                pathState.etaScale = 1.f;
                                pathState.anyNonSpecularBounces = false;
 
@@ -440,7 +452,7 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
                 auto events = accel->IntersectClosest(
                     pathRayQueue, pixelsPerPass, intersections[depth & 1],
-                    rayIndexToPixelIndex[depth & 1], interactionType);
+                    rayIndexToPixelIndex[depth & 1], interactionType[depth & 1]);
                 struct IsectHack {};
                 GetGPUKernelStats<IsectHack>("Path tracing closest hit rays")
                     .launchEvents.push_back(events);
@@ -469,34 +481,40 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
                         // Hit something; add surface emission if there is any
                         SampledSpectrum Le(0.f);
                         LightHandle light;
-                        if (interactionType[rayIndex] == InteractionType::Surface &&
-                            intersection.areaLight) {
+                        InteractionType it = interactionType[depth & 1][rayIndex];
+                        if (it == InteractionType::Surface && intersection.areaLight) {
                             Vector3f wo = -ray.d;
                             Le = intersection.areaLight.L(intersection, wo, lambda);
                             light = intersection.areaLight;
-                        } else if (envLight &&
-                                   interactionType[rayIndex] == InteractionType::None) {
+                        } else if (envLight && it == InteractionType::None) {
                             Le = envLight.Le(ray, lambda);
                             light = envLight;
                         }
 
-                        if (Le) {
-                            Float weight;
-                            if (depth == 0 || IsSpecular(pathState->bsdfFlags))
-                                weight = 1;
-                            else {
-                                const SurfaceInteraction &prevIntr =
-                                    intersections[(depth & 1) ^ 1][pixelIndex];
-                                // Compute MIS pdf...
-                                Float lightChoicePDF = lightSampler.PDF(prevIntr, light);
-                                Float lightPDF = lightChoicePDF *
-                                                 light.Pdf_Li(prevIntr, ray.d,
-                                                              LightSamplingMode::WithMIS);
-                                weight = PowerHeuristic(1, pathState->scatteringPDF, 1,
-                                                        lightPDF);
-                            }
-                            pathState->L += beta * weight * Le;
+                        if (!Le)
+                            return;
+
+                        if (depth == 0 || (it == InteractionType::Surface &&
+                                           IsSpecular(pathState->bsdfFlags))) {
+                            pathState->L += beta * Le;
+                            return;
                         }
+
+                        const Interaction *prevIntr;
+                        if (it == InteractionType::Surface)
+                            prevIntr = &intersections[(depth & 1) ^ 1][pixelIndex];
+                        else
+                            prevIntr = &mediumInteractions[(depth & 1) ^ 1][pixelIndex];
+
+                        // Compute MIS pdf...
+                        Float lightChoicePDF = lightSampler.PDF(*prevIntr, light);
+                        Float lightPDF = lightChoicePDF *
+                            light.Pdf_Li(*prevIntr, ray.d, LightSamplingMode::WithMIS);
+
+                        pathState->pdfNEE *= lightPDF;
+
+                        pathState->L += pathState->beta * Le /
+                            (pathState->pdfUni + pathState->pdfNEE).Average();
                     });
 
                 if (depth == maxDepth)

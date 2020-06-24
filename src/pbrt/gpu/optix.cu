@@ -17,8 +17,10 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
+#include <pbrt/util/colorspace.cpp>     // :-(
 #include <pbrt/util/log.cpp>            // :-(
 #include <pbrt/util/sobolmatrices.cpp>  // :-(
+#include <pbrt/util/spectrum.cpp>       // :-(
 #include <pbrt/util/transform.cpp>      // :-(
 
 using namespace pbrt;
@@ -220,7 +222,11 @@ extern "C" __global__ void __raygen__shadow() {
                0,                      /* missSBTIndex */
                missed);
 
-    params.shadowRayTr[rayIndex] = missed ? SampledSpectrum(1.f) : SampledSpectrum(0.f);
+    if (!missed)
+        params.shadowRayLd[rayIndex] = SampledSpectrum(0.);
+    else
+        params.shadowRayLd[rayIndex] /= (params.shadowRayPDFUni[rayIndex] +
+                                         params.shadowRayPDFLight[rayIndex]).Average();
 }
 
 extern "C" __global__ void __miss__shadow() {
@@ -233,10 +239,12 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     if (rayIndex >= params.shadowRays->Size())
         return;
 
-    SampledSpectrum Tr(1.f);
     PixelIndex pixelIndex = params.shadowRayIndexToPixelIndex[rayIndex];
     SampledWavelengths lambda = params.lambda[pixelIndex];
     RNG &rng = *params.rng[pixelIndex];
+    SampledSpectrum &Ld = params.shadowRayLd[rayIndex];
+    SampledSpectrum pdfUni = params.shadowRayPDFUni[rayIndex];
+    SampledSpectrum pdfLight = params.shadowRayPDFLight[rayIndex];
 
     SurfaceInteraction intr;
     uint32_t p0 = packPointer0(&intr), p1 = packPointer1(&intr);
@@ -245,7 +253,6 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     Ray ray = params.shadowRays->GetRay(rayIndex, &tMax);
     Point3f pLight = ray(tMax);
 
-    int depth = 0;
     while (true) {
         uint32_t missed = 0;
 
@@ -261,16 +268,49 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
         if (!missed && intr.material) {
             // Hit opaque surface
-            Tr = SampledSpectrum(0.f);
-            break;
+            Ld = SampledSpectrum(0.f);
+            return;
         }
 
-        if (ray.medium != nullptr) {
+        if (ray.medium) {
             Float tEnd = missed ? tMax : (Distance(ray.o, intr.p()) / Length(ray.d));
-            Tr *= ray.medium.Tr(ray, tEnd, lambda, rng);
+            Point3f pExit = ray(tEnd);
+            ray.d = pExit - ray.o;
+
+            while (ray.o != pExit) {
+                Float u = rng.Uniform<Float>();
+                MediumSample mediumSample =
+                    ray.medium.Sample_Tmaj(ray, 1.f, u, lambda, nullptr);
+                if (!mediumSample.intr)
+                    // FIXME: include last Tmaj?
+                    break;
+
+                const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                const MediumInteraction &intr = *mediumSample.intr;
+                SampledSpectrum sigma_n = intr.sigma_n();
+
+                // ratio-tracking: only evaluate null scattering
+                Ld *= Tmaj * sigma_n;
+                pdfLight *= Tmaj * intr.sigma_maj;
+                pdfUni *= Tmaj * sigma_n;
+
+                if (!Ld)
+                    return;
+
+                ray = intr.SpawnRayTo(pExit);
+
+                if (Ld.MaxComponentValue() > 0x1p24f ||
+                    pdfLight.MaxComponentValue() > 0x1p24f ||
+                    pdfUni.MaxComponentValue() > 0x1p24f) {
+                    Ld *= 1.f / 0x1p24f;
+                    pdfLight *= 1.f / 0x1p24f;
+                    pdfUni *= 1.f / 0x1p24f;
+                }
+            }
         }
 
         if (missed)
+            // done
             break;
 
         ray = intr.SpawnRayTo(pLight);
@@ -279,7 +319,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             break;
     }
 
-    params.shadowRayTr[rayIndex] = Tr;
+    Ld /= (pdfUni + pdfLight).Average();
 }
 
 extern "C" __global__ void __miss__shadow_Tr() {

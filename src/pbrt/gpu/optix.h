@@ -62,8 +62,8 @@ struct RayIntersectParameters {
 
     // shadow rays
     const RayQueue<ShadowRayIndex> *shadowRays = nullptr;
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayTr;
-    // shadow + transmittance
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd;
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni, shadowRayPDFLight;
     TypedIndexSpan<PixelIndex, ShadowRayIndex> shadowRayIndexToPixelIndex;
     TypedIndexSpan<SampledWavelengths, PixelIndex> lambda;
     TypedIndexSpan<RNG *, PixelIndex> rng;

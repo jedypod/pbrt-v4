@@ -63,21 +63,21 @@ void GPUPathIntegrator::SampleDirect(int depth) {
                 if (p == 0)
                     return;
 
-                Float lightPDF = ls->pdf * lightChoicePDF;
-                Float weight = 1;
-                if (!IsDeltaLight(light.Type())) {
-                    Float phasePDF = intr.phase.PDF(intr.wo, ls->wi);
-                    weight = PowerHeuristic(1, lightPDF, 1, phasePDF);
-                }
+                beta *= p;
 
                 Ray ray = intr.SpawnRayTo(ls->pLight);
                 ShadowRayIndex shadowRayIndex =
                     shadowRayQueue->Add(ray, 1 - ShadowEpsilon);
                 shadowRayIndexToPixelIndex[shadowRayIndex] = pixelIndex;
 
-                SampledSpectrum Ld = beta * ls->L * p * weight / lightPDF;
-                DCHECK(!Ld.HasNaNs());
-                shadowRayLd[shadowRayIndex] = Ld;
+                Float lightPDF = ls->pdf * lightChoicePDF;
+                // Make pdfUni be a no-op for MIS with delta lights...
+                Float phasePDF = IsDeltaLight(light.Type()) ? 0.f :
+                    intr.phase.PDF(intr.wo, ls->wi);
+
+                shadowRayLd[shadowRayIndex] = beta * ls->L;
+                shadowRayPDFLight[shadowRayIndex] = pathState.pdfUni * lightPDF;
+                shadowRayPDFUni[shadowRayIndex] = pathState.pdfUni * phasePDF;
             });
     }
 }
@@ -86,7 +86,7 @@ void GPUPathIntegrator::SampleLight(int depth) {
     GPUParallelFor(
         "Choose Light to Sample", pixelsPerPass, [=] __device__(PathRayIndex rayIndex) {
             if (rayIndex >= *numActiveRays ||
-                interactionType[rayIndex] == InteractionType::None)
+                interactionType[depth & 1][rayIndex] == InteractionType::None)
                 return;
 
             PixelIndex pixelIndex = rayIndexToPixelIndex[depth & 1][rayIndex];
@@ -95,7 +95,7 @@ void GPUPathIntegrator::SampleLight(int depth) {
                 return;
 
             Interaction *intr = nullptr;
-            if (interactionType[rayIndex] == InteractionType::Surface) {
+            if (interactionType[depth & 1][rayIndex] == InteractionType::Surface) {
                 SurfaceInteraction &surfaceIntr = intersections[depth & 1][pixelIndex];
                 if (surfaceIntr.material == nullptr ||
                     (surfaceIntr.bsdf->IsSpecular() &&

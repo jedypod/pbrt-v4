@@ -37,22 +37,26 @@ void GPUPathIntegrator::SampleIndirect(int depth) {
                 PixelIndex pixelIndex = rayIndexToPixelIndex[depth & 1][rayIndex];
                 PathState &pathState = pathStates[pixelIndex];
 
-                SampledSpectrum beta = pathState.beta;
+                SampledSpectrum &beta = pathState.beta;
                 if (!beta)
                     return;
 
+                SampledSpectrum &pdfUni = pathState.pdfUni;
+                SampledSpectrum &pdfNEE = pathState.pdfNEE;
                 SamplerHandle sampler = samplers[pixelIndex];
                 MediumInteraction &intr = mediumInteractions[depth & 1][pixelIndex];
 
                 pstd::optional<PhaseFunctionSample> ps =
                     intr.phase.Sample_p(intr.wo, sampler.Get2D());
                 if (!ps || ps->pdf == 0) {
-                    pathState.beta = SampledSpectrum(0);
+                    beta = SampledSpectrum(0);
                     return;
                 }
 
-                beta *= ps->p / ps->pdf;
-                pathState.scatteringPDF = ps->pdf;
+                beta *= ps->p;
+                pdfNEE = pdfUni;
+                pdfUni *= ps->pdf;
+
                 pathState.bsdfFlags = BxDFFlags::Unset;
                 if (regularize)
                     pathState.anyNonSpecularBounces =
@@ -63,19 +67,17 @@ void GPUPathIntegrator::SampleIndirect(int depth) {
                 if (rrBeta.MaxComponentValue() < 1 && depth > 3) {
                     Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                     if (sampler.Get1D() < q) {
-                        pathState.beta = SampledSpectrum(0);
+                        beta = SampledSpectrum(0);
                         return;
                     }
-                    beta /= 1 - q;
-                    DCHECK(!beta.HasNaNs());
+                    pdfUni *= 1 - q;
+                    pdfNEE *= 1 - q;
                 }
 
                 Ray ray = intr.SpawnRay(ps->wi);
                 PathRayIndex newRayIndex = pathRayQueue->Add(ray, 1e20f);
                 pixelIndexToRayIndex[pixelIndex] = newRayIndex;
                 rayIndexToPixelIndex[(depth & 1) ^ 1][newRayIndex] = pixelIndex;
-
-                pathState.beta = beta;
             });
     }
 }

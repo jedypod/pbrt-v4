@@ -37,10 +37,12 @@ inline void GPUPathIntegrator::SampleIndirect(int depth, bool overrideRay) {
             SurfaceInteraction &intersection = intersections[depth & 1][pixelIndex];
             PathState *pathState = &pathStates[pixelIndex];
 
-            SampledSpectrum beta = pathState->beta;
+            SampledSpectrum &beta = pathState->beta;
             if (!beta)
                 return;
 
+            SampledSpectrum &pdfUni = pathState->pdfUni;
+            SampledSpectrum &pdfNEE = pathState->pdfNEE;
             BSDF *bsdf = intersection.bsdf;
             Vector3f wo = intersection.wo;
 
@@ -53,11 +55,16 @@ inline void GPUPathIntegrator::SampleIndirect(int depth, bool overrideRay) {
                 pathState->beta = SampledSpectrum(0);
                 return;
             }
-            beta *= bs->f * (AbsDot(intersection.shading.n, bs->wi) / bs->pdf);
-            DCHECK(!beta.HasNaNs());
 
-            pathState->scatteringPDF =
-                bsdf->SampledPDFIsProportional() ? bsdf->PDF(wo, bs->wi) : bs->pdf;
+            beta *= bs->f * AbsDot(bs->wi, intersection.shading.n);
+            pdfNEE = pdfUni;
+            if (bsdf->SampledPDFIsProportional()) {
+                Float pdf = bsdf->PDF(wo, bs->wi);
+                beta *= pdf / bs->pdf;
+                pdfUni *= pdf;
+            } else
+                pdfUni *= bs->pdf;
+
             pathState->bsdfFlags = bs->flags;
 
             if (regularize && !bs->IsSpecular())
@@ -72,10 +79,11 @@ inline void GPUPathIntegrator::SampleIndirect(int depth, bool overrideRay) {
             if (rrBeta.MaxComponentValue() < 1 && depth > 3) {
                 Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                 if (sampler.Get1D() < q) {
-                    pathState->beta = SampledSpectrum(0);
+                    beta = SampledSpectrum(0);
                     return;
                 }
-                beta /= 1 - q;
+                pdfUni *= 1 - q;
+                pdfNEE *= 1 - q;
                 DCHECK(!beta.HasNaNs());
             }
 
@@ -88,8 +96,6 @@ inline void GPUPathIntegrator::SampleIndirect(int depth, bool overrideRay) {
                 pixelIndexToRayIndex[pixelIndex] = newRayIndex;
                 rayIndexToPixelIndex[(depth & 1) ^ 1][newRayIndex] = pixelIndex;
             }
-
-            pathState->beta = beta;
         });
 }
 

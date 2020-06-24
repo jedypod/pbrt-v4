@@ -156,9 +156,10 @@ static FloatTextureHandle getAlphaTexture(
 
 static int getOptixGeometryFlags(bool isTriangle, FloatTextureHandle alphaTextureHandle,
                                  MaterialHandle materialHandle) {
-    if (materialHandle.HasSubsurfaceScattering())
+    if (materialHandle && materialHandle.HasSubsurfaceScattering())
         return OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-    else if ((alphaTextureHandle && isTriangle) || materialHandle.IsTransparent())
+    else if ((alphaTextureHandle && isTriangle) ||
+             (materialHandle && materialHandle.IsTransparent()))
         // Need anyhit
         return OPTIX_GEOMETRY_FLAG_NONE;
     else
@@ -1051,7 +1052,9 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectClosest(
 
 std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
     const RayQueue<ShadowRayIndex> *shadowRays, int maxRays,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayTr) const {
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight) const {
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -1062,7 +1065,9 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRays = shadowRays;
-        params.shadowRayTr = shadowRayTr;
+        params.shadowRayLd = shadowRayLd;
+        params.shadowRayPDFUni = shadowRayPDFUni;
+        params.shadowRayPDFLight = shadowRayPDFLight;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
@@ -1087,7 +1092,9 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
 
 std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadowTr(
     const RayQueue<ShadowRayIndex> *shadowRays, int maxRays,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayTr,
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight,
     TypedIndexSpan<PixelIndex, ShadowRayIndex> shadowRayIndexToPixelIndex,
     TypedIndexSpan<SampledWavelengths, PixelIndex> lambda,
     TypedIndexSpan<RNG *, PixelIndex> rng) const {
@@ -1101,7 +1108,9 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadowTr(
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRays = shadowRays;
-        params.shadowRayTr = shadowRayTr;
+        params.shadowRayLd = shadowRayLd;
+        params.shadowRayPDFUni = shadowRayPDFUni;
+        params.shadowRayPDFLight = shadowRayPDFLight;
         params.shadowRayIndexToPixelIndex = shadowRayIndexToPixelIndex;
         params.lambda = lambda;
         params.rng = rng;

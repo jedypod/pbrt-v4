@@ -28,7 +28,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             if (rayIndex >= *numActiveRays)
                 return;
 
-            if (interactionType[rayIndex] != InteractionType::Surface)
+            if (interactionType[depth & 1][rayIndex] != InteractionType::Surface)
                 return;
 
             PixelIndex pixelIndex = rayIndexToPixelIndex[depth & 1][rayIndex];
@@ -71,7 +71,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
             PathRayIndex rayIndex =
                 subsurfaceRayIndexToPathRayIndex[ssRayIndex];  // incident ray
-            CHECK(interactionType[rayIndex] == InteractionType::Surface);
+            CHECK(interactionType[depth & 1][rayIndex] == InteractionType::Surface);
 
             PixelIndex pixelIndex = rayIndexToPixelIndex[depth & 1][rayIndex];
             PathState &pathState = pathStates[pixelIndex];

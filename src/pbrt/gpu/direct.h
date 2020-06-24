@@ -64,21 +64,21 @@ inline void GPUPathIntegrator::SampleDirect(int depth) {
             if (!f)
                 return;
 
-            Float cosTheta = AbsDot(ls->wi, intersection.shading.n);
-            Float lightPDF = ls->pdf * lightChoicePDF;
-            Float weight = 1;
-            if (!IsDeltaLight(light.Type())) {
-                Float bsdfPDF = bsdf->PDF<BxDF>(wo, ls->wi);
-                weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
-            }
+            beta *= f * AbsDot(ls->wi, intersection.shading.n);
 
             Ray ray = intersection.SpawnRayTo(ls->pLight);
             ShadowRayIndex shadowRayIndex = shadowRayQueue->Add(ray, 1 - ShadowEpsilon);
             shadowRayIndexToPixelIndex[shadowRayIndex] = pixelIndex;
 
-            SampledSpectrum Ld = beta * ls->L * f * (weight * cosTheta / lightPDF);
-            DCHECK(!Ld.HasNaNs());
-            shadowRayLd[shadowRayIndex] = Ld;
+            Float lightPDF = ls->pdf * lightChoicePDF;
+            // This causes pdfUni to be zero for the shadow ray, so that
+            // part of MIS just becomes a no-op.
+            Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f :
+                bsdf->PDF<BxDF>(wo, ls->wi);
+
+            shadowRayLd[shadowRayIndex] = beta * ls->L;
+            shadowRayPDFLight[shadowRayIndex] = pathState->pdfUni * lightPDF;
+            shadowRayPDFUni[shadowRayIndex] = pathState->pdfUni * bsdfPDF;
         });
 }
 

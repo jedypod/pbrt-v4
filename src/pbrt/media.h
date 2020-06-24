@@ -64,6 +64,7 @@ class alignas(8) HenyeyGreensteinPhaseFunction {
 };
 
 struct MediumSample {
+    PBRT_CPU_GPU
     MediumSample() : Tmaj(1) { }
 
     PBRT_CPU_GPU
@@ -201,12 +202,15 @@ class alignas(8) GridDensityMedium {
                     CHECK_LE(density.r, node.maxDensity);
                     CHECK_LE(density.g, node.maxDensity);
                     CHECK_LE(density.b, node.maxDensity);
+#if 0
                     SampledSpectrum spec =
 #ifdef PBRT_IS_GPU_CODE
                         RGBSpectrum(*RGBColorSpace_sRGB, density).Sample(lambda);
 #else
                         RGBSpectrum(*RGBColorSpace::sRGB, density).Sample(lambda);
 #endif
+#endif
+                    SampledSpectrum spec((density.r + density.g + density.b) / 3);
                     sigma_a *= spec;
                     sigma_s *= spec;
                 }

@@ -29,14 +29,13 @@ void GPURender(ParsedScene &scene);
 
 struct PathState {
     SampledSpectrum L;
-    SampledSpectrum beta;
+    SampledSpectrum beta, pdfUni, pdfNEE;
     Float filterSampleWeight;
     Float etaScale;
     bool anyNonSpecularBounces;
 
     pstd::optional<SampledLight> sampledLight;
 
-    Float scatteringPDF;
     BxDFFlags bsdfFlags;
 };
 
@@ -291,7 +290,7 @@ class GPUPathIntegrator {
     TypedIndexSpan<SampledWavelengths, PixelIndex> lambdas;
     TypedIndexSpan<SurfaceInteraction, PixelIndex> intersections[2];
     TypedIndexSpan<MediumInteraction, PixelIndex> mediumInteractions[2];
-    TypedIndexSpan<InteractionType, PathRayIndex> interactionType;
+    TypedIndexSpan<InteractionType, PathRayIndex> interactionType[2];
     TypedIndexSpan<SamplerHandle, PixelIndex> samplers;
     TypedIndexSpan<RNG *, PixelIndex> rngs;
     SampledSpectrumSOA<PixelIndex> cameraRayWeights;
@@ -305,8 +304,8 @@ class GPUPathIntegrator {
 
     RayQueue<ShadowRayIndex> *shadowRayQueue;
     TypedIndexSpan<PixelIndex, ShadowRayIndex> shadowRayIndexToPixelIndex;
-    SampledSpectrumSOA<ShadowRayIndex> shadowRayLd;
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowTr;
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd;
+    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni, shadowRayPDFLight;
 
     RayQueue<SSRayIndex> *randomHitRayQueue;
     TypedIndexSpan<MaterialHandle, SSRayIndex> subsurfaceMaterials;

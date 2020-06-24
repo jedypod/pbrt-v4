@@ -109,11 +109,15 @@ class GPUAccel {
 
     std::pair<cudaEvent_t, cudaEvent_t> IntersectShadow(
         const RayQueue<ShadowRayIndex> *rays, int maxRays,
-        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayTr) const;
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight) const;
 
     std::pair<cudaEvent_t, cudaEvent_t> IntersectShadowTr(
         const RayQueue<ShadowRayIndex> *rays, int maxRays,
-        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayTr,
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
+        TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight,
         TypedIndexSpan<PixelIndex, ShadowRayIndex> shadowRayIndexToPixelIndex,
         TypedIndexSpan<SampledWavelengths, PixelIndex> lambda,
         TypedIndexSpan<RNG *, PixelIndex> rng) const;
