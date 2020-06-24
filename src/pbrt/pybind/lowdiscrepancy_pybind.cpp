@@ -1,10 +1,7 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
-#include <pybind11/functional.h>
-#include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/operators.h>
+#include <pybind11/functional.h>
 
 #include <pbrt/sampling/lowdiscrepancy.h>
 
@@ -14,28 +11,26 @@ using namespace pybind11::literals;
 namespace pbrt {
 
 void PybindInitSamplingLowDiscrepancy(py::module &m) {
-    m.def("RadicalInverse", &RadicalInverse, "baseIndex"_a, "a"_a);
+    m.def("RadicalInverse", &RadicalInverse,
+          "baseIndex"_a, "a"_a);
     m.def("ComputeRadicalInversePermutations", &ComputeRadicalInversePermutations,
           "rng"_a);
-    m.def(
-        "ScrambledRadicalInverse",
-        [](int baseIndex, uint64_t a, const std::vector<uint16_t> &perm) {
-            return ScrambledRadicalInverse(baseIndex, a, perm);
-        },
-        "baseIndex"_a, "a"_a, "perm"_a);
-    m.def(
-        "MultiplyGenerator",
-        [](const std::vector<uint32_t> &C, uint32_t a) {
-            return MultiplyGenerator(C, a);
-        },
-        "C"_a, "a"_a);
-    m.def(
-        "SampleGeneratorMatrix",
-        [](const std::vector<uint32_t> &C, uint32_t a,
-           std::function<uint32_t(uint32_t)> randomizer) {
-            return SampleGeneratorMatrix(C, a, randomizer);
-        },
-        "C"_a, "a"_a, "scramble"_a = 0);
+    m.def("ScrambledRadicalInverse",
+          [](int baseIndex, uint64_t a, const std::vector<uint16_t> &perm) {
+              return ScrambledRadicalInverse(baseIndex, a, perm);
+          },
+          "baseIndex"_a, "a"_a, "perm"_a);
+    m.def("MultiplyGenerator",
+          [](const std::vector<uint32_t> &C, uint32_t a) {
+              return MultiplyGenerator(C, a);
+          },
+          "C"_a, "a"_a);
+    m.def("SampleGeneratorMatrix",
+          [](const std::vector<uint32_t> &C, uint32_t a,
+             std::function<uint32_t(uint32_t)> randomizer) {
+              return SampleGeneratorMatrix(C, a, randomizer);
+          },
+          "C"_a, "a"_a, "scramble"_a = 0);
 
     m.def("OwenScramble", &OwenScramble, "v"_a, "hash"_a);
 
@@ -44,8 +39,7 @@ void PybindInitSamplingLowDiscrepancy(py::module &m) {
         .def("__call__", [](const NoRandomizer &s, uint32_t v) { return s(v); });
     py::class_<CranleyPattersonRotator>(m, "CranleyPattersonRotator")
         .def(py::init<Float>())
-        .def("__call__",
-             [](const CranleyPattersonRotator &s, uint32_t v) { return s(v); });
+        .def("__call__", [](const CranleyPattersonRotator &s, uint32_t v) { return s(v); });
     py::class_<XORScrambler>(m, "XORScrambler")
         .def(py::init<uint32_t>(), "scramble"_a)
         .def("__call__", [](const XORScrambler &s, uint32_t v) { return s(v); });
@@ -54,4 +48,4 @@ void PybindInitSamplingLowDiscrepancy(py::module &m) {
         .def("__call__", [](const OwenScrambler &s, uint32_t v) { return s(v); });
 }
 
-}  // namespace pbrt
+} // namespace pbrt

@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -16,7 +44,6 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
-#include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 
 #include <cmath>
@@ -29,55 +56,58 @@ namespace pbrt {
 class RGB {
   public:
     RGB() = default;
-    PBRT_CPU_GPU
-    RGB(Float r, Float g, Float b) : r(r), g(g), b(b) {}
+    PBRT_HOST_DEVICE_INLINE
+    RGB(Float r, Float g, Float b)
+        : r(r), g(g), b(b) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator+=(const RGB &s) {
         r += s.r;
         g += s.g;
         b += s.b;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator+(const RGB &s) const {
         RGB ret = *this;
         return ret += s;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator-=(const RGB &s) {
         r -= s.r;
         g -= s.g;
         b -= s.b;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator-(const RGB &s) const {
         RGB ret = *this;
         return ret -= s;
     }
-    PBRT_CPU_GPU
-    friend RGB operator-(Float a, const RGB &s) { return {a - s.r, a - s.g, a - s.b}; }
+    PBRT_HOST_DEVICE_INLINE
+    friend RGB operator-(Float a, const RGB &s) {
+        return {a - s.r, a - s.g, a - s.b};
+    }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator*=(const RGB &s) {
         r *= s.r;
         g *= s.g;
         b *= s.b;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator*(const RGB &s) const {
         RGB ret = *this;
         return ret *= s;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator*(Float a) const {
         DCHECK(!std::isnan(a));
         return {a * r, a * g, a * b};
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator*=(Float a) {
         DCHECK(!std::isnan(a));
         r *= a;
@@ -85,22 +115,24 @@ class RGB {
         b *= a;
         return *this;
     }
-    PBRT_CPU_GPU
-    friend RGB operator*(Float a, const RGB &s) { return s * a; }
+    PBRT_HOST_DEVICE_INLINE
+    friend RGB operator*(Float a, const RGB &s) {
+        return s * a;
+    }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator/=(const RGB &s) {
         r /= s.r;
         g /= s.g;
         b /= s.b;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator/(const RGB &s) const {
         RGB ret = *this;
         return ret /= s;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB &operator/=(Float a) {
         DCHECK(!std::isnan(a));
         DCHECK_NE(a, 0);
@@ -109,38 +141,38 @@ class RGB {
         b /= a;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator/(Float a) const {
         RGB ret = *this;
         return ret /= a;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RGB operator-() const { return {-r, -g, -b}; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float Average() const { return (r + g + b) / 3; }
 
-    PBRT_CPU_GPU
-    bool operator==(const RGB &s) const { return r == s.r && g == s.g && b == s.b; }
-    PBRT_CPU_GPU
-    bool operator!=(const RGB &s) const { return r != s.r || g != s.g || b != s.b; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
+    bool operator==(const RGB &s) const {
+        return r == s.r && g == s.g && b == s.b;
+    }
+    PBRT_HOST_DEVICE_INLINE
+    bool operator!=(const RGB &s) const {
+        return r != s.r || g != s.g || b != s.b;
+    }
+    PBRT_HOST_DEVICE_INLINE
     Float operator[](int c) const {
         DCHECK(c >= 0 && c < 3);
-        if (c == 0)
-            return r;
-        else if (c == 1)
-            return g;
+        if (c == 0) return r;
+        else if (c == 1) return g;
         return b;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float &operator[](int c) {
         DCHECK(c >= 0 && c < 3);
-        if (c == 0)
-            return r;
-        else if (c == 1)
-            return g;
+        if (c == 0) return r;
+        else if (c == 1) return g;
         return b;
     }
 
@@ -149,86 +181,85 @@ class RGB {
     Float r = 0, g = 0, b = 0;
 };
 
-PBRT_CPU_GPU
-inline RGB max(const RGB &a, const RGB &b) {
-    return RGB(std::max(a.r, b.r), std::max(a.g, b.g), std::max(a.b, b.b));
-}
-
 template <typename U, typename V>
-PBRT_CPU_GPU inline RGB Clamp(const RGB &rgb, U min, V max) {
-    return RGB(pbrt::Clamp(rgb.r, min, max), pbrt::Clamp(rgb.g, min, max),
+PBRT_HOST_DEVICE_INLINE
+RGB Clamp(const RGB &rgb, U min, V max) {
+    return RGB(pbrt::Clamp(rgb.r, min, max),
+               pbrt::Clamp(rgb.g, min, max),
                pbrt::Clamp(rgb.b, min, max));
 }
 
-PBRT_CPU_GPU
-inline RGB ClampZero(const RGB &rgb) {
-    return RGB(std::max<Float>(0, rgb.r), std::max<Float>(0, rgb.g),
-               std::max<Float>(0, rgb.b));
+PBRT_HOST_DEVICE_INLINE
+RGB ClampZero(const RGB &rgb) {
+    return RGB(std::max<Float>(0, rgb.r), std::max<Float>(0, rgb.g), std::max<Float>(0, rgb.b));
 }
 
-PBRT_CPU_GPU
-inline RGB Lerp(Float t, const RGB &s1, const RGB &s2) {
+PBRT_HOST_DEVICE_INLINE
+RGB Lerp(Float t, const RGB &s1, const RGB &s2) {
     return (1 - t) * s1 + t * s2;
 }
+
 
 class XYZ {
   public:
     XYZ() = default;
-    PBRT_CPU_GPU
-    XYZ(Float X, Float Y, Float Z) : X(X), Y(Y), Z(Z) {}
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
+    XYZ(Float X, Float Y, Float Z)
+        : X(X), Y(Y), Z(Z) {}
+    PBRT_HOST_DEVICE_INLINE
     static XYZ FromxyY(Float x, Float y, Float Y = 1) {
-        if (y == 0)
-            return XYZ(0, 0, 0);
+        if (y == 0) return XYZ(0, 0, 0);
         return XYZ(x * Y / y, Y, (1 - x - y) * Y / y);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator+=(const XYZ &s) {
         X += s.X;
         Y += s.Y;
         Z += s.Z;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator+(const XYZ &s) const {
         XYZ ret = *this;
         return ret += s;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator-=(const XYZ &s) {
         X -= s.X;
         Y -= s.Y;
         Z -= s.Z;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator-(const XYZ &s) const {
         XYZ ret = *this;
         return ret -= s;
     }
-    PBRT_CPU_GPU
-    friend XYZ operator-(Float a, const XYZ &s) { return {a - s.X, a - s.Y, a - s.Z}; }
+    PBRT_HOST_DEVICE_INLINE
+    friend XYZ operator-(Float a, const XYZ &s) {
+        return {a - s.X, a - s.Y, a - s.Z};
+    }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator*=(const XYZ &s) {
         X *= s.X;
         Y *= s.Y;
         Z *= s.Z;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator*(const XYZ &s) const {
         XYZ ret = *this;
         return ret *= s;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator*(Float a) const {
         DCHECK(!std::isnan(a));
         return {a * X, a * Y, a * Z};
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator*=(Float a) {
         DCHECK(!std::isnan(a));
         X *= a;
@@ -237,19 +268,19 @@ class XYZ {
         return *this;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator/=(const XYZ &s) {
         X /= s.X;
         Y /= s.Y;
         Z /= s.Z;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator/(const XYZ &s) const {
         XYZ ret = *this;
         return ret /= s;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ &operator/=(Float a) {
         DCHECK(!std::isnan(a));
         DCHECK_NE(a, 0);
@@ -258,38 +289,38 @@ class XYZ {
         Z /= a;
         return *this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator/(Float a) const {
         XYZ ret = *this;
         return ret /= a;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XYZ operator-() const { return {-X, -Y, -Z}; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float Average() const { return (X + Y + Z) / 3; }
 
-    PBRT_CPU_GPU
-    bool operator==(const XYZ &s) const { return X == s.X && Y == s.Y && Z == s.Z; }
-    PBRT_CPU_GPU
-    bool operator!=(const XYZ &s) const { return X != s.X || Y != s.Y || Z != s.Z; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
+    bool operator==(const XYZ &s) const {
+        return X == s.X && Y == s.Y && Z == s.Z;
+    }
+    PBRT_HOST_DEVICE_INLINE
+    bool operator!=(const XYZ &s) const {
+        return X != s.X || Y != s.Y || Z != s.Z;
+    }
+    PBRT_HOST_DEVICE_INLINE
     Float operator[](int c) const {
         DCHECK(c >= 0 && c < 3);
-        if (c == 0)
-            return X;
-        else if (c == 1)
-            return Y;
+        if (c == 0) return X;
+        else if (c == 1) return Y;
         return Z;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float &operator[](int c) {
         DCHECK(c >= 0 && c < 3);
-        if (c == 0)
-            return X;
-        else if (c == 1)
-            return Y;
+        if (c == 0) return X;
+        else if (c == 1) return Y;
         return Z;
     }
 
@@ -298,35 +329,37 @@ class XYZ {
     Float X = 0, Y = 0, Z = 0;
 };
 
-PBRT_CPU_GPU
-inline XYZ operator*(Float a, const XYZ &s) {
+PBRT_HOST_DEVICE_INLINE
+XYZ operator*(Float a, const XYZ &s) {
     return s * a;
 }
 
 template <typename U, typename V>
-PBRT_CPU_GPU inline XYZ Clamp(const XYZ &xyz, U min, V max) {
-    return XYZ(pbrt::Clamp(xyz.X, min, max), pbrt::Clamp(xyz.Y, min, max),
+PBRT_HOST_DEVICE_INLINE
+XYZ Clamp(const XYZ &xyz, U min, V max) {
+    return XYZ(pbrt::Clamp(xyz.X, min, max),
+               pbrt::Clamp(xyz.Y, min, max),
                pbrt::Clamp(xyz.Z, min, max));
 }
 
-PBRT_CPU_GPU
-inline XYZ ClampZero(const XYZ &xyz) {
-    return XYZ(std::max<Float>(0, xyz.X), std::max<Float>(0, xyz.Y),
-               std::max<Float>(0, xyz.Z));
+PBRT_HOST_DEVICE_INLINE
+XYZ ClampZero(const XYZ &xyz) {
+    return XYZ(std::max<Float>(0, xyz.X), std::max<Float>(0, xyz.Y), std::max<Float>(0, xyz.Z));
 }
 
-PBRT_CPU_GPU
-inline XYZ Lerp(Float t, const XYZ &s1, const XYZ &s2) {
+PBRT_HOST_DEVICE_INLINE
+XYZ Lerp(Float t, const XYZ &s1, const XYZ &s2) {
     return (1 - t) * s1 + t * s2;
 }
 
 class RGBSigmoidPolynomial {
-  public:
+public:
     RGBSigmoidPolynomial() = default;
-    PBRT_CPU_GPU
-    RGBSigmoidPolynomial(Float c0, Float c1, Float c2) : c0(c0), c1(c1), c2(c2) {}
+    PBRT_HOST_DEVICE_INLINE
+    RGBSigmoidPolynomial(Float c0, Float c1, Float c2)
+        : c0(c0), c1(c1), c2(c2) { }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float operator()(Float lambda) const {
         // c2 + c1 * lambda + c0 * lambda^2
         Float v = EvaluatePolynomial(lambda, c2, c1, c0);
@@ -335,7 +368,7 @@ class RGBSigmoidPolynomial {
         return S(v);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float MaxValue() const {
         // if c0 > 0, then the extremum is a minimum
         if (c0 < 0) {
@@ -348,19 +381,19 @@ class RGBSigmoidPolynomial {
 
     std::string ToString() const;
 
-  private:
-    PBRT_CPU_GPU
+private:
+    PBRT_HOST_DEVICE_INLINE
     static Float S(Float x) { return .5 + x / (2 * std::sqrt(1 + x * x)); };
 
     Float c0, c1, c2;
 };
 
 class RGBToSpectrumTable {
-  public:
+public:
     RGBToSpectrumTable(int res, const float *scale, const float *data)
         : res(res), scale(scale), data(data) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     RGBSigmoidPolynomial operator()(const RGB &rgb) const;
 
     static void Init(Allocator alloc);
@@ -371,53 +404,48 @@ class RGBToSpectrumTable {
 
     std::string ToString() const;
 
-  private:
+private:
     int res = 0;
     const float *scale = nullptr, *data = nullptr;
 };
 
-class LinearColorEncoding;
-class sRGBColorEncoding;
-class GammaColorEncoding;
 
-class ColorEncodingHandle
-    : public TaggedPointer<LinearColorEncoding, sRGBColorEncoding, GammaColorEncoding> {
-  public:
-    using TaggedPointer::TaggedPointer;
-    ColorEncodingHandle(
-        TaggedPointer<LinearColorEncoding, sRGBColorEncoding, GammaColorEncoding> tp)
-        : TaggedPointer(tp) {}
+class ColorEncoding {
+ public:
+    PBRT_HOST_DEVICE
+    virtual ~ColorEncoding();
+    PBRT_HOST_DEVICE
+    virtual void ToLinear(pstd::span<const uint8_t> vin,
+                          pstd::span<Float> vout) const = 0;
+    PBRT_HOST_DEVICE
+    virtual Float ToFloatLinear(Float v) const = 0;
+    PBRT_HOST_DEVICE
+    virtual void FromLinear(pstd::span<const Float> vin,
+                            pstd::span<uint8_t> vout) const = 0;
 
-    PBRT_CPU_GPU inline void ToLinear(pstd::span<const uint8_t> vin,
-                                      pstd::span<Float> vout) const;
+    virtual std::string ToString() const = 0;
 
-    PBRT_CPU_GPU inline Float ToFloatLinear(Float v) const;
+    static const ColorEncoding *Linear;
+    static const ColorEncoding *sRGB;
 
-    PBRT_CPU_GPU inline void FromLinear(pstd::span<const Float> vin,
-                                        pstd::span<uint8_t> vout) const;
-
-    std::string ToString() const;
-
-    static const ColorEncodingHandle Linear;
-    static const ColorEncodingHandle sRGB;
-
-    static const ColorEncodingHandle Get(const std::string &name);
+    static const ColorEncoding *Get(const std::string &name);
 };
 
-class LinearColorEncoding {
-  public:
-    PBRT_CPU_GPU
+class LinearColorEncoding : public ColorEncoding {
+ public:
+    PBRT_HOST_DEVICE_INLINE
     void ToLinear(pstd::span<const uint8_t> vin, pstd::span<Float> vout) const {
         DCHECK_EQ(vin.size(), vout.size());
         for (size_t i = 0; i < vin.size(); ++i)
             vout[i] = vin[i] / 255.f;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float ToFloatLinear(Float v) const { return v; }
 
-    PBRT_CPU_GPU
-    void FromLinear(pstd::span<const Float> vin, pstd::span<uint8_t> vout) const {
+    PBRT_HOST_DEVICE_INLINE
+    void FromLinear(pstd::span<const Float> vin,
+                    pstd::span<uint8_t> vout) const {
         DCHECK_EQ(vin.size(), vout.size());
         for (size_t i = 0; i < vin.size(); ++i)
             vout[i] = uint8_t(Clamp(vin[i] * 255.f + 0.5f, 0, 255));
@@ -426,59 +454,41 @@ class LinearColorEncoding {
     std::string ToString() const { return "[ LinearColorEncoding ]"; }
 };
 
-class sRGBColorEncoding {
-  public:
-    PBRT_CPU_GPU
+class sRGBColorEncoding : public ColorEncoding {
+ public:
+    PBRT_HOST_DEVICE
     void ToLinear(pstd::span<const uint8_t> vin, pstd::span<Float> vout) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float ToFloatLinear(Float v) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void FromLinear(pstd::span<const Float> vin, pstd::span<uint8_t> vout) const;
 
     std::string ToString() const { return "[ sRGBColorEncoding ]"; }
 };
 
-class GammaColorEncoding {
-  public:
-    PBRT_CPU_GPU
+class GammaColorEncoding : public ColorEncoding {
+ public:
+    PBRT_HOST_DEVICE
     GammaColorEncoding(Float gamma);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void ToLinear(pstd::span<const uint8_t> vin, pstd::span<Float> vout) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float ToFloatLinear(Float v) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void FromLinear(pstd::span<const Float> vin, pstd::span<uint8_t> vout) const;
 
     std::string ToString() const;
 
-  private:
+ private:
     Float gamma;
     pstd::array<Float, 256> applyLUT;
     pstd::array<Float, 1024> inverseLUT;
 };
 
-inline void ColorEncodingHandle::ToLinear(pstd::span<const uint8_t> vin,
-                                          pstd::span<Float> vout) const {
-    auto tolin = [&](auto ptr) { return ptr->ToLinear(vin, vout); };
-    return Apply<void>(tolin);
-}
-
-inline Float ColorEncodingHandle::ToFloatLinear(Float v) const {
-    auto tfl = [&](auto ptr) { return ptr->ToFloatLinear(v); };
-    return Apply<Float>(tfl);
-}
-
-inline void ColorEncodingHandle::FromLinear(pstd::span<const Float> vin,
-                                            pstd::span<uint8_t> vout) const {
-    auto fl = [&](auto ptr) { return ptr->FromLinear(vin, vout); };
-    return Apply<void>(fl);
-}
-
-PBRT_CPU_GPU
-inline Float LinearToSRGBFull(Float value) {
-    if (value <= 0.0031308f)
-        return 12.92f * value;
+PBRT_HOST_DEVICE_INLINE
+Float LinearToSRGBFull(Float value) {
+    if (value <= 0.0031308f) return 12.92f * value;
     return 1.055f * std::pow(value, (Float)(1.f / 2.4f)) - 0.055f;
 }
 
@@ -496,36 +506,31 @@ struct PiecewiseLinearSegment {
 extern PBRT_CONST PiecewiseLinearSegment LinearToSRGBPiecewise[];
 constexpr int LinearToSRGBPiecewiseSize = 256;
 
-PBRT_CPU_GPU
-inline Float LinearToSRGB(Float value) {
+PBRT_HOST_DEVICE_INLINE
+Float LinearToSRGB(Float value) {
     int index = int(value * LinearToSRGBPiecewiseSize);
-    if (index < 0)
-        return 0;
-    if (index >= LinearToSRGBPiecewiseSize)
-        return 1;
+    if (index < 0) return 0;
+    if (index >= LinearToSRGBPiecewiseSize) return 1;
     return LinearToSRGBPiecewise[index].base + value * LinearToSRGBPiecewise[index].slope;
 }
 
-PBRT_CPU_GPU
-inline uint8_t LinearToSRGB8(Float value, Float dither = 0) {
-    if (value <= 0)
-        return 0;
-    if (value >= 1)
-        return 255;
+PBRT_HOST_DEVICE_INLINE
+uint8_t LinearToSRGB8(Float value, Float dither = 0) {
+    if (value <= 0) return 0;
+    if (value >= 1) return 255;
     return Clamp(255.f * LinearToSRGB(value) + dither, 0, 255);
 }
 
-PBRT_CPU_GPU
-inline Float SRGBToLinear(Float value) {
-    if (value <= 0.04045f)
-        return value * (1 / 12.92f);
+PBRT_HOST_DEVICE_INLINE
+Float SRGBToLinear(Float value) {
+    if (value <= 0.04045f) return value * (1 / 12.92f);
     return std::pow((value + 0.055f) * (1 / 1.055f), (Float)2.4f);
 }
 
 extern PBRT_CONST Float SRGBToLinearLUT[256];
 
-PBRT_CPU_GPU
-inline Float SRGB8ToLinear(uint8_t value) {
+PBRT_HOST_DEVICE_INLINE
+Float SRGB8ToLinear(uint8_t value) {
     return SRGBToLinearLUT[value];
 }
 

@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,7 +41,6 @@
 // util/rng.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/bits.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/float.h>
 #include <pbrt/util/pstd.h>
@@ -34,36 +61,29 @@ namespace pbrt {
 class RNG {
   public:
     // RNG Public Methods
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RNG();
-
-    PBRT_CPU_GPU
-    RNG(uint64_t sequenceIndex, uint64_t seed) { SetSequence(sequenceIndex, seed); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     RNG(uint64_t sequenceIndex) { SetSequence(sequenceIndex); }
-
-    PBRT_CPU_GPU
-    void SetSequence(uint64_t sequenceIndex, uint64_t seed);
-    PBRT_CPU_GPU
-    void SetSequence(uint64_t sequenceIndex) {
-        SetSequence(sequenceIndex, MixBits(sequenceIndex));
-    }
+    PBRT_HOST_DEVICE_INLINE
+    void SetSequence(uint64_t sequenceIndex);
 
     template <typename T>
-    PBRT_CPU_GPU T Uniform();
+    PBRT_HOST_DEVICE_INLINE
+    T Uniform();
 
     template <typename T>
-    PBRT_CPU_GPU T
-    Uniform(T b, typename std::enable_if_t<std::is_integral<T>::value> * = nullptr) {
+    PBRT_HOST_DEVICE_INLINE
+    T Uniform(
+        T b, typename std::enable_if_t<std::is_integral<T>::value> * = nullptr) {
         T threshold = (~b + 1u) % b;
         while (true) {
             T r = Uniform<T>();
-            if (r >= threshold)
-                return r % b;
+            if (r >= threshold) return r % b;
         }
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void Advance(int64_t idelta) {
         uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
         uint64_t accPlus = 0u, delta = (uint64_t)idelta;
@@ -79,7 +99,7 @@ class RNG {
         state = accMult * state + accPlus;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     int64_t operator-(const RNG &other) const {
         CHECK_EQ(inc, other.inc);
         uint64_t curMult = PCG32_MULT, curPlus = inc, curState = other.state;
@@ -132,7 +152,7 @@ inline int32_t RNG::Uniform<int32_t>() {
 
     DCHECK_GE(v, (uint32_t)std::numeric_limits<int32_t>::min());
     return int32_t(v - std::numeric_limits<int32_t>::min()) +
-           std::numeric_limits<int32_t>::min();
+        std::numeric_limits<int32_t>::min();
 }
 
 template <>
@@ -145,29 +165,37 @@ inline int64_t RNG::Uniform<int64_t>() {
 
     DCHECK_GE(v, (uint64_t)std::numeric_limits<int64_t>::min());
     return int64_t(v - std::numeric_limits<int64_t>::min()) +
-           std::numeric_limits<int64_t>::min();
+        std::numeric_limits<int64_t>::min();
 }
 
-template <>
+template<>
 inline float RNG::Uniform<float>() {
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min<float>(OneMinusEpsilon,
+                            Uniform<uint32_t>() * 2.3283064365386963e-10f);
+#else
     return std::min<float>(OneMinusEpsilon, Uniform<uint32_t>() * 0x1p-32f);
+#endif
 }
 
-template <>
+template<>
 inline double RNG::Uniform<double>() {
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min<double>(OneMinusEpsilon, (Uniform<uint64_t>() *
+                                               5.42101086242752217003726400435e-20));
+#else
     return std::min<double>(OneMinusEpsilon, Uniform<uint64_t>() * 0x1p-64);
+#endif
 }
 
 template <typename T>
-inline T RNG::Uniform() {
-    return T::unimplemented;
-}
+inline T RNG::Uniform() { return T::unimplemented; }
 
-inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
+inline void RNG::SetSequence(uint64_t initseq) {
     state = 0u;
-    inc = (sequenceIndex << 1u) | 1u;
+    inc = (initseq << 1u) | 1u;
     Uniform<uint32_t>();
-    state += seed;
+    state += PCG32_DEFAULT_STATE;
     Uniform<uint32_t>();
 }
 

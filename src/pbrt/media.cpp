@@ -1,21 +1,53 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // media.cpp*
 #include <pbrt/media.h>
 
+#include <pbrt/base.h>
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
-#include <pbrt/samplers.h>
-#include <pbrt/textures.h>
+#include <pbrt/primitive.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
+#include <pbrt/util/octree.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/profile.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/scattering.h>
+#include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 
 #include <algorithm>
@@ -25,28 +57,16 @@ namespace pbrt {
 
 std::string MediumInterface::ToString() const {
     return StringPrintf("[ MediumInterface inside: %s outside: %s ]",
-                        inside ? inside.ToString().c_str() : "(nullptr)",
-                        outside ? outside.ToString().c_str() : "(nullptr)");
-}
-
-std::string PhaseFunctionHandle::ToString() const {
-    if (ptr() == nullptr)
-        return "(nullptr)";
-
-    auto ts = [&](auto ptr) { return ptr->ToString(); };
-    return ApplyCPU<std::string>(ts);
-}
-
-std::string MediumSample::ToString() const {
-    return StringPrintf("[ MediumSample intr: %s t: %f Tmaj: %s ]",
-                        intr, t, Tmaj);
+                        inside ? inside->ToString().c_str() : "(nullptr)",
+                        outside ? outside->ToString().c_str() : "(nullptr)");
 }
 
 // Media Definitions
+PhaseFunction::~PhaseFunction() {}
 
 // HenyeyGreenstein Method Definitions
-std::string HenyeyGreensteinPhaseFunction::ToString() const {
-    return StringPrintf("[ HenyeyGreensteinPhaseFunction g: %f ]", g);
+std::string HenyeyGreenstein::ToString() const {
+    return StringPrintf("[ HenyeyGreenstein g: %f ]", g);
 }
 
 // Media Local Definitions
@@ -55,13 +75,14 @@ struct MeasuredSS {
     RGB sigma_prime_s, sigma_a;  // mm^-1
 };
 
-bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigma_a,
-                                   SpectrumHandle *sigma_s, Allocator alloc) {
+bool GetMediumScatteringProperties(const std::string &name,
+                                   SpectrumHandle *sigma_a,
+                                   SpectrumHandle *sigma_s,
+                                   Allocator alloc) {
     static MeasuredSS SubsurfaceParameterTable[] = {
         // From "A Practical Model for Subsurface Light Transport"
         // Jensen, Marschner, Levoy, Hanrahan
         // Proc SIGGRAPH 2001
-        // clang-format off
         {"Apple", RGB(2.29, 2.39, 1.97), RGB(0.0030, 0.0034, 0.046)},
         {"Chicken1", RGB(0.15, 0.21, 0.38), RGB(0.015, 0.077, 0.19)},
         {"Chicken2", RGB(0.19, 0.25, 0.32), RGB(0.018, 0.088, 0.20)},
@@ -113,108 +134,126 @@ bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigm
         {"Salt Powder", RGB(0.027333, 0.032451, 0.031979), RGB(0.28415, 0.3257, 0.34148)},
         {"Sugar Powder", RGB(0.00022272, 0.00025513, 0.000271), RGB(0.012638, 0.031051, 0.050124)},
         {"Suisse Mocha Powder", RGB(2.7979, 3.5452, 4.3365), RGB(17.502, 27.004, 35.433)},
-        {"Pacific Ocean Surface Water", RGB(0.0001764, 0.00032095, 0.00019617), RGB(0.031845, 0.031324, 0.030147)}
-        // clang-format on
-    };
+        {"Pacific Ocean Surface Water", RGB(0.0001764, 0.00032095, 0.00019617), RGB(0.031845, 0.031324, 0.030147)}};
 
     for (MeasuredSS &mss : SubsurfaceParameterTable) {
         if (name == mss.name) {
             *sigma_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_a);
-            *sigma_s =
-                alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_prime_s);
+            *sigma_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_prime_s);
             return true;
         }
     }
     return false;
 }
 
-bool MediumHandle::IsEmissive() const {
-    auto is = [&](auto ptr) { return ptr->IsEmissive(); };
-    return ApplyCPU<bool>(is);
-}
-
-std::string MediumHandle::ToString() const {
-    if (ptr() == nullptr)
-        return "(nullptr)";
-
-    auto ts = [&](auto ptr) { return ptr->ToString(); };
-    return ApplyCPU<std::string>(ts);
-}
-
 // HomogeneousMedium Method Definitions
-HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &parameters,
-                                             const FileLoc *loc, Allocator alloc) {
+HomogeneousMedium *HomogeneousMedium::Create(
+    const ParameterDictionary &dict, const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = parameters.GetOneString("preset", "");
+    std::string preset = dict.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
     if (sig_a == nullptr) {
-        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General,
+                                    alloc);
         if (sig_a == nullptr)
-            sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(.0011f, .0024f, .014f));
+            sig_a =
+                alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
+                                              RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General,
+                                    alloc);
         if (sig_s == nullptr)
-            sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(2.55f, 3.21f, 3.77f));
+            sig_s =
+                alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
+                                              RGB(2.55f, 3.21f, 3.77f));
     }
 
-    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
-                                            alloc);
-    if (Le == nullptr)
-        Le = alloc.new_object<ConstantSpectrum>(0.f);
+    Float scale = dict.GetOneFloat("scale", 1.f);
+    if (scale != 1) {
+        sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
+        sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
+    }
 
-    Float scale = parameters.GetOneFloat("scale", 1.f);
-    sig_a.Scale(scale);
-    sig_s.Scale(scale);
+    Float g = dict.GetOneFloat("g", 0.0f);
 
-    Float g = parameters.GetOneFloat("g", 0.0f);
+    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, g);
+}
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, Le, g, alloc);
+SampledSpectrum HomogeneousMedium::Tr(const Ray &ray, Float tMax,
+                                      const SampledWavelengths &lambda,
+                                      SamplerHandle sampler) const {
+    ProfilerScope _(ProfilePhase::MediumTr);
+    SampledSpectrum sigma_t = sigma_a.Sample(lambda) + sigma_s.Sample(lambda);
+    return Exp(-sigma_t * std::min(tMax * Length(ray.d), MaxFloat));
+}
+
+SampledSpectrum HomogeneousMedium::Sample(const Ray &ray, Float tMax, SamplerHandle sampler,
+                                          const SampledWavelengths &lambda,
+                                          MemoryArena &arena,
+                                          MediumInteraction *mi) const {
+    ProfilerScope _(ProfilePhase::MediumSample);
+
+    // Sample a channel and distance along the ray
+    SampledSpectrum sigma_t = sigma_a.Sample(lambda) + sigma_s.Sample(lambda);
+    int channel = sampler.GetDiscrete1D(NSpectrumSamples);
+    if (sigma_t[channel] == 0) return SampledSpectrum(1);
+    Float dist = -std::log(1 - sampler.Get1D()) / sigma_t[channel];
+    Float t = std::min(dist / Length(ray.d), tMax);
+    bool sampledMedium = t < tMax;
+    if (sampledMedium)
+        *mi = MediumInteraction(ray(t), -ray.d, ray.time, this,
+                                arena.Alloc<HenyeyGreenstein>(g));
+
+    // Compute the transmittance and sampling density
+    SampledSpectrum Tr = Exp(-sigma_t * std::min(t, MaxFloat) * Length(ray.d));
+
+    // Return weighting factor for scattering from homogeneous medium
+    SampledSpectrum density = sampledMedium ? (sigma_t * Tr) : Tr;
+    Float pdf = density.Average();
+    if (pdf == 0) {
+        CHECK(!Tr);
+        pdf = 1;
+    }
+    return sampledMedium ? (Tr * sigma_s.Sample(lambda) / pdf) : (Tr / pdf);
 }
 
 std::string HomogeneousMedium::ToString() const {
     return StringPrintf("[ Homogeneous medium sigma_a: %s sigma_s: %s g: %f ]",
-                        sigma_a_spec, sigma_s_spec, g);
+                        sigma_a, sigma_s, g);
 }
 
-STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
+
+STAT_RATIO("Media/Grid steps per Tr() call", nTrSteps, nTrCalls);
+STAT_RATIO("Media/Grid steps per Sample() call", nSampleSteps, nSampleCalls);
+STAT_MEMORY_COUNTER("Memory/Volume density grid", densityBytes);
 STAT_MEMORY_COUNTER("Memory/Volume density octree", densityOctreeBytes);
 
 // GridDensityMedium Method Definitions
-GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s,
-                                     SpectrumHandle Le, Float g,
-                                     const Transform &worldFromMedium,
-                                     pstd::optional<SampledGrid<Float>> dgrid,
-                                     pstd::optional<SampledGrid<RGB>> rgbgrid,
-                                     const RGBColorSpace *colorSpace,
-                                     SampledGrid<Float> Legrid, Allocator alloc)
-    : sigma_a_spec(sigma_a, alloc),
-      sigma_s_spec(sigma_s, alloc),
-      Le_spec(Le, alloc),
-      phase(g),
+GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float g,
+                                     int nx, int ny, int nz, const Transform &worldFromMedium,
+                                     std::vector<Float> d, Allocator alloc)
+    : sigma_a_spec(sigma_a),
+      sigma_s_spec(sigma_s),
       g(g),
+      nx(nx),
+      ny(ny),
+      nz(nz),
       mediumFromWorld(Inverse(worldFromMedium)),
       worldFromMedium(worldFromMedium),
-      densityGrid(std::move(dgrid)),
-      rgbDensityGrid(std::move(rgbgrid)),
-      colorSpace(colorSpace),
-      LeScaleGrid(std::move(Legrid)),
-      treeBufferResource(256 * 1024, alloc.resource()) {
-    volumeGridBytes += LeScaleGrid.BytesAllocated();
-    volumeGridBytes += densityGrid ? densityGrid->BytesAllocated() :
-        rgbDensityGrid->BytesAllocated();
+      density(d.begin(), d.end()) {
+    CHECK_EQ(nx * ny * nz, density.size());
+    densityBytes += density.size() * sizeof(Float);
 
     // Create densityOctree. For starters, make the full thing. (Probably
     // not the best approach).
     const int maxDepth = 6;
     Bounds3f bounds(Point3f(0, 0, 0), Point3f(1, 1, 1));
-    Allocator treeAllocator(&treeBufferResource);
-    buildOctree(&densityOctree, treeAllocator, bounds, maxDepth);
+    buildOctree(&densityOctree, alloc, bounds, maxDepth);
+//CO    return;///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Want world-space bounds, but not including the rotation, so that the bbox
     // doesn't expand
@@ -230,8 +269,8 @@ GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigm
     // densityOctreeBytes += octreeArena.BytesAllocated();
 }
 
-void GridDensityMedium::simplifyOctree(OctreeNode *node, const Bounds3f &bounds, Float SE,
-                                       Float sigma_t) {
+void GridDensityMedium::simplifyOctree(OctreeNode *node, const Bounds3f &bounds,
+                                       Float SE, Float sigma_t) {
     if (node->children == nullptr)
         // leaf
         return;
@@ -249,61 +288,43 @@ void GridDensityMedium::simplifyOctree(OctreeNode *node, const Bounds3f &bounds,
     // equation (14)...
     Float Nsplit = (4 * childVolume * kChildSum + bounds.SurfaceArea()) / SE;
 
-    // LOG(INFO) << bounds << ": Nparent " << Nparent << " (kparent) " <<
-    // kParent << ", NSplit " << Nsplit;
+    //LOG(INFO) << bounds << ": Nparent " << Nparent << " (kparent) " << kParent << ", NSplit " << Nsplit;
     if (1.1 * Nparent < Nsplit) {
-        // LOG(INFO) << " -> SIMPLIFYING";
+        //LOG(INFO) << " -> SIMPLIFYING";
         node->children = nullptr;
     } else {
         for (int i = 0; i < 8; ++i)
-            simplifyOctree(node->child(i), OctreeChildBounds(bounds, i), SE, sigma_t);
+            simplifyOctree(node->child(i), OctreeChildBounds(bounds, i), SE,
+                           sigma_t);
     }
 }
 
 void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
                                     const Bounds3f &bounds, int depth) {
+    node->bounds = bounds;
     if (depth == 0) {
         // leaf
-        if (densityGrid)
-            node->maxDensity = densityGrid->MaximumValue(bounds);
-        else {
-            int nx = rgbDensityGrid->xSize();
-            int ny = rgbDensityGrid->ySize();
-            int nz = rgbDensityGrid->zSize();
-            Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                                     bounds.pMin.z * nz - .5f),
-                             Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                                     bounds.pMax.z * nz - .5f)};
-            Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-                             Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
-                                 Point3i(nx - 1, ny - 1, nz - 1))};
+        Point3f ps[2] = { Point3f(bounds.pMin.x * nx - .5f,
+                                  bounds.pMin.y * ny - .5f,
+                                  bounds.pMin.z * nz - .5f),
+                          Point3f(bounds.pMax.x * nx - .5f,
+                                  bounds.pMax.y * ny - .5f,
+                                  bounds.pMax.z * nz - .5f) };
+        Point3i pi[2] = { Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+                          Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
+                              Point3i(nx - 1, ny - 1, nz - 1)) };
 
-            std::vector<SampledWavelengths> lambdas;
-            for (Float u : Stratified1D(16))
-                lambdas.push_back(SampledWavelengths::SampleImportance(u));
+        Float minDensity = Infinity, maxDensity = 0;
+        for (int z = pi[0].z; z <= pi[1].z; ++z)
+            for (int y = pi[0].y; y <= pi[1].y; ++y)
+                for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                    Float d = D(Point3i(x, y, z));
+                    minDensity = std::min(minDensity, d);
+                    maxDensity = std::max(maxDensity, d);
+                }
 
-            node->maxDensity = 0;
-            for (int z = pi[0].z; z <= pi[1].z; ++z)
-                for (int y = pi[0].y; y <= pi[1].y; ++y)
-                    for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                        RGB rgb = rgbDensityGrid->Lookup(Point3i(x, y, z));
-
-                        Float maxComponent = std::max({rgb.r, rgb.g, rgb.b});
-                        if (maxComponent == 0)
-                            continue;
-
-                        RGBSpectrum spec(*colorSpace, rgb);
-                        for (const SampledWavelengths &lambda : lambdas) {
-                            SampledSpectrum s = spec.Sample(lambda);
-                            node->maxDensity =
-                                std::max(node->maxDensity, s.MaxComponentValue());
-                        }
-                    }
-
-            node->maxDensity *= 1.025f;
-        }
-
-        CHECK_GE(node->maxDensity, 0);
+        node->minDensity = minDensity;
+        node->maxDensity = maxDensity;
         return;
     }
 
@@ -313,114 +334,323 @@ void GridDensityMedium::buildOctree(OctreeNode *node, Allocator alloc,
         buildOctree(node->child(i), alloc, OctreeChildBounds(bounds, i), depth - 1);
     }
 
+    node->minDensity = node->child(0)->minDensity;
     node->maxDensity = node->child(0)->maxDensity;
-    for (int i = 1; i < 8; ++i)
-        node->maxDensity = std::max(node->maxDensity, node->child(i)->maxDensity);
+    for (int i = 1; i < 8; ++i) {
+        node->minDensity = std::min(node->minDensity,
+                                    node->child(i)->minDensity);
+        node->maxDensity = std::max(node->maxDensity,
+                                    node->child(i)->maxDensity);
+    }
 }
 
-GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
-                                             const Transform &worldFromMedium,
-                                             const FileLoc *loc, Allocator alloc) {
+GridDensityMedium *GridDensityMedium::Create(
+        const ParameterDictionary &dict,
+        const Transform &worldFromMedium, const FileLoc *loc, Allocator alloc) {
     SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = parameters.GetOneString("preset", "");
+    std::string preset = dict.GetOneString("preset", "");
     if (!preset.empty()) {
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
 
     if (sig_a == nullptr) {
-        sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+        sig_a = dict.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(.0011f, .0024f, .014f));
     }
     if (sig_s == nullptr) {
-        sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+        sig_s = dict.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    Float scale = parameters.GetOneFloat("scale", 1.f);
-    sig_a.Scale(scale);
-    sig_s.Scale(scale);
-
-    Float g = parameters.GetOneFloat("g", 0.0f);
-
-    std::vector<Float> density = parameters.GetFloatArray("density");
-    std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
-    if (density.empty() && rgbDensity.empty())
-        ErrorExit(loc, "No \"density\" values provided for heterogeneous medium.");
-    if (!density.empty() && !rgbDensity.empty())
-        ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
-
-    int nx = parameters.GetOneInt("nx", 1);
-    int ny = parameters.GetOneInt("ny", 1);
-    int nz = parameters.GetOneInt("nz", 1);
-    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-    size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
-    if (nDensity != nx * ny * nz)
-        ErrorExit(loc, "GridDensityMedium has %d density values; expected nx*ny*nz = %d",
-                  nDensity, nx * ny * nz);
-
-    const RGBColorSpace *colorSpace = parameters.ColorSpace();
-
-    pstd::optional<SampledGrid<Float>> densityGrid;
-    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
-    if (density.size())
-        densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
-    else
-        rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
-
-    SpectrumHandle Le = parameters.GetOneSpectrum("Le", nullptr, SpectrumType::General,
-                                            alloc);
-    if (Le == nullptr)
-        Le = alloc.new_object<ConstantSpectrum>(0.f);
-
-    SampledGrid<Float> LeGrid(alloc);
-    std::vector<Float> LeScale = parameters.GetFloatArray("Lescale");
-    if (LeScale.empty())
-        LeGrid = SampledGrid<Float>({1.f}, 1, 1, 1, alloc);
-    else {
-        if (LeScale.size() != nx * ny * nz)
-            ErrorExit("Expected %d x %d %d = %d values for \"Lescale\" but were "
-                      "given %d.", nx, ny, nz, nx * ny * nz, LeScale.size());
-        LeGrid = SampledGrid<Float>(LeScale, nx, ny, nz, alloc);
+    Float scale = dict.GetOneFloat("scale", 1.f);
+    if (scale != 1) {
+        sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
+        sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
     }
 
-    Transform MediumFromData =
-        Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-    return alloc.new_object<GridDensityMedium>(sig_a, sig_s, Le, g,
-                                               worldFromMedium * MediumFromData,
-                                               std::move(densityGrid),
-                                               std::move(rgbDensityGrid), colorSpace,
-                                               std::move(LeGrid), alloc);
+    Float g = dict.GetOneFloat("g", 0.0f);
+
+    std::vector<Float> density = dict.GetFloatArray("density");
+    if (density.empty()) {
+        Error(loc, "No \"density\" values provided for heterogeneous medium?");
+        return nullptr;
+    }
+    int nx = dict.GetOneInt("nx", 1);
+    int ny = dict.GetOneInt("ny", 1);
+    int nz = dict.GetOneInt("nz", 1);
+    Point3f p0 = dict.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = dict.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+    if (density.size() != nx * ny * nz) {
+        Error(loc,
+              "GridDensityMedium has %d density values; expected nx*ny*nz = "
+              "%d",
+              (int)density.size(), nx * ny * nz);
+        return nullptr;
+    }
+
+    Transform MediumFromData = Translate(Vector3f(p0)) *
+        Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+    return alloc.new_object<GridDensityMedium>(
+        sig_a, sig_s, g, nx, ny, nz, worldFromMedium * MediumFromData, std::move(density),
+        alloc);
+}
+
+
+Float GridDensityMedium::Density(const Point3f &p) const {
+    // Compute voxel coordinates and offsets for _p_
+    Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
+    Point3i pi = (Point3i)Floor(pSamples);
+    Vector3f d = pSamples - (Point3f)pi;
+
+    // Trilinearly interpolate density values to compute local density
+    Float d00 = Lerp(d.x, D(pi), D(pi + Vector3i(1, 0, 0)));
+    Float d10 = Lerp(d.x, D(pi + Vector3i(0, 1, 0)), D(pi + Vector3i(1, 1, 0)));
+    Float d01 = Lerp(d.x, D(pi + Vector3i(0, 0, 1)), D(pi + Vector3i(1, 0, 1)));
+    Float d11 = Lerp(d.x, D(pi + Vector3i(0, 1, 1)), D(pi + Vector3i(1, 1, 1)));
+    Float d0 = Lerp(d.y, d00, d10);
+    Float d1 = Lerp(d.y, d01, d11);
+    return Lerp(d.z, d0, d1);
+}
+
+SampledSpectrum GridDensityMedium::Sample(const Ray &rWorld, Float raytMax, SamplerHandle sampler,
+                                          const SampledWavelengths &lambda,
+                                          MemoryArena &arena,
+                                          MediumInteraction *mi) const {
+    ProfilerScope _(ProfilePhase::MediumSample);
+    ++nSampleCalls;
+
+    raytMax *= Length(rWorld.d);
+    Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
+    // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium bounds
+    const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
+    Float tMin, tMax;
+    if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) return SampledSpectrum(1.f);
+
+    // Run delta-tracking iterations to sample a medium interaction
+    bool foundInteraction = false;
+#if 0
+    // WHY IS THIS SO MUCH NOISIER? SHOULDNT IT BASICALLY BE EQUIVALENT?
+    SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+    SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+    SampledSpectrum sigma_t = sigma_a + sigma_s;
+
+    SampledSpectrum w(1.f);
+    TraverseOctree(&densityOctree, ray.o, ray.d, [&](const OctreeNode &node, Float t, Float t1) {
+//CO            w = SampledSpectrum(1.f);
+            if (node.maxDensity == 0)
+                // Empty--skip it!
+                return OctreeTraversal::Continue;
+
+            CHECK(!std::isnan(t));
+            CHECK(!std::isnan(t1));
+            Float sigma_bar = node.maxDensity * sigma_t.MaxComponentValue();
+
+            CHECK_LT(t0, tMax); // this should be the case now
+
+            while (true) {
+                ++nSampleSteps;
+                t += -std::log(1 - sampler.Get1D()) / sigma_bar;
+
+                if (t >= t1)
+                    // exited this cell w/o a scattering event
+                    return OctreeTraversal::Continue;
+
+                if (t >= tMax)
+                    // Nothing before the geom intersection; get out of here
+                    return OctreeTraversal::Abort;
+
+//CO                CHECK(Inside(ray(t), node.bounds)) << t << ", pos " << ray(t) << ", bounds " << node.bounds;
+//CO                if (!Inside(ray(t), node.bounds))
+//CO                    LOG(WARNING) << "Outside node bounds, t " << t << ", pos " << ray(t) << ", bounds " << node.bounds;
+                Float d = Density(ray(t));
+                CHECK_LE(d, 1.0001 * node.maxDensity) << t << ", pos " << ray(t) <<
+                    ", t0 " << t0 << ", t1 " << t1 << ", tmax " << tMax;
+                SampledSpectrum sigma_n = sigma_bar - d * sigma_t;
+//CO                CHECK_GE(sigma_n.MinComponentValue(), -1e-5) << sigma_n << ", d " << d <<
+//CO                    ", max density " << node.maxDensity << ", sigma_a " << sigma_a <<
+//CO                    ", sigma_s " << sigma_s;
+
+                // Slightly confusing: sigma_{a,s} aren't scaled by d, but
+                // sigma_n is.
+                Float Ps = (sigma_s * d * w).Average();
+                Float Pn = (sigma_n * w).Average();
+                Float Psum = Ps + Pn;
+                // TODO: multiply the sample value by this instead, or use SampleDiscrete for that matter...
+                Ps /= Psum;
+                Pn /= Psum;
+
+                if (sampler.Get1D() < Ps) {
+                    // Scatter
+                    w *= sigma_s * (d / (sigma_bar * Ps));
+                    CHECK(w.MaxComponentValue() != Infinity);
+                    CHECK(!w.HasNaNs());
+                    // Populate _mi_ with medium interaction information and return
+                    PhaseFunction *phase = arena.Alloc<HenyeyGreenstein>(g);
+                    *mi = MediumInteraction(rWorld(t), -rWorld.d, rWorld.time, this,
+                                            phase);
+                    foundInteraction = true;
+                    return OctreeTraversal::Abort;
+                } else {
+                    // null collision; keep going
+                    w *= sigma_n / (sigma_bar * Pn);
+                    CHECK(w.MaxComponentValue() != Infinity);
+                    CHECK(!w.HasNaNs());
+                }
+            }
+        });
+                    CHECK(w.MaxComponentValue() != Infinity);
+                    CHECK(!w.HasNaNs());
+    return w; // TODO: can nuke foundInteractino???
+    return foundInteraction ? w : SampledSpectrum(1.f); // TODO: safe to always return w?
+#else
+    // For now...
+    Float sigma_t = sigma_a_spec.MaxValue() + sigma_s_spec.MaxValue();
+
+    TraverseOctree(&densityOctree, ray.o, ray.d, raytMax, [&](const OctreeNode &node, Float t, Float t1) {
+            if (node.maxDensity == 0)
+                // Empty--skip it!
+                return OctreeTraversal::Continue;
+
+            DCHECK_RARE(1e-5, Density(ray((t + t1)/2)) > node.maxDensity);
+            while (true) {
+                ++nSampleSteps;
+                t += -std::log(1 - sampler.Get1D()) / (sigma_t * node.maxDensity);
+
+                if (t >= t1)
+                    // exited this cell w/o a scattering event
+                    return OctreeTraversal::Continue;
+
+                if (t >= tMax)
+                    // Nothing before the geom intersection; get out of here
+                    return OctreeTraversal::Abort;
+
+                if (Density(ray(t)) > sampler.Get1D() * node.maxDensity) {
+                    // Populate _mi_ with medium interaction information and return
+                    PhaseFunction *phase = arena.Alloc<HenyeyGreenstein>(g);
+                    *mi = MediumInteraction(rWorld(t), -rWorld.d, rWorld.time, this,
+                                            phase);
+                    foundInteraction = true;
+                    return OctreeTraversal::Abort;
+                }
+            }
+        });
+    return foundInteraction ? sigma_s_spec.Sample(lambda) / sigma_t :
+        SampledSpectrum(1.f);
+#endif
+}
+
+SampledSpectrum GridDensityMedium::Tr(const Ray &rWorld, Float raytMax,
+                                      const SampledWavelengths &lambda,
+                                      SamplerHandle sampler) const {
+    ProfilerScope _(ProfilePhase::MediumTr);
+    ++nTrCalls;
+
+    raytMax *= Length(rWorld.d);
+    Ray ray = mediumFromWorld(Ray(rWorld.o, Normalize(rWorld.d)), &raytMax);
+    // Compute $[\tmin, \tmax]$ interval of _ray_'s overlap with medium bounds
+    const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
+    Float tMin, tMax;
+    if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) return SampledSpectrum(1.f);
+
+    SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+    SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+    SampledSpectrum sigma_t = sigma_a + sigma_s;
+
+    // Perform ratio tracking to estimate the transmittance value
+    SampledSpectrum Tr(1.f);
+    TraverseOctree(&densityOctree, ray.o, ray.d, raytMax, [&](const OctreeNode &node, Float t, Float t1) {
+            if (node.maxDensity == 0)
+                // Empty--skip it!
+                return OctreeTraversal::Continue;
+
+            DCHECK_GE(t1, 0);
+
+            CHECK_GE(t, .999 * tMin);
+
+            // Residual tracking. First, account for the constant part.
+            if (node.minDensity > 0) {
+                Float dt = std::min(t1, tMax) - t;
+                Tr *= Exp(-dt * node.minDensity * sigma_t);
+            CHECK(Tr.MaxComponentValue() != Infinity);
+            CHECK(!Tr.HasNaNs());
+            }
+
+            // Now do ratio tracking through the residual volume.
+            Float sigma_bar = (node.maxDensity - node.minDensity) *
+                sigma_t.MaxComponentValue();
+            DCHECK_GE(sigma_bar, 0);
+            if (sigma_bar == 0)
+                // There's no residual; go on to the next octree node.
+                return OctreeTraversal::Continue;
+
+            while (true) {
+                ++nTrSteps;
+                t += -std::log(1 - sampler.Get1D()) / sigma_bar;
+                if (t >= t1)
+                    // exited node; keep going
+                    return OctreeTraversal::Continue;
+
+                if (t >= tMax)
+                    // past hit point. stop
+                    return OctreeTraversal::Abort;
+
+                Float density = Density(ray(t)) - node.minDensity;
+                CHECK_RARE(1e-9, density < 0);
+                density = std::max<Float>(density, 0);
+
+                // FIXME: if sigma_bar isn't a majorant, then is this clamp wrong???
+                Tr *= 1 - Clamp(density * sigma_t / sigma_bar, 0, 1);
+
+            CHECK(Tr.MaxComponentValue() != Infinity);
+            CHECK(!Tr.HasNaNs());
+                Float Tr_max = Tr.MaxComponentValue();
+                if (Tr_max < 1) {
+                    Float q = 1 - Tr_max;
+                    if (sampler.Get1D() < q) {
+                        Tr = SampledSpectrum(0.f);
+                        return OctreeTraversal::Abort;
+                    }
+                    Tr /= 1 - q;
+            CHECK(Tr.MaxComponentValue() != Infinity);
+            CHECK(!Tr.HasNaNs());
+                }
+            }
+        });
+
+            CHECK(Tr.MaxComponentValue() != Infinity);
+            CHECK(!Tr.HasNaNs());
+    return Tr;
 }
 
 std::string GridDensityMedium::ToString() const {
     Float maxDensity = densityOctree.maxDensity;
-    return StringPrintf("[ GridDensityMedium sigma_a: %s sigma_s: %s mediumFromWorld: %s "
-                        "root maxDensity: %f ]",
-                        sigma_a_spec, sigma_s_spec, mediumFromWorld, maxDensity);
+    return StringPrintf("[ GridDensityMedium sigma_a: %s sigma_s: %s "
+                        " nx: %d ny: %d nz: %d mediumFromWorld: %s root maxDensity: %f ]",
+                        sigma_a_spec, sigma_s_spec, nx, ny, nz, mediumFromWorld,
+                        maxDensity);
 }
 
-MediumHandle MediumHandle::Create(const std::string &name,
-                                  const ParameterDictionary &parameters,
-                                  const Transform &worldFromMedium, const FileLoc *loc,
-                                  Allocator alloc) {
-    MediumHandle m = nullptr;
+Medium *Medium::Create(const std::string &name,
+                       const ParameterDictionary &dict,
+                       const Transform &worldFromMedium,
+                       const FileLoc *loc, Allocator alloc) {
+    Medium *m = nullptr;
     if (name == "homogeneous")
-        m = HomogeneousMedium::Create(parameters, loc, alloc);
+        m = HomogeneousMedium::Create(dict, loc, alloc);
     else if (name == "heterogeneous")
-        m = GridDensityMedium::Create(parameters, worldFromMedium, loc, alloc);
+        m = GridDensityMedium::Create(dict, worldFromMedium, loc, alloc);
     else
         ErrorExit(loc, "%s: medium unknown.", name);
 
     if (!m)
         ErrorExit(loc, "%s: unable to create medium.", name);
 
-    parameters.ReportUnused();
+    dict.ReportUnused();
     return m;
 }
 

@@ -1,6 +1,35 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // sampling/lowdiscrepancy.cpp*
 #include <pbrt/util/lowdiscrepancy.h>
@@ -15,8 +44,8 @@
 namespace pbrt {
 
 std::string DigitPermutation::ToString() const {
-    std::string s = StringPrintf(
-        "[ DigitPermitation base: %d nDigits: %d permutations: ", base, nDigits);
+    std::string s = StringPrintf("[ DigitPermitation base: %d nDigits: %d permutations: ",
+                                 base, nDigits);
     for (int digitIndex = 0; digitIndex < nDigits; ++digitIndex) {
         s += StringPrintf("[%d] ( ", digitIndex);
         for (int digitValue = 0; digitValue < base; ++digitValue) {
@@ -72,23 +101,18 @@ HaltonPixelIndexer::HaltonPixelIndexer(const Point2i &fullResolution) {
 
 std::string ToString(RandomizeStrategy r) {
     switch (r) {
-    case RandomizeStrategy::None:
-        return "None";
-    case RandomizeStrategy::CranleyPatterson:
-        return "CranleyPatterson";
-    case RandomizeStrategy::Xor:
-        return "Xor";
-    case RandomizeStrategy::Owen:
-        return "Owen";
-    default:
-        LOG_FATAL("Unhandled RandomizeStrategy");
-        return "";
+    case RandomizeStrategy::None: return "None";
+    case RandomizeStrategy::CranleyPatterson: return "CranleyPatterson";
+    case RandomizeStrategy::Xor: return "Xor";
+    case RandomizeStrategy::Owen: return "Owen";
+    default: LOG_FATAL("Unhandled RandomizeStrategy"); return "";
     }
 }
 
 // Low Discrepancy Static Functions
 template <int base>
-PBRT_NOINLINE PBRT_CPU_GPU static Float RadicalInverseSpecialized(uint64_t a) {
+PBRT_NOINLINE PBRT_HOST_DEVICE
+static Float RadicalInverseSpecialized(uint64_t a) {
     const Float invBase = (Float)1 / (Float)base;
     uint64_t reversedDigits = 0;
     Float invBaseN = 1;
@@ -104,8 +128,9 @@ PBRT_NOINLINE PBRT_CPU_GPU static Float RadicalInverseSpecialized(uint64_t a) {
 }
 
 template <int base>
-PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
-    uint64_t a, const DigitPermutation &perm) {
+PBRT_NOINLINE PBRT_HOST_DEVICE
+static Float
+ScrambledRadicalInverseSpecialized(uint64_t a, const DigitPermutation &perm) {
     CHECK_EQ(perm.base, base);
     const Float invBase = (Float)1 / (Float)base;
     uint64_t reversedDigits = 0;
@@ -123,8 +148,9 @@ PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
 }
 
 template <int base>
-PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
-    uint64_t a, uint32_t seed) {
+PBRT_NOINLINE PBRT_HOST_DEVICE
+static Float
+ScrambledRadicalInverseSpecialized(uint64_t a, uint32_t seed) {
     const Float invBase = (Float)1 / (Float)base;
     uint64_t reversedDigits = 0;
     Float invBaseN = 1;
@@ -135,8 +161,7 @@ PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
         // NOTE: can do Owen scrambling if digitSeed also incorporates
         // reversedDigits...
         uint32_t digitSeed = ((base * 32) + digitIndex) ^ seed ^ reversedDigits;
-        reversedDigits =
-            reversedDigits * base + PermutationElement(digit, base, digitSeed);
+        reversedDigits = reversedDigits * base + PermutationElement(digit, base, digitSeed);
         invBaseN *= invBase;
         ++digitIndex;
         a = next;
@@ -148,8 +173,12 @@ PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
 Float RadicalInverse(int baseIndex, uint64_t a) {
     switch (baseIndex) {
     case 0:
-        // Compute base-2 radical inverse
+    // Compute base-2 radical inverse
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+        return ReverseBits64(a) * 5.4210108624275222e-20;
+#else
         return ReverseBits64(a) * 0x1p-64;
+#endif
     case 1:
         return RadicalInverseSpecialized<3>(a);
     case 2:
@@ -2208,13 +2237,14 @@ pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
     pstd::vector<DigitPermutation> *perms =
         alloc.new_object<pstd::vector<DigitPermutation>>(alloc);
     perms->resize(PrimeTableSize);
-    ParallelFor(0, PrimeTableSize, [&perms, &alloc, seed](int64_t i) {
+    ParallelFor(0, PrimeTableSize, [&perms,&alloc,seed](int64_t i) {
         (*perms)[i] = DigitPermutation(Primes[i], seed, alloc);
     });
     return perms;
 }
 
-Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const DigitPermutation &perm) {
+Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
+                              const DigitPermutation &perm) {
     switch (baseIndex) {
     case 0:
         return ScrambledRadicalInverseSpecialized<2>(a, perm);
@@ -4266,7 +4296,8 @@ Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const DigitPermutation 
     case 1023:
         return ScrambledRadicalInverseSpecialized<8161>(a, perm);
     default:
-        LOG_FATAL("Base %d is >= 1024, the limit of ScrambledRadicalInverse", baseIndex);
+        LOG_FATAL("Base %d is >= 1024, the limit of ScrambledRadicalInverse",
+                  baseIndex);
         return 0;
     }
 }
@@ -6323,7 +6354,8 @@ Float ScrambledRadicalInverse(int baseIndex, uint64_t a, uint32_t seed) {
     case 1023:
         return ScrambledRadicalInverseSpecialized<8161>(a, seed);
     default:
-        LOG_FATAL("Base %d is >= 1024, the limit of ScrambledRadicalInverse", baseIndex);
+        LOG_FATAL("Base %d is >= 1024, the limit of ScrambledRadicalInverse",
+                  baseIndex);
         return 0;
     }
 }

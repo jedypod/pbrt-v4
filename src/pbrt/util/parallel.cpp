@@ -1,12 +1,43 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // core/parallel.cpp*
 #include <pbrt/util/parallel.h>
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/progressreporter.h>
+#include <pbrt/util/profile.h>
 
 #include <iterator>
 #include <list>
@@ -49,12 +80,13 @@ class ParallelJob {
 
     virtual std::string ToString() const = 0;
 
-  protected:
+protected:
     std::string BaseToString() const {
-        return StringPrintf("activeWorkers: %d removed: %s", activeWorkers, removed);
+        return StringPrintf("activeWorkers: %d removed: %s", activeWorkers,
+                            removed);
     }
 
-  private:
+private:
     friend class ThreadPool;
 
     ParallelJob *prev = nullptr, *next = nullptr;
@@ -79,7 +111,7 @@ class ThreadPool {
     std::string ToString() const;
 
   private:
-    void workerFunc(int tIndex);
+    void workerFunc(int tIndex, Barrier *barrier);
 
     ParallelJob *jobList = nullptr;
     // Protects jobList
@@ -100,15 +132,23 @@ static bool maxThreadIndexCalled = false;
 ThreadPool::ThreadPool(int nThreads) {
     ThreadIndex = 0;
 
+    // Create a barrier so that we can be sure all worker threads get past
+    // their call to ProfilerWorkerThreadInit() before we return from this
+    // function.  In turn, we can be sure that the profiling system isn't
+    // started until after all worker threads have done that.
+    Barrier *barrier = new Barrier(nThreads);
+
     // Launch one fewer worker thread than the total number we want doing
     // work, since the main thread helps out, too.
     for (int i = 0; i < nThreads - 1; ++i)
-        threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1));
+        threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1,
+                                      barrier));
+
+    if (barrier->Block()) delete barrier;
 }
 
 ThreadPool::~ThreadPool() {
-    if (threads.empty())
-        return;
+    if (threads.empty()) return;
 
     {
         std::lock_guard<std::mutex> lock(jobListMutex);
@@ -116,14 +156,12 @@ ThreadPool::~ThreadPool() {
         jobListCondition.notify_all();
     }
 
-    for (std::thread &thread : threads)
-        thread.join();
+    for (std::thread &thread : threads) thread.join();
 }
 
 std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
     std::unique_lock<std::mutex> lock(jobListMutex);
-    if (jobList != nullptr)
-        jobList->prev = job;
+    if (jobList != nullptr) jobList->prev = job;
     job->next = jobList;
     jobList = job;
     jobListCondition.notify_all();
@@ -145,9 +183,18 @@ void ThreadPool::RemoveFromJobList(ParallelJob *job) {
     job->removed = true;
 }
 
-void ThreadPool::workerFunc(int tIndex) {
+void ThreadPool::workerFunc(int tIndex, Barrier *barrier) {
     LOG_VERBOSE("Started execution in worker thread %d", tIndex);
     ThreadIndex = tIndex;
+
+    // Give the profiler a chance to do per-thread initialization for
+    // the worker thread before the profiling system actually stops running.
+    ProfilerWorkerThreadInit();
+
+    // The main thread sets up a barrier so that it can be sure that all
+    // workers have called ProfilerWorkerThreadInit() before it continues
+    // (and actually starts the profiling system).
+    if (barrier->Block()) delete barrier;
 
     std::unique_lock<std::mutex> lock(jobListMutex);
     while (!shutdownThreads)
@@ -185,11 +232,11 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
 void ThreadPool::ForEachThread(std::function<void(void)> func) {
     Barrier *barrier = new Barrier(threads.size() + 1);
 
-    ParallelFor(0, threads.size() + 1, [barrier, &func](int64_t) {
-        func();
-        if (barrier->Block())
-            delete barrier;
-    });
+    ParallelFor(0, threads.size() + 1,
+                [barrier,&func](int64_t) {
+                    func();
+                    if (barrier->Block()) delete barrier;
+                });
 }
 
 std::string ThreadPool::ToString() const {
@@ -204,8 +251,8 @@ std::string ThreadPool::ToString() const {
         }
         s += "] ";
         jobListMutex.unlock();
-    } else
-        s += "(job list mutex locked) ";
+    }
+    else s += "(job list mutex locked) ";
     return s + "]";
 }
 
@@ -215,41 +262,58 @@ std::string ThreadPool::ToString() const {
 class ParallelForLoop1D : public ParallelJob {
   public:
     ParallelForLoop1D(int64_t start, int64_t end, int chunkSize,
-                      std::function<void(int64_t, int64_t)> func)
-        : func(std::move(func)), nextIndex(start), maxIndex(end), chunkSize(chunkSize) {}
+                      std::function<void(int64_t, int64_t)> func,
+                      ProgressReporter *progressReporter,
+                      uint64_t profilerState)
+        : func(std::move(func)),
+          nextIndex(start),
+          maxIndex(end),
+          chunkSize(chunkSize),
+          progressReporter(progressReporter),
+          profilerState(profilerState) {}
 
     bool HaveWork() const { return nextIndex < maxIndex; }
     void RunStep(std::unique_lock<std::mutex> *lock);
 
     std::string ToString() const {
         return StringPrintf("[ ParallelForLoop1D nextIndex: %d maxIndex: %d "
-                            "chunkSize: %d ]",
-                            nextIndex, maxIndex, chunkSize);
+                            "chunkSize: %d progressReporter: %s profilerState: %d ]", nextIndex,
+                            maxIndex, chunkSize,
+                            progressReporter ? progressReporter->ToString() : "(nullptr)",
+                            profilerState);
     }
 
-  private:
+private:
     std::function<void(int64_t, int64_t)> func;
     int64_t nextIndex;
     int64_t maxIndex;
     int chunkSize;
+    ProgressReporter *progressReporter;
+    uint64_t profilerState;
 };
 
 class ParallelForLoop2D : public ParallelJob {
   public:
     ParallelForLoop2D(const Bounds2i &extent, int chunkSize,
-                      std::function<void(Bounds2i)> func)
+                      std::function<void(Bounds2i)> func,
+                      ProgressReporter *progressReporter,
+                      uint64_t profilerState)
         : func(std::move(func)),
           extent(extent),
           nextStart(extent.pMin),
-          chunkSize(chunkSize) {}
+          chunkSize(chunkSize),
+          progressReporter(progressReporter),
+          profilerState(profilerState) {}
 
     bool HaveWork() const { return nextStart.y < extent.pMax.y; }
     void RunStep(std::unique_lock<std::mutex> *lock);
 
     std::string ToString() const {
         return StringPrintf("[ ParallelForLoop2D extent: %s nextStart: %s "
-                            "chunkSize: %d ]",
-                            extent, nextStart, chunkSize);
+                            "chunkSize: %d progressReporter: %s profilerState: %d ]", extent,
+                            nextStart, chunkSize,
+                            progressReporter ? progressReporter->ToString() : "(nullptr)",
+                            profilerState);
     }
 
   private:
@@ -257,6 +321,8 @@ class ParallelForLoop2D : public ParallelJob {
     const Bounds2i extent;
     Point2i nextStart;
     int chunkSize;
+    ProgressReporter *progressReporter;
+    uint64_t profilerState;
 };
 
 void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
@@ -273,7 +339,19 @@ void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
     lock->unlock();
 
     // Run loop indices in _[indexStart, indexEnd)_
+    uint64_t oldState = ProfilerState;
+    ProfilerState = profilerState;
+
     func(indexStart, indexEnd);
+
+    ProfilerState = oldState;
+
+    if (progressReporter) {
+        if (!HaveWork())
+            progressReporter->Done();
+        else
+            progressReporter->Update(indexEnd - indexStart);
+    }
 }
 
 void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
@@ -295,11 +373,32 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     lock->unlock();
 
     // Run the loop iteration
+    uint64_t oldState = ProfilerState;
+    ProfilerState = profilerState;
+
     func(b);
+
+    ProfilerState = oldState;
+
+    if (progressReporter) {
+        if (!HaveWork())
+            progressReporter->Done();
+        else
+            progressReporter->Update(b.Area());
+    }
 }
 
-void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func) {
+void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func,
+                 const char *progressName) {
     CHECK(threadPool);
+
+    // https://stackoverflow.com/a/23934764 :-(
+    ProgressReporter &&progress = [&]() -> ProgressReporter {
+        if (progressName)
+            return {end - start, progressName};
+        else
+            return { };
+    }();
 
     int64_t chunkSize = std::max<int64_t>(1, (end - start) / (8 * RunningThreads()));
 
@@ -309,7 +408,8 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
     }
 
     // Create and enqueue _ParallelJob_ for this loop
-    ParallelForLoop1D loop(start, end, chunkSize, std::move(func));
+    ParallelForLoop1D loop(start, end, chunkSize, std::move(func),
+                           &progress, CurrentProfilerState());
     std::unique_lock<std::mutex> lock = threadPool->AddToJobList(&loop);
 
     // Help out with parallel loop iterations in the current thread
@@ -317,8 +417,17 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
         threadPool->WorkOrWait(&lock);
 }
 
-void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func) {
+void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func,
+                   const char *progressName) {
     CHECK(threadPool);
+
+    // https://stackoverflow.com/a/23934764 :-(
+    ProgressReporter &&progress = [&]() -> ProgressReporter {
+        if (progressName)
+            return {extent.Area(), progressName};
+        else
+            return { };
+    }();
 
     if (extent.IsEmpty())
         return;
@@ -327,14 +436,14 @@ void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func) {
         return;
     }
 
-    // Want at least 8 tiles per thread, subject to not too big and not too
-    // small.
+    // Want at least 8 tiles per thread, subject to not too big and not too small.
     // TODO: should we do non-square?
     int tileSize = Clamp(int(std::sqrt(extent.Diagonal().x * extent.Diagonal().y /
                                        (8 * RunningThreads()))),
                          1, 32);
 
-    ParallelForLoop2D loop(extent, tileSize, std::move(func));
+    ParallelForLoop2D loop(extent, tileSize, std::move(func), &progress,
+                           CurrentProfilerState());
     std::unique_lock<std::mutex> lock = threadPool->AddToJobList(&loop);
 
     // Help out with parallel loop iterations in the current thread
@@ -375,8 +484,7 @@ void ParallelCleanup() {
 }
 
 void ForEachThread(std::function<void(void)> func) {
-    if (threadPool)
-        threadPool->ForEachThread(std::move(func));
+    threadPool->ForEachThread(std::move(func));
 }
 
 }  // namespace pbrt

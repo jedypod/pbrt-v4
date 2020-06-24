@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -28,28 +56,28 @@ namespace {
 std::string normalizeArg(const std::string &str) {
     std::string ret;
     for (unsigned char c : str) {
-        if (c != '_' && c != '-')
-            ret += std::tolower(c);
+        if (c != '_' && c != '-') ret += std::tolower(c);
     }
     return ret;
 }
 
 bool initArg(const std::string &str, int *ptr) {
-    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-'))
-        return false;
+    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-')) return false;
     *ptr = std::stoi(str);
     return true;
 }
 
 bool initArg(const std::string &str, float *ptr) {
-    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
+    if (str.empty() ||
+        (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
         return false;
     *ptr = std::stof(str);
     return true;
 }
 
 bool initArg(const std::string &str, double *ptr) {
-    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
+    if (str.empty() ||
+        (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
         return false;
     *ptr = std::stod(str);
     return true;
@@ -80,16 +108,14 @@ bool initArg(const std::string &str, pstd::span<int> out) {
 }
 
 bool initArg(const std::string &str, char **ptr) {
-    if (str.empty())
-        return false;
+    if (str.empty()) return false;
     *ptr = new char[str.size() + 1];
     std::strcpy(*ptr, str.c_str());
     return true;
 }
 
 bool initArg(const std::string &str, std::string *ptr) {
-    if (str.empty())
-        return false;
+    if (str.empty()) return false;
     *ptr = str;
     return true;
 }
@@ -116,11 +142,9 @@ bool initArg(const std::string &str, pstd::optional<T> *ptr) {
 }
 
 bool matchPrefix(const std::string &str, const std::string &prefix) {
-    if (prefix.size() > str.size())
-        return false;
+    if (prefix.size() > str.size()) return false;
     for (size_t i = 0; i < prefix.size(); ++i)
-        if (prefix[i] != str[i])
-            return false;
+        if (prefix[i] != str[i]) return false;
     return true;
 }
 

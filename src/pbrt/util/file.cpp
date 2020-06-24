@@ -1,12 +1,41 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // core/file.cpp*
 #include <pbrt/util/file.h>
 
-#include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/check.h>
 #include <pbrt/util/string.h>
 
 #include <filesystem/path.h>
@@ -18,9 +47,9 @@
 #include <cstring>
 #include <fstream>
 #ifndef PBRT_IS_WINDOWS
-#include <dirent.h>
-#include <sys/dir.h>
-#include <sys/types.h>
+  #include <dirent.h>
+  #include <sys/types.h>
+  #include <sys/dir.h>
 #endif
 
 namespace pbrt {
@@ -35,27 +64,24 @@ void SetSearchDirectory(const std::string &filename) {
 }
 
 static bool IsAbsolutePath(const std::string &filename) {
-    if (filename.empty())
-        return false;
+    if (filename.empty()) return false;
     return filesystem::path(filename).is_absolute();
 }
 
 bool HasExtension(const std::string &filename, const std::string &e) {
     std::string ext = e;
-    if (!ext.empty() && ext[0] == '.')
-        ext.erase(0, 1);
+    if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);
 
     std::string filenameExtension = filesystem::path(filename).extension();
-    if (ext.size() > filenameExtension.size())
-        return false;
-    return std::equal(ext.rbegin(), ext.rend(), filenameExtension.rbegin(),
-                      [](char a, char b) { return std::tolower(a) == std::tolower(b); });
+    if (ext.size() > filenameExtension.size()) return false;
+    return std::equal(
+        ext.rbegin(), ext.rend(), filenameExtension.rbegin(),
+        [](char a, char b) { return std::tolower(a) == std::tolower(b); });
 }
 
 std::string RemoveExtension(const std::string &filename) {
     std::string ext = filesystem::path(filename).extension();
-    if (ext.empty())
-        return filename;
+    if (ext.empty()) return filename;
     std::string f = filename;
     f.erase(f.end() - ext.size() - 1, f.end());
     return f;
@@ -67,7 +93,8 @@ std::string ResolveFilename(const std::string &filename) {
     else if (IsAbsolutePath(filename))
         return filename;
     else
-        return (searchDirectory / filesystem::path(filename)).make_absolute().str();
+        return (searchDirectory /
+                filesystem::path(filename)).make_absolute().str();
 }
 
 std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
@@ -75,8 +102,7 @@ std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
 
     filesystem::path basePath(filenameBase);
     std::string dirStr = basePath.parent_path().str();
-    if (dirStr.empty())
-        dirStr = ".";
+    if (dirStr.empty()) dirStr = ".";
 #ifdef PBRT_IS_WINDOWS
     LOG_FATAL("Need Windows implementation of MatchingFilenames()");
 #else
@@ -89,8 +115,7 @@ std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
     while ((ent = readdir(dir)) != nullptr) {
         if (ent->d_type == DT_REG &&
             strncmp(basePath.filename().c_str(), ent->d_name, n) == 0)
-            filenames.push_back(
-                (basePath.parent_path() / filesystem::path(ent->d_name)).str());
+            filenames.push_back((basePath.parent_path() / filesystem::path(ent->d_name)).str());
     }
     closedir(dir);
 #endif
@@ -101,7 +126,7 @@ std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
 pstd::optional<std::string> ReadFileContents(const std::string &filename) {
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
-        Error("%s: %s", filename, ErrorString());
+        Error("%s: %s", filename, strerror(errno));
         return {};
     }
     return std::string((std::istreambuf_iterator<char>(ifs)),
@@ -122,25 +147,21 @@ pstd::optional<std::vector<float>> ReadFloatFile(const std::string &filename) {
     int lineNumber = 1;
     std::vector<float> values;
     while ((c = getc(f)) != EOF) {
-        if (c == '\n')
-            ++lineNumber;
+        if (c == '\n') ++lineNumber;
         if (inNumber) {
             if (curNumberPos >= (int)sizeof(curNumber))
-                LOG_FATAL("Overflowed buffer for parsing number in file: %s at "
-                          "line %d",
+                LOG_FATAL("Overflowed buffer for parsing number in file: %s at line %d",
                           filename, lineNumber);
             // Note: this is not very robust, and would accept something
             // like 0.0.0.0eeee-+--2 as a valid number.
-            if ((isdigit(c) != 0) || c == '.' || c == 'e' || c == 'E' || c == '-' ||
-                c == '+') {
+            if ((isdigit(c) != 0) || c == '.' || c == 'e' || c == 'E' || c == '-' || c == '+') {
                 CHECK_LT(curNumberPos, sizeof(curNumber));
                 curNumber[curNumberPos++] = c;
             } else {
                 curNumber[curNumberPos++] = '\0';
                 float v;
                 if (!Atof(curNumber, &v))
-                    ErrorExit("%s: unable to parse float value \"%s\"", filename,
-                              curNumber);
+                    ErrorExit("%s: unable to parse float value \"%s\"", filename, curNumber);
                 values.push_back(v);
                 inNumber = false;
                 curNumberPos = 0;
@@ -154,8 +175,8 @@ pstd::optional<std::vector<float>> ReadFloatFile(const std::string &filename) {
                     ;
                 ++lineNumber;
             } else if (isspace(c) == 0) {
-                Error("%s: unexpected character \"%c\" found at line %d.", filename, c,
-                      lineNumber);
+                Error("%s: unexpected character \"%c\" found at line %d.",
+                      filename, c, lineNumber);
                 return {};
             }
         }
@@ -169,7 +190,7 @@ bool WriteFile(const std::string &filename, const std::string &contents) {
     out << contents;
     out.close();
     if (!out.good()) {
-        Error("%s: %s", filename, ErrorString());
+        Error("%s: %s", filename, strerror(errno));
         return false;
     }
     return true;

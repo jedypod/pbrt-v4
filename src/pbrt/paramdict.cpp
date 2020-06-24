@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 // core/paramset.cpp*
 #include <pbrt/paramdict.h>
@@ -21,8 +49,7 @@
 
 namespace pbrt {
 
-template <>
-struct ParameterTypeTraits<ParameterType::Boolean> {
+template <> struct ParameterTypeTraits<ParameterType::Boolean> {
     static constexpr char typeName[] = "bool";
     static constexpr int nPerItem = 1;
     using ReturnType = uint8_t;
@@ -32,8 +59,7 @@ struct ParameterTypeTraits<ParameterType::Boolean> {
 
 constexpr char ParameterTypeTraits<ParameterType::Boolean>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Float> {
+template <> struct ParameterTypeTraits<ParameterType::Float> {
     static constexpr char typeName[] = "float";
     static constexpr int nPerItem = 1;
     using ReturnType = Float;
@@ -43,21 +69,16 @@ struct ParameterTypeTraits<ParameterType::Float> {
 
 constexpr char ParameterTypeTraits<ParameterType::Float>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Integer> {
+template <> struct ParameterTypeTraits<ParameterType::Integer> {
     static constexpr char typeName[] = "integer";
     static constexpr int nPerItem = 1;
     using ReturnType = int;
     static int Convert(const double *v, const FileLoc *loc) {
         if (*v > std::numeric_limits<int>::max())
-            Warning(loc,
-                    "Numeric value %f too large to represent as an integer. "
-                    "Clamping to %d",
+            Warning(loc, "Numeric value %f too large to represent as an integer. Clamping to %d",
                     *v, std::numeric_limits<int>::max());
         else if (*v < std::numeric_limits<int>::lowest())
-            Warning(loc,
-                    "Numeric value %f too low to represent as an integer. "
-                    "Clamping to %d",
+            Warning(loc, "Numeric value %f too low to represent as an integer. Clamping to %d",
                     *v, std::numeric_limits<int>::lowest());
         else if (double(int(*v)) != *v)
             Warning(loc, "Floating-point value %f will be rounded to an integer", *v);
@@ -70,73 +91,57 @@ struct ParameterTypeTraits<ParameterType::Integer> {
 
 constexpr char ParameterTypeTraits<ParameterType::Integer>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Point2f> {
+template <> struct ParameterTypeTraits<ParameterType::Point2f> {
     static constexpr char typeName[] = "point2";
     static constexpr int nPerItem = 2;
     using ReturnType = Point2f;
-    static Point2f Convert(const double *v, const FileLoc *loc) {
-        return Point2f(v[0], v[1]);
-    }
+    static Point2f Convert(const double *v, const FileLoc *loc) { return Point2f(v[0], v[1]); }
     static const auto &GetValues(const ParsedParameter &param) { return param.numbers; }
 };
 
 constexpr char ParameterTypeTraits<ParameterType::Point2f>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Vector2f> {
+template <> struct ParameterTypeTraits<ParameterType::Vector2f> {
     static constexpr char typeName[] = "vector2";
     static constexpr int nPerItem = 2;
     using ReturnType = Vector2f;
-    static Vector2f Convert(const double *v, const FileLoc *loc) {
-        return Vector2f(v[0], v[1]);
-    }
+    static Vector2f Convert(const double *v, const FileLoc *loc) { return Vector2f(v[0], v[1]); }
     static const auto &GetValues(const ParsedParameter &param) { return param.numbers; }
 };
 
 constexpr char ParameterTypeTraits<ParameterType::Vector2f>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Point3f> {
+template <> struct ParameterTypeTraits<ParameterType::Point3f> {
     static constexpr char typeName[] = "point3";
     static constexpr int nPerItem = 3;
     using ReturnType = Point3f;
-    static Point3f Convert(const double *v, const FileLoc *loc) {
-        return Point3f(v[0], v[1], v[2]);
-    }
+    static Point3f Convert(const double *v, const FileLoc *loc) { return Point3f(v[0], v[1], v[2]); }
     static const auto &GetValues(const ParsedParameter &param) { return param.numbers; }
 };
 
 constexpr char ParameterTypeTraits<ParameterType::Point3f>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Vector3f> {
+template <> struct ParameterTypeTraits<ParameterType::Vector3f> {
     static constexpr char typeName[] = "vector3";
     static constexpr int nPerItem = 3;
     using ReturnType = Vector3f;
-    static Vector3f Convert(const double *v, const FileLoc *loc) {
-        return Vector3f(v[0], v[1], v[2]);
-    }
+    static Vector3f Convert(const double *v, const FileLoc *loc) { return Vector3f(v[0], v[1], v[2]); }
     static const auto &GetValues(const ParsedParameter &param) { return param.numbers; }
 };
 
 constexpr char ParameterTypeTraits<ParameterType::Vector3f>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::Normal3f> {
+template <> struct ParameterTypeTraits<ParameterType::Normal3f> {
     static constexpr char typeName[] = "normal";
     static constexpr int nPerItem = 3;
     using ReturnType = Normal3f;
-    static Normal3f Convert(const double *v, const FileLoc *loc) {
-        return Normal3f(v[0], v[1], v[2]);
-    }
+    static Normal3f Convert(const double *v, const FileLoc *loc) { return Normal3f(v[0], v[1], v[2]); }
     static const auto &GetValues(const ParsedParameter &param) { return param.numbers; }
 };
 
 constexpr char ParameterTypeTraits<ParameterType::Normal3f>::typeName[];
 
-template <>
-struct ParameterTypeTraits<ParameterType::String> {
+template <> struct ParameterTypeTraits<ParameterType::String> {
     static constexpr char typeName[] = "string";
     static constexpr int nPerItem = 1;
     using ReturnType = std::string;
@@ -145,6 +150,41 @@ struct ParameterTypeTraits<ParameterType::String> {
 };
 
 constexpr char ParameterTypeTraits<ParameterType::String>::typeName[];
+
+///////////////////////////////////////////////////////////////////////////
+// ParsedParameter
+
+void ParsedParameter::AddNumber(double d) {
+    CHECK(strings.empty() && bools.empty());
+    numbers.push_back(d);
+}
+
+void ParsedParameter::AddString(pstd::string_view str) {
+    CHECK(numbers.empty() && bools.empty());
+    strings.push_back({str.begin(), str.end()});
+}
+
+void ParsedParameter::AddBool(bool v) {
+    CHECK(numbers.empty() && strings.empty());
+    bools.push_back(v);
+}
+
+std::string ParsedParameter::ToString() const {
+    std::string str;
+    str += std::string("\"") + type + " " + name + std::string("\" [ ");
+    if (!numbers.empty())
+        for (double d : numbers)
+            str += StringPrintf("%f ", d);
+    else if (!strings.empty())
+        for (const auto &s : strings)
+            str += '\"' + s + "\" ";
+    else if (!bools.empty())
+        for (bool b : bools)
+            str += b ? "true " : "false ";
+    str += "] ";
+
+    return str;
+}
 
 ///////////////////////////////////////////////////////////////////////////
 // ParameterDictionary
@@ -180,15 +220,16 @@ void ParameterDictionary::checkParameterTypes() {
             p->type != ParameterTypeTraits<ParameterType::Vector3f>::typeName &&
             p->type != ParameterTypeTraits<ParameterType::Normal3f>::typeName &&
             p->type != ParameterTypeTraits<ParameterType::String>::typeName &&
-            p->type != "texture" && p->type != "rgb" && p->type != "spectrum" &&
+            p->type != "texture" &&
+            p->type != "rgb" &&
+            p->type != "spectrum" &&
             p->type != "blackbody")
             ErrorExit(&p->loc, "%s: unknown parameter type", p->type);
 }
 
 template <ParameterType PT>
 typename ParameterTypeTraits<PT>::ReturnType ParameterDictionary::lookupSingle(
-    const std::string &name,
-    typename ParameterTypeTraits<PT>::ReturnType defaultValue) const {
+        const std::string &name, typename ParameterTypeTraits<PT>::ReturnType defaultValue) const {
     {
         std::lock_guard<std::mutex> lock(requestedParametersMutex);
         requestedParameters.push_back(std::make_pair(PT, name));
@@ -203,8 +244,7 @@ typename ParameterTypeTraits<PT>::ReturnType ParameterDictionary::lookupSingle(
         if (values.empty())
             ErrorExit(&p->loc, "No values provided for parameter \"%s\".", name);
         if (values.size() > traits::nPerItem)
-            ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".",
-                      name);
+            ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".", name);
 
         p->lookedUp = true;
         return traits::Convert(values.data(), &p->loc);
@@ -225,35 +265,28 @@ bool ParameterDictionary::GetOneBool(const std::string &name, bool def) const {
     return lookupSingle<ParameterType::Boolean>(name, def);
 }
 
-Point2f ParameterDictionary::GetOnePoint2f(const std::string &name,
-                                           const Point2f &def) const {
+Point2f ParameterDictionary::GetOnePoint2f(const std::string &name, const Point2f &def) const {
     return lookupSingle<ParameterType::Point2f>(name, def);
 }
 
-Vector2f ParameterDictionary::GetOneVector2f(const std::string &name,
-                                             const Vector2f &def) const {
+Vector2f ParameterDictionary::GetOneVector2f(const std::string &name, const Vector2f &def) const {
     return lookupSingle<ParameterType::Vector2f>(name, def);
 }
 
-Point3f ParameterDictionary::GetOnePoint3f(const std::string &name,
-                                           const Point3f &def) const {
+Point3f ParameterDictionary::GetOnePoint3f(const std::string &name, const Point3f &def) const {
     return lookupSingle<ParameterType::Point3f>(name, def);
 }
 
-Vector3f ParameterDictionary::GetOneVector3f(const std::string &name,
-                                             const Vector3f &def) const {
+Vector3f ParameterDictionary::GetOneVector3f(const std::string &name, const Vector3f &def) const {
     return lookupSingle<ParameterType::Vector3f>(name, def);
 }
 
-Normal3f ParameterDictionary::GetOneNormal3f(const std::string &name,
-                                             const Normal3f &def) const {
+Normal3f ParameterDictionary::GetOneNormal3f(const std::string &name, const Normal3f &def) const {
     return lookupSingle<ParameterType::Normal3f>(name, def);
 }
 
-SpectrumHandle ParameterDictionary::GetOneSpectrum(const std::string &name,
-                                                   SpectrumHandle defaultValue,
-                                                   SpectrumType spectrumType,
-                                                   Allocator alloc) const {
+SpectrumHandle ParameterDictionary::GetOneSpectrum(const std::string &name, SpectrumHandle defaultValue,
+                                                   SpectrumType spectrumType, Allocator alloc) const {
     {
         std::lock_guard<std::mutex> lock(requestedParametersMutex);
         requestedParameters.push_back(std::make_pair(ParameterType::Spectrum, name));
@@ -275,15 +308,13 @@ SpectrumHandle ParameterDictionary::GetOneSpectrum(const std::string &name,
     return defaultValue;
 }
 
-std::string ParameterDictionary::GetOneString(const std::string &name,
-                                              const std::string &def) const {
+std::string ParameterDictionary::GetOneString(const std::string &name, const std::string &def) const {
     return lookupSingle<ParameterType::String>(name, def);
 }
 
 template <typename ReturnType, typename ValuesType, typename C>
-static std::vector<ReturnType> returnArray(const ValuesType &values,
-                                           const ParsedParameter &param, int nPerItem,
-                                           C convert) {
+static std::vector<ReturnType> returnArray(const ValuesType &values, const ParsedParameter &param,
+                                           int nPerItem, C convert) {
     if (values.empty())
         ErrorExit(&param.loc, "No values provided for \"%s\".", param.name);
     if (values.size() % nPerItem)
@@ -299,11 +330,10 @@ static std::vector<ReturnType> returnArray(const ValuesType &values,
 }
 
 template <typename ReturnType, typename G, typename C>
-std::vector<ReturnType> ParameterDictionary::lookupArray(const std::string &name,
-                                                         ParameterType type,
-                                                         const char *typeName,
-                                                         int nPerItem, G getValues,
-                                                         C convert) const {
+std::vector<ReturnType> ParameterDictionary::lookupArray(const std::string &name, ParameterType type,
+                                                         const char *typeName, int nPerItem, G getValues,
+                                                         C convert) const
+{
     {
         std::lock_guard<std::mutex> lock(requestedParametersMutex);
         requestedParameters.push_back(std::make_pair(type, name));
@@ -340,8 +370,7 @@ std::vector<Point2f> ParameterDictionary::GetPoint2fArray(const std::string &nam
     return lookupArray<ParameterType::Point2f>(name);
 }
 
-std::vector<Vector2f> ParameterDictionary::GetVector2fArray(
-    const std::string &name) const {
+std::vector<Vector2f> ParameterDictionary::GetVector2fArray(const std::string &name) const {
     return lookupArray<ParameterType::Vector2f>(name);
 }
 
@@ -349,13 +378,11 @@ std::vector<Point3f> ParameterDictionary::GetPoint3fArray(const std::string &nam
     return lookupArray<ParameterType::Point3f>(name);
 }
 
-std::vector<Vector3f> ParameterDictionary::GetVector3fArray(
-    const std::string &name) const {
+std::vector<Vector3f> ParameterDictionary::GetVector3fArray(const std::string &name) const {
     return lookupArray<ParameterType::Vector3f>(name);
 }
 
-std::vector<Normal3f> ParameterDictionary::GetNormal3fArray(
-    const std::string &name) const {
+std::vector<Normal3f> ParameterDictionary::GetNormal3fArray(const std::string &name) const {
     return lookupArray<ParameterType::Normal3f>(name);
 }
 
@@ -364,8 +391,7 @@ static std::map<std::string, SpectrumHandle> cachedSpectra;
 // TODO: move this functionality (but not the caching?) to a Spectrum method.
 static SpectrumHandle readSpectrumFromFile(const std::string &filename, Allocator alloc) {
     std::string fn = ResolveFilename(filename);
-    if (cachedSpectra.find(fn) != cachedSpectra.end())
-        return cachedSpectra[fn];
+    if (cachedSpectra.find(fn) != cachedSpectra.end()) return cachedSpectra[fn];
 
     pstd::optional<SpectrumHandle> pls = PiecewiseLinearSpectrum::Read(fn, alloc);
     if (!pls)
@@ -376,62 +402,53 @@ static SpectrumHandle readSpectrumFromFile(const std::string &filename, Allocato
 }
 
 std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
-    const ParsedParameter &param, SpectrumType spectrumType, Allocator alloc) const {
-    if (param.type == "rgb" || (Options->upgrade && param.type == "color"))
-        return returnArray<SpectrumHandle>(
-            param.numbers, param, 3,
-            [this, spectrumType, &alloc, &param](const double *v,
-                                                 const FileLoc *loc) -> SpectrumHandle {
+        const ParsedParameter &param, SpectrumType spectrumType, Allocator alloc) const {
+    if (param.type == "rgb" || (PbrtOptions.upgrade && param.type == "color"))
+        return returnArray<SpectrumHandle>(param.numbers, param, 3,
+            [this, spectrumType, &alloc, &param](const double *v, const FileLoc *loc) -> SpectrumHandle {
                 RGB rgb(v[0], v[1], v[2]);
-                const RGBColorSpace &cs =
-                    param.colorSpace ? *param.colorSpace : *colorSpace;
+                const RGBColorSpace &cs = param.colorSpace ? *param.colorSpace : *colorSpace;
                 if (spectrumType == SpectrumType::Reflectance) {
                     if (std::min({v[0], v[1], v[2]}) < 0 ||
                         std::max({v[0], v[1], v[2]}) > 1)
-                        ErrorExit(&param.loc,
-                                  "RGB reflectance parameter \"%s\" has "
-                                  "parameter outside of [0,1].",
-                                  param.name);
+                        ErrorExit(&param.loc, "RGB reflectance parameter \"%s\" has "
+                                  "parameter outside of [0,1].", param.name);
                     return alloc.new_object<RGBReflectanceSpectrum>(cs, rgb);
                 } else {
                     CHECK(spectrumType == SpectrumType::General);
                     return alloc.new_object<RGBSpectrum>(cs, rgb);
                 }
-            });
+           });
     else if (param.type == "blackbody")
-        return returnArray<SpectrumHandle>(
-            param.numbers, param, 2,
+        return returnArray<SpectrumHandle>(param.numbers, param, 1,
             [this, &alloc](const double *v, const FileLoc *loc) -> SpectrumHandle {
-                return alloc.new_object<BlackbodySpectrum>(v[0], v[1]);
+                return alloc.new_object<BlackbodySpectrum>(v[0]);
             });
     else if (param.type == "spectrum" && !param.numbers.empty()) {
         if (param.numbers.size() % 2 != 0)
-            ErrorExit(&param.loc, "Found odd number of values for \"%s\"", param.name);
+            ErrorExit(&param.loc, "Found odd number of values for \"%s\"",
+                      param.name);
 
         int nSamples = param.numbers.size() / 2;
-        return returnArray<SpectrumHandle>(
-            param.numbers, param, param.numbers.size(),
-            [this, nSamples, &alloc, param](const double *v,
-                                            const FileLoc *Loc) -> SpectrumHandle {
+        return returnArray<SpectrumHandle>(param.numbers, param, param.numbers.size(),
+            [this, nSamples, &alloc, param](const double *v, const FileLoc *Loc) -> SpectrumHandle {
                 std::vector<Float> lambda(nSamples), value(nSamples);
                 for (int i = 0; i < nSamples; ++i) {
                     if (i > 0 && v[2 * i] <= lambda[i - 1])
-                        ErrorExit(&param.loc,
-                                  "Spectrum description invalid: at %d'th entry, "
-                                  "wavelengths aren't increasing: %f >= %f.",
-                                  i - 1, lambda[i - 1], v[2 * i]);
+                        ErrorExit(&param.loc, "Spectrum description invalid: at %d'th entry, "
+                                  "wavelengths aren't increasing: %f >= %f.", i - 1,
+                                  lambda[i - 1], v[2 * i]);
                     lambda[i] = v[2 * i];
                     value[i] = v[2 * i + 1];
                 }
                 return alloc.new_object<PiecewiseLinearSpectrum>(lambda, value, alloc);
             });
-    } else if (param.type == "spectrum" && !param.strings.empty())
-        return returnArray<SpectrumHandle>(
-            param.strings, param, 1,
+    }
+    else if (param.type == "spectrum" && !param.strings.empty())
+        return returnArray<SpectrumHandle>(param.strings, param, 1,
             [param, &alloc](const std::string *s, const FileLoc *loc) -> SpectrumHandle {
                 SpectrumHandle spd = SPDs::GetNamed(*s);
-                if (spd)
-                    return spd;
+                if (spd) return spd;
 
                 spd = readSpectrumFromFile(*s, alloc);
                 if (!spd)
@@ -443,7 +460,7 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
 }
 
 std::vector<SpectrumHandle> ParameterDictionary::GetSpectrumArray(
-    const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
+        const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
     {
         std::lock_guard<std::mutex> lock(requestedParametersMutex);
         requestedParameters.push_back(std::make_pair(ParameterType::Spectrum, name));
@@ -460,8 +477,7 @@ std::vector<SpectrumHandle> ParameterDictionary::GetSpectrumArray(
     return {};
 }
 
-std::vector<std::string> ParameterDictionary::GetStringArray(
-    const std::string &name) const {
+std::vector<std::string> ParameterDictionary::GetStringArray(const std::string &name) const {
     return lookupArray<ParameterType::String>(name);
 }
 
@@ -478,31 +494,12 @@ std::string ParameterDictionary::GetTexture(const std::string &name) const {
         if (p->strings.empty())
             ErrorExit(&p->loc, "No string values provided for parameter \"%s\".", name);
         if (p->strings.size() > 1)
-            ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".",
-                      name);
+            ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".", name);
         p->lookedUp = true;
         return p->strings[0];
     }
 
     return "";
-}
-
-std::vector<RGB> ParameterDictionary::GetRGBArray(const std::string &name) const {
-    for (const ParsedParameter *p : params) {
-        if (p->name == name && p->type == "rgb") {
-            if (p->numbers.size() % 3)
-                ErrorExit(&p->loc, "Number of values given for \"rgb\" parameter %d "
-                          "\"name\" isn't a multiple of 3.");
-
-            std::vector<RGB> rgb(p->numbers.size() / 3);
-            for (int i = 0; i < p->numbers.size() / 3; ++i)
-                rgb[i] = RGB(p->numbers[3*i], p->numbers[3*i + 1], p->numbers[3*i + 2]);
-
-            p->lookedUp = true;
-            return rgb;
-        }
-    }
-    return {};
 }
 
 pstd::optional<RGB> ParameterDictionary::GetOneRGB(const std::string &name) const {
@@ -578,8 +575,7 @@ void ParameterDictionary::RenameParameter(const std::string &before,
             p->name = after;
 }
 
-void ParameterDictionary::RenameUsedTextures(
-    const std::map<std::string, std::string> &m) {
+void ParameterDictionary::RenameUsedTextures(const std::map<std::string, std::string> &m) {
     for (ParsedParameter *p : params) {
         if (p->type != "texture")
             continue;
@@ -599,11 +595,10 @@ void ParameterDictionary::ReportUnused() const {
         if (p->mayBeUnused)
             continue;
 
-        bool haveSeen =
-            std::find_if(seen.begin(), seen.end(),
-                         [&p](std::pair<const std::string *, const std::string *> p2) {
-                             return *p2.first == p->type && *p2.second == p->name;
-                         }) != seen.end();
+        bool haveSeen = std::find_if(seen.begin(), seen.end(),
+                                     [&p](std::pair<const std::string *, const std::string *> p2) {
+                                         return *p2.first == p->type && *p2.second == p->name;
+                                     }) != seen.end();
         if (p->lookedUp) {
             // A parameter may be used when creating an initial Material, say,
             // but then an override from a Shape may shadow it such that its
@@ -617,20 +612,19 @@ void ParameterDictionary::ReportUnused() const {
     }
 }
 
-std::string ParameterDictionary::ToParameterDefinition(const ParsedParameter *p,
-                                                       int indentCount) {
+std::string ParameterDictionary::ToParameterDefinition(const ParsedParameter *p, int indentCount) {
     std::string s = StringPrintf("\"%s %s\" [ ", p->type, p->name);
     int continuationIndent = indentCount + 10 + p->type.size() + p->name.size();
     int column = indentCount + 4 + s.size();
     auto printOne = [&](const std::string &val) {
-        if (column > 80) {  //   && i % 3 == 0) {
+        if (column > 80) { //   && i % 3 == 0) {
             s += "\n";
             s.append(continuationIndent, ' ');
             column = continuationIndent;
         }
         column += val.size();
         s += val;
-    };
+     };
 
     for (double v : p->numbers)
         if (p->type == ParameterTypeTraits<ParameterType::Integer>::typeName)
@@ -667,29 +661,24 @@ std::string ParameterDictionary::ToParameterDefinition(const std::string &name) 
 std::string ParameterDictionary::ToString() const {
     std::string s = "[ ParameterDictionary params: ";
     for (const ParsedParameter *p : params) {
-        s += "[ " + p->ToString() + "] ";
+        s+= "[ " + p->ToString() + "] ";
     }
-    s += StringPrintf("colorSpace: %s ",
-                      colorSpace ? colorSpace->ToString().c_str() : "<nullptr>");
+    s += StringPrintf("colorSpace: %s ", colorSpace ? colorSpace->ToString().c_str() : "<nullptr>");
     s += "]";
     return s;
 }
 
 bool ParameterDictionary::ShadowsAny(const ParameterDictionary &dict) const {
     auto isSpectrumType = [](const std::string &t) {
-        return t == "spectrum" || t == "rgb" || t == "blackbody";
-    };
+                              return t == "spectrum" || t == "rgb" || t == "blackbody";
+                          };
     auto typesShadow = [isSpectrumType](const std::string &ta, const std::string &tb) {
-        if (ta == tb)
-            return true;
-        if (isSpectrumType(ta) && isSpectrumType(tb))
-            return true;
-        if (ta == "texture" && (tb == "float" || isSpectrumType(tb)))
-            return true;
-        if (tb == "texture" && (ta == "float" || isSpectrumType(ta)))
-            return true;
-        return false;
-    };
+                           if (ta == tb) return true;
+                           if (isSpectrumType(ta) && isSpectrumType(tb)) return true;
+                           if (ta == "texture" && (tb == "float" || isSpectrumType(tb))) return true;
+                           if (tb == "texture" && (ta == "float" || isSpectrumType(ta))) return true;
+                           return false;
+                       };
 
     // O(n^2), yo.
     for (const ParsedParameter *p : params)
@@ -719,45 +708,36 @@ bool TextureParameterDictionary::GetOneBool(const std::string &name, bool def) c
     return dict->GetOneBool(name, def);
 }
 
-Point2f TextureParameterDictionary::GetOnePoint2f(const std::string &name,
-                                                  const Point2f &def) const {
+Point2f TextureParameterDictionary::GetOnePoint2f(const std::string &name, const Point2f &def) const {
     return dict->GetOnePoint2f(name, def);
 }
 
-Vector2f TextureParameterDictionary::GetOneVector2f(const std::string &name,
-                                                    const Vector2f &def) const {
+Vector2f TextureParameterDictionary::GetOneVector2f(const std::string &name, const Vector2f &def) const {
     return dict->GetOneVector2f(name, def);
 }
 
-Point3f TextureParameterDictionary::GetOnePoint3f(const std::string &name,
-                                                  const Point3f &def) const {
+Point3f TextureParameterDictionary::GetOnePoint3f(const std::string &name, const Point3f &def) const {
     return dict->GetOnePoint3f(name, def);
 }
 
-Vector3f TextureParameterDictionary::GetOneVector3f(const std::string &name,
-                                                    const Vector3f &def) const {
+Vector3f TextureParameterDictionary::GetOneVector3f(const std::string &name, const Vector3f &def) const {
     return dict->GetOneVector3f(name, def);
 }
 
-Normal3f TextureParameterDictionary::GetOneNormal3f(const std::string &name,
-                                                    const Normal3f &def) const {
+Normal3f TextureParameterDictionary::GetOneNormal3f(const std::string &name, const Normal3f &def) const {
     return dict->GetOneNormal3f(name, def);
 }
 
-SpectrumHandle TextureParameterDictionary::GetOneSpectrum(const std::string &name,
-                                                          SpectrumHandle def,
-                                                          SpectrumType spectrumType,
-                                                          Allocator alloc) const {
+SpectrumHandle TextureParameterDictionary::GetOneSpectrum(const std::string &name, SpectrumHandle def,
+                                                          SpectrumType spectrumType, Allocator alloc) const {
     return dict->GetOneSpectrum(name, def, spectrumType, alloc);
 }
 
-std::string TextureParameterDictionary::GetOneString(const std::string &name,
-                                                     const std::string &def) const {
+std::string TextureParameterDictionary::GetOneString(const std::string &name, const std::string &def) const {
     return dict->GetOneString(name, def);
 }
 
-std::vector<Float> TextureParameterDictionary::GetFloatArray(
-    const std::string &name) const {
+std::vector<Float> TextureParameterDictionary::GetFloatArray(const std::string &name) const {
     return dict->GetFloatArray(name);
 }
 
@@ -765,49 +745,43 @@ std::vector<int> TextureParameterDictionary::GetIntArray(const std::string &name
     return dict->GetIntArray(name);
 }
 
-std::vector<uint8_t> TextureParameterDictionary::GetBoolArray(
-    const std::string &name) const {
+std::vector<uint8_t> TextureParameterDictionary::GetBoolArray(const std::string &name) const {
     return dict->GetBoolArray(name);
 }
 
-std::vector<Point2f> TextureParameterDictionary::GetPoint2fArray(
-    const std::string &name) const {
+std::vector<Point2f> TextureParameterDictionary::GetPoint2fArray(const std::string &name) const {
     return dict->GetPoint2fArray(name);
 }
 
-std::vector<Vector2f> TextureParameterDictionary::GetVector2fArray(
-    const std::string &name) const {
+std::vector<Vector2f> TextureParameterDictionary::GetVector2fArray(const std::string &name) const {
     return dict->GetVector2fArray(name);
 }
 
-std::vector<Point3f> TextureParameterDictionary::GetPoint3fArray(
-    const std::string &name) const {
+std::vector<Point3f> TextureParameterDictionary::GetPoint3fArray(const std::string &name) const {
     return dict->GetPoint3fArray(name);
 }
 
-std::vector<Vector3f> TextureParameterDictionary::GetVector3fArray(
-    const std::string &name) const {
+std::vector<Vector3f> TextureParameterDictionary::GetVector3fArray(const std::string &name) const {
     return dict->GetVector3fArray(name);
 }
 
-std::vector<Normal3f> TextureParameterDictionary::GetNormal3fArray(
-    const std::string &name) const {
+std::vector<Normal3f> TextureParameterDictionary::GetNormal3fArray(const std::string &name) const {
     return dict->GetNormal3fArray(name);
 }
 
-std::vector<SpectrumHandle> TextureParameterDictionary::GetSpectrumArray(
-    const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
+std::vector<SpectrumHandle> TextureParameterDictionary::GetSpectrumArray(const std::string &name,
+                                                                         SpectrumType spectrumType,
+                                                                         Allocator alloc) const {
     return dict->GetSpectrumArray(name, spectrumType, alloc);
 }
 
-std::vector<std::string> TextureParameterDictionary::GetStringArray(
-    const std::string &name) const {
+std::vector<std::string> TextureParameterDictionary::GetStringArray(const std::string &name) const {
     return dict->GetStringArray(name);
 }
 
 SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
-    const std::string &name, SpectrumHandle defaultValue, SpectrumType spectrumType,
-    Allocator alloc) const {
+        const std::string &name, SpectrumHandle defaultValue, SpectrumType spectrumType,
+        Allocator alloc) const {
     SpectrumTextureHandle tex = GetSpectrumTextureOrNull(name, spectrumType, alloc);
     if (tex)
         return tex;
@@ -825,11 +799,9 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
 
         if (p->type == "texture") {
             if (p->strings.empty())
-                ErrorExit(&p->loc, "No texture name provided for parameter \"%s\".",
-                          name);
+                ErrorExit(&p->loc, "No texture name provided for parameter \"%s\".", name);
             if (p->strings.size() != 1)
-                ErrorExit(&p->loc,
-                          "More than one texture name provided for parameter \"%s\".",
+                ErrorExit(&p->loc, "More than one texture name provided for parameter \"%s\".",
                           name);
 
             p->lookedUp = true;
@@ -839,7 +811,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
 
             ErrorExit(&p->loc,
                       R"(Couldn't find spectrum texture named "%s" for parameter "%s")",
-                      p->strings[0], p->name);
+                      p->name, p->strings[0]);
         } else if (p->type == "rgb" || p->type == "spectrum" || p->type == "blackbody") {
             SpectrumHandle s = GetOneSpectrum(name, nullptr, spectrumType, alloc);
             CHECK(s != nullptr);
@@ -851,8 +823,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
 }
 
 FloatTextureHandle TextureParameterDictionary::GetFloatTexture(const std::string &name,
-                                                               Float defaultValue,
-                                                               Allocator alloc) const {
+                                                               Float defaultValue, Allocator alloc) const {
     FloatTextureHandle tex = GetFloatTextureOrNull(name, alloc);
     return tex ? tex : alloc.new_object<FloatConstantTexture>(defaultValue);
 }
@@ -865,11 +836,9 @@ FloatTextureHandle TextureParameterDictionary::GetFloatTextureOrNull(
 
         if (p->type == "texture") {
             if (p->strings.empty())
-                ErrorExit(&p->loc, "No texture name provided for parameter \"%s\".",
-                          name);
+                ErrorExit(&p->loc, "No texture name provided for parameter \"%s\".", name);
             if (p->strings.size() != 1)
-                ErrorExit(&p->loc,
-                          "More than one texture name provided for parameter \"%s\".",
+                ErrorExit(&p->loc, "More than one texture name provided for parameter \"%s\".",
                           name);
 
             p->lookedUp = true;
@@ -879,7 +848,7 @@ FloatTextureHandle TextureParameterDictionary::GetFloatTextureOrNull(
 
             ErrorExit(&p->loc,
                       R"(Couldn't find float texture named "%s" for parameter "%s")",
-                      p->strings[0], p->name);
+                      p->name, p->strings[0]);
         } else if (p->type == "float") {
             Float v = GetOneFloat(name, 0.f);  // we know this will be found
             return alloc.new_object<FloatConstantTexture>(v);

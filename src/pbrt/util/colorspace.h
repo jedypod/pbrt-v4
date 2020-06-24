@@ -1,6 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #ifndef PBRT_COLORSPACE_H
 #define PBRT_COLORSPACE_H
@@ -8,8 +5,8 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/math.h>
-#include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/spectrum.h>
 
 #include <string>
 
@@ -25,14 +22,20 @@ namespace pbrt {
 class RGBColorSpace {
   public:
     // Chromaticities of the r, g, and b primaries and the white point.
-    RGBColorSpace(Point2f r, Point2f g, Point2f b, Point2f w, SpectrumHandle illuminant,
-                  const RGBToSpectrumTable *rgbToSpectrumTable, Allocator alloc);
+    RGBColorSpace(Point2f r, Point2f g, Point2f b, Point2f w,
+                  SpectrumHandle illuminant,
+                  const RGBToSpectrumTable *rgbToSpectrumTable,
+                  Allocator alloc);
 
-    PBRT_CPU_GPU
-    RGB ToRGB(const XYZ &xyz) const { return Mul<RGB>(RGBFromXYZ, xyz); }
-    PBRT_CPU_GPU
-    XYZ ToXYZ(const RGB &rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
+    RGB ToRGB(const XYZ &xyz) const {
+        return Mul<RGB>(RGBFromXYZ, xyz);
+    }
+    PBRT_HOST_DEVICE_INLINE
+    XYZ ToXYZ(const RGB &rgb) const {
+        return Mul<XYZ>(XYZFromRGB, rgb);
+    }
+    PBRT_HOST_DEVICE
     RGBSigmoidPolynomial ToRGBCoeffs(const RGB &rgb) const;
 
     // TODO: these could run on the device as well, but need to deal with
@@ -41,6 +44,7 @@ class RGBColorSpace {
     SquareMatrix<3> ColorCorrectionMatrixForXYZ(const XYZ &xyz) const {
         return ColorCorrectionMatrixForxy(xyz[0] / (xyz[0] + xyz[1] + xyz[2]),
                                           xyz[1] / (xyz[0] + xyz[1] + xyz[2]));
+
     }
 
     static void Init(Allocator alloc);
@@ -50,12 +54,12 @@ class RGBColorSpace {
     static const RGBColorSpace *Rec2020;  // UHDTV
     static const RGBColorSpace *sRGB;
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     bool operator==(const RGBColorSpace &cs) const {
         return (r == cs.r && g == cs.g && b == cs.b && w == cs.w &&
                 rgbToSpectrumTable == cs.rgbToSpectrumTable);
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     bool operator!=(const RGBColorSpace &cs) const {
         return (r != cs.r || g != cs.g || b != cs.b || w != cs.w ||
                 rgbToSpectrumTable != cs.rgbToSpectrumTable);
@@ -68,23 +72,17 @@ class RGBColorSpace {
 
     std::string ToString() const;
 
-  private:
-    PBRT_CPU_GPU
-    friend SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from,
-                                                const RGBColorSpace &to);
+ private:
+    PBRT_HOST_DEVICE
+    friend SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSpace &to);
 
     SquareMatrix<3> XYZFromRGB, RGBFromXYZ;
     const RGBToSpectrumTable *rgbToSpectrumTable;
 };
 
-#ifdef PBRT_BUILD_GPU_RENDERER
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_ACES2065_1;
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_Rec2020;
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_sRGB;
-#endif
-
 SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSpace &to);
 
-}  // namespace pbrt
+} // namespace pbrt
 
-#endif  // PBRT_COLORSPACE_H
+#endif // PBRT_COLORSPACE_H
+

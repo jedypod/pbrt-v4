@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,12 +41,12 @@
 // core/paramdict.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/parser.h>
-#include <pbrt/util/containers.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/parser.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/containers.h>
 
 #include <limits>
 #include <map>
@@ -28,29 +56,50 @@
 
 namespace pbrt {
 
-enum class ParameterType {
-    Boolean,
-    Float,
-    Integer,
-    Point2f,
-    Vector2f,
-    Point3f,
-    Vector3f,
-    Normal3f,
-    Spectrum,
-    String,
-    Texture
+class ParsedParameter {
+public:
+    ParsedParameter(MemoryArena *arena, FileLoc loc)
+        : loc(loc),
+          numbers(ArenaAllocator<double>(arena)),
+          strings(ArenaAllocator<std::string>(arena)),
+          bools(ArenaAllocator<uint8_t>(arena)) {}
+
+    void AddNumber(double d);
+    void AddString(pstd::string_view str);
+    void AddBool(bool v);
+
+    std::string ToString() const;
+
+    // TODO: We're trusting the short string optimization. Could also use
+    // pstd::string_views...
+    std::string type, name;
+
+    FileLoc loc;
+    mutable bool lookedUp = false;
+    // If set, overrides the one given to the ParameterDictionary constructor...
+    mutable const RGBColorSpace *colorSpace = nullptr;
+    bool mayBeUnused = false;
+
+    std::vector<double, ArenaAllocator<double>> numbers;
+    std::vector<std::string, ArenaAllocator<std::string>> strings;
+    std::vector<uint8_t, ArenaAllocator<uint8_t>> bools;
 };
 
-template <ParameterType PT>
-struct ParameterTypeTraits {};
+using ParsedParameterVector = InlinedVector<ParsedParameter *, 8>;
+
+enum class ParameterType {
+    Boolean, Float, Integer, Point2f, Vector2f, Point3f, Vector3f, Normal3f,
+    Spectrum, String, Texture
+};
+
+template <ParameterType PT> struct ParameterTypeTraits {};
 
 class ParameterDictionary {
-  public:
+public:
     ParameterDictionary() = default;
-    ParameterDictionary(ParsedParameterVector params, const RGBColorSpace *colorSpace);
-    ParameterDictionary(ParsedParameterVector params0,
-                        const ParsedParameterVector &params1,
+    ParameterDictionary(ParsedParameterVector params,
+                        const RGBColorSpace *colorSpace);
+    ParameterDictionary(ParsedParameterVector params0, const ParsedParameterVector &params1,
                         const RGBColorSpace *colorSpace);
 
     Float GetOneFloat(const std::string &name, Float def) const;
@@ -78,7 +127,7 @@ class ParameterDictionary {
                                                  SpectrumType spectrumType,
                                                  Allocator alloc) const;
     std::vector<std::string> GetStringArray(const std::string &name) const;
-    std::vector<RGB> GetRGBArray(const std::string &name) const;
+
 
     // For --upgrade only
     pstd::optional<RGB> GetOneRGB(const std::string &name) const;
@@ -107,11 +156,11 @@ class ParameterDictionary {
 
     // Returns true if this ParameterDictionary shadows anything represented in
     // ps::requestedParameters.
-    bool ShadowsAny(const ParameterDictionary &parameters) const;
+    bool ShadowsAny(const ParameterDictionary &dict) const;
 
     const FileLoc *loc(const std::string &) const;
 
-  private:
+private:
     friend class TextureParameterDictionary;
 
     ParsedParameterVector params;
@@ -122,12 +171,10 @@ class ParameterDictionary {
 
     template <ParameterType PT>
     typename ParameterTypeTraits<PT>::ReturnType lookupSingle(
-        const std::string &name,
-        typename ParameterTypeTraits<PT>::ReturnType defaultValue) const;
+        const std::string &name, typename ParameterTypeTraits<PT>::ReturnType defaultValue) const;
 
     template <ParameterType PT>
-    std::vector<typename ParameterTypeTraits<PT>::ReturnType> lookupArray(
-        const std::string &name) const;
+    std::vector<typename ParameterTypeTraits<PT>::ReturnType> lookupArray(const std::string &name) const;
 
     template <typename ReturnType, typename G, typename C>
     std::vector<ReturnType> lookupArray(const std::string &name, ParameterType type,
@@ -135,8 +182,7 @@ class ParameterDictionary {
                                         C convert) const;
 
     std::vector<SpectrumHandle> extractSpectrumArray(const ParsedParameter &param,
-                                                     SpectrumType spectrumType,
-                                                     Allocator alloc) const;
+                                                     SpectrumType spectrumType, Allocator alloc) const;
 
     void remove(const std::string &name, const char *typeName);
     void checkParameterTypes();
@@ -144,12 +190,11 @@ class ParameterDictionary {
 };
 
 class TextureParameterDictionary {
-  public:
-    TextureParameterDictionary(
-        const ParameterDictionary *dict,
-        const std::map<std::string, FloatTextureHandle> *floatTextures,
-        const std::map<std::string, SpectrumTextureHandle> *spectrumTextures)
-        : dict(dict), floatTextures(floatTextures), spectrumTextures(spectrumTextures) {}
+public:
+    TextureParameterDictionary(const ParameterDictionary *dict,
+                               const std::map<std::string, FloatTextureHandle> *floatTextures,
+                               const std::map<std::string, SpectrumTextureHandle> *spectrumTextures)
+        : dict(dict), floatTextures(floatTextures), spectrumTextures(spectrumTextures) { }
 
     operator const ParameterDictionary &() const { return *dict; }
 
@@ -162,7 +207,7 @@ class TextureParameterDictionary {
     Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
     Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
     SpectrumHandle GetOneSpectrum(const std::string &name, SpectrumHandle def,
-                                  SpectrumType spectrumType, Allocator alloc) const;
+                                   SpectrumType spectrumType, Allocator alloc) const;
     std::string GetOneString(const std::string &name, const std::string &def) const;
 
     std::vector<Float> GetFloatArray(const std::string &name) const;
@@ -185,14 +230,13 @@ class TextureParameterDictionary {
     SpectrumTextureHandle GetSpectrumTextureOrNull(const std::string &name,
                                                    SpectrumType spectrumType,
                                                    Allocator alloc) const;
-    FloatTextureHandle GetFloatTexture(const std::string &name, Float defaultValue,
-                                       Allocator alloc) const;
-    FloatTextureHandle GetFloatTextureOrNull(const std::string &name,
-                                             Allocator alloc) const;
+    FloatTextureHandle GetFloatTexture(const std::string &name,
+                                       Float defaultValue, Allocator alloc) const;
+    FloatTextureHandle GetFloatTextureOrNull(const std::string &name, Allocator alloc) const;
 
     void ReportUnused() const;
 
-  private:
+private:
     const ParameterDictionary *dict;
     const std::map<std::string, FloatTextureHandle> *floatTextures;
     const std::map<std::string, SpectrumTextureHandle> *spectrumTextures;

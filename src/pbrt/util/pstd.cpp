@@ -1,6 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #include <pbrt/util/pstd.h>
 
@@ -11,7 +8,7 @@ namespace pstd {
 
 namespace pmr {
 
-memory_resource::~memory_resource() {}
+memory_resource::~memory_resource() { }
 
 class NewDeleteResource : public memory_resource {
     void *do_allocate(size_t bytes, size_t alignment) {
@@ -21,7 +18,9 @@ class NewDeleteResource : public memory_resource {
         return ptr;
     }
 
-    void do_deallocate(void *p, size_t bytes, size_t alignment) { pbrt::FreeAligned(p); }
+    void do_deallocate(void *p, size_t bytes, size_t alignment) {
+        pbrt::FreeAligned(p);
+    }
 
     bool do_is_equal(const memory_resource &other) const noexcept {
         return this == &other;
@@ -42,10 +41,10 @@ memory_resource *set_default_resource(memory_resource *r) noexcept {
     return orig;
 }
 
-memory_resource *get_default_resource() noexcept {
+memory_resource* get_default_resource() noexcept {
     return defaultMemoryResource;
 }
 
-}  // namespace pmr
+} // namespace pmr
 
-}  // namespace pstd
+} // namespace pstd

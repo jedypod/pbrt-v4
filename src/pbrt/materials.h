@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2017
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,16 +41,13 @@
 // materials.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/bssrdf.h>
-#include <pbrt/base/material.h>
-#include <pbrt/bsdf.h>
+#include <pbrt/base.h>
 #include <pbrt/bssrdf.h>
 #include <pbrt/interaction.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/taggedptr.h>
-#include <pbrt/util/transform.h>
 
 #include <memory>
 
@@ -30,22 +55,13 @@ namespace pbrt {
 
 struct BumpEvalContext {
     BumpEvalContext() = default;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     BumpEvalContext(const SurfaceInteraction &si)
-        : p(si.p()),
-          dpdu(si.shading.dpdu),
-          dpdv(si.shading.dpdv),
-          dpdx(si.dpdx),
-          dpdy(si.dpdy),
-          uv(si.uv),
-          dudx(si.dudx),
-          dvdx(si.dvdx),
-          dudy(si.dudy),
-          dvdy(si.dvdy),
-          n(si.shading.n),
-          dndu(si.shading.dndu),
-          dndv(si.shading.dndv) {}
-    PBRT_CPU_GPU
+        : p(si.p()), dpdu(si.shading.dpdu), dpdv(si.shading.dpdv), dpdx(si.dpdx), dpdy(si.dpdy),
+          uv(si.uv), dudx(si.dudx), dvdx(si.dvdx), dudy(si.dudy), dvdy(si.dvdy),
+          n(si.shading.n), dndu(si.shading.dndu), dndv(si.shading.dndv) {
+    }
+    PBRT_HOST_DEVICE
     operator TextureEvalContext() const {
         return TextureEvalContext(p, dpdx, dpdy, uv, dudx, dvdx, dudy, dvdy);
     }
@@ -60,15 +76,17 @@ struct BumpEvalContext {
 };
 
 template <typename TextureEvaluator>
-PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTextureHandle displacement,
-                       const BumpEvalContext &ctx, Vector3f *dpdu, Vector3f *dpdv) {
+PBRT_HOST_DEVICE
+bool Bump(TextureEvaluator texEval, FloatTextureHandle displacement,
+          const BumpEvalContext &ctx, Vector3f *dpdu, Vector3f *dpdv) {
     if (!displacement) {
         *dpdu = ctx.dpdu;
         *dpdv = ctx.dpdv;
-        return;
+        return true;
     }
 
-    CHECK(texEval.CanEvaluate({displacement}, {}));
+    if (!texEval.Matches({displacement}, {}))
+        return false;
 
     // Compute offset positions and evaluate displacement texture
     TextureEvalContext shiftedTexCtx = ctx;
@@ -79,16 +97,14 @@ PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTextureHandle displacement
     // light sources, where no differentials are available. In this case,
     // we try to choose a small enough du so that we still get a decently
     // accurate bump value.
-    if (du == 0)
-        du = .0005f;
+    if (du == 0) du = .0005f;
     shiftedTexCtx.p = ctx.p + du * ctx.dpdu;
     shiftedTexCtx.uv = ctx.uv + Vector2f(du, 0.f);
     Float uDisplace = texEval(displacement, shiftedTexCtx);
 
     // Shift _shiftedTexCtx_ _dv_ in the $v$ direction
     Float dv = .5f * (std::abs(ctx.dvdx) + std::abs(ctx.dvdy));
-    if (dv == 0)
-        dv = .0005f;
+    if (dv == 0) dv = .0005f;
     shiftedTexCtx.p = ctx.p + dv * ctx.dpdv;
     shiftedTexCtx.uv = ctx.uv + Vector2f(0.f, dv);
     Float vDisplace = texEval(displacement, shiftedTexCtx);
@@ -96,33 +112,25 @@ PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTextureHandle displacement
     Float displace = texEval(displacement, ctx);
 
     // Compute bump-mapped differential geometry
-    *dpdu = ctx.dpdu + (uDisplace - displace) / du * Vector3f(ctx.n) +
+    *dpdu = ctx.dpdu +
+            (uDisplace - displace) / du * Vector3f(ctx.n) +
             displace * Vector3f(ctx.dndu);
-    *dpdv = ctx.dpdv + (vDisplace - displace) / dv * Vector3f(ctx.n) +
+    *dpdv = ctx.dpdv +
+            (vDisplace - displace) / dv * Vector3f(ctx.n) +
             displace * Vector3f(ctx.dndv);
+    return true;
 }
 
-class MaterialBase {
-public:
-    template <typename TextureEvaluator>
-    PBRT_CPU_GPU
-    BSSRDFHandle GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                           const SampledWavelengths &lambda,
-                           ScratchBuffer &scratchBuffer) const {
-        return nullptr;
-    }
-
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
-    PBRT_CPU_GPU bool HasSubsurfaceScattering() const { return false; }
-};
-
 // DielectricMaterial Declarations
-class alignas(8) DielectricMaterial : public MaterialBase {
+class alignas(8) DielectricMaterial {
   public:
     // DielectricMaterial Public Methods
-    DielectricMaterial(FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                       FloatTextureHandle etaF, SpectrumTextureHandle etaS,
-                       FloatTextureHandle displacement, bool remapRoughness)
+    DielectricMaterial(FloatTextureHandle uRoughness,
+                       FloatTextureHandle vRoughness,
+                       FloatTextureHandle etaF,
+                       SpectrumTextureHandle etaS,
+                       FloatTextureHandle displacement,
+                       bool remapRoughness)
         : displacement(displacement),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
@@ -133,10 +141,11 @@ class alignas(8) DielectricMaterial : public MaterialBase {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({etaF, uRoughness, vRoughness}, {etaS}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({etaF, uRoughness, vRoughness}, {etaS}))
             return nullptr;
 
         // Compute index of refraction for glass
@@ -153,20 +162,19 @@ class alignas(8) DielectricMaterial : public MaterialBase {
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
-        MicrofacetDistributionHandle distrib =
-            (urough != 0 && vrough != 0)
-                ? scratchBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough)
-                : nullptr;
+        MicrofacetDistributionHandle distrib = (urough != 0 && vrough != 0) ?
+            materialBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough) : nullptr;
 
         // Initialize _bsdf_ for smooth or rough dielectric
-        return scratchBuffer.Alloc<BSDF>(
-            si, scratchBuffer.Alloc<DielectricInterfaceBxDF>(eta, distrib), eta);
+        return materialBuffer.Alloc<BSDF>(si,
+                                          materialBuffer.Alloc<DielectricInterfaceBxDF>(eta, distrib, mode),
+                                          eta);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static DielectricMaterial *Create(const TextureParameterDictionary &parameters,
+    static DielectricMaterial *Create(const TextureParameterDictionary &dict,
                                       const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -181,20 +189,24 @@ class alignas(8) DielectricMaterial : public MaterialBase {
 };
 
 // ThinDielectricMaterial Declarations
-class alignas(8) ThinDielectricMaterial : public MaterialBase {
+class alignas(8) ThinDielectricMaterial {
   public:
     // ThinDielectricMaterial Public Methods
-    ThinDielectricMaterial(FloatTextureHandle etaF, SpectrumTextureHandle etaS,
+    ThinDielectricMaterial(FloatTextureHandle etaF,
+                           SpectrumTextureHandle etaS,
                            FloatTextureHandle displacement)
-        : displacement(displacement), etaF(etaF), etaS(etaS) {
+        : displacement(displacement),
+          etaF(etaF),
+          etaS(etaS) {
         CHECK((bool)etaF ^ (bool)etaS);
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({etaF}, {etaS}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({etaF}, {etaS}))
             return nullptr;
 
         Float eta;
@@ -205,21 +217,18 @@ class alignas(8) ThinDielectricMaterial : public MaterialBase {
             lambda.TerminateSecondaryWavelengths();
         }
 
-        return scratchBuffer.Alloc<BSDF>(si, scratchBuffer.Alloc<ThinDielectricBxDF>(eta),
-                                         eta);
+        return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<ThinDielectricBxDF>(eta, mode), eta);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    PBRT_CPU_GPU bool IsTransparent() const { return true; }
-
-    static ThinDielectricMaterial *Create(const TextureParameterDictionary &parameters,
+    static ThinDielectricMaterial *Create(const TextureParameterDictionary &dict,
                                           const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
-  private:
+private:
     // ThinDielectricMaterial Private Data
     FloatTextureHandle displacement;
     FloatTextureHandle etaF;
@@ -227,13 +236,17 @@ class alignas(8) ThinDielectricMaterial : public MaterialBase {
 };
 
 // HairMaterial Declarations
-class alignas(8) HairMaterial : public MaterialBase {
+class alignas(8) HairMaterial {
   public:
     // HairMaterial Public Methods
-    HairMaterial(SpectrumTextureHandle sigma_a, SpectrumTextureHandle color,
-                 FloatTextureHandle eumelanin, FloatTextureHandle pheomelanin,
-                 FloatTextureHandle eta, FloatTextureHandle beta_m,
-                 FloatTextureHandle beta_n, FloatTextureHandle alpha)
+    HairMaterial(SpectrumTextureHandle sigma_a,
+                 SpectrumTextureHandle color,
+                 FloatTextureHandle eumelanin,
+                 FloatTextureHandle pheomelanin,
+                 FloatTextureHandle eta,
+                 FloatTextureHandle beta_m,
+                 FloatTextureHandle beta_n,
+                 FloatTextureHandle alpha)
         : sigma_a(sigma_a),
           color(color),
           eumelanin(eumelanin),
@@ -244,11 +257,12 @@ class alignas(8) HairMaterial : public MaterialBase {
           alpha(alpha) {}
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({eumelanin, pheomelanin, eta, beta_m, beta_n, alpha},
-                                 {sigma_a, color}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({eumelanin, pheomelanin, eta, beta_m, beta_n, alpha},
+                             {sigma_a, color}))
             return nullptr;
 
         Float bm = std::max<Float>(1e-2, texEval(beta_m, si));
@@ -265,21 +279,19 @@ class alignas(8) HairMaterial : public MaterialBase {
         } else {
             CHECK(eumelanin || pheomelanin);
             sig_a = HairBxDF::SigmaAFromConcentration(
-                        std::max(Float(0), eumelanin ? texEval(eumelanin, si) : 0),
-                        std::max(Float(0), pheomelanin ? texEval(pheomelanin, si) : 0))
-                        .Sample(lambda);
+                std::max(Float(0), eumelanin ? texEval(eumelanin, si) : 0),
+                std::max(Float(0), pheomelanin ? texEval(pheomelanin, si) : 0)).Sample(lambda);
         }
 
         // Offset along width
         Float h = -1 + 2 * si.uv[1];
-        return scratchBuffer.Alloc<BSDF>(
-            si, scratchBuffer.Alloc<HairBxDF>(h, e, sig_a, bm, bn, a), e);
+        return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<HairBxDF>(h, e, sig_a, bm, bn, a), e);
     }
 
-    static HairMaterial *Create(const TextureParameterDictionary &parameters,
+    static HairMaterial *Create(const TextureParameterDictionary &dict,
                                 const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return nullptr; }
 
     std::string ToString() const;
@@ -292,31 +304,34 @@ class alignas(8) HairMaterial : public MaterialBase {
 };
 
 // DiffuseMaterial Declarations
-class alignas(8) DiffuseMaterial : public MaterialBase {
+class alignas(8) DiffuseMaterial {
   public:
     // DiffuseMaterial Public Methods
-    DiffuseMaterial(SpectrumTextureHandle reflectance, FloatTextureHandle sigma,
+    DiffuseMaterial(SpectrumTextureHandle reflectance,
+                    FloatTextureHandle sigma,
                     FloatTextureHandle displacement)
         : displacement(displacement), reflectance(reflectance), sigma(sigma) {}
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({sigma}, {reflectance}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({sigma}, {reflectance}))
             return nullptr;
 
         // Evaluate textures for _DiffuseMaterial_ material and allocate BRDF
         SampledSpectrum r = Clamp(texEval(reflectance, si, lambda), 0, 1);
         Float sig = Clamp(texEval(sigma, si), 0, 90);
-        DiffuseBxDF *bxdf = scratchBuffer.Alloc<DiffuseBxDF>(r, SampledSpectrum(0), sig);
-        return scratchBuffer.Alloc<BSDF>(si, bxdf);
+        LambertianBxDF *bxdf =
+            materialBuffer.Alloc<LambertianBxDF>(r, SampledSpectrum(0), sig);
+        return materialBuffer.Alloc<BSDF>(si, bxdf);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static DiffuseMaterial *Create(const TextureParameterDictionary &parameters,
+    static DiffuseMaterial *Create(const TextureParameterDictionary &dict,
                                    const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -329,24 +344,23 @@ class alignas(8) DiffuseMaterial : public MaterialBase {
 };
 
 // ConductorMaterial Declarations
-class alignas(8) ConductorMaterial : public MaterialBase {
+class alignas(8) ConductorMaterial {
   public:
     // ConductorMaterial Public Methods
-    ConductorMaterial(SpectrumTextureHandle eta, SpectrumTextureHandle k,
-                      FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                      FloatTextureHandle displacement, bool remapRoughness)
-        : displacement(displacement),
-          eta(eta),
-          k(k),
-          uRoughness(uRoughness),
-          vRoughness(vRoughness),
-          remapRoughness(remapRoughness) {}
+    ConductorMaterial(SpectrumTextureHandle eta,
+                      SpectrumTextureHandle k,
+                      FloatTextureHandle uRoughness,
+                      FloatTextureHandle vRoughness,
+                      FloatTextureHandle displacement,
+                      bool remapRoughness)
+    : displacement(displacement), eta(eta), k(k), uRoughness(uRoughness),
+      vRoughness(vRoughness), remapRoughness(remapRoughness) {}
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({uRoughness, vRoughness}, {eta, k}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si, const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({uRoughness, vRoughness}, {eta, k}))
             return nullptr;
 
         Float uRough = texEval(uRoughness, si);
@@ -355,23 +369,23 @@ class alignas(8) ConductorMaterial : public MaterialBase {
             uRough = TrowbridgeReitzDistribution::RoughnessToAlpha(uRough);
             vRough = TrowbridgeReitzDistribution::RoughnessToAlpha(vRough);
         }
-        FresnelHandle frMf = scratchBuffer.Alloc<FresnelConductor>(
-            texEval(eta, si, lambda), texEval(k, si, lambda));
+        FresnelHandle frMf = materialBuffer.Alloc<FresnelConductor>(texEval(eta, si, lambda),
+                                                                    texEval(k, si, lambda));
         if (uRough == 0 || vRough == 0) {
-            return scratchBuffer.Alloc<BSDF>(
-                si, scratchBuffer.Alloc<SpecularReflectionBxDF>(frMf));
+            return materialBuffer.Alloc<BSDF>(si,
+                                              materialBuffer.Alloc<SpecularReflectionBxDF>(frMf));
         } else {
             MicrofacetDistributionHandle distrib =
-                scratchBuffer.Alloc<TrowbridgeReitzDistribution>(uRough, vRough);
-            return scratchBuffer.Alloc<BSDF>(
-                si, scratchBuffer.Alloc<MicrofacetReflectionBxDF>(distrib, frMf));
+                materialBuffer.Alloc<TrowbridgeReitzDistribution>(uRough, vRough);
+            return materialBuffer.Alloc<BSDF>(si,
+                                              materialBuffer.Alloc<MicrofacetReflectionBxDF>(distrib, frMf));
         }
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static ConductorMaterial *Create(const TextureParameterDictionary &parameters,
+    static ConductorMaterial *Create(const TextureParameterDictionary &dict,
                                      const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -384,14 +398,61 @@ class alignas(8) ConductorMaterial : public MaterialBase {
     bool remapRoughness;
 };
 
+// MixMaterial Declarations
+class alignas(8) MixMaterial {
+  public:
+    // MixMaterial Public Methods
+    MixMaterial(MaterialHandle m1, MaterialHandle m2, FloatTextureHandle amount)
+        : m1(m1), m2(m2), amount(amount) {}
+
+    template <typename TextureEvaluator>
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si, const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({amount}, {}))
+            return nullptr;
+
+        // Compute weights and original _BxDF_s for mix material
+        BSDF *bsdfs[2] = { m1.GetBSDF(texEval, si, lambda, materialBuffer, mode),
+                           m2.GetBSDF(texEval, si, lambda, materialBuffer, mode) };
+        if (!bsdfs[0] || !bsdfs[1])
+            return nullptr;
+        Float t = Clamp(texEval(amount, si), 0, 1);
+
+        Float eta = Lerp(t, bsdfs[0]->eta, bsdfs[1]->eta);
+        return materialBuffer.Alloc<BSDF>(si,
+                                          materialBuffer.Alloc<MixBxDF>(t, bsdfs[0]->GetBxDF(), bsdfs[1]->GetBxDF()),
+                                          eta);
+    }
+
+    static MixMaterial *Create(const TextureParameterDictionary &dict,
+                               MaterialHandle m1, MaterialHandle m2,
+                               const FileLoc *loc, Allocator alloc);
+
+    PBRT_HOST_DEVICE_INLINE
+    // FIXME?
+    FloatTextureHandle GetDisplacement() const { return m1.GetDisplacement(); }
+
+    std::string ToString() const;
+
+  private:
+    // MixMaterial Private Data
+    MaterialHandle m1, m2;
+    FloatTextureHandle amount;
+};
+
+
 // CoatedDiffuseMaterial Declarations
-class alignas(8) CoatedDiffuseMaterial : public MaterialBase {
+class alignas(8) CoatedDiffuseMaterial {
   public:
     // CoatedDiffuseMaterial Public Methods
     CoatedDiffuseMaterial(SpectrumTextureHandle reflectance,
-                          FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                          FloatTextureHandle thickness, FloatTextureHandle eta,
-                          FloatTextureHandle displacement, bool remapRoughness,
+                          FloatTextureHandle uRoughness,
+                          FloatTextureHandle vRoughness,
+                          FloatTextureHandle thickness,
+                          FloatTextureHandle eta,
+                          FloatTextureHandle displacement,
+                          bool remapRoughness,
                           LayeredBxDFConfig config)
         : displacement(displacement),
           reflectance(reflectance),
@@ -403,10 +464,12 @@ class alignas(8) CoatedDiffuseMaterial : public MaterialBase {
           config(config) {}
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({uRoughness, vRoughness, thickness, eta}, {reflectance}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({uRoughness, vRoughness, thickness, eta},
+                             {reflectance}))
             return nullptr;
 
         // Initialize diffuse component of plastic material
@@ -420,21 +483,24 @@ class alignas(8) CoatedDiffuseMaterial : public MaterialBase {
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
         MicrofacetDistributionHandle distrib =
-            scratchBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough);
+            materialBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough);
 
         Float thick = texEval(thickness, si);
         Float e = texEval(eta, si);
 
-        BxDFHandle lb = scratchBuffer.Alloc<CoatedDiffuseBxDF>(
-            DielectricInterfaceBxDF(e, distrib), DiffuseBxDF(r, SampledSpectrum(0), 0),
-            thick, SampledSpectrum(0) /* albedo */, 0 /* g */, config);
-        return scratchBuffer.Alloc<BSDF>(si, lb);
+        BxDFHandle lb = materialBuffer.Alloc<CoatedDiffuseBxDF>(DielectricInterfaceBxDF(e, distrib, mode),
+                                                                LambertianBxDF(r, SampledSpectrum(0), 0),
+                                                                thick,
+                                                                SampledSpectrum(0) /* albedo */,
+                                                                0 /* g */,
+                                                                config);
+        return materialBuffer.Alloc<BSDF>(si, lb);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static CoatedDiffuseMaterial *Create(const TextureParameterDictionary &parameters,
+    static CoatedDiffuseMaterial *Create(const TextureParameterDictionary &dict,
                                          const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -448,11 +514,14 @@ class alignas(8) CoatedDiffuseMaterial : public MaterialBase {
     LayeredBxDFConfig config;
 };
 
-class alignas(8) LayeredMaterial : public MaterialBase {
+class alignas(8) LayeredMaterial {
   public:
-    LayeredMaterial(MaterialHandle top, MaterialHandle base, FloatTextureHandle thickness,
-                    SpectrumTextureHandle albedo, FloatTextureHandle g,
-                    FloatTextureHandle displacement, LayeredBxDFConfig config)
+    LayeredMaterial(MaterialHandle top, MaterialHandle base,
+                    FloatTextureHandle thickness,
+                    SpectrumTextureHandle albedo,
+                    FloatTextureHandle g,
+                    FloatTextureHandle displacement,
+                    LayeredBxDFConfig config)
         : displacement(displacement),
           top(top),
           base(base),
@@ -462,30 +531,32 @@ class alignas(8) LayeredMaterial : public MaterialBase {
           config(config) {}
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        BSDF *topBSDF = top.GetBSDF(texEval, si, lambda, scratchBuffer);
-        BSDF *bottomBSDF = base.GetBSDF(texEval, si, lambda, scratchBuffer);
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        BSDF *topBSDF = top.GetBSDF(texEval, si, lambda, materialBuffer, mode);
+        BSDF *bottomBSDF = base.GetBSDF(texEval, si, lambda, materialBuffer, mode);
         if (!topBSDF || !bottomBSDF)
             return nullptr;
 
-        if (!texEval.CanEvaluate({thickness, g}, {albedo}))
+        if (!texEval.Matches({thickness, g}, {albedo}))
             return nullptr;
 
         Float thick = texEval(thickness, si);
         SampledSpectrum a = texEval(albedo, si, lambda);
         Float gg = texEval(g, si);
 
-        BxDFHandle layered = scratchBuffer.Alloc<GeneralLayeredBxDF>(
-            topBSDF->GetBxDF(), bottomBSDF->GetBxDF(), thick, a, gg, config);
-        return scratchBuffer.Alloc<BSDF>(si, layered);
+        BxDFHandle layered = materialBuffer.Alloc<GeneralLayeredBxDF>(topBSDF->GetBxDF(),
+                                                                      bottomBSDF->GetBxDF(),
+                                                                      thick, a, gg, config);
+        return materialBuffer.Alloc<BSDF>(si, layered);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static LayeredMaterial *Create(const TextureParameterDictionary &parameters,
+    static LayeredMaterial *Create(const TextureParameterDictionary &dict,
                                    MaterialHandle top, MaterialHandle base,
                                    const FileLoc *loc, Allocator alloc);
 
@@ -500,15 +571,21 @@ class alignas(8) LayeredMaterial : public MaterialBase {
     LayeredBxDFConfig config;
 };
 
+
 // SubsurfaceMaterial Declarations
-class alignas(8) SubsurfaceMaterial : public MaterialBase {
+class alignas(8) SubsurfaceMaterial {
   public:
     // SubsurfaceMaterial Public Methods
-    SubsurfaceMaterial(Float scale, SpectrumTextureHandle sigma_a,
-                       SpectrumTextureHandle sigma_s, SpectrumTextureHandle reflectance,
-                       SpectrumTextureHandle mfp, Float g, Float eta,
-                       FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                       FloatTextureHandle displacement, bool remapRoughness,
+    SubsurfaceMaterial(Float scale,
+                       SpectrumTextureHandle sigma_a,
+                       SpectrumTextureHandle sigma_s,
+                       SpectrumTextureHandle reflectance,
+                       SpectrumTextureHandle mfp,
+                       Float g, Float eta,
+                       FloatTextureHandle uRoughness,
+                       FloatTextureHandle vRoughness,
+                       FloatTextureHandle displacement,
+                       bool remapRoughness,
                        Allocator alloc)
         : displacement(displacement),
           scale(scale),
@@ -525,10 +602,11 @@ class alignas(8) SubsurfaceMaterial : public MaterialBase {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({uRoughness, vRoughness}, {}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({uRoughness, vRoughness}, {}))
             return nullptr;
 
         // Initialize BSDF for _SubsurfaceMaterial_
@@ -538,30 +616,28 @@ class alignas(8) SubsurfaceMaterial : public MaterialBase {
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
-        MicrofacetDistributionHandle distrib =
-            (urough != 0 && vrough != 0)
-                ? scratchBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough)
-                : nullptr;
+        MicrofacetDistributionHandle distrib = (urough != 0 && vrough != 0) ?
+            materialBuffer.Alloc<TrowbridgeReitzDistribution>(urough, vrough) : nullptr;
 
         // Initialize _bsdf_ for smooth or rough dielectric
-        return scratchBuffer.Alloc<BSDF>(
-            si, scratchBuffer.Alloc<DielectricInterfaceBxDF>(eta, distrib), eta);
+        return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<DielectricInterfaceBxDF>(eta, distrib, mode), eta);
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSSRDFHandle GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                                        const SampledWavelengths &lambda,
-                                        ScratchBuffer &scratchBuffer) const {
+    PBRT_HOST_DEVICE
+    BSSRDFHandle GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                           const SampledWavelengths &lambda,
+                           MaterialBuffer &materialBuffer, TransportMode mode) const {
         SampledSpectrum sig_a, sig_s;
         if (sigma_a && sigma_s) {
-            if (!texEval.CanEvaluate({}, {sigma_a, sigma_s}))
+            if (!texEval.Matches({}, {sigma_a, sigma_s}))
                 return nullptr;
 
             sig_a = ClampZero(scale * texEval(sigma_a, si, lambda));
             sig_s = ClampZero(scale * texEval(sigma_s, si, lambda));
         } else {
             DCHECK(reflectance && mfp);
-            if (!texEval.CanEvaluate({}, {mfp, reflectance}))
+            if (!texEval.Matches({}, {mfp, reflectance}))
                 return nullptr;
 
             SampledSpectrum mfree = ClampZero(scale * texEval(mfp, si, lambda));
@@ -569,15 +645,13 @@ class alignas(8) SubsurfaceMaterial : public MaterialBase {
             SubsurfaceFromDiffuse(table, r, mfree, &sig_a, &sig_s);
         }
 
-        return scratchBuffer.Alloc<TabulatedBSSRDF>(si, eta, sig_a, sig_s, table);
+        return materialBuffer.Alloc<TabulatedBSSRDF>(si, eta, mode, sig_a, sig_s, table);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    PBRT_CPU_GPU bool HasSubsurfaceScattering() const { return true; }
-
-    static SubsurfaceMaterial *Create(const TextureParameterDictionary &parameters,
+    static SubsurfaceMaterial *Create(const TextureParameterDictionary &dict,
                                       const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -593,39 +667,41 @@ class alignas(8) SubsurfaceMaterial : public MaterialBase {
     BSSRDFTable table;
 };
 
+
 // DiffuseTransmissionMaterial Declarations
-class alignas(8) DiffuseTransmissionMaterial : public MaterialBase {
+class alignas(8) DiffuseTransmissionMaterial {
   public:
     // DiffuseTransmissionMaterial Public Methods
     DiffuseTransmissionMaterial(SpectrumTextureHandle reflectance,
                                 SpectrumTextureHandle transmittance,
-                                FloatTextureHandle sigma, FloatTextureHandle displacement,
+                                FloatTextureHandle sigma,
+                                FloatTextureHandle displacement,
                                 Float scale)
         : displacement(displacement),
           reflectance(reflectance),
           transmittance(transmittance),
           sigma(sigma),
-          scale(scale) {}
+          scale(scale) { }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        if (!texEval.CanEvaluate({sigma}, {reflectance, transmittance}))
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        if (!texEval.Matches({sigma}, {reflectance, transmittance}))
             return nullptr;
 
         SampledSpectrum r = Clamp(scale * texEval(reflectance, si, lambda), 0, 1);
         SampledSpectrum t = Clamp(scale * texEval(transmittance, si, lambda), 0, 1);
         Float s = texEval(sigma, si);
-        return scratchBuffer.Alloc<BSDF>(si, scratchBuffer.Alloc<DiffuseBxDF>(r, t, s));
+        return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<LambertianBxDF>(r, t, s));
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static DiffuseTransmissionMaterial *Create(
-        const TextureParameterDictionary &parameters, const FileLoc *loc,
-        Allocator alloc);
+    static DiffuseTransmissionMaterial *Create(const TextureParameterDictionary &dict,
+                                               const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
@@ -637,23 +713,23 @@ class alignas(8) DiffuseTransmissionMaterial : public MaterialBase {
     Float scale;
 };
 
-class alignas(8) MeasuredMaterial : public MaterialBase {
-  public:
+class alignas(8) MeasuredMaterial {
+public:
     MeasuredMaterial(const std::string &filename, FloatTextureHandle displacement,
                      Allocator alloc);
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                               const SampledWavelengths &lambda,
-                               ScratchBuffer &scratchBuffer) const {
-        return scratchBuffer.Alloc<BSDF>(
-            si, scratchBuffer.Alloc<MeasuredBxDF>(brdfData, lambda));
+    PBRT_HOST_DEVICE
+    BSDF *GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                  const SampledWavelengths &lambda,
+                  MaterialBuffer &materialBuffer, TransportMode mode) const {
+        return materialBuffer.Alloc<BSDF>(si, materialBuffer.Alloc<MeasuredBxDF>(brdfData, lambda));
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     FloatTextureHandle GetDisplacement() const { return displacement; }
 
-    static MeasuredMaterial *Create(const TextureParameterDictionary &parameters,
+    static MeasuredMaterial *Create(const TextureParameterDictionary &dict,
                                     const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
@@ -664,35 +740,94 @@ class alignas(8) MeasuredMaterial : public MaterialBase {
 };
 
 template <typename TextureEvaluator>
-inline BSDF *MaterialHandle::GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
-                                     const SampledWavelengths &lambda,
-                                     ScratchBuffer &scratchBuffer) const {
-    auto get = [&](auto ptr) { return ptr->GetBSDF(texEval, si, lambda, scratchBuffer); };
-    return Apply<BSDF *>(get);
+inline BSDF *
+MaterialHandle::GetBSDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                        const SampledWavelengths &lambda,
+                        MaterialBuffer &materialBuffer, TransportMode mode) const {
+    DCHECK(ptr() != nullptr);
+
+    switch (Tag()) {
+    case TypeIndex<CoatedDiffuseMaterial>():
+        return Cast<CoatedDiffuseMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<ConductorMaterial>():
+        return Cast<ConductorMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<DielectricMaterial>():
+        return Cast<DielectricMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<DiffuseMaterial>():
+        return Cast<DiffuseMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<DiffuseTransmissionMaterial>():
+        return Cast<DiffuseTransmissionMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+#ifndef __CUDA_ARCH__
+    case TypeIndex<HairMaterial>():
+        return Cast<HairMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<LayeredMaterial>():
+        return Cast<LayeredMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+#endif // __CUDA_ARCH__
+    case TypeIndex<MeasuredMaterial>():
+        return Cast<MeasuredMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<MixMaterial>():
+        return Cast<MixMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<SubsurfaceMaterial>():
+        return Cast<SubsurfaceMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    case TypeIndex<ThinDielectricMaterial>():
+        return Cast<ThinDielectricMaterial>()->GetBSDF(texEval, si, lambda, materialBuffer, mode);
+    default:
+        LOG_FATAL("Unhandled Material type: tag %d", Tag());
+        return {};
+    }
 }
 
 template <typename TextureEvaluator>
-inline BSSRDFHandle MaterialHandle::GetBSSRDF(TextureEvaluator texEval,
-                                              SurfaceInteraction &si,
-                                              const SampledWavelengths &lambda,
-                                              ScratchBuffer &scratchBuffer) const {
-    auto get = [&](auto ptr) { return ptr->GetBSSRDF(texEval, si, lambda, scratchBuffer); };
-    return Apply<BSSRDFHandle>(get);
+inline BSSRDFHandle
+MaterialHandle::GetBSSRDF(TextureEvaluator texEval, SurfaceInteraction &si,
+                          const SampledWavelengths &lambda,
+                          MaterialBuffer &materialBuffer, TransportMode mode) const {
+    if (Is<SubsurfaceMaterial>())
+        return Cast<SubsurfaceMaterial>()->GetBSSRDF(texEval, si, lambda,
+                                                     materialBuffer, mode);
+    return nullptr;
 }
 
 inline bool MaterialHandle::IsTransparent() const {
-    auto transp = [&](auto ptr) { return ptr->IsTransparent(); };
-    return Apply<bool>(transp);
+    if (Is<ThinDielectricMaterial>())
+        return true;
+    return false;
 }
 
 inline bool MaterialHandle::HasSubsurfaceScattering() const {
-    auto has = [&](auto ptr) { return ptr->HasSubsurfaceScattering(); };
-    return Apply<bool>(has);
+    return Is<SubsurfaceMaterial>();
 }
 
 inline FloatTextureHandle MaterialHandle::GetDisplacement() const {
-    auto disp = [&](auto ptr) { return ptr->GetDisplacement(); };
-    return Apply<FloatTextureHandle>(disp);
+    switch (Tag()) {
+    case TypeIndex<CoatedDiffuseMaterial>():
+        return Cast<CoatedDiffuseMaterial>()->GetDisplacement();
+    case TypeIndex<ConductorMaterial>():
+        return Cast<ConductorMaterial>()->GetDisplacement();
+    case TypeIndex<DielectricMaterial>():
+        return Cast<DielectricMaterial>()->GetDisplacement();
+    case TypeIndex<DiffuseMaterial>():
+        return Cast<DiffuseMaterial>()->GetDisplacement();
+    case TypeIndex<DiffuseTransmissionMaterial>():
+        return Cast<DiffuseTransmissionMaterial>()->GetDisplacement();
+#ifndef __CUDA_ARCH__
+    case TypeIndex<HairMaterial>():
+        return Cast<HairMaterial>()->GetDisplacement();
+    case TypeIndex<LayeredMaterial>():
+        return Cast<LayeredMaterial>()->GetDisplacement();
+#endif // __CUDA_ARCH__
+    case TypeIndex<MeasuredMaterial>():
+        return Cast<MeasuredMaterial>()->GetDisplacement();
+    case TypeIndex<MixMaterial>():
+        return Cast<MixMaterial>()->GetDisplacement();
+    case TypeIndex<SubsurfaceMaterial>():
+        return Cast<SubsurfaceMaterial>()->GetDisplacement();
+    case TypeIndex<ThinDielectricMaterial>():
+        return Cast<ThinDielectricMaterial>()->GetDisplacement();
+    default:
+        LOG_FATAL("Unhandled Material type: tag %d", Tag());
+        return {};
+    }
 }
 
 }  // namespace pbrt

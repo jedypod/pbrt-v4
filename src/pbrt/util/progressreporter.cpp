@@ -1,13 +1,44 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // core/progressreporter.cpp*
 #include <pbrt/util/progressreporter.h>
 
-#include <pbrt/util/check.h>
+#include <pbrt/gpu.h>
+#include <pbrt/options.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/profile.h>
 
 #include <cerrno>
 #include <cstdio>
@@ -25,20 +56,19 @@ namespace pbrt {
 static int TerminalWidth();
 
 std::string Timer::ToString() const {
-    return StringPrintf(
-        "[ Timer start(ns): %d ]",
-        std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch())
-            .count());
+    return StringPrintf("[ Timer start(ns): %d ]",
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count());
 }
 
 // ProgressReporter Method Definitions
-ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title,
-                                   bool quiet, bool gpu)
-    : totalWork(std::max<int64_t>(1, totalWork)), title(title), quiet(quiet) {
+ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title, bool gpu)
+    : totalWork(std::max<int64_t>(1, totalWork)),
+      title(title),
+      quiet(PbrtOptions.quiet) {
     workDone = 0;
     exitThread = false;
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_OPTIX
     if (gpu) {
         gpuEventsLaunchedOffset = 0;
         gpuEventsFinishedOffset = 0;
@@ -57,16 +87,26 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title,
 }
 
 void ProgressReporter::launchThread() {
+    // We need to temporarily disable the profiler before launching
+    // the update thread here, through the time the thread calls
+    // ProfilerWorkerThreadInit(). Otherwise, there's a potential
+    // deadlock if the profiler interrupt fires in the progress
+    // reporter's thread and we try to access the thread-local
+    // ProfilerState variable in the signal handler for the first
+    // time. (Which in turn calls malloc, which isn't allowed in a
+    // signal handler.)
+    SuspendProfiler();
     Barrier *barrier = new Barrier(2);
     updateThread = std::thread([this, barrier]() {
-        if (barrier->Block())
-            delete barrier;
+        ProfilerWorkerThreadInit();
+        ProfilerState = 0;
+        if (barrier->Block()) delete barrier;
         printBar();
     });
     // Wait for the thread to get past the ProfilerWorkerThreadInit()
     // call.
-    if (barrier->Block())
-        delete barrier;
+    if (barrier->Block()) delete barrier;
+    ResumeProfiler();
 }
 
 ProgressReporter::~ProgressReporter() {
@@ -84,15 +124,14 @@ void ProgressReporter::printBar() {
     snprintf(buf.get(), bufLen, "\r%s: [", title.c_str());
     char *curSpace = buf.get() + strlen(buf.get());
     char *s = curSpace;
-    for (int i = 0; i < totalPlusses; ++i)
-        *s++ = ' ';
+    for (int i = 0; i < totalPlusses; ++i) *s++ = ' ';
     *s++ = ']';
     *s++ = ' ';
     *s++ = '\0';
     fputs(buf.get(), stdout);
     fflush(stdout);
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_OPTIX
     std::chrono::milliseconds sleepDuration(gpuEvents.size() ? 50 : 250);
 #else
     std::chrono::milliseconds sleepDuration(250);
@@ -119,7 +158,7 @@ void ProgressReporter::printBar() {
             // After 15m, jump up to 5s intervals
             sleepDuration *= 5;
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_OPTIX
         if (gpuEvents.size()) {
             while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
                 cudaError_t err = cudaEventQuery(gpuEvents[gpuEventsFinishedOffset]);
@@ -157,12 +196,11 @@ void ProgressReporter::printBar() {
 
 void ProgressReporter::Done() {
     if (!quiet) {
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_OPTIX
         if (gpuEvents.size()) {
             CHECK_EQ(gpuEventsLaunchedOffset.load(), gpuEvents.size());
             while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
-                cudaError_t err =
-                    cudaEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
+                cudaError_t err = cudaEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
                 if (err != cudaSuccess)
                     LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
             }
@@ -206,7 +244,8 @@ static int TerminalWidth() {
             static bool warned = false;
             if (!warned) {
                 warned = true;
-                fprintf(stderr, "Error in ioctl() in TerminalWidth(): %d\n", errno);
+                fprintf(stderr, "Error in ioctl() in TerminalWidth(): %d\n",
+                        errno);
             }
         }
         return 80;

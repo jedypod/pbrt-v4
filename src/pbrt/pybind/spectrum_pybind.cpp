@@ -1,15 +1,12 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
-#include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
 #include <pbrt/core/types.h>
+#include <pbrt/spectrum/rgbcolorspace.h>
 #include <pbrt/spectrum/encoding.h>
 #include <pbrt/spectrum/rgb.h>
-#include <pbrt/spectrum/rgbcolorspace.h>
 #include <pbrt/spectrum/rgbspectrum.h>
 #include <pbrt/spectrum/sampled.h>
 #include <pbrt/spectrum/spds.h>
@@ -28,7 +25,8 @@ void PybindInitSpectrum(py::module &m) {
         .def("MaxValue", &Spectrum::MaxValue)
         .def("__str__", &Spectrum::ToString)
         .def("ParameterType", &Spectrum::ParameterType)
-        .def("ParameterString", &Spectrum::ParameterString);
+        .def("ParameterString", &Spectrum::ParameterString)
+        ;
 
     // rgb.h (do this early)
     py::class_<RGB>(m, "RGB")
@@ -52,9 +50,10 @@ void PybindInitSpectrum(py::module &m) {
         .def("__eq__", &RGB::operator==)
         .def("__getitem__", [](const RGB &rgb, int i) { return rgb[i]; })
         .def("__setitem__", [](RGB &rgb, int i, Float v) { rgb[i] = v; })
-        .def("__str__", &RGB::ToString);
+        .def("__str__", &RGB::ToString)
+        ;
 
-    m.def("Lerp", (RGB(*)(Float, const RGB &, const RGB &))Lerp);
+    m.def("Lerp", (RGB (*)(Float, const RGB &, const RGB &))Lerp);
 
     // xyz.h (do this early)
     py::class_<XYZ>(m, "XYZ")
@@ -79,9 +78,10 @@ void PybindInitSpectrum(py::module &m) {
         .def("__eq__", &XYZ::operator==)
         .def("__getitem__", [](const XYZ &xyz, int i) { return xyz[i]; })
         .def("__setitem__", [](XYZ &xyz, int i, Float v) { xyz[i] = v; })
-        .def("__str__", &XYZ::ToString);
+        .def("__str__", &XYZ::ToString)
+        ;
 
-    m.def("Lerp", (XYZ(*)(Float, const XYZ &, const XYZ &))Lerp);
+    m.def("Lerp", (XYZ (*)(Float, const XYZ &, const XYZ &))Lerp);
 
     // rgbcolorspace.h
     py::class_<RGBColorSpace>(m, "RGBColorSpace")
@@ -92,8 +92,7 @@ void PybindInitSpectrum(py::module &m) {
         .def("ToRGBCoeffs", &RGBColorSpace::ToRGBCoeffs)
         .def("GetNamed", &RGBColorSpace::GetNamed)
         .def("ColorCorrectionMatrixForxy", &RGBColorSpace::ColorCorrectionMatrixForxy)
-        .def("ColorCorrectionMatrixForIlluminant",
-             &RGBColorSpace::ColorCorrectionMatrixForIlluminant)
+        .def("ColorCorrectionMatrixForIlluminant", &RGBColorSpace::ColorCorrectionMatrixForIlluminant)
         .def("__eq__", &RGBColorSpace::operator==)
         .def("__str__", &RGBColorSpace::ToString)
         .def("Lookup", &RGBColorSpace::Lookup)
@@ -103,57 +102,60 @@ void PybindInitSpectrum(py::module &m) {
         .def_readwrite("r", &RGBColorSpace::r)
         .def_readwrite("g", &RGBColorSpace::g)
         .def_readwrite("b", &RGBColorSpace::b)
-        .def_readwrite("w", &RGBColorSpace::w);
+        .def_readwrite("w", &RGBColorSpace::w)
+        ;
 
     m.def("ConvertRGBColorSpace", &ConvertRGBColorSpace);
 
     // encoding.h
     py::class_<ColorEncoding>(m, "ColorEncoding")
-        .def("ToLinear",
-             [](const ColorEncoding &ce, std::vector<uint8_t> v) {
-                 std::vector<Float> vout;
-                 ce.ToLinear(MakeConstSpan(v), MakeSpan(vout));
-                 return vout;
-             })
+        .def("ToLinear", [](const ColorEncoding &ce, std::vector<uint8_t> v) {
+                             std::vector<Float> vout;
+                             ce.ToLinear(MakeConstSpan(v), MakeSpan(vout));
+                             return vout;
+                         })
         .def("ToFloatLinear", &ColorEncoding::ToFloatLinear)
-        .def("FromLinear",
-             [](const ColorEncoding &ce, std::vector<Float> v) {
-                 std::vector<uint8_t> vout;
-                 ce.FromLinear(MakeConstSpan(v), MakeSpan(vout));
-                 return vout;
-             })
+        .def("FromLinear", [](const ColorEncoding &ce, std::vector<Float> v) {
+                               std::vector<uint8_t> vout;
+                               ce.FromLinear(MakeConstSpan(v), MakeSpan(vout));
+                               return vout;
+                           })
         .def("__str__", &ColorEncoding::ToString)
         .def_readonly_static("Linear", ColorEncoding::Linear)
         .def_readonly_static("sRGB", ColorEncoding::sRGB)
-        .def_static("Get", &ColorEncoding::Get);
+        .def_static("Get", &ColorEncoding::Get)
+        ;
 
     // rgbspectrum.h
     py::class_<RGBReflectanceSpectrum, Spectrum>(m, "RGBReflectanceSpectrum")
-        .def(py::init<const RGBColorSpace &, const RGB &>());
+        .def(py::init<const RGBColorSpace &, const RGB &>())
+        ;
     py::class_<RGBSpectrum, Spectrum>(m, "RGBSpectrum")
-        .def(py::init<const RGBColorSpace &, const RGB &>());
+        .def(py::init<const RGBColorSpace &, const RGB &>())
+        ;
     py::class_<RGBSigmoidPolynomial>(m, "RGBSigmoidPolynomial")
         .def(py::init())
         .def(py::init<Float, Float, Float>())
         .def("__call__", &RGBSigmoidPolynomial::operator())
         .def("MaxValue", &RGBSigmoidPolynomial::MaxValue)
-        .def("__str__", &RGBSigmoidPolynomial::ToString);
+        .def("__str__", &RGBSigmoidPolynomial::ToString)
+        ;
     py::class_<RGBToSpectrumTable>(m, "RGBToSpectrumTable")
         .def("__call__", &RGBToSpectrumTable::operator())
         .def_readonly_static("sRGB", &RGBToSpectrumTable::sRGB)
         .def_readonly_static("Rec2020", &RGBToSpectrumTable::Rec2020)
-        .def_readonly_static("ACES2065_1", &RGBToSpectrumTable::ACES2065_1);
+        .def_readonly_static("ACES2065_1", &RGBToSpectrumTable::ACES2065_1)
+        ;
 
     // sampled.h
     py::class_<SampledWavelengths>(m, "SampledWavelengths")
         .def("__getitem__", [](const SampledWavelengths &s, int i) { return s[i]; })
         .def("__eq__", &SampledWavelengths::operator==)
         .def("__str__", &SampledWavelengths::ToString)
-        .def("TerminateSecondaryWavelengths",
-             &SampledWavelengths::TerminateSecondaryWavelengths)
+        .def("TerminateSecondaryWavelengths", &SampledWavelengths::TerminateSecondaryWavelengths)
         .def_static("SampleEqui", &SampledWavelengths::SampleEqui, "u"_a,
-                    "lambdaMin"_a = Spectrum::LambdaMin,
-                    "lambdaMax"_a = Spectrum::LambdaMax);
+                    "lambdaMin"_a = Spectrum::LambdaMin, "lambdaMax"_a = Spectrum::LambdaMax)
+        ;
     m.attr("NSpectrumSamples") = py::int_(NSpectrumSamples);
 
     py::class_<SampledSpectrum>(m, "SampledSpectrum")
@@ -183,15 +185,15 @@ void PybindInitSpectrum(py::module &m) {
         .def("ToXYZ", &SampledSpectrum::ToXYZ)
         .def("y", &SampledSpectrum::y)
         .def("__getitem__", [](const SampledSpectrum &s, int i) { return s[i]; })
-        .def("__setitem__", [](SampledSpectrum &s, int i, Float v) { s[i] = v; });
-    m.def("Sqrt", (SampledSpectrum(*)(const SampledSpectrum &))Sqrt);
-    m.def("Pow", (SampledSpectrum(*)(const SampledSpectrum &, Float))Pow);
-    m.def("Exp", (SampledSpectrum(*)(const SampledSpectrum &))Exp);
-    m.def("SaveDiv",
-          (SampledSpectrum(*)(const SampledSpectrum &, const SampledSpectrum &))SafeDiv);
+        .def("__setitem__", [](SampledSpectrum &s, int i, Float v) { s[i] = v; })
+        ;
+    m.def("Sqrt", (SampledSpectrum (*)(const SampledSpectrum &))Sqrt);
+    m.def("Pow", (SampledSpectrum (*)(const SampledSpectrum &, Float))Pow);
+    m.def("Exp", (SampledSpectrum (*)(const SampledSpectrum &))Exp);
+    m.def("SaveDiv", (SampledSpectrum (*)(const SampledSpectrum &, const SampledSpectrum &))SafeDiv);
     m.def("Clamp", [](const SampledSpectrum &s, Float low, Float high) {
-        return Clamp(s, low, high);
-    });
+                       return Clamp(s, low, high);
+                   });
 
     // spds.h
     auto mspds = m.def_submodule("spds");
@@ -241,18 +243,23 @@ void PybindInitSpectrum(py::module &m) {
 
     // spectrum.h
     py::class_<BlackbodySpectrum, Spectrum>(m, "BlackbodySpectrum")
-        .def(py::init<Float>());
-    py::class_<ConstantSpectrum, Spectrum>(m, "ConstantSpectrum").def(py::init<Float>());
+        .def(py::init<Float>())
+        ;
+    py::class_<ConstantSpectrum, Spectrum>(m, "ConstantSpectrum")
+        .def(py::init<Float>())
+        ;
     py::class_<ScaledSpectrum, Spectrum>(m, "ScaledSpectrum")
-        .def(py::init<Float, const Spectrum *>());
+        .def(py::init<Float, const Spectrum *>())
+        ;
     py::class_<PiecewiseLinearSpectrum>(m, "PiecewiseLienarSpectrum")
         .def(py::init([](std::vector<Float> lambda, std::vector<Float> values) {
-            return new PiecewiseLinearSpectrum(MakeConstSpan(lambda),
-                                               MakeConstSpan(values));
-        }));
+                          return new PiecewiseLinearSpectrum(MakeConstSpan(lambda), MakeConstSpan(values));
+                      }))
+        ;
     py::class_<DenselySampledSpectrum, Spectrum>(m, "DenselySampledSpectrum")
-        .def(py::init<const Spectrum &, int, int>(), "s"_a, "lambdaStart"_a = 400,
-             "lambdaEnd"_a = 700);
+        .def(py::init<const Spectrum &, int, int>(), "s"_a, "lambdaStart"_a = 400, "lambdaEnd"_a = 700)
+        ;
 }
 
 }  // namespace pbrt
+

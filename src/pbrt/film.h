@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,24 +41,20 @@
 // film.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/bxdf.h>
-#include <pbrt/base/camera.h>
-#include <pbrt/base/film.h>
-#include <pbrt/bsdf.h>
+#include <pbrt/base.h>
+#include <pbrt/film.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/util/profile.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/spectrum.h>
-#include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
-#include <atomic>
 #include <map>
+#include <mutex>
 #include <string>
-#include <thread>
-#include <vector>
 
 namespace pbrt {
 
@@ -42,71 +66,48 @@ namespace pbrt {
 // sppm: ...
 struct VisibleSurface {
     VisibleSurface() = default;
-    PBRT_CPU_GPU
-    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &cameraTransform,
+    PBRT_HOST_DEVICE
+    VisibleSurface(const SurfaceInteraction &si, const Camera &camera,
                    const SampledWavelengths &lambda);
 
     std::string ToString() const;
 
     Point3f p;
-    Float dzdx = 0, dzdy = 0;  // x/y: raster space, z: camera space
+    Float dzdx = 0, dzdy = 0; // x/y: raster space, z: camera space
     Normal3f n, ns;
     Float time = 0;
-    SampledSpectrum albedo;
-    Vector3f dpdx, dpdy;  // world(ish) space
+    SampledSpectrum Le, Ld, albedo;
+    BSDF *bsdf = nullptr;
+
+private:
+    Vector3f dpdx, dpdy; // world(ish) space
 };
 
-class FilmBase {
-  public:
-    PBRT_CPU_GPU
-    Bounds2f SampleBounds() const;
-
-    PBRT_CPU_GPU
-    FilterHandle GetFilter() const { return filter; }
-
-    PBRT_CPU_GPU
-    Point2i FullResolution() const { return fullResolution; }
-
-    PBRT_CPU_GPU
-    Float Diagonal() const { return diagonal; }
-
-    PBRT_CPU_GPU
-    Bounds2i PixelBounds() const { return pixelBounds; }
-
-    std::string GetFilename() const { return filename; }
-
-  protected:
-    Point2i fullResolution;
-    Float diagonal;
-    FilterHandle filter;
-    std::string filename;
-    Bounds2i pixelBounds;
-
-    FilmBase(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
-             Float diagonal, const std::string &filename);
-
-    std::string BaseToString() const;
-};
-
-class RGBFilm : public FilmBase {
+class RGBFilm final : public Film {
   public:
     RGBFilm() = default;
-    RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
-            Float diagonal, const std::string &filename, Float scale,
-            const RGBColorSpace *colorSpace, Float maxSampleLuminance = Infinity,
-            bool writeFP16 = true, Allocator allocator = {});
+    RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
+            FilterHandle filter, Float diagonal,
+            const std::string &filename, Float scale,
+            const RGBColorSpace *colorSpace,
+            Float maxSampleLuminance = Infinity,
+            bool writeFP16 = true, bool saveVariance = false,
+            Allocator allocator = {});
 
-    static RGBFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
-                           const RGBColorSpace *colorSpace, const FileLoc *loc,
-                           Allocator alloc);
+    static RGBFilm *Create(const ParameterDictionary &dict,
+                           FilterHandle filter,
+                           const RGBColorSpace *colorSpace,
+                           const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     SampledWavelengths SampleWavelengths(Float u) const;
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void AddSample(const Point2i &pFilm, SampledSpectrum L,
                    const SampledWavelengths &lambda,
-                   const pstd::optional<VisibleSurface> &visibleSurface, Float weight) {
+                   const pstd::optional<VisibleSurface> &visibleSurface,
+                   Float weight) {
+        ProfilerScope _(ProfilePhase::AddFilmSample);
         if (L.y(lambda) > maxSampleLuminance)
             L *= maxSampleLuminance / L.y(lambda);
 
@@ -123,32 +124,9 @@ class RGBFilm : public FilmBase {
         pixel.weightSum += weight;
     }
 
-    PBRT_CPU_GPU
-    void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
-
-    PBRT_CPU_GPU
-    bool UsesVisibleSurface() const { return false; }
-
-    PBRT_CPU_GPU
-    RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
-        const Pixel &pixel = pixels[p];
-        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
-
-        // Normalize pixel with weight sum
-        Float weightSum = pixel.weightSum;
-        if (weightSum != 0)
-            rgb /= weightSum;
-
-        // Add splat value at pixel
-        for (int c = 0; c < 3; ++c)
-            rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
-
-        // Scale pixel value by _scale_
-        rgb *= scale;
-
-        return rgb;
-    }
-
+    PBRT_HOST_DEVICE
+    void AddSplat(const Point2f &p, SampledSpectrum v,
+                  const SampledWavelengths &lambda);
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
 
@@ -158,7 +136,7 @@ class RGBFilm : public FilmBase {
     // RGBFilm Private Data
     struct Pixel {
         Pixel() = default;
-        double rgbSum[3] = {0., 0., 0.};
+        double rgbSum[3] = { 0., 0., 0. };
         double weightSum = 0.;
         AtomicDouble splatRGB[3];
         VarianceEstimator<Float> varianceEstimator;
@@ -167,139 +145,62 @@ class RGBFilm : public FilmBase {
     Float scale;
     const RGBColorSpace *colorSpace;
     Float maxSampleLuminance;
-    bool writeFP16;
-    Float filterIntegral;
+    bool writeFP16, saveVariance;
 };
 
-class GBufferFilm : public FilmBase {
+class AOVFilm final : public Film {
   public:
-    GBufferFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                FilterHandle filter, Float diagonal, const std::string &filename,
-                Float scale, const RGBColorSpace *colorSpace,
-                Float maxSampleLuminance = Infinity, bool writeFP16 = true,
-                Allocator alloc = {});
+    AOVFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
+            FilterHandle filter, Float diagonal,
+            const std::string &filename, const RGBColorSpace *colorSpace,
+            Float maxSampleLuminance = Infinity,
+            bool writeFP16 = true,
+            Allocator alloc = {});
 
-    static GBufferFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
-                               const RGBColorSpace *colorSpace, const FileLoc *loc,
-                               Allocator alloc);
+    static AOVFilm *Create(const ParameterDictionary &dict, FilterHandle filter,
+                           const RGBColorSpace *colorSpace, const FileLoc *loc,
+                           Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     SampledWavelengths SampleWavelengths(Float u) const;
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void AddSample(const Point2i &pFilm, SampledSpectrum L,
                    const SampledWavelengths &lambda,
-                   const pstd::optional<VisibleSurface> &visibleSurface, Float weight);
+                   const pstd::optional<VisibleSurface> &visibleSurface,
+                   Float weight);
 
-    PBRT_CPU_GPU
-    void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
-
-    PBRT_CPU_GPU
-    bool UsesVisibleSurface() const { return true; }
-
-    PBRT_CPU_GPU
-    RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
-        const Pixel &pixel = pixels[p];
-        RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
-
-        // Normalize pixel with weight sum
-        Float weightSum = pixel.weightSum;
-        if (weightSum != 0)
-            rgb /= weightSum;
-
-        // Add splat value at pixel
-        for (int c = 0; c < 3; ++c)
-            rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
-
-        // Scale pixel value by _scale_
-        rgb *= scale;
-
-        return rgb;
-    }
+    PBRT_HOST_DEVICE
+    void AddSplat(const Point2f &p, SampledSpectrum v,
+                  const SampledWavelengths &lambda);
 
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
-
     std::string ToString() const;
 
   private:
-    // GBufferFilm Private Data
+    // AOVFilm Private Data
     struct Pixel {
         Pixel() = default;
-        double rgbSum[3] = {0., 0., 0.};
+        double LSum[3] = { 0., 0., 0. };
         double weightSum = 0.;
         AtomicDouble splatRGB[3];
         Point3f pSum;
         Float dzdxSum = 0, dzdySum = 0;
         Normal3f nSum, nsSum;
-        double albedoSum[3] = {0., 0., 0.};
-        VarianceEstimator<Float> rgbVarianceEstimator;
+        double albedoSum[3] = { 0., 0., 0. };
+        double LeSum[3] = { 0., 0., 0. };
+        double LdSum[3] = { 0., 0., 0. };
+        VarianceEstimator<Float> LdVarianceEstimator, LiVarianceEstimator;
         RGB materialRGB;
     };
+    std::mutex materialIdMapLock;
+    std::map<std::string, RGB> staticMaterialIdMap, dynamicMaterialIdMap;
     Array2D<Pixel> pixels;
-    Float scale;
     const RGBColorSpace *colorSpace;
     Float maxSampleLuminance;
     bool writeFP16;
-    Float filterIntegral;
 };
-
-PBRT_CPU_GPU
-inline SampledWavelengths FilmHandle::SampleWavelengths(Float u) const {
-    auto sample = [&](auto ptr) { return ptr->SampleWavelengths(u); };
-    return Apply<SampledWavelengths>(sample);
-}
-
-PBRT_CPU_GPU
-inline Bounds2f FilmHandle::SampleBounds() const {
-    auto sb = [&](auto ptr) { return ptr->SampleBounds(); };
-    return Apply<Bounds2f>(sb);
-}
-
-PBRT_CPU_GPU
-inline Bounds2i FilmHandle::PixelBounds() const {
-    auto pb = [&](auto ptr) { return ptr->PixelBounds(); };
-    return Apply<Bounds2i>(pb);
-}
-
-PBRT_CPU_GPU
-inline Point2i FilmHandle::FullResolution() const {
-    auto fr = [&](auto ptr) { return ptr->FullResolution(); };
-    return Apply<Point2i>(fr);
-}
-
-PBRT_CPU_GPU
-inline Float FilmHandle::Diagonal() const {
-    auto diag = [&](auto ptr) { return ptr->Diagonal(); };
-    return Apply<Float>(diag);
-}
-
-PBRT_CPU_GPU
-inline FilterHandle FilmHandle::GetFilter() const {
-    auto filter = [&](auto ptr) { return ptr->GetFilter(); };
-    return Apply<FilterHandle>(filter);
-}
-
-PBRT_CPU_GPU
-inline bool FilmHandle::UsesVisibleSurface() const {
-    auto uses = [&](auto ptr) { return ptr->UsesVisibleSurface(); };
-    return Apply<bool>(uses);
-}
-
-PBRT_CPU_GPU
-inline RGB FilmHandle::GetPixelRGB(const Point2i &p, Float splatScale) const {
-    auto get = [&](auto ptr) { return ptr->GetPixelRGB(p, splatScale); };
-    return Apply<RGB>(get);
-}
-
-PBRT_CPU_GPU
-inline void FilmHandle::AddSample(const Point2i &pFilm, SampledSpectrum L,
-                                  const SampledWavelengths &lambda,
-                                  const pstd::optional<VisibleSurface> &visibleSurface,
-                                  Float weight) {
-    auto add = [&](auto ptr) { return ptr->AddSample(pFilm, L, lambda, visibleSurface, weight); };
-    return Apply<void>(add);
-}
 
 }  // namespace pbrt
 

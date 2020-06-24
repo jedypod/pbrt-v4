@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 // util/image.cpp*
 #include <pbrt/util/image.h>
@@ -17,17 +45,17 @@
 #include <pbrt/util/string.h>
 
 #include <lodepng/lodepng.h>
-#ifndef PBRT_IS_GPU_CODE
-// Work around conflict with "half".
-#include <ImfChannelList.h>
-#include <ImfChromaticitiesAttribute.h>
-#include <ImfFloatAttribute.h>
-#include <ImfFrameBuffer.h>
-#include <ImfInputFile.h>
-#include <ImfIntAttribute.h>
-#include <ImfMatrixAttribute.h>
-#include <ImfOutputFile.h>
-#include <ImfStringVectorAttribute.h>
+#ifndef __CUDA_ARCH__
+  // Work around conflict with "half".
+  #include <ImfChannelList.h>
+  #include <ImfChromaticitiesAttribute.h>
+  #include <ImfFloatAttribute.h>
+  #include <ImfFrameBuffer.h>
+  #include <ImfInputFile.h>
+  #include <ImfIntAttribute.h>
+  #include <ImfMatrixAttribute.h>
+  #include <ImfOutputFile.h>
+  #include <ImfStringVectorAttribute.h>
 #endif
 
 #include <cmath>
@@ -71,7 +99,8 @@ int TexelBytes(PixelFormat format) {
 }
 
 std::string ImageChannelValues::ToString() const {
-    return StringPrintf("[ ImageChannelValues %s ]", ((InlinedVector<Float, 4> &)*this));
+    return StringPrintf("[ ImageChannelValues %s ]",
+                        ((InlinedVector<Float, 4> &)*this));
 }
 
 std::string ImageChannelDesc::ToString() const {
@@ -82,20 +111,18 @@ std::string ImageMetadata::ToString() const {
     return StringPrintf("[ ImageMetadata renderTimeSeconds: %s cameraFromWorld: %s "
                         "NDCFromWorld: %s pixelBounds: %s fullResolution: %s "
                         "samplesPerPixel: %s estimatedVariance: %s MSE: %s "
-                        "colorSpace: %s ]",
-                        renderTimeSeconds, cameraFromWorld, NDCFromWorld, pixelBounds,
-                        fullResolution, samplesPerPixel, estimatedVariance, MSE,
-                        colorSpace);
+                        "colorSpace: %s ]", renderTimeSeconds, cameraFromWorld,
+                        NDCFromWorld, pixelBounds, fullResolution, samplesPerPixel,
+                        estimatedVariance, MSE, colorSpace);
 }
 
 const RGBColorSpace *ImageMetadata::GetColorSpace() const {
-    if (colorSpace && *colorSpace)
-        return *colorSpace;
+    if (colorSpace && *colorSpace) return *colorSpace;
     return RGBColorSpace::sRGB;
 }
 
-template <typename F>
-void ForExtent(const Bounds2i &extent, WrapMode2D wrapMode, Image &image, F op) {
+template <typename F> void ForExtent(const Bounds2i &extent, WrapMode2D wrapMode,
+                                     Image &image, F op) {
     CHECK_LT(extent.pMin.x, extent.pMax.x);
     CHECK_LT(extent.pMin.y, extent.pMax.y);
 
@@ -124,15 +151,11 @@ void ForExtent(const Bounds2i &extent, WrapMode2D wrapMode, Image &image, F op) 
 }
 
 Image::Image(PixelFormat format, Point2i resolution,
-             pstd::span<const std::string> channels, ColorEncodingHandle encoding,
-             Allocator alloc)
-    : format(format),
-      resolution(resolution),
-      channelNames(channels.begin(), channels.end()),
-      encoding(encoding),
-      p8(alloc),
-      p16(alloc),
-      p32(alloc) {
+             pstd::span<const std::string> channels,
+             const ColorEncoding *encoding, Allocator alloc)
+    : format(format), resolution(resolution),
+      channelNames(channels.begin(), channels.end()), encoding(encoding),
+      p8(alloc), p16(alloc), p32(alloc) {
     if (Is8Bit(format)) {
         p8.resize(NChannels() * resolution[0] * resolution[1]);
         CHECK(encoding != nullptr);
@@ -145,38 +168,33 @@ Image::Image(PixelFormat format, Point2i resolution,
 }
 
 Image::Image(pstd::vector<uint8_t> p8c, Point2i resolution,
-             pstd::span<const std::string> channels, ColorEncodingHandle encoding)
-    : format(PixelFormat::U256),
-      resolution(resolution),
-      channelNames(channels.begin(), channels.end()),
-      encoding(encoding),
+             pstd::span<const std::string> channels,
+             const ColorEncoding *encoding)
+    : format(PixelFormat::U256), resolution(resolution),
+      channelNames(channels.begin(), channels.end()), encoding(encoding),
       p8(std::move(p8c)) {
     CHECK_EQ(p8.size(), NChannels() * resolution[0] * resolution[1]);
 }
 
 Image::Image(pstd::vector<Half> p16c, Point2i resolution,
              pstd::span<const std::string> channels)
-    : format(PixelFormat::Half),
-      resolution(resolution),
-      channelNames(channels.begin(), channels.end()),
-      p16(std::move(p16c)) {
+    : format(PixelFormat::Half), resolution(resolution),
+      channelNames(channels.begin(), channels.end()), p16(std::move(p16c)) {
     CHECK_EQ(p16.size(), NChannels() * resolution[0] * resolution[1]);
     CHECK(Is16Bit(format));
 }
 
 Image::Image(pstd::vector<float> p32c, Point2i resolution,
              pstd::span<const std::string> channels)
-    : format(PixelFormat::Float),
-      resolution(resolution),
-      channelNames(channels.begin(), channels.end()),
-      p32(std::move(p32c)) {
+    : format(PixelFormat::Float), resolution(resolution),
+      channelNames(channels.begin(), channels.end()), p32(std::move(p32c)) {
     CHECK_EQ(p32.size(), NChannels() * resolution[0] * resolution[1]);
     CHECK(Is32Bit(format));
 }
 
-Image Image::ConvertToFormat(PixelFormat newFormat, ColorEncodingHandle encoding) const {
-    if (newFormat == format)
-        return *this;
+Image Image::ConvertToFormat(PixelFormat newFormat,
+                             const ColorEncoding *encoding) const {
+    if (newFormat == format) return *this;
 
     Image newImage(newFormat, resolution, channelNames, encoding);
     for (int y = 0; y < resolution.y; ++y)
@@ -186,8 +204,7 @@ Image Image::ConvertToFormat(PixelFormat newFormat, ColorEncodingHandle encoding
     return newImage;
 }
 
-pstd::optional<ImageChannelDesc> Image::GetChannelDesc(
-    pstd::span<const std::string> requestedChannels) const {
+pstd::optional<ImageChannelDesc> Image::GetChannelDesc(pstd::span<const std::string> requestedChannels) const {
     ImageChannelDesc desc;
     desc.offset.resize(requestedChannels.size());
     for (size_t i = 0; i < requestedChannels.size(); ++i) {
@@ -206,14 +223,13 @@ pstd::optional<ImageChannelDesc> Image::GetChannelDesc(
 
 ImageChannelValues Image::GetChannels(Point2i p, WrapMode2D wrapMode) const {
     ImageChannelValues cv(NChannels(), Float(0));
-    if (!RemapPixelCoords(&p, resolution, wrapMode))
-        return cv;
+    if (!RemapPixelCoords(&p, resolution, wrapMode)) return cv;
 
     size_t pixelOffset = PixelOffset(p);
     switch (format) {
     case PixelFormat::U256: {
-        encoding.ToLinear({&p8[pixelOffset], size_t(NChannels())},
-                          {&cv[0], size_t(NChannels())});
+        encoding->ToLinear({&p8[pixelOffset], size_t(NChannels())},
+                           {&cv[0], size_t(NChannels())});
         break;
     }
     case PixelFormat::Half: {
@@ -236,14 +252,14 @@ ImageChannelValues Image::GetChannels(Point2i p, WrapMode2D wrapMode) const {
 ImageChannelValues Image::GetChannels(Point2i p, const ImageChannelDesc &desc,
                                       WrapMode2D wrapMode) const {
     ImageChannelValues cv(desc.offset.size(), Float(0));
-    if (!RemapPixelCoords(&p, resolution, wrapMode))
-        return cv;
+    if (!RemapPixelCoords(&p, resolution, wrapMode)) return cv;
 
     size_t pixelOffset = PixelOffset(p);
     switch (format) {
     case PixelFormat::U256: {
         for (int i = 0; i < desc.offset.size(); ++i)
-            encoding.ToLinear({&p8[pixelOffset + desc.offset[i]], 1}, {&cv[i], 1});
+            encoding->ToLinear({&p8[pixelOffset + desc.offset[i]], 1},
+                                {&cv[i], 1});
         break;
     }
     case PixelFormat::Half: {
@@ -264,7 +280,7 @@ ImageChannelValues Image::GetChannels(Point2i p, const ImageChannelDesc &desc,
 }
 
 std::vector<std::string> Image::ChannelNames() const {
-    return {channelNames.begin(), channelNames.end()};
+    return { channelNames.begin(), channelNames.end() };
 }
 
 std::vector<std::string> Image::ChannelNames(const ImageChannelDesc &desc) const {
@@ -311,9 +327,7 @@ ImageChannelValues Image::MSE(const ImageChannelDesc &desc, const Image &ref,
     std::vector<double> sumSE(desc.size(), 0.);
 
     pstd::optional<ImageChannelDesc> refDesc = ref.GetChannelDesc(ChannelNames(desc));
-    if (!refDesc)
-        ErrorExit("Channels not found in image: %s", ChannelNames(desc));
-
+    CHECK((bool)refDesc);
     CHECK_EQ(Resolution(), ref.Resolution());
 
     if (mseImage)
@@ -388,8 +402,8 @@ ImageChannelValues Image::Average(const ImageChannelDesc &desc) const {
     return average;
 }
 
-void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
-                        WrapMode2D wrapMode) {
+void Image::CopyRectOut(const Bounds2i &extent,
+                        pstd::span<float> buf, WrapMode2D wrapMode) {
     CHECK_GE(buf.size(), extent.Area() * NChannels());
 
     auto bufIter = buf.begin();
@@ -404,11 +418,11 @@ void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
 #ifdef PBRT_FLOAT_AS_DOUBLE
                 for (int i = 0; i < count; ++i) {
                     Float v;
-                    encoding.ToLinear({&p8[offset + i], 1}, {&v, 1});
+                    encoding->ToLinear({&p8[offset + i], 1}, {&v, 1});
                     *bufIter++ = v;
                 }
 #else
-                encoding.ToLinear({&p8[offset], count}, {&*bufIter, count});
+                encoding->ToLinear({&p8[offset], count}, {&*bufIter, count});
 #endif
                 bufIter += count;
             }
@@ -416,10 +430,10 @@ void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
             ForExtent(extent, wrapMode, *this, [&bufIter, this](int offset) {
 #ifdef PBRT_FLOAT_AS_DOUBLE
                 Float v;
-                encoding.ToLinear({&p8[offset], 1}, {&v, 1});
+                encoding->ToLinear({&p8[offset], 1}, {&v, 1});
                 *bufIter = v;
 #else
-                encoding.ToLinear({&p8[offset], 1}, {&*bufIter, 1});
+                encoding->ToLinear({&p8[offset], 1}, {&*bufIter, 1});
 #endif
                 ++bufIter;
             });
@@ -427,13 +441,15 @@ void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
         break;
 
     case PixelFormat::Half:
-        ForExtent(extent, wrapMode, *this,
-                  [&bufIter, this](int offset) { *bufIter++ = Float(p16[offset]); });
+        ForExtent(extent, wrapMode, *this, [&bufIter, this](int offset) {
+                                        *bufIter++ = Float(p16[offset]);
+                                    });
         break;
 
     case PixelFormat::Float:
-        ForExtent(extent, wrapMode, *this,
-                  [&bufIter, this](int offset) { *bufIter++ = Float(p32[offset]); });
+        ForExtent(extent, wrapMode, *this, [&bufIter, this](int offset) {
+                                        *bufIter++ = Float(p32[offset]);
+                                    });
         break;
 
     default:
@@ -456,23 +472,24 @@ void Image::CopyRectIn(const Bounds2i &extent, pstd::span<const float> buf) {
 #ifdef PBRT_FLOAT_AS_DOUBLE
                 for (int i = 0; i < count; ++i) {
                     Float v = *bufIter++;
-                    encoding.FromLinear({&v, 1}, {&p8[offset + i], 1});
+                    encoding->FromLinear({&v, 1}, {&p8[offset + i], 1});
                 }
 #else
-                encoding.FromLinear({&*bufIter, count}, {&p8[offset], count});
+                encoding->FromLinear({&*bufIter, count}, {&p8[offset], count});
                 bufIter += count;
 #endif
             }
         } else
             ForExtent(extent, WrapMode::Clamp, *this, [&bufIter, this](int offset) {
-                Float v = *bufIter++;
-                encoding.FromLinear({&v, 1}, {&p8[offset], 1});
-            });
+                    Float v = *bufIter++;
+                    encoding->FromLinear({&v, 1}, {&p8[offset], 1});
+                });
         break;
 
     case PixelFormat::Half:
-        ForExtent(extent, WrapMode::Clamp, *this,
-                  [&bufIter, this](int offset) { p16[offset] = Half(*bufIter++); });
+        ForExtent(extent, WrapMode::Clamp, *this, [&bufIter, this](int offset) {
+                                               p16[offset] = Half(*bufIter++);
+                                           });
         break;
 
     case PixelFormat::Float:
@@ -483,21 +500,6 @@ void Image::CopyRectIn(const Bounds2i &extent, pstd::span<const float> buf) {
     default:
         LOG_FATAL("Unhandled PixelFormat");
     }
-}
-
-ImageChannelValues Image::LookupNearest(Point2f p, WrapMode2D wrapMode) const {
-    ImageChannelValues cv(NChannels(), Float(0));
-    for (int c = 0; c < NChannels(); ++c)
-        cv[c] = LookupNearestChannel(p, c, wrapMode);
-    return cv;
-}
-
-ImageChannelValues Image::LookupNearest(Point2f p, const ImageChannelDesc &desc,
-                                        WrapMode2D wrapMode) const {
-    ImageChannelValues cv(desc.offset.size(), Float(0));
-    for (int i = 0; i < desc.offset.size(); ++i)
-        cv[i] = LookupNearestChannel(p, desc.offset[i], wrapMode);
-    return cv;
 }
 
 ImageChannelValues Image::Bilerp(Point2f p, WrapMode2D wrapMode) const {
@@ -528,8 +530,7 @@ void Image::SetChannels(Point2i p, pstd::span<const Float> values) {
         SetChannel(p, i, values[i]);
 }
 
-void Image::SetChannels(Point2i p, const ImageChannelDesc &desc,
-                        pstd::span<const Float> values) {
+void Image::SetChannels(Point2i p, const ImageChannelDesc &desc, pstd::span<const Float> values) {
     CHECK_LE(values.size(), NChannels());
     for (size_t i = 0; i < values.size(); ++i)
         SetChannel(p, desc.offset[i], values[i]);
@@ -554,10 +555,9 @@ static std::vector<ResampleWeight> resampleWeights(int oldRes, int newRes) {
         }
 
         // Normalize filter weights for texel resampling
-        Float invSumWts =
-            1 / (wt[i].weight[0] + wt[i].weight[1] + wt[i].weight[2] + wt[i].weight[3]);
-        for (int j = 0; j < 4; ++j)
-            wt[i].weight[j] *= invSumWts;
+        Float invSumWts = 1 / (wt[i].weight[0] + wt[i].weight[1] +
+                               wt[i].weight[2] + wt[i].weight[3]);
+        for (int j = 0; j < 4; ++j) wt[i].weight[j] *= invSumWts;
     }
     return wt;
 }
@@ -577,10 +577,10 @@ Image Image::FloatResize(Point2i newResolution, WrapMode2D wrapMode) const {
     thread_local std::vector<float> inBuf, xBuf, outBuf;
 
     ParallelFor2D(Bounds2i({0, 0}, newResolution), [&](Bounds2i outExtent) {
-        Bounds2i inExtent(
-            {xWeights[outExtent[0][0]].firstTexel, yWeights[outExtent[0][1]].firstTexel},
-            {xWeights[outExtent[1][0] - 1].firstTexel + 4,
-             yWeights[outExtent[1][1] - 1].firstTexel + 4});
+        Bounds2i inExtent({xWeights[outExtent[0][0]].firstTexel,
+                           yWeights[outExtent[0][1]].firstTexel},
+                          {xWeights[outExtent[1][0] - 1].firstTexel + 4,
+                           yWeights[outExtent[1][1] - 1].firstTexel + 4});
 
         if (inBuf.size() < NChannels() * inExtent.Area())
             inBuf.resize(NChannels() * inExtent.Area());
@@ -601,8 +601,7 @@ Image Image::FloatResize(Point2i newResolution, WrapMode2D wrapMode) const {
         int nxIn = inExtent[1][0] - inExtent[0][0];
         int nyIn = inExtent[1][1] - inExtent[0][1];
 
-        if (xBuf.size() < NChannels() * nyIn * nxOut)
-            xBuf.resize(NChannels() * nyIn * nxOut);
+        if (xBuf.size() < NChannels() * nyIn * nxOut) xBuf.resize(NChannels() * nyIn * nxOut);
 
         int xBufOffset = 0;
         for (int y = 0; y < nyIn; ++y) {
@@ -665,7 +664,8 @@ Image Image::FloatResize(Point2i newResolution, WrapMode2D wrapMode) const {
 void Image::FlipY() {
     for (int y = 0; y < resolution.y / 2; ++y) {
         for (int x = 0; x < resolution.x; ++x) {
-            size_t o1 = PixelOffset({x, y}), o2 = PixelOffset({x, resolution.y - 1 - y});
+            size_t o1 = PixelOffset({x, y}),
+                   o2 = PixelOffset({x, resolution.y - 1 - y});
             for (int c = 0; c < NChannels(); ++c) {
                 if (Is8Bit(format))
                     pstd::swap(p8[o1 + c], p8[o2 + c]);
@@ -684,21 +684,22 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
                                           Allocator alloc) {
     PixelFormat origFormat = image.format;
     int nChannels = image.NChannels();
-    ColorEncodingHandle origEncoding = image.encoding;
+    const ColorEncoding *origEncoding = image.encoding;
 
     // Set things up so we have a power-of-two sized image stored with
     // floats.
     if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1])) {
         // Resample image to power-of-two resolution
-        image = image.FloatResize(
-            {RoundUpPow2(image.resolution[0]), RoundUpPow2(image.resolution[1])},
-            wrapMode);
+        image = image.FloatResize({RoundUpPow2(image.resolution[0]),
+                                   RoundUpPow2(image.resolution[1])},
+                                  wrapMode);
     } else if (!Is32Bit(image.format))
         image = image.ConvertToFormat(PixelFormat::Float);
     CHECK(Is32Bit(image.format));
 
     // Initialize levels of MIPMap from image
-    int nLevels = 1 + Log2Int(std::max(image.resolution[0], image.resolution[1]));
+    int nLevels =
+        1 + Log2Int(std::max(image.resolution[0], image.resolution[1]));
     pstd::vector<Image> pyramid(alloc);
     pyramid.reserve(nLevels);
 
@@ -706,12 +707,13 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
     for (int i = 0; i < nLevels - 1; ++i) {
         // Initialize $i+1$st MIPMap level from $i$th level and also convert
         // i'th level to the internal format
-        pyramid.push_back(
-            Image(origFormat, levelResolution, image.channelNames, origEncoding, alloc));
+        pyramid.push_back(Image(origFormat, levelResolution, image.channelNames,
+                                origEncoding, alloc));
 
         Point2i nextResolution(std::max(1, levelResolution[0] / 2),
                                std::max(1, levelResolution[1] / 2));
-        Image nextImage(image.format, nextResolution, image.channelNames, origEncoding);
+        Image nextImage(image.format, nextResolution, image.channelNames,
+                        origEncoding);
 
         // Offsets from the base pixel to the four neighbors that we'll
         // downfilter.
@@ -736,10 +738,10 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
                 for (int x = 0; x < nextResolution[0]; ++x) {
                     for (int c = 0; c < nChannels; ++c) {
                         nextImage.p32[nextOffset] =
-                            .25f *
-                            (image.p32[srcOffset] + image.p32[srcOffset + srcDeltas[1]] +
-                             image.p32[srcOffset + srcDeltas[2]] +
-                             image.p32[srcOffset + srcDeltas[3]]);
+                            .25f * (image.p32[srcOffset] +
+                                    image.p32[srcOffset + srcDeltas[1]] +
+                                    image.p32[srcOffset + srcDeltas[2]] +
+                                    image.p32[srcOffset + srcDeltas[3]]);
                         ++srcOffset;
                         ++nextOffset;
                     }
@@ -751,8 +753,9 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
                 int yEnd = std::min(2 * y + 2, levelResolution[1]);
                 int offset = image.PixelOffset({0, yStart});
                 size_t count = (yEnd - yStart) * nChannels * levelResolution[0];
-                pyramid[i].CopyRectIn(Bounds2i({0, yStart}, {levelResolution[0], yEnd}),
-                                      {image.p32.data() + offset, count});
+                pyramid[i].CopyRectIn(
+                    Bounds2i({0, yStart}, {levelResolution[0], yEnd}),
+                    {image.p32.data() + offset, count});
             }
         });
 
@@ -762,16 +765,15 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
 
     // Top level
     CHECK(levelResolution[0] == 1 && levelResolution[1] == 1);
-    pyramid.push_back(
-        Image(origFormat, levelResolution, image.channelNames, origEncoding, alloc));
+    pyramid.push_back(Image(origFormat, levelResolution, image.channelNames,
+                            origEncoding, alloc));
     pyramid[nLevels - 1].CopyRectIn({{0, 0}, {1, 1}},
                                     {image.p32.data(), size_t(nChannels)});
 
     return pyramid;
 }
 
-Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
-                            Float sigma) const {
+Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth, Float sigma) const {
     // Compute filter weights
     std::vector<Float> wts(2 * halfWidth + 1, Float(0));
     for (int d = 0; d < 2 * halfWidth + 1; ++d)
@@ -786,41 +788,43 @@ Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
     // desired channels along the way.
     Image blurx(PixelFormat::Float, resolution, ChannelNames(desc));
     int nc = desc.size();
-    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution.x; ++x) {
-                ImageChannelValues result(desc.size());
-                for (int r = -halfWidth; r <= halfWidth; ++r) {
-                    ImageChannelValues cv = GetChannels({x + r, y}, desc);
-                    for (int c = 0; c < nc; ++c)
-                        result[c] += wts[r + halfWidth] * cv[c];
+    ParallelFor(0, resolution.y,
+        [&](int64_t y0, int64_t y1) {
+            for (int y = y0; y < y1; ++y) {
+                for (int x = 0; x < resolution.x; ++x) {
+                    ImageChannelValues result(desc.size());
+                    for (int r = -halfWidth; r <= halfWidth; ++r) {
+                        ImageChannelValues cv = GetChannels({x + r, y}, desc);
+                        for (int c = 0; c < nc; ++c)
+                            result[c] += wts[r + halfWidth] * cv[c];
+                    }
+                    blurx.SetChannels({x, y}, result);
                 }
-                blurx.SetChannels({x, y}, result);
             }
-        }
-    });
+        });
 
-    // Now blur in y from blur x to the result; blurx has just the
-    // channels we want already.
-    Image blury(PixelFormat::Float, resolution, ChannelNames(desc));
-    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution.x; ++x) {
-                ImageChannelValues result(desc.size());
-                for (int r = -halfWidth; r <= halfWidth; ++r) {
-                    ImageChannelValues cv = blurx.GetChannels({x, y + r});
-                    for (int c = 0; c < nc; ++c)
-                        result[c] += wts[r + halfWidth] * cv[c];
+        // Now blur in y from blur x to the result; blurx has just the
+        // channels we want already.
+        Image blury(PixelFormat::Float, resolution, ChannelNames(desc));
+        ParallelFor(0, resolution.y,
+            [&](int64_t y0, int64_t y1) {
+                for (int y = y0; y < y1; ++y) {
+                    for (int x = 0; x < resolution.x; ++x) {
+                        ImageChannelValues result(desc.size());
+                        for (int r = -halfWidth; r <= halfWidth; ++r) {
+                            ImageChannelValues cv = blurx.GetChannels({x, y + r});
+                            for (int c = 0; c < nc; ++c)
+                                result[c] += wts[r + halfWidth] * cv[c];
+                        }
+                        blury.SetChannels({x, y}, result);
+                    }
                 }
-                blury.SetChannels({x, y}, result);
-            }
-        }
-    });
-    return blury;
+            });
+        return blury;
 }
 
-Image Image::JointBilateralFilter(const ImageChannelDesc &toFilterDesc, int halfWidth,
-                                  const Float xySigma[2],
+Image Image::JointBilateralFilter(const ImageChannelDesc &toFilterDesc,
+                                  int halfWidth, const Float xySigma[2],
                                   const ImageChannelDesc &jointDesc,
                                   const ImageChannelValues &jointSigma) const {
     CHECK_EQ(jointDesc.size(), jointSigma.size());
@@ -832,79 +836,166 @@ Image Image::JointBilateralFilter(const ImageChannelDesc &toFilterDesc, int half
         fy.push_back(Gaussian(i, 0, xySigma[1]));
     }
 
-    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution.x; ++x) {
-                ImageChannelValues jointPixelChannels = GetChannels({x, y}, jointDesc);
-                ImageChannelValues filteredSum(toFilterDesc.size(), Float(0));
-                Float weightSum = 0;
+    ParallelFor(0, resolution.y,
+        [&](int64_t y0, int64_t y1) {
+            for (int y = y0; y < y1; ++y) {
+                for (int x = 0; x < resolution.x; ++x) {
+                    ImageChannelValues jointPixelChannels = GetChannels({x, y}, jointDesc);
+                    ImageChannelValues filteredSum(toFilterDesc.size(), Float(0));
+                    Float weightSum = 0;
 
-                for (int dy = -halfWidth + 1; dy < halfWidth; ++dy) {
-                    if (y + dy < 0 || y + dy >= resolution.y)
-                        continue;
-                    for (int dx = -halfWidth + 1; dx < halfWidth; ++dx) {
+                    for (int dy = -halfWidth + 1; dy < halfWidth; ++dy) {
+                        if (y + dy < 0 || y + dy >= resolution.y) continue;
                         for (int dx = -halfWidth + 1; dx < halfWidth; ++dx) {
-                            if (x + dx < 0 || x + dx >= resolution.x)
-                                continue;
-                            ImageChannelValues jointOtherChannels =
-                                GetChannels({x + dx, y + dy}, jointDesc);
-                            Float weight = fx[std::abs(dx)] * fy[std::abs(dy)];
-                            for (int c = 0; c < jointDesc.size(); ++c)
-                                weight *= Gaussian(jointPixelChannels[c],
-                                                   jointOtherChannels[c], jointSigma[c]);
-                            weightSum += weight;
+                            for (int dx = -halfWidth + 1; dx < halfWidth; ++dx) {
+                                if (x + dx < 0 || x + dx >= resolution.x) continue;
+                                ImageChannelValues jointOtherChannels = GetChannels({x + dx, y + dy}, jointDesc);
+                                Float weight = fx[std::abs(dx)] * fy[std::abs(dy)];
+                                for (int c = 0; c < jointDesc.size(); ++c)
+                                    weight *= Gaussian(jointPixelChannels[c], jointOtherChannels[c], jointSigma[c]);
+                                weightSum += weight;
 
-                            ImageChannelValues filterChannels =
-                                GetChannels({x + dx, y + dy}, toFilterDesc);
-                            for (int c = 0; c < filterChannels.size(); ++c)
-                                filteredSum[c] += weight * filterChannels[c];
+                                ImageChannelValues filterChannels = GetChannels({x + dx, y + dy}, toFilterDesc);
+                                for (int c = 0; c < filterChannels.size(); ++c)
+                                    filteredSum[c] += weight * filterChannels[c];
+                            }
                         }
                     }
+                    if (weightSum > 0)
+                        for (int c = 0; c < filteredSum.size(); ++c)
+                            filteredSum[c] /= weightSum;
+                    result.SetChannels({x, y}, filteredSum);
                 }
-                if (weightSum > 0)
-                    for (int c = 0; c < filteredSum.size(); ++c)
-                        filteredSum[c] /= weightSum;
-                result.SetChannels({x, y}, filteredSum);
             }
-        }
-    });
+        });
 
     return result;
 }
 
-Array2D<Float> Image::GetSamplingDistribution(std::function<Float(Point2f)> dxdA,
-                                              const Bounds2f &domain, Allocator alloc) {
-    Array2D<Float> dist(resolution[0], resolution[1], alloc);
-    ParallelFor(0, resolution[1], [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution[0]; ++x) {
-                // This is noticably better than MaxValue: discuss / show
-                // example..
-                Float value = GetChannels({x, y}).Average();
+Array2D<Float> Image::ComputeSamplingDistribution(
+        std::function<Float(Point2f)> dxdA, const ImageChannelDesc &desc, int resScale,
+        Bounds2f domain, Norm norm, WrapMode2D wrap) {
+    switch (norm) {
+    case Norm::L1: {
+        int width = resScale * resolution.x, height = resScale * resolution.y;
+        Array2D<Float> img(width, height);
 
-                // Assume jacobian term is basically constant over the
-                // region.
-                Point2f p = domain.Lerp(
-                    Point2f((x + .5f) / resolution[0], (y + .5f) / resolution[1]));
-                dist(x, y) = value * dxdA(p);
+        ParallelFor(0, height, [&](int64_t y0, int64_t y1) {
+            for (int y = y0; y < y1; ++y) {
+                Float fy[3] = {Float(y) / height,
+                               Float(y + 0.5f) / height,
+                               Float(y + 1) / height};
+                for (int x = 0; x < width; ++x) {
+                    Float fx[3] = {Float(x) / width,
+                                   Float(x + 0.5f) / width,
+                                   Float(x + 1) / width};
+                    // The integral of bilerp is the average of the
+                    // four corners.  Then some corners are counted
+                    // multiple times.  There is missing a constant
+                    // factor in the below, but that doesn't matter,
+                    // since this is turned into a PDF.
+                    // FIXME: want BilerpMaxAbs()
+                    Float fInt = (    Bilerp({fx[0], fy[0]}, desc, wrap).MaxValue() +
+                                  2 * Bilerp({fx[1], fy[0]}, desc, wrap).MaxValue() +
+                                      Bilerp({fx[2], fy[0]}, desc, wrap).MaxValue() +
+                                  2 * Bilerp({fx[0], fy[1]}, desc, wrap).MaxValue() +
+                                  4 * Bilerp({fx[1], fy[1]}, desc, wrap).MaxValue() +
+                                  2 * Bilerp({fx[2], fy[1]}, desc, wrap).MaxValue() +
+                                      Bilerp({fx[0], fy[2]}, desc, wrap).MaxValue() +
+                                  2 * Bilerp({fx[1], fy[2]}, desc, wrap).MaxValue() +
+                                      Bilerp({fx[2], fy[2]}, desc, wrap).MaxValue());
+                    img(x, y) = fInt * dxdA(domain.Lerp({fx[1], fy[1]}));
+                }
             }
-        }
-    });
-    return dist;
+        });
+        return img;
+    }
+    case Norm::L2: {
+        int width = resScale * resolution.x, height = resScale * resolution.y;
+        Array2D<Float> img(width, height);
+
+        ParallelFor(0, height, [&](int64_t y0, int64_t y1) {
+            for (int y = y0; y < y1; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    // Closed form integral of bilinear interpolation,
+                    // squared, over the given four corners.
+                    auto integrateBilerp2 = [](Float v00, Float v01,
+                                               Float v10, Float v11) {
+                        return (2 * (Sqr(v00) + Sqr(v01) + Sqr(v10) +  Sqr(v11)) +
+                                2 * (v00 * v01 + v00 * v10 + v01 * v11 + v10 * v11) +
+                                v00 * v11 + v01 * v10) / 18;
+                    };
+                    // FIXME: lots of redundancy in BilerpMaxValue across
+                    // neighboring texels
+                    Float f2int = 0;
+                    for (Float dy = 0; dy <= 0.5f; dy += 0.5f) {
+                        Float y0 = (y + dy) / height,
+                              y1 = (y + dy + 0.5f) / height;
+                        for (Float dx = 0; dx <= 0.5f; dx += 0.5f) {
+                            Float x0 = (x + dx) / width,
+                                  x1 = (x + dx + 0.5f) / width;
+                            Float y00 = Bilerp({x0, y0}, desc, wrap).MaxValue();
+                            Float y01 = Bilerp({x0, y1}, desc, wrap).MaxValue();
+                            Float y10 = Bilerp({x1, y0}, desc, wrap).MaxValue();
+                            Float y11 = Bilerp({x1, y1}, desc, wrap).MaxValue();
+                            f2int += integrateBilerp2(y00, y01, y10, y11);
+                        }
+                    }
+                    Point2f p((x + .5f) / width, (y + .5f) / height);
+                    img(x, y) = std::sqrt(f2int) * dxdA(domain.Lerp(p));
+                }
+            }
+        });
+        return img;
+    }
+    case Norm::LInfinity: {
+        CHECK_EQ(1, resScale); // FIXME support this?
+        Array2D<Float> img(resolution[0], resolution[1]);
+        ParallelFor(0, resolution[1], [&](int64_t y0, int64_t y1) {
+            for (int y = y0; y < y1; ++y) {
+                for (int x = 0; x < resolution[0]; ++x) {
+                    Float center = GetChannels({x, y}, desc, wrap).MaxValue();
+                    Float max = center;
+                    // Horizontal and vertical texel neighbors.
+                    max = std::max(max, (center + GetChannels({x, y - 1}, desc, wrap).MaxValue()) / 2);
+                    max = std::max(max, (center + GetChannels({x, y + 1}, desc, wrap).MaxValue()) / 2);
+                    max = std::max(max, (center + GetChannels({x - 1, y}, desc, wrap).MaxValue()) / 2);
+                    max = std::max(max, (center + GetChannels({x + 1, y}, desc, wrap).MaxValue()) / 2);
+
+                    // Diagonal corners.
+                    Float fx[2] = { Float(x) / resolution[0], Float(x + 1) / resolution[0] };
+                    Float fy[2] = { Float(y) / resolution[1], Float(y + 1) / resolution[1] };
+                    max = std::max(max, Bilerp({fx[0], fy[0]}, desc, wrap).MaxValue());
+                    max = std::max(max, Bilerp({fx[1], fy[0]}, desc, wrap).MaxValue());
+                    max = std::max(max, Bilerp({fx[0], fy[1]}, desc, wrap).MaxValue());
+                    max = std::max(max, Bilerp({fx[1], fy[1]}, desc, wrap).MaxValue());
+
+                    // Assume jacobian term is basically constant over the
+                    // region.
+                    Point2f p = domain.Lerp(Point2f((x + .5f) / resolution[0],
+                                                    (y + .5f) / resolution[1]));
+                    img(x, y) = max * dxdA(domain.Lerp(p));
+                }
+            }
+        });
+        return img;
+    }
+    default:
+        LOG_FATAL("Unhandled Norm");
+        return {};
+    }
 }
 
 // ImageIO Local Declarations
 static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name, Allocator alloc);
 static pstd::optional<ImageAndMetadata> ReadPNG(const std::string &name, Allocator alloc,
-                                                ColorEncodingHandle encoding);
-static pstd::optional<ImageAndMetadata> ReadPFM(const std::string &filename,
-                                                Allocator alloc);
-static pstd::optional<ImageAndMetadata> ReadHDR(const std::string &filename,
-                                                Allocator alloc);
+                                                const ColorEncoding *encoding);
+static pstd::optional<ImageAndMetadata> ReadPFM(const std::string &filename, Allocator alloc);
+static pstd::optional<ImageAndMetadata> ReadHDR(const std::string &filename, Allocator alloc);
 
 // ImageIO Function Definitions
 pstd::optional<ImageAndMetadata> Image::Read(const std::string &name, Allocator alloc,
-                                             ColorEncodingHandle encoding) {
+                                             const ColorEncoding *encoding) {
     if (HasExtension(name, "exr"))
         return ReadEXR(name, alloc);
     else if (HasExtension(name, "png"))
@@ -921,25 +1012,20 @@ pstd::optional<ImageAndMetadata> Image::Read(const std::string &name, Allocator 
             stbi_image_free(data);
             switch (n) {
             case 1:
-                return ImageAndMetadata{
-                    Image(std::move(pixels), {x, y}, {"Y"}, ColorEncodingHandle::sRGB),
-                    ImageMetadata()};
+                return ImageAndMetadata{Image(std::move(pixels), {x, y}, { "Y" }, ColorEncoding::sRGB),
+                                            ImageMetadata()};
             case 2: {
-                Image image(std::move(pixels), {x, y}, {"Y", "A"},
-                            ColorEncodingHandle::sRGB);
-                return ImageAndMetadata{
-                    image.SelectChannels(*image.GetChannelDesc({"Y"})), ImageMetadata()};
+                Image image(std::move(pixels), {x, y}, { "Y", "A" }, ColorEncoding::sRGB);
+                return ImageAndMetadata{image.SelectChannels(*image.GetChannelDesc({ "Y" })), ImageMetadata()};
             }
             case 3:
-                return ImageAndMetadata{Image(std::move(pixels), {x, y}, {"R", "G", "B"},
-                                              ColorEncodingHandle::sRGB),
-                                        ImageMetadata()};
+                return ImageAndMetadata{Image(std::move(pixels), {x, y}, { "R", "G", "B" },
+                                              ColorEncoding::sRGB),
+                        ImageMetadata()};
             case 4: {
-                Image image(std::move(pixels), {x, y}, {"R", "G", "B", "A"},
-                            ColorEncodingHandle::sRGB);
-                return ImageAndMetadata{
-                    image.SelectChannels(*image.GetChannelDesc({"R", "G", "B"})),
-                    ImageMetadata()};
+                Image image(std::move(pixels), {x, y}, { "R", "G", "B", "A" }, ColorEncoding::sRGB);
+                return ImageAndMetadata{image.SelectChannels(*image.GetChannelDesc({ "R", "G", "B" })),
+                        ImageMetadata()};
             }
             default:
                 ErrorExit("%s: %d channel image unsupported.", name, n);
@@ -960,8 +1046,7 @@ bool Image::Write(const std::string &name, const ImageMetadata &metadata) const 
 
     if (NChannels() == 3 && *metadata.GetColorSpace() != *RGBColorSpace::sRGB)
         Warning("%s: writing image with non-sRGB color space to a format that "
-                "doesn't store color spaces.",
-                name);
+                "doesn't store color spaces.", name);
 
     const Image *image = this;
     Image rgbImage;
@@ -970,8 +1055,7 @@ bool Image::Write(const std::string &name, const ImageMetadata &metadata) const 
         pstd::optional<ImageChannelDesc> desc = GetChannelDesc({"R", "G", "B"});
         if (!desc)
             Warning("%s: 3-channels but doesn't have R, G, and B. "
-                    "Image may be garbled.",
-                    name);
+                    "Image may be garbled.", name);
         else {
             rgbImage = SelectChannels(*desc);
             image = &rgbImage;
@@ -991,16 +1075,15 @@ bool Image::Write(const std::string &name, const ImageMetadata &metadata) const 
 ///////////////////////////////////////////////////////////////////////////
 // OpenEXR
 
-static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
-                                           const ImageChannelDesc &desc,
+static Imf::FrameBuffer imageToFrameBuffer(const Image &image, const ImageChannelDesc &desc,
                                            const Imath::Box2i &dataWindow) {
     size_t xStride = image.NChannels() * TexelBytes(image.Format());
     size_t yStride = image.Resolution().x * xStride;
     // Would be nice to use PixelOffset(-dw.min.x, -dw.min.y) but
     // it checks to make sure the coordiantes are >= 0 (which
     // usually makes sense...)
-    char *originPtr = (((char *)image.RawPointer({0, 0})) - dataWindow.min.x * xStride -
-                       dataWindow.min.y * yStride);
+    char *originPtr = (((char *)image.RawPointer({0, 0})) -
+                       dataWindow.min.x * xStride - dataWindow.min.y * yStride);
 
     Imf::FrameBuffer fb;
     std::vector<std::string> channelNames = image.ChannelNames();
@@ -1008,13 +1091,15 @@ static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
     case PixelFormat::Half:
         for (int channelIndex : desc.offset)
             fb.insert(channelNames[channelIndex],
-                      Imf::Slice(Imf::HALF, originPtr + channelIndex * sizeof(Half),
+                      Imf::Slice(Imf::HALF,
+                                 originPtr + channelIndex * sizeof(Half),
                                  xStride, yStride));
         break;
     case PixelFormat::Float:
         for (int channelIndex : desc.offset)
             fb.insert(channelNames[channelIndex],
-                      Imf::Slice(Imf::FLOAT, originPtr + channelIndex * sizeof(float),
+                      Imf::Slice(Imf::FLOAT,
+                                 originPtr + channelIndex * sizeof(float),
                                  xStride, yStride));
         break;
     default:
@@ -1042,7 +1127,7 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < 4; ++j)
                     // Can't memcpy since Float may be a double...
-                    m[i][j] = worldToCameraAttrib->value().getValue()[4 * i + j];
+                    m[i][j] = worldToCameraAttrib->value().getValue()[4*i+j];
             metadata.cameraFromWorld = m;
         }
 
@@ -1052,7 +1137,7 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
             SquareMatrix<4> m;
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < 4; ++j)
-                    m[i][j] = worldToNDCAttrib->value().getValue()[4 * i + j];
+                    m[i][j] = worldToNDCAttrib->value().getValue()[4*i+j];
             metadata.NDCFromWorld = m;
         }
 
@@ -1061,8 +1146,8 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
         metadata.pixelBounds = {{dw.min.x, dw.min.y}, {dw.max.x + 1, dw.max.y + 1}};
 
         Imath::Box2i dispw = file.header().displayWindow();
-        metadata.fullResolution =
-            Point2i(dispw.max.x - dispw.min.x + 1, dispw.max.y - dispw.min.y + 1);
+        metadata.fullResolution = Point2i(dispw.max.x - dispw.min.x + 1,
+                                          dispw.max.y - dispw.min.y + 1);
 
         const Imf::IntAttribute *sppAttrib =
             file.header().findTypedAttribute<Imf::IntAttribute>("samplesPerPixel");
@@ -1080,27 +1165,27 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
             metadata.MSE = mseAttrib->value();
 
         // Find any string vector attributes
-        for (auto iter = file.header().begin(); iter != file.header().end(); ++iter) {
+        for (auto iter = file.header().begin(); iter != file.header().end();
+             ++iter) {
             if (strcmp(iter.attribute().typeName(), "stringvector") == 0) {
-                Imf::StringVectorAttribute &sv =
-                    (Imf::StringVectorAttribute &)iter.attribute();
+                Imf::StringVectorAttribute &sv = (Imf::StringVectorAttribute &)iter.attribute();
                 metadata.stringVectors[iter.name()] = sv.value();
             }
         }
 
         // Figure out the color space
-        const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;  // default
+        const RGBColorSpace *colorSpace = RGBColorSpace::sRGB; // default
         const Imf::ChromaticitiesAttribute *chromaticitiesAttrib =
-            file.header().findTypedAttribute<Imf::ChromaticitiesAttribute>(
-                "chromaticities");
+            file.header().findTypedAttribute<Imf::ChromaticitiesAttribute>("chromaticities");
         if (chromaticitiesAttrib != nullptr) {
             Imf::Chromaticities c = chromaticitiesAttrib->value();
-            const RGBColorSpace *cs = RGBColorSpace::Lookup(
-                Point2f(c.red.x, c.red.y), Point2f(c.green.x, c.green.y),
-                Point2f(c.blue.x, c.blue.y), Point2f(c.white.x, c.white.y));
+            const RGBColorSpace *cs =
+                RGBColorSpace::Lookup(Point2f(c.red.x,   c.red.y),
+                                      Point2f(c.green.x, c.green.y),
+                                      Point2f(c.blue.x,  c.blue.y),
+                                      Point2f(c.white.x, c.white.y));
             if (!cs) {
-                Warning("Couldn't find supported color space that matches "
-                        "chromaticities: "
+                Warning("Couldn't find supported color space that matches chromaticities: "
                         "r (%f, %f) g (%f, %f) b (%f, %f), w (%f, %f). Using sRGB.",
                         c.red.x, c.red.y, c.green.x, c.green.y, c.blue.x, c.blue.y,
                         c.white.x, c.white.y);
@@ -1131,7 +1216,7 @@ static pstd::optional<ImageAndMetadata> ReadEXR(const std::string &name,
 
         CHECK(pixelType == Imf::HALF || pixelType == Imf::FLOAT);
         Image image(pixelType == Imf::HALF ? PixelFormat::Half : PixelFormat::Float,
-                    {width, height}, channelNames, nullptr, alloc);
+                    { width, height }, channelNames, nullptr, alloc);
         file.setFrameBuffer(imageToFrameBuffer(image, image.AllChannelsDesc(), dw));
         file.readPixels(dw.min.y, dw.max.y);
 
@@ -1157,19 +1242,20 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
                              Imath::V2i(metadata.fullResolution->x - 1,
                                         metadata.fullResolution->y - 1)};
         else
-            displayWindow = {Imath::V2i(0, 0),
-                             Imath::V2i(resolution.x - 1, resolution.y - 1)};
+            displayWindow =
+                {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
 
         if (metadata.pixelBounds)
-            dataWindow = {
-                Imath::V2i(metadata.pixelBounds->pMin.x, metadata.pixelBounds->pMin.y),
-                Imath::V2i(metadata.pixelBounds->pMax.x - 1,
-                           metadata.pixelBounds->pMax.y - 1)};
+            dataWindow = {Imath::V2i(metadata.pixelBounds->pMin.x,
+                                     metadata.pixelBounds->pMin.y),
+                          Imath::V2i(metadata.pixelBounds->pMax.x - 1,
+                                     metadata.pixelBounds->pMax.y - 1)};
         else
-            dataWindow = {Imath::V2i(0, 0),
-                          Imath::V2i(resolution.x - 1, resolution.y - 1)};
+            dataWindow =
+                {Imath::V2i(0, 0), Imath::V2i(resolution.x - 1, resolution.y - 1)};
 
-        Imf::FrameBuffer fb = imageToFrameBuffer(*this, AllChannelsDesc(), dataWindow);
+        Imf::FrameBuffer fb =
+            imageToFrameBuffer(*this, AllChannelsDesc(), dataWindow);
 
         Imf::Header header(displayWindow, dataWindow);
         for (auto iter = fb.begin(); iter != fb.end(); ++iter)
@@ -1193,11 +1279,9 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
             header.insert("worldToNDC", Imf::M44fAttribute(m));
         }
         if (metadata.samplesPerPixel)
-            header.insert("samplesPerPixel",
-                          Imf::IntAttribute(*metadata.samplesPerPixel));
+            header.insert("samplesPerPixel", Imf::IntAttribute(*metadata.samplesPerPixel));
         if (metadata.estimatedVariance)
-            header.insert("estimatedVariance",
-                          Imf::FloatAttribute(*metadata.estimatedVariance));
+            header.insert("estimatedVariance", Imf::FloatAttribute(*metadata.estimatedVariance));
         if (metadata.MSE)
             header.insert("MSE", Imf::FloatAttribute(*metadata.MSE));
         for (const auto &iter : metadata.stringVectors)
@@ -1212,9 +1296,10 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
         // screen.
         if (*metadata.GetColorSpace() != *RGBColorSpace::sRGB) {
             const RGBColorSpace &cs = *metadata.GetColorSpace();
-            Imf::Chromaticities chromaticities(
-                Imath::V2f(cs.r.x, cs.r.y), Imath::V2f(cs.g.x, cs.g.y),
-                Imath::V2f(cs.b.x, cs.b.y), Imath::V2f(cs.w.x, cs.w.y));
+            Imf::Chromaticities chromaticities(Imath::V2f(cs.r.x, cs.r.y),
+                                               Imath::V2f(cs.g.x, cs.g.y),
+                                               Imath::V2f(cs.b.x, cs.b.y),
+                                               Imath::V2f(cs.w.x, cs.w.y));
             header.insert("chromaticities", Imf::ChromaticitiesAttribute(chromaticities));
         }
 
@@ -1232,21 +1317,21 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
 ///////////////////////////////////////////////////////////////////////////
 // PNG Function Definitions
 
-static pstd::optional<ImageAndMetadata> ReadPNG(const std::string &name, Allocator alloc,
-                                                ColorEncodingHandle encoding) {
+static pstd::optional<ImageAndMetadata>
+ReadPNG(const std::string &name, Allocator alloc, const ColorEncoding *encoding) {
     auto contents = ReadFileContents(name);
     if (!contents)
         return {};
 
     if (encoding == nullptr)
-        encoding = ColorEncodingHandle::sRGB;
+        encoding = ColorEncoding::sRGB;
 
     unsigned width, height;
     LodePNGState state;
     lodepng_state_init(&state);
-    unsigned int error =
-        lodepng_inspect(&width, &height, &state, (const unsigned char *)contents->data(),
-                        contents->size());
+    unsigned int error = lodepng_inspect(&width, &height, &state,
+                                         (const unsigned char *)contents->data(),
+                                         contents->size());
     if (error != 0) {
         Error("%s: %s", name, lodepng_error_text(error));
         return {};
@@ -1258,27 +1343,28 @@ static pstd::optional<ImageAndMetadata> ReadPNG(const std::string &name, Allocat
     case LCT_GREY_ALPHA: {
         std::vector<unsigned char> buf;
         int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
-        error =
-            lodepng::decode(buf, width, height, (const unsigned char *)contents->data(),
-                            contents->size(), LCT_GREY, bpp);
+        error = lodepng::decode(buf, width, height,
+                                (const unsigned char *)contents->data(),
+                                contents->size(), LCT_GREY, bpp);
         if (error != 0) {
             Error("%s: %s", name, lodepng_error_text(error));
             return {};
         }
 
         if (state.info_png.color.bitdepth == 16) {
-            image = Image(PixelFormat::Half, Point2i(width, height), {"Y"});
+            image = Image(PixelFormat::Half, Point2i(width, height), { "Y" });
             auto bufIter = buf.begin();
             for (unsigned int y = 0; y < height; ++y)
                 for (unsigned int x = 0; x < width; ++x, bufIter += 2) {
                     // Convert from little endian.
                     Float v = (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f;
-                    v = encoding.ToFloatLinear(v);
+                    v = encoding->ToFloatLinear(v);
                     image.SetChannel(Point2i(x, y), 0, v);
                 }
             CHECK(bufIter == buf.end());
         } else {
-            image = Image(PixelFormat::U256, Point2i(width, height), {"Y"}, encoding);
+            image = Image(PixelFormat::U256, Point2i(width, height), { "Y" },
+                          encoding);
             std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
         }
         return ImageAndMetadata{image, ImageMetadata()};
@@ -1286,9 +1372,9 @@ static pstd::optional<ImageAndMetadata> ReadPNG(const std::string &name, Allocat
     default: {
         std::vector<unsigned char> buf;
         int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
-        error =
-            lodepng::decode(buf, width, height, (const unsigned char *)contents->data(),
-                            contents->size(), LCT_RGB, bpp);
+        error = lodepng::decode(buf, width, height,
+                                (const unsigned char *)contents->data(),
+                                contents->size(), LCT_RGB, bpp);
         if (error != 0) {
             Error("%s: %s", name, lodepng_error_text(error));
             return {};
@@ -1297,23 +1383,24 @@ static pstd::optional<ImageAndMetadata> ReadPNG(const std::string &name, Allocat
         ImageMetadata metadata;
         metadata.colorSpace = RGBColorSpace::sRGB;
         if (state.info_png.color.bitdepth == 16) {
-            image = Image(PixelFormat::Half, Point2i(width, height), {"R", "G", "B"});
+            image = Image(PixelFormat::Half, Point2i(width, height), { "R", "G", "B" });
             auto bufIter = buf.begin();
             for (unsigned int y = 0; y < height; ++y)
                 for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
-                    CHECK(bufIter < buf.end());
+                    CHECK(bufIter < buf.end()) ;
                     // Convert from little endian.
-                    Float rgb[3] = {(((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
-                                    (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
-                                    (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f};
+                    Float rgb[3] = {
+                        (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
+                        (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
+                        (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f };
                     for (int c = 0; c < 3; ++c) {
-                        rgb[c] = encoding.ToFloatLinear(rgb[c]);
+                        rgb[c] = encoding->ToFloatLinear(rgb[c]);
                         image.SetChannel(Point2i(x, y), c, rgb[c]);
                     }
                 }
             CHECK(bufIter == buf.end());
         } else {
-            image = Image(PixelFormat::U256, Point2i(width, height), {"R", "G", "B"},
+            image = Image(PixelFormat::U256, Point2i(width, height), { "R", "G", "B" },
                           encoding);
             std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
         }
@@ -1338,8 +1425,8 @@ Image Image::SelectChannels(const ImageChannelDesc &desc, Allocator alloc) const
 Image Image::Crop(const Bounds2i &bounds, Allocator alloc) const {
     CHECK_GT(bounds.Area(), 0);
     CHECK(bounds.pMin.x >= 0 && bounds.pMin.y >= 0);
-    Image image(format, Point2i(bounds.pMax - bounds.pMin), channelNames, encoding,
-                alloc);
+    Image image(format, Point2i(bounds.pMax - bounds.pMin), channelNames,
+                encoding, alloc);
     for (Point2i p : bounds)
         for (int c = 0; c < NChannels(); ++c)
             image.SetChannel(Point2i(p - bounds.pMin), c, GetChannel(p, c));
@@ -1348,9 +1435,8 @@ Image Image::Crop(const Bounds2i &bounds, Allocator alloc) const {
 
 std::string Image::ToString() const {
     return StringPrintf("[ Image format: %s resolution: %s channelNames: %s "
-                        "encoding: %s ]",
-                        format, resolution, channelNames,
-                        encoding ? encoding.ToString().c_str() : "(nullptr)");
+                        "encoding: %s ]", format, resolution, channelNames,
+                        encoding ? encoding->ToString().c_str() : "(nullptr)");
 }
 
 bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) const {
@@ -1378,13 +1464,12 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) con
                 for (int c = 0; c < 3; ++c) {
                     Float dither = -.5f + BlueNoise(c, x, y);
                     Float v = GetChannel({x, y}, c);
-                    if (v < 0 || v > 1)
-                        ++nOutOfGamut;
+                    if (v < 0 || v > 1) ++nOutOfGamut;
                     rgb8[3 * (y * resolution.x + x) + c] = LinearToSRGB8(v, dither);
                 }
 
-        error =
-            lodepng_encode24_file(name.c_str(), rgb8.get(), resolution.x, resolution.y);
+        error = lodepng_encode24_file(name.c_str(), rgb8.get(), resolution.x,
+                                      resolution.y);
     } else if (NChannels() == 1) {
         std::unique_ptr<uint8_t[]> y8 =
             std::make_unique<uint8_t[]>(resolution.x * resolution.y);
@@ -1392,18 +1477,17 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) con
             for (int x = 0; x < resolution.x; ++x) {
                 Float dither = -.5f + BlueNoise(0, x, y);
                 Float v = GetChannel({x, y}, 0);
-                if (v < 0 || v > 1)
-                    ++nOutOfGamut;
+                if (v < 0 || v > 1) ++nOutOfGamut;
                 y8[y * resolution.x + x] = LinearToSRGB8(v, dither);
             }
 
-        error = lodepng_encode_file(name.c_str(), y8.get(), resolution.x, resolution.y,
-                                    LCT_GREY, 8 /* bitdepth */);
+        error = lodepng_encode_file(name.c_str(), y8.get(), resolution.x,
+                                    resolution.y, LCT_GREY, 8 /* bitdepth */);
     }
 
     if (nOutOfGamut > 0)
-        Warning("%s: %d out of gamut pixel channels clamped to [0,1].", name,
-                nOutOfGamut);
+        Warning("%s: %d out of gamut pixel channels clamped to [0,1].",
+                name, nOutOfGamut);
 
     if (error != 0) {
         Error("Error writing PNG \"%s\": %s", name, lodepng_error_text(error));
@@ -1422,24 +1506,24 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) con
 
 static constexpr bool hostLittleEndian =
 #if defined(__BYTE_ORDER__)
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     true
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     false
+  #else
+    #error "__BYTE_ORDER__ defined but has unexpected value"
+  #endif
 #else
-#error "__BYTE_ORDER__ defined but has unexpected value"
-#endif
-#else
-#if defined(__LITTLE_ENDIAN__) || defined(__i386__) || defined(__x86_64__) || \
-    defined(_WIN32) || defined(WIN32)
+  #if defined(__LITTLE_ENDIAN__) || defined(__i386__) || defined(__x86_64__) || \
+      defined(_WIN32) || defined(WIN32)
     true
-#elif defined(__BIG_ENDIAN__)
+  #elif defined(__BIG_ENDIAN__)
     false
-#elif defined(__sparc) || defined(__sparc__)
+  #elif defined(__sparc) || defined(__sparc__)
     false
-#else
-#error "Can't detect machine endian-ness at compile-time."
-#endif
+  #else
+    #error "Can't detect machine endian-ness at compile-time."
+  #endif
 #endif
     ;
 
@@ -1457,8 +1541,7 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
     int n;
     int c;
 
-    if (bufferLength < 1)
-        return -1;
+    if (bufferLength < 1) return -1;
 
     n = 0;
     c = fgetc(fp);
@@ -1499,25 +1582,21 @@ static pstd::optional<ImageAndMetadata> ReadPFM(const std::string &filename,
     else if (strcmp(buffer, "PF") == 0)
         nChannels = 3;
     else
-        ErrorExit("%s: unable to decode PFM file type \"%c%c\"", filename, buffer[0],
-                  buffer[1]);
+        ErrorExit("%s: unable to decode PFM file type \"%c%c\"", filename, buffer[0], buffer[1]);
 
     // read the rest of the header
     // read width
-    if (readWord(fp, buffer, BUFFER_SIZE) == -1)
-        goto fail;
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1) goto fail;
     if (!Atoi(buffer, &width))
         ErrorExit("%s: unable to decode width \"%s\"", filename, buffer);
 
     // read height
-    if (readWord(fp, buffer, BUFFER_SIZE) == -1)
-        goto fail;
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1) goto fail;
     if (!Atoi(buffer, &height))
         ErrorExit("%s: unable to decode height \"%s\"", filename, buffer);
 
     // read scale
-    if (readWord(fp, buffer, BUFFER_SIZE) == -1)
-        goto fail;
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1) goto fail;
     if (!Atof(buffer, &scale))
         ErrorExit("%s: unable to decode scale \"%s\"", filename, buffer);
 
@@ -1525,9 +1604,8 @@ static pstd::optional<ImageAndMetadata> ReadPFM(const std::string &filename,
     nFloats = nChannels * width * height;
     rgb32.resize(nFloats);
     for (int y = height - 1; y >= 0; --y)
-        if (fread(&rgb32[nChannels * y * width], sizeof(float), nChannels * width, fp) !=
-            nChannels * width)
-            goto fail;
+      if (fread(&rgb32[nChannels * y * width], sizeof(float),
+                nChannels * width, fp) != nChannels * width) goto fail;
 
     // apply endian conversian and scale if appropriate
     fileLittleEndian = (scale < 0.f);
@@ -1541,22 +1619,21 @@ static pstd::optional<ImageAndMetadata> ReadPFM(const std::string &filename,
         }
     }
     if (std::abs(scale) != 1.f)
-        for (unsigned int i = 0; i < nFloats; ++i)
-            rgb32[i] *= std::abs(scale);
+        for (unsigned int i = 0; i < nFloats; ++i) rgb32[i] *= std::abs(scale);
 
     fclose(fp);
     LOG_VERBOSE("Read PFM image %s (%d x %d)", filename, width, height);
     metadata.colorSpace = RGBColorSpace::sRGB;
     if (nChannels == 1)
-        return ImageAndMetadata{Image(std::move(rgb32), {width, height}, {"Y"}),
-                                metadata};
+        return ImageAndMetadata{Image(std::move(rgb32), { width, height }, { "Y" }),
+                metadata};
     else
-        return ImageAndMetadata{Image(std::move(rgb32), {width, height}, {"R", "G", "B"}),
-                                metadata};
+        return ImageAndMetadata{Image(std::move(rgb32), { width, height },
+                                      { "R", "G", "B" }),
+                metadata};
 
 fail:
-    if (fp != nullptr)
-        fclose(fp);
+    if (fp != nullptr) fclose(fp);
     ErrorExit("%s: premature end of file in PFM file", filename);
 }
 
@@ -1572,25 +1649,23 @@ static pstd::optional<ImageAndMetadata> ReadHDR(const std::string &filename,
 
     switch (n) {
     case 1:
-        return ImageAndMetadata{Image(std::move(pixels), {x, y}, {"Y"}), ImageMetadata()};
+        return ImageAndMetadata{Image(std::move(pixels), {x, y}, { "Y" }), ImageMetadata()};
     case 2: {
-        Image image(std::move(pixels), {x, y}, {"Y", "A"});
-        return ImageAndMetadata{image.SelectChannels(*image.GetChannelDesc({"Y"})),
-                                ImageMetadata()};
+        Image image(std::move(pixels), {x, y}, { "Y", "A" });
+        return ImageAndMetadata{image.SelectChannels(*image.GetChannelDesc({ "Y" })), ImageMetadata()};
     }
     case 3:
-        return ImageAndMetadata{Image(std::move(pixels), {x, y}, {"R", "G", "B"}),
-                                ImageMetadata()};
+        return ImageAndMetadata{Image(std::move(pixels), {x, y}, { "R", "G", "B" }), ImageMetadata()};
     case 4: {
-        Image image(std::move(pixels), {x, y}, {"R", "G", "B", "A"});
-        return ImageAndMetadata{
-            image.SelectChannels(*image.GetChannelDesc({"R", "G", "B"})),
-            ImageMetadata()};
+        Image image(std::move(pixels), {x, y}, { "R", "G", "B", "A" });
+        return ImageAndMetadata{image.SelectChannels(*image.GetChannelDesc({ "R", "G", "B" })),
+                ImageMetadata()};
     }
     default:
         ErrorExit("%s: %d channel image unsupported.", filename, n);
     }
 }
+
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
     FILE *fp = fopen(filename.c_str(), "wb");
@@ -1603,17 +1678,14 @@ bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata)
     float scale;
 
     // only write 3 channel PFMs here...
-    if (fprintf(fp, "PF\n") < 0)
-        goto fail;
+    if (fprintf(fp, "PF\n") < 0) goto fail;
 
     // write the width and height, which must be positive
-    if (fprintf(fp, "%d %d\n", resolution.x, resolution.y) < 0)
-        goto fail;
+    if (fprintf(fp, "%d %d\n", resolution.x, resolution.y) < 0) goto fail;
 
     // write the scale, which encodes endianness
     scale = hostLittleEndian ? -1.f : 1.f;
-    if (fprintf(fp, "%f\n", scale) < 0)
-        goto fail;
+    if (fprintf(fp, "%f\n", scale) < 0) goto fail;
 
     // write the data from bottom left to upper right as specified by
     // http://netpbm.sourceforge.net/doc/pfm.html
@@ -1628,8 +1700,7 @@ bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata)
             } else {
                 CHECK_EQ(3, NChannels());
                 for (int c = 0; c < 3; ++c)
-                    // Assign element-wise in case Float is typedefed as
-                    // 'double'.
+                    // Assign element-wise in case Float is typedefed as 'double'.
                     scanline[3 * x + c] = GetChannel({x, y}, c);
             }
         }
@@ -1645,6 +1716,10 @@ fail:
     Error("Error writing PFM file \"%s\"", filename);
     fclose(fp);
     return false;
+}
+
+std::string SummedAreaTable::ToString() const {
+    return StringPrintf("[ SummedAreaTable sum: %s sum2: %s ]", sum, sum2);
 }
 
 }  // namespace pbrt

@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -27,10 +55,22 @@
 namespace pbrt {
 
 class DigitPermutation {
-  public:
+public:
+    struct UniqueDeleter {
+        UniqueDeleter() = default;
+        UniqueDeleter(Allocator alloc, size_t size)
+            : alloc(alloc), size(size) { }
+
+        void operator()(uint16_t *ptr) { alloc.deallocate_object(ptr, size); }
+
+        Allocator alloc;
+        size_t size = 0;
+    };
+
     DigitPermutation() = default;
-    DigitPermutation(int base, uint32_t seed, Allocator alloc) : base(base) {
-        CHECK_LT(base, 65536);  // uint16_t
+    DigitPermutation(int base, uint32_t seed, Allocator alloc)
+        : base(base) {
+        CHECK_LT(base, 65536); // uint16_t
 
         // Same computation that ScrambledRadicalInverseSpecialized does...
         // It would be nice to do this in closed form, but it's a little
@@ -44,17 +84,18 @@ class DigitPermutation {
             invBaseN *= invBase;
         }
 
-        permutations = alloc.allocate_object<uint16_t>(nDigits * base);
+        uint16_t *ptr = alloc.allocate_object<uint16_t>(nDigits * base);
+        permutations =
+            pstd::unique_ptr<uint16_t, UniqueDeleter>(ptr, UniqueDeleter(alloc, nDigits * base));
 
         for (int digitIndex = 0; digitIndex < nDigits; ++digitIndex) {
             uint32_t digitSeed = (base * 32 + digitIndex) ^ seed;
             for (int digitValue = 0; digitValue < base; ++digitValue)
-                Perm(digitIndex, digitValue) =
-                    PermutationElement(digitValue, base, digitSeed);
+                Perm(digitIndex, digitValue) = PermutationElement(digitValue, base, digitSeed);
         }
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     int Permute(int digitIndex, int digitValue) const {
         DCHECK_LT(digitIndex, nDigits);
         DCHECK_LT(digitValue, base);
@@ -65,34 +106,35 @@ class DigitPermutation {
 
     int base;
 
-  private:
-    PBRT_CPU_GPU
+private:
+    PBRT_HOST_DEVICE_INLINE
     uint16_t &Perm(int digitIndex, int digitValue) {
-        return permutations[digitIndex * base + digitValue];
+        return permutations.get()[digitIndex * base + digitValue];
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint16_t Perm(int digitIndex, int digitValue) const {
-        return permutations[digitIndex * base + digitValue];
+        return permutations.get()[digitIndex * base + digitValue];
     }
 
     int nDigits;
     // indexed by [digitIndex * base + digitValue]
-    uint16_t *permutations;
+    pstd::unique_ptr<uint16_t, UniqueDeleter> permutations;
 };
 
 // Low Discrepancy Declarations
-PBRT_CPU_GPU
+PBRT_HOST_DEVICE
 Float RadicalInverse(int baseIndex, uint64_t a);
 pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
                                                                   Allocator alloc = {});
-PBRT_CPU_GPU
+PBRT_HOST_DEVICE
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const DigitPermutation &perm);
-PBRT_CPU_GPU
+PBRT_HOST_DEVICE
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a, uint32_t seed);
 
 // Low Discrepancy Inline Functions
 template <int base>
-PBRT_CPU_GPU inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
+PBRT_HOST_DEVICE_INLINE
+uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
     uint64_t index = 0;
     for (int i = 0; i < nDigits; ++i) {
         uint64_t digit = inverse % base;
@@ -103,20 +145,22 @@ PBRT_CPU_GPU inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits
 }
 
 class HaltonPixelIndexer {
-  public:
+public:
     HaltonPixelIndexer(const Point2i &fullResolution);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void SetPixel(const Point2i &p) {
         pixelSampleForIndex = 0;
 
         int sampleStride = baseScales[0] * baseScales[1];
         if (sampleStride > 1) {
-            Point2i pm(Mod(p[0], MaxHaltonResolution), Mod(p[1], MaxHaltonResolution));
+            Point2i pm(Mod(p[0], MaxHaltonResolution),
+                       Mod(p[1], MaxHaltonResolution));
             for (int i = 0; i < 2; ++i) {
                 uint64_t dimOffset =
-                    (i == 0) ? InverseRadicalInverse<2>(pm[i], baseExponents[i])
-                             : InverseRadicalInverse<3>(pm[i], baseExponents[i]);
+                    (i == 0)
+                        ? InverseRadicalInverse<2>(pm[i], baseExponents[i])
+                        : InverseRadicalInverse<3>(pm[i], baseExponents[i]);
                 pixelSampleForIndex +=
                     dimOffset * (sampleStride / baseScales[i]) * multInverse[i];
             }
@@ -124,104 +168,110 @@ class HaltonPixelIndexer {
         }
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void SetPixelSample(int pixelSample) {
         int sampleStride = baseScales[0] * baseScales[1];
         sampleIndex = pixelSampleForIndex + pixelSample * sampleStride;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Point2f SampleFirst2D() const {
         return {RadicalInverse(0, sampleIndex >> baseExponents[0]),
                 RadicalInverse(1, sampleIndex / baseScales[1])};
     };
 
-    PBRT_CPU_GPU
-    int64_t SampleIndex() const { return sampleIndex; }
+    PBRT_HOST_DEVICE_INLINE
+    int64_t SampleIndex() const {
+        return sampleIndex;
+    }
 
     std::string ToString() const {
         return StringPrintf("[ HaltonPixelIndexer pixelSampleForIndex: %d "
                             "sampleIndex: %d baseScales: %s baseExponents: %s "
                             "multInverse[0]: %d multInverse[1]: %d ]",
-                            pixelSampleForIndex, sampleIndex, baseScales, baseExponents,
-                            multInverse[0], multInverse[1]);
+                            pixelSampleForIndex, sampleIndex, baseScales,
+                            baseExponents, multInverse[0], multInverse[1]);
     }
 
-  private:
+private:
     static constexpr int MaxHaltonResolution = 128;
 
     int64_t pixelSampleForIndex;
-    int64_t sampleIndex;  // offset into Halton sequence for current sample
-                          // in current pixel.
+    int64_t sampleIndex; // offset into Halton sequence for current sample
+                         // in current pixel.
 
     // note: these could all be uint8_t
     Point2i baseScales, baseExponents;
     int multInverse[2];
 };
 
+
 class Halton128PixelIndexer {
-  public:
-    PBRT_CPU_GPU
+public:
+    PBRT_HOST_DEVICE_INLINE
     void SetPixel(const Point2i &p) {
         static constexpr int baseScales[2] = {128, 243};
         static constexpr int baseExponents[2] = {7, 5};
-        static constexpr int multInverse[2] = {59, 131};
+        static constexpr int multInverse[2] = { 59, 131 };
 
         pixelSampleForIndex = 0;
 
         int sampleStride = baseScales[0] * baseScales[1];
-        Point2i pm(Mod(p[0], MaxHaltonResolution), Mod(p[1], MaxHaltonResolution));
+        Point2i pm(Mod(p[0], MaxHaltonResolution),
+                   Mod(p[1], MaxHaltonResolution));
         for (int i = 0; i < 2; ++i) {
-            uint64_t dimOffset = (i == 0)
-                                     ? InverseRadicalInverse<2>(pm[i], baseExponents[i])
-                                     : InverseRadicalInverse<3>(pm[i], baseExponents[i]);
+            uint64_t dimOffset =
+                (i == 0)
+                ? InverseRadicalInverse<2>(pm[i], baseExponents[i])
+                : InverseRadicalInverse<3>(pm[i], baseExponents[i]);
             pixelSampleForIndex +=
                 dimOffset * (sampleStride / baseScales[i]) * multInverse[i];
         }
         pixelSampleForIndex %= sampleStride;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void SetPixelSample(int pixelSample) {
         static constexpr int baseScales[2] = {128, 243};
         static constexpr int baseExponents[2] = {7, 5};
-        static constexpr int multInverse[2] = {59, 131};
+        static constexpr int multInverse[2] = { 59, 131 };
 
         int sampleStride = baseScales[0] * baseScales[1];
         sampleIndex = pixelSampleForIndex + pixelSample * sampleStride;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Point2f SampleFirst2D() const {
         static constexpr int baseScales[2] = {128, 243};
         static constexpr int baseExponents[2] = {7, 5};
-        static constexpr int multInverse[2] = {59, 131};
+        static constexpr int multInverse[2] = { 59, 131 };
 
         return {RadicalInverse(0, sampleIndex >> baseExponents[0]),
                 RadicalInverse(1, sampleIndex / baseScales[1])};
     };
 
-    PBRT_CPU_GPU
-    int64_t SampleIndex() const { return sampleIndex; }
+    PBRT_HOST_DEVICE_INLINE
+    int64_t SampleIndex() const {
+        return sampleIndex;
+    }
 
-  private:
+private:
     static constexpr int MaxHaltonResolution = 128;
 
     uint32_t pixelSampleForIndex;
     uint32_t sampleIndex;
 };
 
-PBRT_CPU_GPU
-inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uint32_t a) {
+PBRT_HOST_DEVICE_INLINE
+uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uint32_t a) {
     uint32_t v = 0;
     for (int i = 0; a != 0; ++i, a >>= 1)
-        if (a & 1)
-            v ^= C[i];
+        if (a & 1) v ^= C[i];
     return v;
 }
 
-PBRT_CPU_GPU
-inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
+PBRT_HOST_DEVICE_INLINE
+uint32_t OwenScramble(uint32_t v, uint32_t hash) {
     // Expect already reversed?
     v = ReverseBits32(v ^ hash);
     // Must be even numbers!
@@ -239,56 +289,64 @@ enum class RandomizeStrategy { None, CranleyPatterson, Xor, Owen };
 std::string ToString(RandomizeStrategy r);
 
 struct CranleyPattersonRotator {
-    PBRT_CPU_GPU
-    CranleyPattersonRotator(Float v) : offset(v * (1ull << 32)) {}
-    PBRT_CPU_GPU
-    CranleyPattersonRotator(uint32_t offset) : offset(offset) {}
+    PBRT_HOST_DEVICE_INLINE
+    CranleyPattersonRotator(Float v)
+        : offset(v * (1ull << 32)) {}
+    PBRT_HOST_DEVICE_INLINE
+    CranleyPattersonRotator(uint32_t offset)
+        : offset(offset) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint32_t operator()(uint32_t v) const { return v + offset; }
 
     uint32_t offset;
 };
 
 struct XORScrambler {
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     XORScrambler(uint32_t s) : s(s) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint32_t operator()(uint32_t v) const { return s ^ v; }
 
     uint32_t s;
 };
 
 struct OwenScrambler {
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     OwenScrambler(uint32_t seed) : seed(seed) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint32_t operator()(uint32_t v) const { return OwenScramble(v, seed); }
 
     uint32_t seed;
 };
 
 struct NoRandomizer {
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint32_t operator()(uint32_t v) const { return v; }
 };
 
 template <typename R>
-PBRT_CPU_GPU inline Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a,
-                                                R randomizer) {
+PBRT_HOST_DEVICE_INLINE
+Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a,
+                            R randomizer) {
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min(randomizer(MultiplyGenerator(C, a)) * Float(2.3283064365386963e-10),
+                    OneMinusEpsilon);
+#else
     return std::min(randomizer(MultiplyGenerator(C, a)) * Float(0x1p-32),
                     OneMinusEpsilon);
+#endif
 }
 
-PBRT_CPU_GPU
-inline Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a) {
+PBRT_HOST_DEVICE_INLINE
+Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a) {
     return SampleGeneratorMatrix(C, a, NoRandomizer());
 }
 
 PBRT_CONST uint32_t CVanDerCorput[32] = {
-    // clang-format off
+  // clang-format off
   0b10000000000000000000000000000000,
   0b1000000000000000000000000000000,
   0b100000000000000000000000000000,
@@ -322,13 +380,13 @@ PBRT_CONST uint32_t CVanDerCorput[32] = {
   0b100,
   0b10,
   0b1,
-    // clang-format on
+  // clang-format on
 };
 
-PBRT_CPU_GPU
-inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &p) {
-    if (m == 0)
-        return frame;
+PBRT_HOST_DEVICE_INLINE
+uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame,
+                              const Point2i &p) {
+    if (m == 0) return frame;
 
     const uint32_t m2 = m << 1;
     uint64_t index = uint64_t(frame) << m2;
@@ -348,28 +406,34 @@ inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &
     return index;
 }
 
-PBRT_CPU_GPU
-inline uint32_t SobolSampleBits32(int64_t a, int dimension) {
+PBRT_HOST_DEVICE_INLINE
+uint32_t SobolSampleBits32(int64_t a, int dimension) {
     uint32_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
-        if (a & 1)
-            v ^= SobolMatrices32[i];
+        if (a & 1) v ^= SobolMatrices32[i];
     return v;
 }
 
 template <typename R>
-PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
+PBRT_HOST_DEVICE_INLINE
+float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
     if (dimension >= NSobolDimensions)
         LOG_FATAL("Integrator has consumed too many Sobol' dimensions; you "
                   "may want to use a Sampler without a dimension limit like "
                   "\"02sequence.\"");
 
     uint32_t v = randomizer(SobolSampleBits32(a, dimension));
-    return std::min(v * 0x1p-32f /* 1/2^32 */, FloatOneMinusEpsilon);
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+    return std::min(v * 2.3283064365386963e-10f /* 1/2^32 */,
+                     FloatOneMinusEpsilon);
+#else
+    return std::min(v * 0x1p-32f /* 1/2^32 */,
+                     FloatOneMinusEpsilon);
+#endif
 }
 
-PBRT_CPU_GPU
-inline uint64_t SobolSampleBits64(int64_t a, int dimension) {
+PBRT_HOST_DEVICE_INLINE
+uint64_t SobolSampleBits64(int64_t a, int dimension) {
     if (dimension >= NSobolDimensions)
         LOG_FATAL("Integrator has consumed too many Sobol' dimensions; you "
                   "may want to use a Sampler without a dimension limit like "
@@ -377,22 +441,24 @@ inline uint64_t SobolSampleBits64(int64_t a, int dimension) {
 
     uint64_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
-        if (a & 1)
-            v ^= SobolMatrices64[i];
+        if (a & 1) v ^= SobolMatrices64[i];
     return v;
 }
 
 template <typename R>
-PBRT_CPU_GPU inline double SobolSampleDouble(int64_t a, int dimension, R randomizer) {
+PBRT_HOST_DEVICE_INLINE
+double SobolSampleDouble(int64_t a, int dimension, R randomizer) {
     uint64_t v = SobolSampleBits64(a, dimension);
     // FIXME? We just scramble the high bits here...
     uint32_t vs = randomizer(v >> 32);
     v = (uint64_t(vs) << 32) | (v & 0xffffffff);
-    return std::min(v * (1.0 / (1ULL << SobolMatrixSize)), DoubleOneMinusEpsilon);
+    return std::min(v * (1.0 / (1ULL << SobolMatrixSize)),
+                    DoubleOneMinusEpsilon);
 }
 
 template <typename R>
-PBRT_CPU_GPU inline Float SobolSample(int64_t index, int dimension, R randomizer) {
+PBRT_HOST_DEVICE_INLINE
+Float SobolSample(int64_t index, int dimension, R randomizer) {
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return SobolSampleDouble(index, dimension, randomizer);
 #else

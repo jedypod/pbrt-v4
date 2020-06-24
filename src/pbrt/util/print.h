@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -17,7 +45,7 @@
 // Hack: make util/log.h happy
 namespace pbrt {
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args);
+inline std::string StringPrintf(const char *fmt, Args&&... args);
 }
 
 #include <pbrt/util/log.h>
@@ -28,7 +56,6 @@ inline std::string StringPrintf(const char *fmt, Args &&... args);
 #include <memory>
 #include <ostream>
 #include <sstream>
-#include <typeinfo>
 #include <type_traits>
 
 #ifdef __GNUG__
@@ -40,28 +67,26 @@ namespace pbrt {
 
 // helpers, fwiw
 template <typename T>
-static auto operator<<(std::ostream &os, const T &v) -> decltype(v.ToString(), os) {
+static auto operator<<(std::ostream &os, const T &v)
+    -> decltype(v.ToString(), os) {
     return os << v.ToString();
 }
 template <typename T>
-static auto operator<<(std::ostream &os, const T &v) -> decltype(ToString(v), os) {
+static auto operator<<(std::ostream &os, const T &v)
+    -> decltype(ToString(v), os) {
     return os << ToString(v);
 }
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const std::shared_ptr<T> &p) {
-    if (p)
-        return os << p->ToString();
-    else
-        return os << "(nullptr)";
+    if (p) return os << p->ToString();
+    else return os << "(nullptr)";
 }
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const std::unique_ptr<T> &p) {
-    if (p)
-        return os << p->ToString();
-    else
-        return os << "(nullptr)";
+    if (p) return os << p->ToString();
+    else return os << "(nullptr)";
 }
 
 namespace detail {
@@ -69,70 +94,40 @@ namespace detail {
 std::string FloatToString(float v);
 std::string DoubleToString(double v);
 
-template <typename T> struct IntegerFormatTrait;
-
-template <>
-struct IntegerFormatTrait<bool> {
+template <typename T> struct IntegerFormatTrait {
+    static constexpr const char *fmt() { return "ERROR"; }
+};
+template <> struct IntegerFormatTrait<int> {
     static constexpr const char *fmt() { return "d"; }
 };
-template <>
-struct IntegerFormatTrait<char> {
-    static constexpr const char *fmt() { return "d"; }
-};
-template <>
-struct IntegerFormatTrait<unsigned char> {
-    static constexpr const char *fmt() { return "d"; }
-};
-template <>
-struct IntegerFormatTrait<int> {
-    static constexpr const char *fmt() { return "d"; }
-};
-template <>
-struct IntegerFormatTrait<unsigned int> {
+template <> struct IntegerFormatTrait<unsigned int> {
     static constexpr const char *fmt() { return "u"; }
 };
-template <>
-struct IntegerFormatTrait<short> {
+template <> struct IntegerFormatTrait<short> {
     static constexpr const char *fmt() { return "d"; }
 };
-template <>
-struct IntegerFormatTrait<unsigned short> {
+template <> struct IntegerFormatTrait<unsigned short> {
     static constexpr const char *fmt() { return "u"; }
 };
-template <>
-struct IntegerFormatTrait<long> {
-    static constexpr const char *fmt() { return "ld"; }
-};
-template <>
-struct IntegerFormatTrait<unsigned long> {
+template <> struct IntegerFormatTrait<unsigned long> {
     static constexpr const char *fmt() { return "lu"; }
 };
-template <>
-struct IntegerFormatTrait<long long> {
-    static constexpr const char *fmt() { return "lld"; }
-};
-template <>
-struct IntegerFormatTrait<unsigned long long> {
-    static constexpr const char *fmt() { return "llu"; }
-};
-#ifdef PBRT_INT64_IS_OWN_TYPE
-template <>
-struct IntegerFormatTrait<int64_t> {
+template <> struct IntegerFormatTrait<int64_t> {
     static constexpr const char *fmt() { return PRId64; }
 };
-template <>
-struct IntegerFormatTrait<uint64_t> {
+#ifdef PBRT_IS_OSX
+template <> struct IntegerFormatTrait<uint64_t> {
     static constexpr const char *fmt() { return PRIu64; }
 };
 #endif
 
 template <typename T>
 using HasSize =
-    std::is_integral<typename std::decay_t<decltype(std::declval<T &>().size())>>;
+    std::is_integral<typename std::decay_t<decltype(std::declval<T&>().size())>>;
 
 template <typename T>
 using HasData =
-    std::is_pointer<typename std::decay_t<decltype(std::declval<T &>().data())>>;
+    std::is_pointer<typename std::decay_t<decltype(std::declval<T&>().data())>>;
 
 // Don't use size()/data()-based operator<< for std::string...
 inline std::ostream &operator<<(std::ostream &os, const std::string &str) {
@@ -152,6 +147,35 @@ operator<<(std::ostream &os, const T &v) {
     return os << " ]";
 }
 
+template <typename T> inline std::string BoolToString(const T &) {
+    LOG_FATAL("error");
+    return "";
+}
+
+template <typename T> inline std::string FloatToString(const T &) {
+    LOG_FATAL("error");
+    return "";
+}
+
+template <typename T> inline std::string DoubleToString(const T &) {
+    LOG_FATAL("error");
+    return "";
+}
+
+template <> inline std::string BoolToString(const bool &v) {
+    return v ? "true" : "false";
+}
+
+template <> inline std::string
+FloatToString(const float &v) {
+    return detail::FloatToString(v);
+}
+
+template <> inline std::string
+DoubleToString(const double &v) {
+    return detail::DoubleToString(v);
+}
+
 // base case
 void stringPrintfRecursive(std::string *s, const char *fmt);
 
@@ -163,7 +187,7 @@ std::string copyToFormatString(const char **fmt_ptr, std::string *s);
 template <typename T>
 inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value,
                                  std::string>
-formatOne(const char *fmt, T &&v) {
+formatOne(const char *fmt, T&& v) {
     // Figure out how much space we need to allocate; add an extra
     // character for the '\0'.
     size_t size = snprintf(nullptr, 0, fmt, v) + 1;
@@ -175,30 +199,39 @@ formatOne(const char *fmt, T &&v) {
 }
 
 template <typename T>
-inline
-typename std::enable_if_t<std::is_class<typename std::decay_t<T>>::value, std::string>
-formatOne(const char *fmt, T &&v) {
-    LOG_FATAL("Printf: Non-basic type %s passed for format string %s", typeid(v).name(),
-              fmt);
-    return "";
+inline typename std::enable_if_t<std::is_class<typename std::decay_t<T>>::value,
+                                 std::string>
+formatOne(const char *fmt, T&& v) {
+    LOG_FATAL("MEH");
+    return "ERROR";
 }
 
 template <typename T, typename... Args>
 inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
-                                  Args &&... args);
+                                  Args&&... args);
 
 template <typename T, typename... Args>
 inline void stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
-                                               const std::string &nextFmt, T &&v,
-                                               Args &&... args) {
+                                               const std::string &nextFmt,
+                                               T &&v, Args&&... args) {
     LOG_FATAL("MEH");
 }
 
 template <typename T, typename... Args>
-inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value, void>
+inline typename std::enable_if_t<std::is_class<typename std::decay_t<T>>::value,
+                                 void>
 stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
-                                   const std::string &nextFmt, int precision, T &&v,
-                                   Args &&... args) {
+                                   const std::string &nextFmt,
+                                   int precision, T &&v, Args&&... args) {
+    LOG_FATAL("MEH");
+}
+
+template <typename T, typename... Args>
+inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value,
+                                 void>
+stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
+                                   const std::string &nextFmt,
+                                   int precision, T &&v, Args&&... args) {
     size_t size = snprintf(nullptr, 0, nextFmt.c_str(), precision, v) + 1;
     std::string str;
     str.resize(size);
@@ -214,64 +247,41 @@ stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
 // in *s.
 template <typename T, typename... Args>
 inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
-                                  Args &&... args) {
+                                  Args&&... args) {
     std::string nextFmt = copyToFormatString(&fmt, s);
     bool precisionViaArg = nextFmt.find('*') != std::string::npos;
 
+    if (precisionViaArg) {
+        if (!std::is_integral<std::decay_t<T>>::value)
+            LOG_FATAL("Non integral type provided for %* format");
+        stringPrintfRecursiveWithPrecision(s, fmt, nextFmt, v, std::forward<Args>(args)...);
+        return;
+    }
+
     bool isSFmt = nextFmt.find('s') != std::string::npos;
     bool isDFmt = nextFmt.find('d') != std::string::npos;
-
-    if constexpr (std::is_integral<std::decay_t<T>>::value) {
-        if (precisionViaArg) {
-            stringPrintfRecursiveWithPrecision(s, fmt, nextFmt, v,
-                                               std::forward<Args>(args)...);
-            return;
-        }
-    } else if (precisionViaArg)
-        LOG_FATAL("Non-integral type provided for %* format.");
-
-    if constexpr (std::is_same<std::decay_t<T>, float>::value)
-        if (nextFmt == "%f" || nextFmt == "%s") {
-            *s += detail::FloatToString(v);
-            goto done;
-        }
-
-    if constexpr (std::is_same<std::decay_t<T>, double>::value)
-        if (nextFmt == "%f" || nextFmt == "%s") {
-            *s += detail::DoubleToString(v);
-            goto done;
-        }
-
-    if constexpr (std::is_same<std::decay_t<T>, bool>::value)  // FIXME: %-10s with bool
-        if (isSFmt) {
-            *s += bool(v) ? "true" : "false";
-            goto done;
-        }
-
-    if constexpr (std::is_integral<std::decay_t<T>>::value) {
-        if (isDFmt) {
-            nextFmt.replace(nextFmt.find('d'), 1,
-                            detail::IntegerFormatTrait<std::decay_t<T>>::fmt());
-            *s += formatOne(nextFmt.c_str(), std::forward<T>(v));
-            goto done;
-        }
-    } else if (isDFmt)
-        LOG_FATAL("Non-integral type passed to %d format.");
-
-    if (isSFmt) {
+    if ((nextFmt == "%f" || nextFmt == "%s") && std::is_same<std::decay_t<T>, float>::value)
+        *s += FloatToString(v);
+    else if ((nextFmt == "%f" || nextFmt == "%s") && std::is_same<std::decay_t<T>, double>::value)
+        // FIXME: do this and above with an overload
+        *s += DoubleToString(v);
+    else if (isSFmt && std::is_same<std::decay_t<T>, bool>::value) // FIXME: %-10s with booln
+        *s += BoolToString(v);
+    else if (isDFmt) {
+        if (detail::IntegerFormatTrait<std::decay_t<T>>::fmt() == "ERROR")
+            LOG_FATAL("Non-integral type passed to %d format");
+        nextFmt.replace(nextFmt.find('d'), 1, detail::IntegerFormatTrait<std::decay_t<T>>::fmt());
+        *s += formatOne(nextFmt.c_str(), std::forward<T>(v));
+    } else if (isSFmt) {
         std::stringstream ss;
         ss << v;
         *s += formatOne(nextFmt.c_str(), ss.str().c_str());
-    } else if (!nextFmt.empty())
+    } else
         *s += formatOne(nextFmt.c_str(), std::forward<T>(v));
-    else
-        LOG_FATAL("Excess values passed to Printf.");
-
- done:
     stringPrintfRecursive(s, fmt, std::forward<Args>(args)...);
 }
 
-}  // namespace detail
+} // namespace detail
 
 // StringPrintf() is a replacement for sprintf() (and the like) that
 // returns the result as a std::string. This gives convenience/control
@@ -281,14 +291,14 @@ inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
 // specially so that enough digits are always printed so that the original
 // float/double can be reconstituted exactly from the printed digits.
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args) {
+inline std::string StringPrintf(const char *fmt, Args&&... args) {
     std::string ret;
     detail::stringPrintfRecursive(&ret, fmt, std::forward<Args>(args)...);
     return ret;
 }
 
 template <typename... Args>
-void Printf(const char *fmt, Args &&... args) {
+void Printf(const char *fmt, Args&&... args) {
     std::string s = StringPrintf(fmt, std::forward<Args>(args)...);
     fputs(s.c_str(), stdout);
 }

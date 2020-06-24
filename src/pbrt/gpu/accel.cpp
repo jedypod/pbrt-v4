@@ -1,19 +1,17 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #include <pbrt/gpu/accel.h>
 
+#include <pbrt/genscene.h>
+#include <pbrt/gpu.h>
 #include <pbrt/gpu/optix.h>
 #include <pbrt/lights.h>
+#include <pbrt/loopsubdiv.h>
 #include <pbrt/materials.h>
-#include <pbrt/parsedscene.h>
+#include <pbrt/plymesh.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/log.h>
-#include <pbrt/util/loopsubdiv.h>
-#include <pbrt/util/mesh.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/stats.h>
@@ -21,16 +19,17 @@
 #include <mutex>
 
 #include <optix.h>
-#include <optix_function_table_definition.h>
 #include <optix_stubs.h>
+#include <optix_function_table_definition.h>
 
-#define OPTIX_CHECK(EXPR)                                                           \
-    do {                                                                            \
-        OptixResult res = EXPR;                                                     \
-        if (res != OPTIX_SUCCESS)                                                   \
-            LOG_FATAL("OptiX call " #EXPR " failed with code %d: \"%s\"", int(res), \
-                      optixGetErrorString(res));                                    \
-    } while (false) /* eat semicolon */
+#define OPTIX_CHECK(EXPR)                                               \
+        do {                                                            \
+            OptixResult res = EXPR;                                     \
+            if (res != OPTIX_SUCCESS)                                   \
+                LOG_FATAL("OptiX call " #EXPR " failed with code %d: \"%s\"", \
+                          int(res), optixGetErrorString(res));          \
+        } while(false) /* eat semicolon */
+
 
 namespace pbrt {
 
@@ -39,33 +38,38 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
 };
 
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
-    __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    __align__( OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 };
 
-struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GPUAccel::HitgroupRecord {
-    HitgroupRecord() {}
-    HitgroupRecord(const HitgroupRecord &r) { memcpy(this, &r, sizeof(HitgroupRecord)); }
-
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GPUAccel::TriangleHitgroupRecord {
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-    union {
-        TriangleMeshRecord triRec;
-        BilinearMeshRecord bilinearRec;
-        QuadricRecord quadricRec;
-    };
+    TriangleMeshRecord rec;
 };
 
-extern "C" {
-extern const unsigned char PBRT_EMBEDDED_PTX[];
-}
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GPUAccel::BilinearPatchHitgroupRecord {
+    __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    BilinearMeshRecord rec;
+};
+
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GPUAccel::QuadricHitgroupRecord {
+    __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    QuadricRecord rec;
+};
+
+GPUAccel::~GPUAccel() {}
+
+extern "C" { extern const unsigned char PBRT_EMBEDDED_PTX[]; }
 
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
-OptixTraversableHandle GPUAccel::buildBVH(
-    const std::vector<OptixBuildInput> &buildInputs) {
+OptixTraversableHandle
+GPUAccel::buildBVH(const std::vector<OptixBuildInput> &buildInputs) const {
+    ProfilerScope _(ProfilePhase::AccelConstruction);
+
     // Figure out memory requirements.
     OptixAccelBuildOptions accelOptions = {};
-    accelOptions.buildFlags =
-        (OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+    accelOptions.buildFlags = (OPTIX_BUILD_FLAG_ALLOW_COMPACTION |
+                               OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     accelOptions.motionOptions.numKeys = 1;
     accelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
 
@@ -87,11 +91,12 @@ OptixTraversableHandle GPUAccel::buildBVH(
 
     // Build.
     OptixTraversableHandle traversableHandle{0};
-    OPTIX_CHECK(optixAccelBuild(
-        optixContext, cudaStream, &accelOptions, buildInputs.data(), buildInputs.size(),
-        CUdeviceptr(tempBuffer), blasBufferSizes.tempSizeInBytes,
-        CUdeviceptr(outputBuffer), blasBufferSizes.outputSizeInBytes, &traversableHandle,
-        &emitDesc, 1));
+    OPTIX_CHECK(
+        optixAccelBuild(optixContext, cudaStream, &accelOptions, buildInputs.data(),
+                        buildInputs.size(), CUdeviceptr(tempBuffer),
+                        blasBufferSizes.tempSizeInBytes,
+                        CUdeviceptr(outputBuffer), blasBufferSizes.outputSizeInBytes,
+                        &traversableHandle, &emitDesc, 1));
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
@@ -113,10 +118,9 @@ OptixTraversableHandle GPUAccel::buildBVH(
     return traversableHandle;
 }
 
-static MaterialHandle getMaterial(
-    const ShapeSceneEntity &shape,
-    const std::map<std::string, MaterialHandle> &namedMaterials,
-    const std::vector<MaterialHandle> &materials) {
+static MaterialHandle getMaterial(const ShapeSceneEntity &shape,
+                                  const std::map<std::string, MaterialHandle> &namedMaterials,
+                                  const std::vector<MaterialHandle> &materials) {
     if (!shape.materialName.empty()) {
         auto iter = namedMaterials.find(shape.materialName);
         if (iter == namedMaterials.end())
@@ -128,9 +132,8 @@ static MaterialHandle getMaterial(
     }
 }
 
-static FloatTextureHandle getAlphaTexture(
-    const ShapeSceneEntity &shape,
-    const std::map<std::string, FloatTextureHandle> &floatTextures) {
+static FloatTextureHandle getAlphaTexture(const ShapeSceneEntity &shape,
+                                          const std::map<std::string, FloatTextureHandle> &floatTextures) {
     std::string alphaTexName = shape.parameters.GetTexture("alpha");
     if (alphaTexName.empty())
         return nullptr;
@@ -141,217 +144,185 @@ static FloatTextureHandle getAlphaTexture(
 
     FloatTextureHandle alphaTextureHandle = iter->second;
 
-    if (!BasicTextureEvaluator().CanEvaluate({alphaTextureHandle}, {})) {
-        // It would be nice to just use the UniversalTextureEvaluator (maybe
-        // always), but optix complains "Error: Found call graph recursion"...
-        Warning(&shape.loc,
-                "%s: alpha texture too complex for BasicTextureEvaluator "
-                "(need fallback path). Ignoring for now.",
-                alphaTexName);
+    if (!BasicTextureEvaluator().Matches({alphaTextureHandle}, {})) {
+        Warning(&shape.loc, "%s: alpha texture too complex for BasicTextureEvaluator "
+                "(need fallback path). Ignoring for now.", alphaTexName);
         alphaTextureHandle = nullptr;
     }
 
     return alphaTextureHandle;
 }
 
-static int getOptixGeometryFlags(bool isTriangle, FloatTextureHandle alphaTextureHandle,
-                                 MaterialHandle materialHandle) {
-    if (materialHandle && materialHandle.HasSubsurfaceScattering())
+static int
+getOptixGeometryFlags(FloatTextureHandle alphaTextureHandle,
+                      MaterialHandle materialHandle) {
+    if (materialHandle.HasSubsurfaceScattering())
         return OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-    else if ((alphaTextureHandle && isTriangle) ||
-             (materialHandle && materialHandle.IsTransparent()))
-        // Need anyhit
+    else if (alphaTextureHandle || materialHandle.IsTransparent())
         return OPTIX_GEOMETRY_FLAG_NONE;
     else
         return OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
 }
 
-static MediumInterface *getMediumInterface(
-    const ShapeSceneEntity &shape, const std::map<std::string, MediumHandle> &media,
-    Allocator alloc) {
-    if (shape.insideMedium.empty() && shape.outsideMedium.empty())
-        return nullptr;
-
-    auto getMedium = [&](const std::string &name) -> MediumHandle {
-        if (name.empty())
-            return nullptr;
-
-        auto iter = media.find(name);
-        if (iter == media.end())
-            ErrorExit(&shape.loc, "%s: medium not defined", name);
-        return iter->second;
-    };
-
-    return alloc.new_object<MediumInterface>(getMedium(shape.insideMedium),
-                                             getMedium(shape.outsideMedium));
-}
-
-OptixTraversableHandle GPUAccel::createGASForTriangles(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
-    const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-    const std::map<std::string, FloatTextureHandle> &floatTextures,
-    const std::map<std::string, MaterialHandle> &namedMaterials,
-    const std::vector<MaterialHandle> &materials,
-    const std::map<std::string, MediumHandle> &media,
-    const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
+OptixTraversableHandle
+GPUAccel::createGASForTriangles(const std::vector<ShapeSceneEntity> &shapes,
+                             const OptixProgramGroup &intersectPG,
+                             const OptixProgramGroup &shadowPG,
+                             const OptixProgramGroup &randomHitPG,
+                             const std::map<std::string, FloatTextureHandle> &floatTextures,
+                             const std::map<std::string, MaterialHandle> &namedMaterials,
+                             const std::vector<MaterialHandle> &materials,
+                             const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+                             Bounds3f *gasBounds) {
+    std::mutex mutex;
     std::vector<OptixBuildInput> buildInputs;
     std::vector<CUdeviceptr> pDeviceDevicePtrs;
     std::vector<uint32_t> triangleInputFlags;
+    {
+    ProfilerScope _(ProfilePhase::ShapeConstruction);
 
-    // Allocate space for potentially all shapes being triangle meshes so
-    // that we can write them in order (just potentially sparsely...)
-    std::vector<TriangleMesh *> meshes(shapes.size(), nullptr);
-    std::vector<Bounds3f> meshBounds(shapes.size());
-    std::atomic<int> meshesCreated{0};
+    ParallelFor(0, shapes.size(),
+        [&](int64_t shapeIndex) {
+            const auto &shape = shapes[shapeIndex];
+            if (shape.name == "trianglemesh" || shape.name == "plymesh" ||
+                shape.name == "loopsubdiv") {
+                OptixBuildInput input = {};
+                memset(&input, 0, sizeof(input));
 
-    ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
-        const auto &shape = shapes[shapeIndex];
-        if (shape.name == "trianglemesh" || shape.name == "plymesh" ||
-            shape.name == "loopsubdiv") {
-            TriangleMesh *mesh = nullptr;
-            if (shape.name == "trianglemesh") {
-                mesh =
-                    Triangle::CreateMesh(shape.worldFromObject, shape.reverseOrientation,
-                                         shape.parameters, &shape.loc, alloc);
-                CHECK(mesh != nullptr);
-            } else if (shape.name == "loopsubdiv") {
-                // Copied from pbrt/shapes.cpp... :-p
-                int nLevels = shape.parameters.GetOneInt("levels", 3);
-                std::vector<int> vertexIndices = shape.parameters.GetIntArray("indices");
-                if (vertexIndices.empty())
-                    ErrorExit(&shape.loc, "Vertex indices \"indices\" not "
-                                          "provided for LoopSubdiv shape.");
+                TriangleMesh *mesh = nullptr;
+                if (shape.name == "trianglemesh") {
+                    mesh = TriangleMesh::Create(shape.worldFromObject, shape.reverseOrientation,
+                                                shape.parameters, &shape.loc, alloc);
+                    CHECK(mesh != nullptr);
+                } else if (shape.name == "loopsubdiv") {
+                    mesh = CreateLoopSubdivMesh(shape.worldFromObject, shape.reverseOrientation,
+                                                shape.parameters, &shape.loc, alloc);
+                    CHECK(mesh != nullptr);
+                } else {
+                    CHECK_EQ(shape.name, "plymesh");
+                    std::string filename = ResolveFilename(shape.parameters.GetOneString("plyfile", ""));
+                    pstd::optional<PLYMesh> plyMesh = ReadPLYMesh(filename); // todo: alloc
+                    if (!plyMesh)
+                        return;
 
-                std::vector<Point3f> P = shape.parameters.GetPoint3fArray("P");
-                if (P.empty())
-                    ErrorExit(&shape.loc, "Vertex positions \"P\" not provided "
-                                          "for LoopSubdiv shape.");
+                    std::vector<int> indices = std::move(plyMesh->triIndices);
+                    if (plyMesh->quadIndices.size()) {
+                        // Convert quads back to pairs of triangles..
+                        LOG_VERBOSE("Converting %d PLY quads to tris", plyMesh->quadIndices.size());
+                        indices.reserve(indices.size() + 3 * plyMesh->quadIndices.size() / 2);
 
-                // don't actually use this for now...
-                std::string scheme = shape.parameters.GetOneString("scheme", "loop");
+                        for (size_t i = 0; i < plyMesh->quadIndices.size(); i += 4) {
+                            indices.push_back(plyMesh->quadIndices[i]);   // 0, 1, 2 of original
+                            indices.push_back(plyMesh->quadIndices[i+1]);
+                            indices.push_back(plyMesh->quadIndices[i+3]);
 
-                mesh = LoopSubdivide(shape.worldFromObject, shape.reverseOrientation,
-                                     nLevels, vertexIndices, P, alloc);
-                CHECK(mesh != nullptr);
-            } else {
-                CHECK_EQ(shape.name, "plymesh");
-                std::string filename =
-                    ResolveFilename(shape.parameters.GetOneString("plyfile", ""));
-                pstd::optional<TriQuadMesh> plyMesh =
-                    TriQuadMesh::ReadPLY(filename);  // todo: alloc
-                if (!plyMesh)
-                    return;
+                            indices.push_back(plyMesh->quadIndices[i]);   // 0, 2, 3 of original
+                            indices.push_back(plyMesh->quadIndices[i+3]);
+                            indices.push_back(plyMesh->quadIndices[i+2]);
+                        }
+                    }
 
-                plyMesh->ConvertToOnlyTriangles();
+                    std::vector<Vector3f> s;  // can't pass {} for default through new_object...
+                    mesh = alloc.new_object<TriangleMesh>(*shape.worldFromObject, shape.reverseOrientation,
+                                                          indices, plyMesh->p, s, plyMesh->n,
+                                                          plyMesh->uv, plyMesh->faceIndices);
+                }
 
-                mesh = alloc.new_object<TriangleMesh>(
-                    *shape.worldFromObject, shape.reverseOrientation, plyMesh->triIndices,
-                    plyMesh->p, std::vector<Vector3f>(), plyMesh->n, plyMesh->uv,
-                    plyMesh->faceIndices);
+                Bounds3f bounds;
+                for (size_t i = 0; i < mesh->nVertices; ++i)
+                    bounds = Union(bounds, mesh->p[i]);
+
+                input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+                input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+                input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
+                input.triangleArray.numVertices = mesh->nVertices;
+                // input.triangleArray.vertexBuffers is set later, once we're
+                // done and pDeviceDevicePtrs isn't in danger of being
+                // realloced...
+
+                input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+                input.triangleArray.indexStrideInBytes = 3 *sizeof(int);
+                input.triangleArray.numIndexTriplets = mesh->nTriangles;
+                input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
+
+                input.triangleArray.numSbtRecords = 1;
+                input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
+                input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
+                input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
+
+                FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
+                MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
+
+                int flags = getOptixGeometryFlags(alphaTextureHandle, materialHandle);
+
+                TriangleHitgroupRecord hgRecord;
+                OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
+                hgRecord.rec.mesh = mesh;
+                hgRecord.rec.material = materialHandle;
+                hgRecord.rec.alphaTexture = alphaTextureHandle;
+                hgRecord.rec.areaLights = nullptr;
+                if (shape.lightIndex != -1) {
+                    // Note: this will hit if we try to have an instance as an area light.
+                    auto iter = shapeIndexToAreaLights.find(shapeIndex);
+                    CHECK(iter != shapeIndexToAreaLights.end());
+                    // FIXME: needs updating when it's not just tri meshes...
+                    CHECK_EQ(iter->second->size(), mesh->nTriangles);
+                    hgRecord.rec.areaLights = iter->second->data();
+                }
+
+                /////////////////////////////////////////////////////////////////
+                // With Mutex here and below...
+                std::lock_guard<std::mutex> lock(mutex);
+
+                *gasBounds = Union(*gasBounds, bounds);
+
+                pDeviceDevicePtrs.push_back(CUdeviceptr(mesh->p));
+                buildInputs.push_back(input);
+                triangleInputFlags.push_back(flags);
+
+                triangleIntersectHGRecords->push_back(hgRecord);
+
+                OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
+                triangleRandomHitHGRecords->push_back(hgRecord);
+
+                OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
+                triangleShadowHGRecords->push_back(hgRecord);
             }
-
-            Bounds3f bounds;
-            for (size_t i = 0; i < mesh->nVertices; ++i)
-                bounds = Union(bounds, mesh->p[i]);
-
-            meshes[shapeIndex] = mesh;
-            meshBounds[shapeIndex] = bounds;
-            ++meshesCreated;
-        }
-    });
-
-    buildInputs.resize(meshesCreated.load());
-    // Important so that these aren't reallocated so we can take pointers to
-    // elements...
-    pDeviceDevicePtrs.resize(meshesCreated.load());
-    triangleInputFlags.resize(meshesCreated.load());
-
-    int buildIndex = 0;
-    for (int shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
-        TriangleMesh *mesh = meshes[shapeIndex];
-        if (!mesh)
-            continue;
-
-        const auto &shape = shapes[shapeIndex];
-
-        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
-        MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
-
-        OptixBuildInput input = {};
-
-        input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-
-        input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
-        input.triangleArray.numVertices = mesh->nVertices;
-        pDeviceDevicePtrs[buildIndex] = CUdeviceptr(mesh->p);
-        input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[buildIndex];
-
-        input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
-        input.triangleArray.numIndexTriplets = mesh->nTriangles;
-        input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
-
-        triangleInputFlags[buildIndex] =
-            getOptixGeometryFlags(true, alphaTextureHandle, materialHandle);
-        input.triangleArray.flags = &triangleInputFlags[buildIndex];
-
-        input.triangleArray.numSbtRecords = 1;
-        input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
-        input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
-        input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
-
-        buildInputs[buildIndex] = input;
-
-        HitgroupRecord hgRecord;
-        OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
-        hgRecord.triRec.mesh = mesh;
-        hgRecord.triRec.material = materialHandle;
-        hgRecord.triRec.alphaTexture = alphaTextureHandle;
-        hgRecord.triRec.areaLights = nullptr;
-        if (shape.lightIndex != -1) {
-            // Note: this will hit if we try to have an instance as an area
-            // light.
-            auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            CHECK(iter != shapeIndexToAreaLights.end());
-            CHECK_EQ(iter->second->size(), mesh->nTriangles);
-            hgRecord.triRec.areaLights = iter->second->data();
-        }
-        hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
-
-        *gasBounds = Union(*gasBounds, meshBounds[shapeIndex]);
-
-        intersectHGRecords->push_back(hgRecord);
-
-        OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords->push_back(hgRecord);
-
-        OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords->push_back(hgRecord);
-
-        ++buildIndex;
-    }
+        });
 
     if (buildInputs.empty())
         return {};
 
+    for (size_t i = 0; i < buildInputs.size(); ++i)
+        buildInputs[i].triangleArray.vertexBuffers = &pDeviceDevicePtrs[i];
+
+    CHECK_EQ(buildInputs.size(), triangleInputFlags.size());
+    // Wire these up now so that the push_backs don't mess up the pointers...
+    for (size_t i = 0; i < buildInputs.size(); ++i)
+        buildInputs[i].triangleArray.flags = &triangleInputFlags[i];
+
+    }
+
     return buildBVH(buildInputs);
 }
 
-OptixTraversableHandle GPUAccel::createGASForBLPs(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
-    const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-    const std::map<std::string, FloatTextureHandle> &floatTextures,
-    const std::map<std::string, MaterialHandle> &namedMaterials,
-    const std::vector<MaterialHandle> &materials,
-    const std::map<std::string, MediumHandle> &media,
-    const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
+OptixTraversableHandle
+GPUAccel::createGASForBLPs(const std::vector<ShapeSceneEntity> &shapes,
+                           const OptixProgramGroup &intersectPG,
+                           const OptixProgramGroup &shadowPG,
+                           const OptixProgramGroup &randomHitPG,
+                           const std::map<std::string, FloatTextureHandle> &floatTextures,
+                           const std::map<std::string, MaterialHandle> &namedMaterials,
+                           const std::vector<MaterialHandle> &materials,
+                           const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+                           Bounds3f *gasBounds) {
     std::vector<OptixBuildInput> buildInputs;
     pstd::vector<OptixAabb> shapeAABBs(alloc);
     std::vector<CUdeviceptr> aabbPtrs;
     std::vector<uint32_t> flags;
+    {
+    ProfilerScope _(ProfilePhase::ShapeConstruction);
 
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
@@ -359,7 +330,7 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
             continue;
 
         BilinearPatchMesh *mesh =
-            BilinearPatch::CreateMesh(shape.worldFromObject, shape.reverseOrientation,
+            BilinearPatchMesh::Create(shape.worldFromObject, shape.reverseOrientation,
                                       shape.parameters, &shape.loc, alloc);
         CHECK(mesh != nullptr);
 
@@ -374,8 +345,8 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         for (size_t i = 0; i < mesh->nVertices; ++i)
             shapeBounds = Union(shapeBounds, mesh->p[i]);
 
-        OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
-                          shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
+        OptixAabb aabb = { shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
+                           shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z };
         shapeAABBs.push_back(aabb);
 
         *gasBounds = Union(*gasBounds, shapeBounds);
@@ -383,31 +354,28 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
         FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
 
-        flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
+        flags.push_back(getOptixGeometryFlags(alphaTextureHandle, materialHandle));
 
-        HitgroupRecord hgRecord;
+        BilinearPatchHitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
-        hgRecord.bilinearRec.mesh = mesh;
-        hgRecord.bilinearRec.material = materialHandle;
-        hgRecord.bilinearRec.alphaTexture = alphaTextureHandle;
-        hgRecord.bilinearRec.areaLights = nullptr;
+        hgRecord.rec.mesh = mesh;
+        hgRecord.rec.material = materialHandle;
+        hgRecord.rec.alphaTexture = alphaTextureHandle;
+        hgRecord.rec.areaLights = nullptr;
         if (shape.lightIndex != -1) {
             auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            // Note: this will hit if we try to have an instance as an area
-            // light.
+            // Note: this will hit if we try to have an instance as an area light.
             CHECK(iter != shapeIndexToAreaLights.end());
             CHECK_EQ(iter->second->size(), mesh->nPatches);
-            hgRecord.bilinearRec.areaLights = iter->second->data();
+            hgRecord.rec.areaLights = iter->second->data();
         }
-        hgRecord.bilinearRec.mediumInterface = getMediumInterface(shape, media, alloc);
-
-        intersectHGRecords->push_back(hgRecord);
+        bilinearPatchIntersectHGRecords->push_back(hgRecord);
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords->push_back(hgRecord);
+        bilinearPatchRandomHitHGRecords->push_back(hgRecord);
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords->push_back(hgRecord);
+        bilinearPatchShadowHGRecords->push_back(hgRecord);
     }
 
     if (buildInputs.empty())
@@ -421,32 +389,37 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         buildInputs[i].aabbArray.aabbBuffers = &aabbPtrs[i];
         buildInputs[i].aabbArray.flags = &flags[i];
     }
+    }
 
     return buildBVH(buildInputs);
 }
 
 OptixTraversableHandle GPUAccel::createGASForQuadrics(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
-    const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-    const std::map<std::string, FloatTextureHandle> &floatTextures,
-    const std::map<std::string, MaterialHandle> &namedMaterials,
-    const std::vector<MaterialHandle> &materials,
-    const std::map<std::string, MediumHandle> &media,
-    const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
+        const std::vector<ShapeSceneEntity> &shapes,
+        const OptixProgramGroup &intersectPG,
+        const OptixProgramGroup &shadowPG,
+        const OptixProgramGroup &randomHitPG,
+        const std::map<std::string, FloatTextureHandle> &floatTextures,
+        const std::map<std::string, MaterialHandle> &namedMaterials,
+        const std::vector<MaterialHandle> &materials,
+        const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+        Bounds3f *gasBounds) {
     std::vector<OptixBuildInput> buildInputs;
     pstd::vector<OptixAabb> shapeAABBs(alloc);
     std::vector<CUdeviceptr> aabbPtrs;
     std::vector<unsigned int> flags;
+    {
+    ProfilerScope _(ProfilePhase::ShapeConstruction);
 
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
         if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk")
             continue;
 
-        pstd::vector<ShapeHandle> shapeHandles = ShapeHandle::Create(
-            shape.name, shape.worldFromObject, shape.objectFromWorld,
-            shape.reverseOrientation, shape.parameters, &shape.loc, alloc);
+        pstd::vector<ShapeHandle> shapeHandles =
+            ShapeHandle::Create(shape.name, shape.worldFromObject, shape.objectFromWorld,
+                                shape.reverseOrientation, shape.parameters,
+                                &shape.loc, alloc);
         if (shapeHandles.empty())
             continue;
         CHECK_EQ(1, shapeHandles.size());
@@ -462,9 +435,9 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
 
         buildInputs.push_back(buildInput);
 
-        Bounds3f shapeBounds = shapeHandle.Bounds();
-        OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
-                          shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
+        Bounds3f shapeBounds = shapeHandle.WorldBound();
+        OptixAabb aabb = { shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
+                           shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z };
         shapeAABBs.push_back(aabb);
 
         *gasBounds = Union(*gasBounds, shapeBounds);
@@ -472,31 +445,28 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
         // Find alpha texture, if present.
         MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
         FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
-        flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
+        flags.push_back(getOptixGeometryFlags(alphaTextureHandle, materialHandle));
 
-        HitgroupRecord hgRecord;
+        QuadricHitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
-        hgRecord.quadricRec.shape = shapeHandle;
-        hgRecord.quadricRec.material = materialHandle;
-        hgRecord.quadricRec.alphaTexture = alphaTextureHandle;
-        hgRecord.quadricRec.areaLight = nullptr;
+        hgRecord.rec.shape = shapeHandle;
+        hgRecord.rec.material = materialHandle;
+        hgRecord.rec.alphaTexture = alphaTextureHandle;
+        hgRecord.rec.areaLight = nullptr;
         if (shape.lightIndex != -1) {
             auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            // Note: this will hit if we try to have an instance as an area
-            // light.
+            // Note: this will hit if we try to have an instance as an area light.
             CHECK(iter != shapeIndexToAreaLights.end());
             CHECK_EQ(iter->second->size(), 1);
-            hgRecord.quadricRec.areaLight = (*iter->second)[0];
+            hgRecord.rec.areaLight = (*iter->second)[0];
         }
-        hgRecord.quadricRec.mediumInterface = getMediumInterface(shape, media, alloc);
-
-        intersectHGRecords->push_back(hgRecord);
+        quadricIntersectHGRecords->push_back(hgRecord);
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords->push_back(hgRecord);
+        quadricRandomHitHGRecords->push_back(hgRecord);
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords->push_back(hgRecord);
+        quadricShadowHGRecords->push_back(hgRecord);
     }
 
     if (buildInputs.empty())
@@ -510,24 +480,30 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
         buildInputs[i].aabbArray.aabbBuffers = &aabbPtrs[i];
         buildInputs[i].aabbArray.flags = &flags[i];
     }
+    }
 
     return buildBVH(buildInputs);
 }
 
-GPUAccel::GPUAccel(
-    const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
-    const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
-    const std::map<std::string, MediumHandle> &media)
-    : alloc(alloc),
-      cudaStream(cudaStream),
-      intersectHGRecords(alloc.new_object<pstd::vector<HitgroupRecord>>(alloc)),
-      shadowHGRecords(alloc.new_object<pstd::vector<HitgroupRecord>>(alloc)),
-      randomHitHGRecords(alloc.new_object<pstd::vector<HitgroupRecord>>(alloc)) {
+static CUDAMemoryResource cudaMemoryResource;
+
+GPUAccel::GPUAccel(const GeneralScene &scene, CUstream cudaStream,
+                   const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights)
+    : alloc(&cudaMemoryResource), cudaStream(cudaStream),
+      triangleIntersectHGRecords(alloc.new_object<pstd::vector<TriangleHitgroupRecord>>(alloc)),
+      triangleShadowHGRecords(alloc.new_object<pstd::vector<TriangleHitgroupRecord>>(alloc)),
+      triangleRandomHitHGRecords(alloc.new_object<pstd::vector<TriangleHitgroupRecord>>(alloc)),
+      bilinearPatchIntersectHGRecords(alloc.new_object<pstd::vector<BilinearPatchHitgroupRecord>>(alloc)),
+      bilinearPatchShadowHGRecords(alloc.new_object<pstd::vector<BilinearPatchHitgroupRecord>>(alloc)),
+      bilinearPatchRandomHitHGRecords(alloc.new_object<pstd::vector<BilinearPatchHitgroupRecord>>(alloc)),
+      quadricIntersectHGRecords(alloc.new_object<pstd::vector<QuadricHitgroupRecord>>(alloc)),
+      quadricShadowHGRecords(alloc.new_object<pstd::vector<QuadricHitgroupRecord>>(alloc)),
+      quadricRandomHitHGRecords(alloc.new_object<pstd::vector<QuadricHitgroupRecord>>(alloc)) {
     CUcontext cudaContext;
     CU_CHECK(cuCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
 
-    paramsPool.resize(256);  // should be plenty
+    paramsPool.resize(256);   // should be plenty
     for (ParamBufferState &ps : paramsPool) {
         void *ptr;
         CUDA_CHECK(cudaMalloc(&ptr, sizeof(RayIntersectParameters)));
@@ -554,14 +530,15 @@ GPUAccel::GPUAccel(
 #endif
 
     OptixPipelineCompileOptions pipelineCompileOptions = {};
-    pipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
+    pipelineCompileOptions.traversableGraphFlags =
+        OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     pipelineCompileOptions.usesMotionBlur = false;
-    pipelineCompileOptions.numPayloadValues = 3;
+    pipelineCompileOptions.numPayloadValues = 2;
     pipelineCompileOptions.numAttributeValues = 4;
     // OPTIX_EXCEPTION_FLAG_NONE;
-    pipelineCompileOptions.exceptionFlags =
-        (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
-         OPTIX_EXCEPTION_FLAG_DEBUG);
+    pipelineCompileOptions.exceptionFlags = (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW |
+                                             OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
+                                             OPTIX_EXCEPTION_FLAG_DEBUG);
     pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
@@ -573,9 +550,9 @@ GPUAccel::GPUAccel(
 
     char log[4096];
     size_t logSize = sizeof(log);
-    OPTIX_CHECK(optixModuleCreateFromPTX(optixContext, &moduleCompileOptions,
-                                         &pipelineCompileOptions, ptxCode.c_str(),
-                                         ptxCode.size(), log, &logSize, &optixModule));
+    OPTIX_CHECK(optixModuleCreateFromPTX(
+        optixContext, &moduleCompileOptions, &pipelineCompileOptions,
+        ptxCode.c_str(), ptxCode.size(), log, &logSize, &optixModule));
     LOG_VERBOSE("%s", log);
 
     // Optix program groups...
@@ -586,8 +563,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__findClosest";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGClosest));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &raygenPGClosest));
         LOG_VERBOSE("%s", log);
     }
 
@@ -597,8 +574,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         desc.miss.module = optixModule;
         desc.miss.entryFunctionName = "__miss__noop";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGNoOp));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &missPGNoOp));
         LOG_VERBOSE("%s", log);
     }
 
@@ -610,8 +587,8 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameCH = "__closesthit__triangle";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__triangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGTriangle));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGTriangle));
         LOG_VERBOSE("%s", log);
     }
 
@@ -621,10 +598,12 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleCH = optixModule;
         desc.hitgroup.entryFunctionNameCH = "__closesthit__bilinearPatch";
+        desc.hitgroup.moduleAH = optixModule;
+        desc.hitgroup.entryFunctionNameAH = "__anyhit__bilinearPatch";
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGBilinearPatch));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGBilinearPatch));
         LOG_VERBOSE("%s", log);
     }
 
@@ -634,10 +613,12 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleCH = optixModule;
         desc.hitgroup.entryFunctionNameCH = "__closesthit__quadric";
+        desc.hitgroup.moduleAH = optixModule;
+        desc.hitgroup.entryFunctionNameAH = "__anyhit__quadric";
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGQuadric));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGQuadric));
         LOG_VERBOSE("%s", log);
     }
 
@@ -647,8 +628,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__shadow";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGShadow));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &raygenPGShadow));
         LOG_VERBOSE("%s", log);
     }
 
@@ -658,8 +639,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         desc.miss.module = optixModule;
         desc.miss.entryFunctionName = "__miss__shadow";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGShadow));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &missPGShadow));
         LOG_VERBOSE("%s", log);
     }
 
@@ -669,30 +650,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowTriangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowTriangle));
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup raygenPGShadowTr;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-        desc.raygen.module = optixModule;
-        desc.raygen.entryFunctionName = "__raygen__shadow_Tr";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGShadowTr));
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup missPGShadowTr;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-        desc.miss.module = optixModule;
-        desc.miss.entryFunctionName = "__miss__shadow_Tr";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGShadowTr));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &anyhitPGShadowTriangle));
         LOG_VERBOSE("%s", log);
     }
 
@@ -704,8 +663,8 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowBilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowBilinearPatch));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &anyhitPGShadowBilinearPatch));
         LOG_VERBOSE("%s", log);
     }
 
@@ -717,8 +676,8 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowQuadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowQuadric));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &anyhitPGShadowQuadric));
         LOG_VERBOSE("%s", log);
     }
 
@@ -728,8 +687,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__randomHit";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGRandomHit));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &raygenPGRandomHit));
         LOG_VERBOSE("%s", log);
     }
 
@@ -739,8 +698,8 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitTriangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitTriangle));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGRandomHitTriangle));
         LOG_VERBOSE("%s", log);
     }
 
@@ -752,8 +711,8 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitBilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitBilinearPatch));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGRandomHitBilinearPatch));
         LOG_VERBOSE("%s", log);
     }
 
@@ -765,47 +724,38 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitQuadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitQuadric));
+        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                            log, &logSize, &hitPGRandomHitQuadric));
         LOG_VERBOSE("%s", log);
     }
 
     // Optix pipeline...
-    OptixProgramGroup allPGs[] = {raygenPGClosest,
-                                  missPGNoOp,
-                                  hitPGTriangle,
-                                  hitPGBilinearPatch,
-                                  hitPGQuadric,
-                                  raygenPGShadow,
-                                  missPGShadow,
-                                  anyhitPGShadowTriangle,
-                                  anyhitPGShadowBilinearPatch,
-                                  anyhitPGShadowQuadric,
-                                  raygenPGShadowTr,
-                                  missPGShadowTr,
-                                  raygenPGRandomHit,
-                                  hitPGRandomHitTriangle,
-                                  hitPGRandomHitBilinearPatch,
-                                  hitPGRandomHitQuadric};
-    OPTIX_CHECK(optixPipelineCreate(
-        optixContext, &pipelineCompileOptions, &pipelineLinkOptions, allPGs,
-        sizeof(allPGs) / sizeof(allPGs[0]), log, &logSize, &optixPipeline));
+    OptixProgramGroup allPGs[] = { raygenPGClosest, missPGNoOp,
+                                   hitPGTriangle, hitPGBilinearPatch, hitPGQuadric,
+                                   raygenPGShadow, missPGShadow,
+                                   anyhitPGShadowTriangle, anyhitPGShadowBilinearPatch,
+                                   anyhitPGShadowQuadric,
+                                   raygenPGRandomHit, hitPGRandomHitTriangle,
+                                   hitPGRandomHitBilinearPatch, hitPGRandomHitQuadric };
+    OPTIX_CHECK(optixPipelineCreate(optixContext, &pipelineCompileOptions,
+                                    &pipelineLinkOptions, allPGs,
+                                    sizeof(allPGs) / sizeof(allPGs[0]),
+                                    log, &logSize, &optixPipeline));
     LOG_VERBOSE("%s", log);
 
-    OPTIX_CHECK(optixPipelineSetStackSize(
-        optixPipeline,
-        /* [in] The direct stack size requirement for
-           direct callables invoked from IS or AH. */
-        2 * 1024,
-        /* [in] The direct stack size requirement for
-           direct callables invoked from RG, MS, or
-           CH.  */
-        2 * 1024,
-        /* [in] The continuation stack requirement. */
-        2 * 1024,
-        /* [in] The maximum depth of a traversable
-           graph passed to trace. */
-        2));  // NOTE: this has to increase if there are motion xforms I think
+    OPTIX_CHECK(optixPipelineSetStackSize(optixPipeline,
+                                          /* [in] The direct stack size requirement for
+                                             direct callables invoked from IS or AH. */
+                                          2 * 1024,
+                                          /* [in] The direct stack size requirement for
+                                             direct callables invoked from RG, MS, or
+                                             CH.  */
+                                          2 * 1024,
+                                          /* [in] The continuation stack requirement. */
+                                          2 * 1024,
+                                          /* [in] The maximum depth of a traversable
+                                             graph passed to trace. */
+                                          2));  // NOTE: this has to increase if there are motion xforms I think
 
     // Shader binding tables...
     // Hitgroups are done as meshes are processed
@@ -813,43 +763,58 @@ GPUAccel::GPUAccel(
     // Closest intersection
     RaygenRecord *raygenClosestRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGClosest, raygenClosestRecord));
-    intersectSBT.raygenRecord = (CUdeviceptr)raygenClosestRecord;
+    triangleIntersectSBT.raygenRecord = (CUdeviceptr)raygenClosestRecord;
+    bilinearPatchIntersectSBT.raygenRecord = (CUdeviceptr)raygenClosestRecord;
+    quadricIntersectSBT.raygenRecord = (CUdeviceptr)raygenClosestRecord;
 
     MissRecord *missNoOpRecord = alloc.new_object<MissRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(missPGNoOp, missNoOpRecord));
-    intersectSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
-    intersectSBT.missRecordStrideInBytes = sizeof(MissRecord);
-    intersectSBT.missRecordCount = 1;
+    triangleIntersectSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    triangleIntersectSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    triangleIntersectSBT.missRecordCount = 1;
+    bilinearPatchIntersectSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    bilinearPatchIntersectSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    bilinearPatchIntersectSBT.missRecordCount = 1;
+    quadricIntersectSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    quadricIntersectSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    quadricIntersectSBT.missRecordCount = 1;
 
     // Shadow
     RaygenRecord *raygenShadowRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGShadow, raygenShadowRecord));
-    shadowSBT.raygenRecord = (CUdeviceptr)raygenShadowRecord;
+    triangleShadowSBT.raygenRecord = (CUdeviceptr)raygenShadowRecord;
+    bilinearPatchShadowSBT.raygenRecord = (CUdeviceptr)raygenShadowRecord;
+    quadricShadowSBT.raygenRecord = (CUdeviceptr)raygenShadowRecord;
 
     MissRecord *missShadowRecord = alloc.new_object<MissRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(missPGShadow, missShadowRecord));
-    shadowSBT.missRecordBase = (CUdeviceptr)missShadowRecord;
-    shadowSBT.missRecordStrideInBytes = sizeof(MissRecord);
-    shadowSBT.missRecordCount = 1;
-
-    // Shadow + Tr
-    RaygenRecord *raygenShadowTrRecord = alloc.new_object<RaygenRecord>();
-    OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGShadowTr, raygenShadowTrRecord));
-    shadowTrSBT.raygenRecord = (CUdeviceptr)raygenShadowTrRecord;
-
-    MissRecord *missShadowTrRecord = alloc.new_object<MissRecord>();
-    OPTIX_CHECK(optixSbtRecordPackHeader(missPGShadowTr, missShadowTrRecord));
-    shadowTrSBT.missRecordBase = (CUdeviceptr)missShadowTrRecord;
-    shadowTrSBT.missRecordStrideInBytes = sizeof(MissRecord);
-    shadowTrSBT.missRecordCount = 1;
+    triangleShadowSBT.missRecordBase = (CUdeviceptr)missShadowRecord;
+    triangleShadowSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    triangleShadowSBT.missRecordCount = 1;
+    bilinearPatchShadowSBT.missRecordBase = (CUdeviceptr)missShadowRecord;
+    bilinearPatchShadowSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    bilinearPatchShadowSBT.missRecordCount = 1;
+    quadricShadowSBT.missRecordBase = (CUdeviceptr)missShadowRecord;
+    quadricShadowSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    quadricShadowSBT.missRecordCount = 1;
 
     // Random hit
     RaygenRecord *raygenRandomHitRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGRandomHit, raygenRandomHitRecord));
-    randomHitSBT.raygenRecord = (CUdeviceptr)raygenRandomHitRecord;
-    randomHitSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
-    randomHitSBT.missRecordStrideInBytes = sizeof(MissRecord);
-    randomHitSBT.missRecordCount = 1;
+    triangleRandomHitSBT.raygenRecord = (CUdeviceptr)raygenRandomHitRecord;
+    triangleRandomHitSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    triangleRandomHitSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    triangleRandomHitSBT.missRecordCount = 1;
+
+    bilinearPatchRandomHitSBT.raygenRecord = (CUdeviceptr)raygenRandomHitRecord;
+    bilinearPatchRandomHitSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    bilinearPatchRandomHitSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    bilinearPatchRandomHitSBT.missRecordCount = 1;
+
+    quadricRandomHitSBT.raygenRecord = (CUdeviceptr)raygenRandomHitRecord;
+    quadricRandomHitSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    quadricRandomHitSBT.missRecordStrideInBytes = sizeof(MissRecord);
+    quadricRandomHitSBT.missRecordCount = 1;
 
     // Textures
     std::map<std::string, FloatTextureHandle> floatTextures;
@@ -862,47 +827,44 @@ GPUAccel::GPUAccel(
     scene.CreateMaterials(floatTextures, spectrumTextures, alloc, &namedMaterials,
                           &materials);
 
-    for (const auto &shape : scene.shapes)
-        if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk" &&
-            shape.name != "trianglemesh" && shape.name != "plymesh" &&
-            shape.name != "loopsubdiv" && shape.name != "bilinearmesh")
-            ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
-
-    OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
-        scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
-        floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
-    int bilinearSBTOffset = intersectHGRecords->size();
+    OptixTraversableHandle triangleGASTraversable =
+        createGASForTriangles(scene.shapes, hitPGTriangle, anyhitPGShadowTriangle,
+                              hitPGRandomHitTriangle,
+                              floatTextures, namedMaterials, materials,
+                              shapeIndexToAreaLights, &bounds);
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                         hitPGRandomHitBilinearPatch, floatTextures, namedMaterials,
-                         materials, media, shapeIndexToAreaLights, &bounds);
-    int quadricSBTOffset = intersectHGRecords->size();
-    OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
-        scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
-        floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+                         hitPGRandomHitBilinearPatch,
+                         floatTextures, namedMaterials, materials,
+                         shapeIndexToAreaLights, &bounds);
+    OptixTraversableHandle quadricGASTraversable =
+        createGASForQuadrics(scene.shapes, hitPGQuadric, anyhitPGShadowQuadric,
+                             hitPGRandomHitQuadric,
+                             floatTextures, namedMaterials, materials,
+                             shapeIndexToAreaLights, &bounds);
 
-    pstd::vector<OptixInstance> iasInstances(alloc);
+    pstd::vector<OptixInstance> triangleInstances(alloc), bilinearPatchInstances(alloc);
+    pstd::vector<OptixInstance> quadricInstances(alloc);
 
     OptixInstance gasInstance = {};
-    float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+    float identity[12] = { 1, 0, 0, 0,
+                           0, 1, 0, 0,
+                           0, 0, 1, 0 };
     memcpy(gasInstance.transform, identity, 12 * sizeof(float));
     gasInstance.visibilityMask = 255;
-    gasInstance.flags =
-        OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
+    gasInstance.sbtOffset = 0;
+    gasInstance.flags = OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
     if (triangleGASTraversable) {
         gasInstance.traversableHandle = triangleGASTraversable;
-        gasInstance.sbtOffset = 0;
-        iasInstances.push_back(gasInstance);
+        triangleInstances.push_back(gasInstance);
     }
     if (bilinearPatchGASTraversable) {
         gasInstance.traversableHandle = bilinearPatchGASTraversable;
-        gasInstance.sbtOffset = bilinearSBTOffset;
-        iasInstances.push_back(gasInstance);
+        bilinearPatchInstances.push_back(gasInstance);
     }
     if (quadricGASTraversable) {
         gasInstance.traversableHandle = quadricGASTraversable;
-        gasInstance.sbtOffset = quadricSBTOffset;
-        iasInstances.push_back(gasInstance);
+        quadricInstances.push_back(gasInstance);
     }
 
     // Create GASs for instance definitions
@@ -919,11 +881,11 @@ GPUAccel::GPUAccel(
                     def.second.animatedShapes.size(), def.first);
 
         Instance inst;
-        inst.sbtOffset = intersectHGRecords->size();
-        inst.handle = createGASForTriangles(
-            def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
-            hitPGRandomHitTriangle, floatTextures, namedMaterials, materials, media, {},
-            &inst.bounds);
+        inst.sbtOffset = triangleIntersectHGRecords->size();
+        inst.handle = createGASForTriangles(def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
+                                            hitPGRandomHitTriangle,
+                                            floatTextures, namedMaterials, materials, {},
+                                            &inst.bounds);
         instanceMap[def.first] = inst;
     }
 
@@ -940,8 +902,7 @@ GPUAccel::GPUAccel(
 
         const Instance &in = instanceMap[inst.name];
         if (!in.handle) {
-            // Warning(&inst.loc, "Skipping instance of empty instance
-            // definition");
+            //Warning(&inst.loc, "Skipping instance of empty instance definition");
             continue;
         }
 
@@ -950,49 +911,73 @@ GPUAccel::GPUAccel(
         OptixInstance optixInstance = {};
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 4; ++j)
-                optixInstance.transform[4 * i + j] =
-                    inst.worldFromInstance->GetMatrix()[i][j];
+                optixInstance.transform[4*i+j] = inst.worldFromInstance->GetMatrix()[i][j];
         optixInstance.visibilityMask = 255;
         optixInstance.sbtOffset = instanceMap[inst.name].sbtOffset;
-        optixInstance.flags =
-            OPTIX_INSTANCE_FLAG_NONE;  // TODO:
-                                       // OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
+        optixInstance.flags = OPTIX_INSTANCE_FLAG_NONE;   // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
         optixInstance.traversableHandle = instanceMap[inst.name].handle;
-        iasInstances.push_back(optixInstance);
+        triangleInstances.push_back(optixInstance);
     }
 
-    // Build the top-level IAS
-    OptixBuildInput buildInput = {};
-    buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    buildInput.instanceArray.instances = CUdeviceptr(iasInstances.data());
-    buildInput.instanceArray.numInstances = iasInstances.size();
-    std::vector<OptixBuildInput> buildInputs = {buildInput};
+    auto buildIAS = [this](const pstd::vector<OptixInstance> &instances) -> OptixTraversableHandle {
+        if (instances.empty()) return {};
 
-    rootTraversable = buildBVH({buildInput});
+        // TODO: if instances.size() == 1 -> rootTriangleTraversable = instances[0].traversableHandle
+        // But beware sbt offset, visibility mask, and xform...
+        OptixBuildInput buildInput = {};
+        buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
+        buildInput.instanceArray.instances = CUdeviceptr(instances.data());
+        buildInput.instanceArray.numInstances = instances.size();
+        std::vector<OptixBuildInput> buildInputs = { buildInput };
+
+        return buildBVH(buildInputs);
+    };
+
+    triangleTraversable = buildIAS(triangleInstances);
+    bilinearPatchTraversable = buildIAS(bilinearPatchInstances);
+    quadricTraversable = buildIAS(quadricInstances);
 
     if (!scene.animatedShapes.empty())
         Warning("Ignoring %d animated shapes", scene.animatedShapes.size());
 
-    intersectSBT.hitgroupRecordBase = (CUdeviceptr)intersectHGRecords->data();
-    intersectSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
-    intersectSBT.hitgroupRecordCount = intersectHGRecords->size();
+    triangleIntersectSBT.hitgroupRecordBase = (CUdeviceptr)triangleIntersectHGRecords->data();
+    triangleIntersectSBT.hitgroupRecordStrideInBytes = sizeof(TriangleHitgroupRecord);
+    triangleIntersectSBT.hitgroupRecordCount = triangleIntersectHGRecords->size();
 
-    shadowSBT.hitgroupRecordBase = (CUdeviceptr)shadowHGRecords->data();
-    shadowSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
-    shadowSBT.hitgroupRecordCount = shadowHGRecords->size();
+    triangleShadowSBT.hitgroupRecordBase = (CUdeviceptr)triangleShadowHGRecords->data();
+    triangleShadowSBT.hitgroupRecordStrideInBytes = sizeof(TriangleHitgroupRecord);
+    triangleShadowSBT.hitgroupRecordCount = triangleShadowHGRecords->size();
 
-    // Still want to run the closest hit shaders...
-    shadowTrSBT.hitgroupRecordBase = (CUdeviceptr)intersectHGRecords->data();
-    shadowTrSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
-    shadowTrSBT.hitgroupRecordCount = intersectHGRecords->size();
+    triangleRandomHitSBT.hitgroupRecordBase = (CUdeviceptr)triangleRandomHitHGRecords->data();
+    triangleRandomHitSBT.hitgroupRecordStrideInBytes = sizeof(TriangleHitgroupRecord);
+    triangleRandomHitSBT.hitgroupRecordCount = triangleRandomHitHGRecords->size();
 
-    randomHitSBT.hitgroupRecordBase = (CUdeviceptr)randomHitHGRecords->data();
-    randomHitSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
-    randomHitSBT.hitgroupRecordCount = randomHitHGRecords->size();
+    bilinearPatchIntersectSBT.hitgroupRecordBase = (CUdeviceptr)bilinearPatchIntersectHGRecords->data();
+    bilinearPatchIntersectSBT.hitgroupRecordStrideInBytes = sizeof(BilinearPatchHitgroupRecord);
+    bilinearPatchIntersectSBT.hitgroupRecordCount = bilinearPatchIntersectHGRecords->size();
+
+    bilinearPatchShadowSBT.hitgroupRecordBase = (CUdeviceptr)bilinearPatchShadowHGRecords->data();
+    bilinearPatchShadowSBT.hitgroupRecordStrideInBytes = sizeof(BilinearPatchHitgroupRecord);
+    bilinearPatchShadowSBT.hitgroupRecordCount = bilinearPatchShadowHGRecords->size();
+
+    bilinearPatchRandomHitSBT.hitgroupRecordBase = (CUdeviceptr)bilinearPatchRandomHitHGRecords->data();
+    bilinearPatchRandomHitSBT.hitgroupRecordStrideInBytes = sizeof(BilinearPatchHitgroupRecord);
+    bilinearPatchRandomHitSBT.hitgroupRecordCount = bilinearPatchRandomHitHGRecords->size();
+
+    quadricIntersectSBT.hitgroupRecordBase = (CUdeviceptr)quadricIntersectHGRecords->data();
+    quadricIntersectSBT.hitgroupRecordStrideInBytes = sizeof(QuadricHitgroupRecord);
+    quadricIntersectSBT.hitgroupRecordCount = quadricIntersectHGRecords->size();
+
+    quadricShadowSBT.hitgroupRecordBase = (CUdeviceptr)quadricShadowHGRecords->data();
+    quadricShadowSBT.hitgroupRecordStrideInBytes = sizeof(QuadricHitgroupRecord);
+    quadricShadowSBT.hitgroupRecordCount = quadricShadowHGRecords->size();
+
+    quadricRandomHitSBT.hitgroupRecordBase = (CUdeviceptr)quadricRandomHitHGRecords->data();
+    quadricRandomHitSBT.hitgroupRecordStrideInBytes = sizeof(QuadricHitgroupRecord);
+    quadricRandomHitSBT.hitgroupRecordCount = quadricRandomHitHGRecords->size();
 }
 
-GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(
-    const RayIntersectParameters &params) const {
+GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(const RayIntersectParameters &params) const {
     CHECK(nextParamOffset < paramsPool.size());
 
     ParamBufferState &pbs = paramsPool[nextParamOffset];
@@ -1003,40 +988,40 @@ GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(
     else
         CUDA_CHECK(cudaEventSynchronize(pbs.finishedEvent));
 
-    CUDA_CHECK(
-        cudaMemcpy((void *)pbs.ptr, &params, sizeof(params), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy((void *)pbs.ptr, &params, sizeof(params), cudaMemcpyHostToDevice));
 
     return pbs;
 }
 
 std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectClosest(
-    const RayQueue<PathRayIndex> *pathRays, int maxRays,
-    TypedIndexSpan<SurfaceInteraction, PixelIndex> intersections,
-    TypedIndexSpan<PixelIndex, PathRayIndex> rayIndexToPixelIndex,
-    TypedIndexSpan<InteractionType, PathRayIndex> interactionType) const {
+        int maxRays, const cuda::std::atomic<int> *numActiveRays, const int *rayIndexToPixelIndex,
+        const Point3fSOA *rayo, const Vector3fSOA *rayd, Float *tMax,
+        SurfaceInteraction *intersections) const {
+
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
-
-    if (rootTraversable) {
+    if (triangleTraversable) {
         RayIntersectParameters params;
-        params.traversable = rootTraversable;
-        params.pathRays = pathRays;
-        params.intersections = intersections;
+        params.traversable = triangleTraversable;
+        params.numActiveRays = numActiveRays;
         params.rayIndexToPixelIndex = rayIndexToPixelIndex;
-        params.interactionType = interactionType;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.intersections = intersections;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
 #ifndef NDEBUG
-        LOG_VERBOSE("Launching intersect closest");
+        LOG_VERBOSE("Launching triangle intersect closest");
 #endif
 
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
-                                sizeof(RayIntersectParameters), &intersectSBT, maxRays, 1,
-                                1));
+                                sizeof(RayIntersectParameters), &triangleIntersectSBT,
+                                maxRays, 1, 1));
         CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
 
 #ifndef NDEBUG
@@ -1045,124 +1030,168 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectClosest(
 #endif
     }
 
+    if (bilinearPatchTraversable) {
+        RayIntersectParameters params;
+        params.traversable = bilinearPatchTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayIndexToPixelIndex = rayIndexToPixelIndex;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.intersections = intersections;
+
+        ParamBufferState &pbs = getParamBuffer(params);
+
+#ifndef NDEBUG
+        LOG_VERBOSE("Launching bilinear patch intersect closest");
+#endif
+
+        OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
+                                sizeof(RayIntersectParameters), &bilinearPatchIntersectSBT,
+                                maxRays, 1, 1));
+        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+
+#ifndef NDEBUG
+        CUDA_CHECK(cudaDeviceSynchronize());
+        LOG_VERBOSE("Post-sync bilinear patch intersect closest");
+#endif
+    }
+
+    if (quadricTraversable) {
+        RayIntersectParameters params;
+        params.traversable = quadricTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayIndexToPixelIndex = rayIndexToPixelIndex;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.intersections = intersections;
+
+        ParamBufferState &pbs = getParamBuffer(params);
+
+#ifndef NDEBUG
+        LOG_VERBOSE("Launching quadric intersect closest");
+#endif
+
+        OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
+                                sizeof(RayIntersectParameters), &quadricIntersectSBT,
+                                maxRays, 1, 1));
+        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+
+#ifndef NDEBUG
+        CUDA_CHECK(cudaDeviceSynchronize());
+        LOG_VERBOSE("Post-sync quadric intersect closest");
+#endif
+    }
     cudaEventRecord(stop);
 
     return std::make_pair(start, stop);
 };
 
 std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
-    const RayQueue<ShadowRayIndex> *shadowRays, int maxRays,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight) const {
+        int maxRays, const cuda::std::atomic<int> *numActiveRays,
+        const Point3fSOA *rayo, const Vector3fSOA *rayd,
+        Float *tMax, int *occluded) const {
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
-
-    if (rootTraversable) {
+    if (triangleTraversable) {
         RayIntersectParameters params;
-        params.traversable = rootTraversable;
-        params.shadowRays = shadowRays;
-        params.shadowRayLd = shadowRayLd;
-        params.shadowRayPDFUni = shadowRayPDFUni;
-        params.shadowRayPDFLight = shadowRayPDFLight;
+        params.traversable = triangleTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.occluded = occluded;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
-#ifndef NDEBUG
-        LOG_VERBOSE("Launching intersect shadow");
-#endif
-
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
-                                sizeof(RayIntersectParameters), &shadowSBT, maxRays, 1,
-                                1));
+                                sizeof(RayIntersectParameters), &triangleShadowSBT,
+                                maxRays, 1, 1));
         CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
 
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
-        LOG_VERBOSE("Post-sync intersect shadow");
+        LOG_VERBOSE("Post-sync triangle intersect shadow");
 #endif
     }
 
-    cudaEventRecord(stop);
-    return std::make_pair(start, stop);
-}
-
-std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadowTr(
-    const RayQueue<ShadowRayIndex> *shadowRays, int maxRays,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayLd,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFUni,
-    TypedIndexSpan<SampledSpectrum, ShadowRayIndex> shadowRayPDFLight,
-    TypedIndexSpan<PixelIndex, ShadowRayIndex> shadowRayIndexToPixelIndex,
-    TypedIndexSpan<SampledWavelengths, PixelIndex> lambda,
-    TypedIndexSpan<RNG *, PixelIndex> rng) const {
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-
-    cudaEventRecord(start);
-
-    if (rootTraversable) {
+    if (bilinearPatchTraversable) {
         RayIntersectParameters params;
-        params.traversable = rootTraversable;
-        params.shadowRays = shadowRays;
-        params.shadowRayLd = shadowRayLd;
-        params.shadowRayPDFUni = shadowRayPDFUni;
-        params.shadowRayPDFLight = shadowRayPDFLight;
-        params.shadowRayIndexToPixelIndex = shadowRayIndexToPixelIndex;
-        params.lambda = lambda;
-        params.rng = rng;
+        params.traversable = bilinearPatchTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.occluded = occluded;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
-#ifndef NDEBUG
-        LOG_VERBOSE("Launching intersect shadow Tr");
-#endif
-
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
-                                sizeof(RayIntersectParameters), &shadowTrSBT, maxRays, 1,
-                                1));
+                                sizeof(RayIntersectParameters), &bilinearPatchShadowSBT,
+                                maxRays, 1, 1));
         CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
 
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
-        LOG_VERBOSE("Post-sync intersect shadow Tr");
+        LOG_VERBOSE("Post-sync bilinear patch intersect shadow");
 #endif
     }
 
+    if (quadricTraversable) {
+        RayIntersectParameters params;
+        params.traversable = quadricTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.occluded = occluded;
+
+        ParamBufferState &pbs = getParamBuffer(params);
+
+        OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
+                                sizeof(RayIntersectParameters), &quadricShadowSBT,
+                                maxRays, 1, 1));
+        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+
+#ifndef NDEBUG
+        CUDA_CHECK(cudaDeviceSynchronize());
+        LOG_VERBOSE("Post-sync quadric intersect shadow");
+#endif
+    }
     cudaEventRecord(stop);
+
     return std::make_pair(start, stop);
-}
+};
 
 std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectOneRandom(
-    const RayQueue<SSRayIndex> *randomHitRays, int maxRays,
-    TypedIndexSpan<MaterialHandle, SSRayIndex> materials,
-    TypedIndexSpan<WeightedReservoirSampler<SurfaceInteraction>, SSRayIndex>
-        reservoirSamplers) const {
+        int maxRays, const cuda::std::atomic<int> *numActiveRays, const MaterialHandle *materialHandleArray,
+        const Point3fSOA *rayo, const Vector3fSOA *rayd, Float *tMax,
+        WeightedReservoirSampler<SurfaceInteraction, Float> *reservoirSamplers) const {
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
 
-    if (rootTraversable) {
+    if (triangleTraversable) {
         RayIntersectParameters params;
-        params.traversable = rootTraversable;
-        params.randomHitRays = randomHitRays;
-        params.materials = materials;
-        params.reservoirSamplers = reservoirSamplers;
+        params.traversable = triangleTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.materialArray = materialHandleArray;
+        params.reservoirSamplerArray = reservoirSamplers;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
-#ifndef NDEBUG
-        LOG_VERBOSE("Launching intersect random");
-#endif
-
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
-                                sizeof(RayIntersectParameters), &randomHitSBT, maxRays, 1,
-                                1));
+                                sizeof(RayIntersectParameters), &triangleRandomHitSBT,
+                                maxRays, 1, 1));
         CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
 
 #ifndef NDEBUG
@@ -1170,10 +1199,54 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectOneRandom(
         LOG_VERBOSE("Post-sync triangle intersect random");
 #endif
     }
+    if (bilinearPatchTraversable) {
+        RayIntersectParameters params;
+        params.traversable = bilinearPatchTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.materialArray = materialHandleArray;
+        params.reservoirSamplerArray = reservoirSamplers;
+
+        ParamBufferState &pbs = getParamBuffer(params);
+
+        OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
+                                sizeof(RayIntersectParameters), &bilinearPatchRandomHitSBT,
+                                maxRays, 1, 1));
+        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+
+#ifndef NDEBUG
+        CUDA_CHECK(cudaDeviceSynchronize());
+        LOG_VERBOSE("Post-sync bilinearPatch intersect random");
+#endif
+    }
+    if (quadricTraversable) {
+        RayIntersectParameters params;
+        params.traversable = quadricTraversable;
+        params.numActiveRays = numActiveRays;
+        params.rayo = rayo;
+        params.rayd = rayd;
+        params.tMax = tMax;
+        params.materialArray = materialHandleArray;
+        params.reservoirSamplerArray = reservoirSamplers;
+
+        ParamBufferState &pbs = getParamBuffer(params);
+
+        OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
+                                sizeof(RayIntersectParameters), &quadricRandomHitSBT,
+                                maxRays, 1, 1));
+        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+
+#ifndef NDEBUG
+        CUDA_CHECK(cudaDeviceSynchronize());
+        LOG_VERBOSE("Post-sync quadric intersect shadow");
+#endif
+    }
 
     cudaEventRecord(stop);
 
     return std::make_pair(start, stop);
 }
 
-}  // namespace pbrt
+} // namespace pbrt

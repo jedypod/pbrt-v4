@@ -1,6 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #include <pbrt/util/string.h>
 
@@ -9,37 +6,37 @@
 
 namespace pbrt {
 
-bool Atoi(std::string_view str, int *ptr) {
+bool Atoi(pstd::string_view str, int *ptr) {
     try {
         *ptr = std::stoi(std::string(str.begin(), str.end()));
-    } catch (...) {
+    } catch(...) {
         return false;
     }
     return true;
 }
 
-bool Atof(std::string_view str, float *ptr) {
+bool Atof(pstd::string_view str, float *ptr) {
     try {
         *ptr = std::stof(std::string(str.begin(), str.end()));
-    } catch (...) {
+    } catch(...) {
         return false;
     }
     return true;
 }
 
-bool Atod(std::string_view str, double *ptr) {
+bool Atod(pstd::string_view str, double *ptr) {
     try {
         *ptr = std::stod(std::string(str.begin(), str.end()));
-    } catch (...) {
+    } catch(...) {
         return false;
     }
     return true;
 }
 
-std::vector<std::string> SplitStringsFromWhitespace(std::string_view str) {
+std::vector<std::string> SplitStringsFromWhitespace(pstd::string_view str) {
     std::vector<std::string> ret;
 
-    std::string_view::iterator start = str.begin();
+    pstd::string_view::iterator start = str.begin();
     do {
         // skip leading ws
         while (start != str.end() && isspace(*start))
@@ -57,15 +54,15 @@ std::vector<std::string> SplitStringsFromWhitespace(std::string_view str) {
     return ret;
 }
 
-std::vector<std::string> SplitString(std::string_view str, char ch) {
+std::vector<std::string> SplitString(pstd::string_view str, char ch) {
     std::vector<std::string> strings;
 
     if (str.empty())
         return strings;
 
-    std::string_view::iterator begin = str.begin();
+    pstd::string_view::iterator begin = str.begin();
     while (true) {
-        std::string_view::iterator end = begin;
+        pstd::string_view::iterator end = begin;
         while (end != str.end() && *end != ch)
             ++end;
 
@@ -81,7 +78,7 @@ std::vector<std::string> SplitString(std::string_view str, char ch) {
     return strings;
 }
 
-pstd::optional<std::vector<int>> SplitStringToInts(std::string_view str, char ch) {
+pstd::optional<std::vector<int>> SplitStringToInts(pstd::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<int> ints(strs.size());
 
@@ -91,7 +88,7 @@ pstd::optional<std::vector<int>> SplitStringToInts(std::string_view str, char ch
     return ints;
 }
 
-pstd::optional<std::vector<Float>> SplitStringToFloats(std::string_view str, char ch) {
+pstd::optional<std::vector<Float>> SplitStringToFloats(pstd::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<Float> floats(strs.size());
 
@@ -101,7 +98,7 @@ pstd::optional<std::vector<Float>> SplitStringToFloats(std::string_view str, cha
     return floats;
 }
 
-pstd::optional<std::vector<double>> SplitStringToDoubles(std::string_view str, char ch) {
+pstd::optional<std::vector<double>> SplitStringToDoubles(pstd::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<double> doubles(strs.size());
 
@@ -111,4 +108,4 @@ pstd::optional<std::vector<double>> SplitStringToDoubles(std::string_view str, c
     return doubles;
 }
 
-}  // namespace pbrt
+} // namespace pbrt

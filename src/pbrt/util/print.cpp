@@ -1,6 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #include <pbrt/util/print.h>
 
@@ -14,8 +11,10 @@ namespace detail {
 
 std::string FloatToString(float v) {
     double_conversion::DoubleToStringConverter doubleConverter(
-        double_conversion::DoubleToStringConverter::NO_FLAGS, "Inf", "NaN", 'e',
-        -6 /* decimal_in_shortest_low */, 9 /* decimal_in_shortest_high */,
+        double_conversion::DoubleToStringConverter::NO_FLAGS,
+        "Inf", "NaN", 'e',
+        -6 /* decimal_in_shortest_low */,
+        9 /* decimal_in_shortest_high */,
         5 /* max_leading_padding_zeroes_in_precision_mode */,
         5 /*  max_trailing_padding_zeroes_in_precision_mode */);
     char buf[64];
@@ -27,8 +26,10 @@ std::string FloatToString(float v) {
 
 std::string DoubleToString(double v) {
     double_conversion::DoubleToStringConverter doubleConverter(
-        double_conversion::DoubleToStringConverter::NO_FLAGS, "Inf", "NaN", 'e',
-        -6 /* decimal_in_shortest_low */, 9 /* decimal_in_shortest_high */,
+        double_conversion::DoubleToStringConverter::NO_FLAGS,
+        "Inf", "NaN", 'e',
+        -6 /* decimal_in_shortest_low */,
+        9 /* decimal_in_shortest_high */,
         5 /* max_leading_padding_zeroes_in_precision_mode */,
         5 /*  max_trailing_padding_zeroes_in_precision_mode */);
     char buf[64];
@@ -44,8 +45,7 @@ void stringPrintfRecursive(std::string *s, const char *fmt) {
     // specifiers.
     while (*c) {
         if (*c == '%') {
-            if (c[1] != '%')
-                LOG_FATAL("Not enough optional values passed to Printf.");
+            CHECK_EQ(c[1], '%');
             ++c;
         }
         *s += *c++;
@@ -86,6 +86,6 @@ std::string copyToFormatString(const char **fmt_ptr, std::string *s) {
     return nextFmt;
 }
 
-}  // namespace detail
+} // namespace detail
 
-}  // namespace pbrt
+} // namespace pbrt

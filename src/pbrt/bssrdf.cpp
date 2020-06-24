@@ -1,16 +1,47 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // core/bssrdf.cpp*
 #include <pbrt/bssrdf.h>
 
 #include <pbrt/media.h>
+#include <pbrt/scene.h>
 #include <pbrt/shapes.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/profile.h>
 #include <pbrt/util/sampling.h>
 
 #include <cmath>
@@ -20,11 +51,12 @@ namespace pbrt {
 // BSSRDF Method Definitions
 std::string TabulatedBSSRDF::ToString() const {
     return StringPrintf("[ TabulatedBSSRDF po: %s eta: %f ns: %s ss: %s ts: %s "
-                        "sigma_t: %s rho: %s table: %s ]",
-                        po, eta, ns, ss, ts, sigma_t, rho, table);
+                        "mode: %s sigma_t: %s rho: %s table: %s ]",
+                        po, eta, ns, ss, ts, mode, sigma_t, rho, table);
 }
 
-Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r) {
+Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta,
+                      Float r) {
     const int nSamples = 100;
     Float Ed = 0;
     // Precompute information for dipole integrand
@@ -59,15 +91,15 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
         Float dr = std::sqrt(r * r + zr * zr), dv = std::sqrt(r * r + zv * zv);
 
         // Compute dipole fluence rate $\dipole(r)$ using Equation (15.27)
-        Float phiD = Inv4Pi / D_g *
-                     (std::exp(-sigma_tr * dr) / dr - std::exp(-sigma_tr * dv) / dv);
+        Float phiD = Inv4Pi / D_g * (std::exp(-sigma_tr * dr) / dr -
+                                     std::exp(-sigma_tr * dv) / dv);
 
         // Compute dipole vector irradiance $-\N{}\cdot\dipoleE(r)$ using
         // Equation (15.27)
-        Float EDn =
-            Inv4Pi *
-            (zr * (1 + sigma_tr * dr) * std::exp(-sigma_tr * dr) / (dr * dr * dr) -
-             zv * (1 + sigma_tr * dv) * std::exp(-sigma_tr * dv) / (dv * dv * dv));
+        Float EDn = Inv4Pi * (zr * (1 + sigma_tr * dr) *
+                                  std::exp(-sigma_tr * dr) / (dr * dr * dr) -
+                              zv * (1 + sigma_tr * dv) *
+                                  std::exp(-sigma_tr * dv) / (dv * dv * dv));
 
         // Add contribution from dipole for depth $\depthreal$ to _Ed_
         Float E = phiD * cPhi + EDn * cE;
@@ -77,7 +109,8 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
     return Ed / nSamples;
 }
 
-Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r) {
+Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta,
+                      Float r) {
     // Compute material parameters and minimum $t$ below the critical angle
     Float sigma_t = sigma_a + sigma_s, rho = sigma_s / sigma_t;
     Float tCrit = r * SafeSqrt(eta * eta - 1);
@@ -93,8 +126,8 @@ Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
 
         // Add contribution of single scattering at depth $t$
         Ess += rho * std::exp(-sigma_t * (d + tCrit)) / (d * d) *
-               EvaluateHenyeyGreenstein(cosTheta_o, g) *
-               (1 - FrDielectric(-cosTheta_o, eta)) * std::abs(cosTheta_o);
+               EvaluateHenyeyGreenstein(cosTheta_o, g) * (1 - FrDielectric(-cosTheta_o, eta)) *
+               std::abs(cosTheta_o);
     }
     return Ess / nSamples;
 }
@@ -108,8 +141,9 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
 
     // Choose albedo values of the diffusion profile discretization
     for (int i = 0; i < t->rhoSamples.size(); ++i)
-        t->rhoSamples[i] = (1 - std::exp(-8 * i / (Float)(t->rhoSamples.size() - 1))) /
-                           (1 - std::exp(-8));
+        t->rhoSamples[i] =
+            (1 - std::exp(-8 * i / (Float)(t->rhoSamples.size() - 1))) /
+            (1 - std::exp(-8));
     ParallelFor(0, t->rhoSamples.size(), [&](int i) {
         // Compute the diffusion profile for the _i_th albedo sample
 
@@ -117,16 +151,17 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
         size_t nSamples = t->radiusSamples.size();
         for (int j = 0; j < nSamples; ++j) {
             Float rho = t->rhoSamples[i], r = t->radiusSamples[j];
-            t->profile[i * nSamples + j] = 2 * Pi * r *
-                                           (BeamDiffusionSS(rho, 1 - rho, g, eta, r) +
-                                            BeamDiffusionMS(rho, 1 - rho, g, eta, r));
+            t->profile[i * nSamples + j] =
+                2 * Pi * r * (BeamDiffusionSS(rho, 1 - rho, g, eta, r) +
+                              BeamDiffusionMS(rho, 1 - rho, g, eta, r));
         }
 
         // Compute effective albedo $\rho_{\roman{eff}}$ and CDF for importance
         // sampling
-        t->rhoEff[i] =
-            IntegrateCatmullRom(t->radiusSamples, {&t->profile[i * nSamples], nSamples},
-                                {&t->profileCDF[i * nSamples], nSamples});
+        t->rhoEff[i] = IntegrateCatmullRom(
+            t->radiusSamples,
+            {&t->profile[i * nSamples], nSamples},
+            {&t->profileCDF[i * nSamples], nSamples});
     });
 }
 
@@ -139,8 +174,8 @@ BSSRDFTable::BSSRDFTable(int nRhoSamples, int nRadiusSamples, Allocator alloc)
 
 std::string BSSRDFTable::ToString() const {
     return StringPrintf("[ BSSRDFTable rhoSamples: %s radiusSamples: %s profile: %s "
-                        "rhoEff: %s profileCDF: %s ]",
-                        rhoSamples, radiusSamples, profile, rhoEff, profileCDF);
+                        "rhoEff: %s profileCDF: %s ]", rhoSamples, radiusSamples,
+                        profile, rhoEff, profileCDF);
 }
 
 }  // namespace pbrt

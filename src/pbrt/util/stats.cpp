@@ -1,10 +1,39 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 // core/stats.cpp*
 #include <pbrt/util/stats.h>
 
+#include <pbrt/options.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/memory.h>
@@ -14,8 +43,8 @@
 #include <pbrt/util/vecmath.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cinttypes>
+#include <chrono>
 #include <csignal>
 #include <functional>
 #include <map>
@@ -25,6 +54,7 @@
 namespace pbrt {
 
 // Statistics Local Variables
+static std::vector<StatRegisterer::InitFunc> *initFuncs;
 static std::vector<StatRegisterer::AccumFunc> *statFuncs;
 static std::vector<StatRegisterer::PixelAccumFunc> *pixelStatFuncs;
 
@@ -37,7 +67,6 @@ struct ThreadStatsState {
     PixelStatsAccumulator accum;
 };
 
-bool pixelStatsEnabled = false;
 static Bounds2i imageBounds;
 std::string pixelStatsBaseName;
 static thread_local ThreadStatsState threadStatsState;
@@ -47,21 +76,22 @@ void ReportThreadStats() {
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock(mutex);
     StatRegisterer::CallCallbacks(statsAccumulator);
-    if (pixelStatsEnabled) {
+    if (PbrtOptions.recordPixelStatistics) {
         statsAccumulator.AccumulatePixelStats(threadStatsState.accum);
-        threadStatsState.accum = PixelStatsAccumulator();  // FIXME: memory leaks
+        threadStatsState.accum = PixelStatsAccumulator(); // FIXME: memory leaks
     }
 }
 
-void StatsEnablePixelStats(const Bounds2i &b, const std::string &baseName) {
-    pixelStatsEnabled = true;
+void StatsSetImageResolution(const Bounds2i &b) {
     imageBounds = b;
-    pixelStatsBaseName = baseName;
+}
+
+void StatsSetPixelStatsBaseName(const char *base) {
+    pixelStatsBaseName = base;
 }
 
 void StatsReportPixelStart(const Point2i &p) {
-    if (!pixelStatsEnabled)
-        return;
+    if (!PbrtOptions.recordPixelStatistics) return;
     CHECK(threadStatsState.active == false);
     threadStatsState.active = true;
     threadStatsState.p = p;
@@ -69,16 +99,14 @@ void StatsReportPixelStart(const Point2i &p) {
 }
 
 void StatsReportPixelEnd(const Point2i &p) {
-    if (!pixelStatsEnabled)
-        return;
+    if (!PbrtOptions.recordPixelStatistics) return;
 
     ThreadStatsState &tss = threadStatsState;
     CHECK(tss.active == true && tss.p == p);
     tss.active = false;
 
     auto elapsed = std::chrono::steady_clock::now() - tss.start;
-    float deltaMS =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 1e6f;
+    float deltaMS = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 1e6f;
     tss.accum.ReportPixelMS(p, deltaMS);
 
     StatRegisterer::CallPixelCallbacks(p, tss.accum);
@@ -99,12 +127,31 @@ StatRegisterer::StatRegisterer(AccumFunc func, PixelAccumFunc pfunc) {
         pixelStatFuncs->push_back(pfunc);
 }
 
+StatRegisterer::StatRegisterer(InitFunc func) {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (initFuncs == nullptr)
+        initFuncs = new std::vector<InitFunc>;
+    if (func)
+        initFuncs->push_back(func);
+}
+
+void StatRegisterer::CallInitializationCallbacks() {
+    if (initFuncs == nullptr)
+        return;
+
+    for (InitFunc func : *initFuncs)
+        func();
+}
+
 void StatRegisterer::CallCallbacks(StatsAccumulator &accum) {
     for (AccumFunc func : *statFuncs)
         func(accum);
 }
 
-void StatRegisterer::CallPixelCallbacks(const Point2i &p, PixelStatsAccumulator &accum) {
+void StatRegisterer::CallPixelCallbacks(const Point2i &p,
+                                        PixelStatsAccumulator &accum) {
     for (size_t i = 0; i < pixelStatFuncs->size(); ++i)
         (*pixelStatFuncs)[i](p, i, accum);
 }
@@ -147,8 +194,8 @@ void PixelStatsAccumulator::ReportCounter(const Point2i &p, int statIndex,
     im.SetChannel(pp, 0, im.GetChannel(pp, 0) + val);
 }
 
-void PixelStatsAccumulator::ReportRatio(const Point2i &p, int statIndex, const char *name,
-                                        int64_t num, int64_t denom) {
+void PixelStatsAccumulator::ReportRatio(const Point2i &p, int statIndex,
+                                        const char *name, int64_t num, int64_t denom) {
     if (statIndex >= stats->ratioImages.size()) {
         stats->ratioImages.resize(statIndex + 1);
         stats->ratioNames.resize(statIndex + 1);
@@ -172,8 +219,7 @@ void PixelStatsAccumulator::ReportRatio(const Point2i &p, int statIndex, const c
 struct StatsAccumulator::Stats {
     std::map<std::string, int64_t> counters;
     std::map<std::string, int64_t> memoryCounters;
-    template <typename T>
-    struct Distribution {
+    template <typename T> struct Distribution {
         int64_t count = 0;
         T min = std::numeric_limits<T>::max();
         T max = std::numeric_limits<T>::lowest();
@@ -228,8 +274,8 @@ void StatsAccumulator::ReportRareCheck(const char *condition, Float maxFrequency
     rc.total += total;
 }
 
-void StatsAccumulator::ReportIntDistribution(const char *name, int64_t sum, int64_t count,
-                                             int64_t min, int64_t max) {
+void StatsAccumulator::ReportIntDistribution(const char *name, int64_t sum,
+                                             int64_t count, int64_t min, int64_t max) {
     Stats::Distribution<int64_t> &distrib = stats->intDistributions[name];
     distrib.sum += sum;
     distrib.count += count;
@@ -256,9 +302,8 @@ void StatsAccumulator::AccumulatePixelStats(const PixelStatsAccumulator &accum) 
 
     for (int y = 0; y < stats->pixelTime.Resolution().y; ++y)
         for (int x = 0; x < stats->pixelTime.Resolution().x; ++x)
-            stats->pixelTime.SetChannel({x, y}, 0,
-                                        (stats->pixelTime.GetChannel({x, y}, 0) +
-                                         accum.stats->time.GetChannel({x, y}, 0)));
+            stats->pixelTime.SetChannel({x, y}, 0, (stats->pixelTime.GetChannel({x, y}, 0) +
+                                                    accum.stats->time.GetChannel({x, y}, 0)));
 
     if (stats->pixelCounterImages.size() < accum.stats->counterImages.size()) {
         stats->pixelCounterImages.resize(accum.stats->counterImages.size());
@@ -281,9 +326,8 @@ void StatsAccumulator::AccumulatePixelStats(const PixelStatsAccumulator &accum) 
             accumImage = Image(PixelFormat::Float, threadImage.Resolution(), {"count"});
         for (int y = 0; y < threadImage.Resolution().y; ++y)
             for (int x = 0; x < threadImage.Resolution().x; ++x)
-                accumImage.SetChannel({x, y}, 0,
-                                      (accumImage.GetChannel({x, y}, 0) +
-                                       threadImage.GetChannel({x, y}, 0)));
+                accumImage.SetChannel({x, y}, 0, (accumImage.GetChannel({x, y}, 0) +
+                                                  threadImage.GetChannel({x, y}, 0)));
     }
     for (size_t i = 0; i < accum.stats->ratioImages.size(); ++i) {
         if (stats->pixelRatioNames[i].empty())
@@ -298,18 +342,15 @@ void StatsAccumulator::AccumulatePixelStats(const PixelStatsAccumulator &accum) 
                                {"numerator", "denominator", "ratio"});
         for (int y = 0; y < threadImage.Resolution().y; ++y)
             for (int x = 0; x < threadImage.Resolution().x; ++x) {
-                accumImage.SetChannel({x, y}, 0,
-                                      (accumImage.GetChannel({x, y}, 0) +
-                                       threadImage.GetChannel({x, y}, 0)));
-                accumImage.SetChannel({x, y}, 1,
-                                      (accumImage.GetChannel({x, y}, 1) +
-                                       threadImage.GetChannel({x, y}, 1)));
+                accumImage.SetChannel({x, y}, 0, (accumImage.GetChannel({x, y}, 0) +
+                                                  threadImage.GetChannel({x, y}, 0)));
+                accumImage.SetChannel({x, y}, 1, (accumImage.GetChannel({x, y}, 1) +
+                                                  threadImage.GetChannel({x, y}, 1)));
                 if (accumImage.GetChannel({x, y}, 0) == 0)
                     accumImage.SetChannel({x, y}, 2, 0.f);
                 else
-                    accumImage.SetChannel({x, y}, 2,
-                                          (accumImage.GetChannel({x, y}, 0) /
-                                           accumImage.GetChannel({x, y}, 1)));
+                    accumImage.SetChannel({x, y}, 2, (accumImage.GetChannel({x, y}, 0) /
+                                                      accumImage.GetChannel({x, y}, 1)));
             }
     }
 }
@@ -318,13 +359,9 @@ void PrintStats(FILE *dest) {
     statsAccumulator.Print(dest);
 }
 
-bool PrintCheckRare(FILE *dest) {
-    return statsAccumulator.PrintCheckRare(dest);
-}
+bool PrintCheckRare(FILE *dest) { return statsAccumulator.PrintCheckRare(dest); }
 
-void ClearStats() {
-    statsAccumulator.Clear();
-}
+void ClearStats() { statsAccumulator.Clear(); }
 
 static void getCategoryAndTitle(const std::string &str, std::string *category,
                                 std::string *title) {
@@ -343,87 +380,85 @@ void StatsAccumulator::Print(FILE *dest) {
     std::map<std::string, std::vector<std::string>> toPrint;
 
     for (auto &counter : stats->counters) {
-        if (counter.second == 0)
-            continue;
+        if (counter.second == 0) continue;
         std::string category, title;
         getCategoryAndTitle(counter.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s               %12" PRIu64, title, counter.second));
+        toPrint[category].push_back(StringPrintf(
+            "%-42s               %12" PRIu64, title, counter.second));
     }
 
     size_t totalMemoryReported = 0;
     auto printBytes = [](size_t bytes) -> std::string {
         float kb = (double)bytes / 1024.;
-        if (std::abs(kb) < 1024.)
-            return StringPrintf("%9.2f kB", kb);
+        if (std::abs(kb) < 1024.) return StringPrintf("%9.2f kB", kb);
 
         float mib = kb / 1024.;
-        if (std::abs(mib) < 1024.)
-            return StringPrintf("%9.2f MiB", mib);
+        if (std::abs(mib) < 1024.) return StringPrintf("%9.2f MiB", mib);
 
         float gib = mib / 1024.;
         return StringPrintf("%9.2f GiB", gib);
     };
 
     for (auto &counter : stats->memoryCounters) {
-        if (counter.second == 0)
-            continue;
+        if (counter.second == 0) continue;
         totalMemoryReported += counter.second;
 
         std::string category, title;
         getCategoryAndTitle(counter.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s                  %s", title, printBytes(counter.second)));
+        toPrint[category].push_back(StringPrintf(
+            "%-42s                  %s", title,
+            printBytes(counter.second)));
     }
     int64_t unreportedBytes = GetCurrentRSS() - totalMemoryReported;
     if (unreportedBytes > 0)
-        toPrint["Memory"].push_back(StringPrintf("%-42s                  %s",
-                                                 "Unreported / unused",
-                                                 printBytes(unreportedBytes)));
+        toPrint["Memory"].push_back(StringPrintf(
+            "%-42s                  %s", "Unreported / unused",
+            printBytes(unreportedBytes)));
 
     for (auto &distrib : stats->intDistributions) {
         const std::string &name = distrib.first;
-        if (distrib.second.count == 0)
-            continue;
+        if (distrib.second.count == 0) continue;
         std::string category, title;
         getCategoryAndTitle(name, &category, &title);
-        double avg = (double)distrib.second.sum / (double)distrib.second.count;
-        toPrint[category].push_back(StringPrintf(
-            "%-42s                      %.3f avg [range %" PRIu64 " - %" PRIu64 "]",
-            title, avg, distrib.second.min, distrib.second.max));
+        double avg = (double)distrib.second.sum /
+            (double)distrib.second.count;
+        toPrint[category].push_back(
+            StringPrintf("%-42s                      %.3f avg [range %" PRIu64
+                         " - %" PRIu64 "]",
+                         title, avg, distrib.second.min,
+                         distrib.second.max));
     }
     for (auto &distrib : stats->floatDistributions) {
         const std::string &name = distrib.first;
-        if (distrib.second.count == 0)
-            continue;
+        if (distrib.second.count == 0) continue;
         std::string category, title;
         getCategoryAndTitle(name, &category, &title);
-        double avg = (double)distrib.second.sum / (double)distrib.second.count;
+        double avg = (double)distrib.second.sum /
+            (double)distrib.second.count;
         toPrint[category].push_back(
-            StringPrintf("%-42s                      %.3f avg [range %f - %f]", title,
-                         avg, distrib.second.min, distrib.second.max));
+            StringPrintf("%-42s                      %.3f avg [range %f - %f]",
+                         title, avg, distrib.second.min,
+                         distrib.second.max));
     }
     for (auto &percentage : stats->percentages) {
-        if (percentage.second.second == 0)
-            continue;
+        if (percentage.second.second == 0) continue;
         int64_t num = percentage.second.first;
         int64_t denom = percentage.second.second;
         std::string category, title;
         getCategoryAndTitle(percentage.first, &category, &title);
         toPrint[category].push_back(
-            StringPrintf("%-42s%12" PRIu64 " / %12" PRIu64 " (%.2f%%)", title, num, denom,
-                         (100.f * num) / denom));
+            StringPrintf("%-42s%12" PRIu64 " / %12" PRIu64 " (%.2f%%)",
+                         title, num, denom, (100.f * num) / denom));
     }
     for (auto &ratio : stats->ratios) {
-        if (ratio.second.second == 0)
-            continue;
+        if (ratio.second.second == 0) continue;
         int64_t num = ratio.second.first;
         int64_t denom = ratio.second.second;
         std::string category, title;
         getCategoryAndTitle(ratio.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s%12" PRIu64 " / %12" PRIu64 " (%.2fx)", title, num, denom,
-                         (double)num / (double)denom));
+        toPrint[category].push_back(StringPrintf(
+            "%-42s%12" PRIu64 " / %12" PRIu64 " (%.2fx)", title, num,
+            denom, (double)num / (double)denom));
     }
 
     for (auto &categories : toPrint) {
@@ -442,10 +477,10 @@ void StatsAccumulator::WritePixelImages() const {
     CHECK(stats->pixelTime.Write(pixelStatsBaseName + "-time.exr"));
 
     for (size_t i = 0; i < stats->pixelCounterImages.size(); ++i) {
-        std::string n = pixelStatsBaseName + "-" + stats->pixelCounterNames[i] + ".exr";
+        std::string n = pixelStatsBaseName + "-" +
+            stats->pixelCounterNames[i] + ".exr";
         for (size_t j = 0; j < n.size(); ++j)
-            if (n[j] == '/')
-                n[j] = '_';
+            if (n[j] == '/') n[j] = '_';
 
         auto AllZero = [](const Image &im) {
             for (int y = 0; y < im.Resolution().y; ++y)
@@ -459,10 +494,10 @@ void StatsAccumulator::WritePixelImages() const {
     }
 
     for (size_t i = 0; i < stats->pixelRatioImages.size(); ++i) {
-        std::string n = pixelStatsBaseName + "-" + stats->pixelRatioNames[i] + ".exr";
+        std::string n = pixelStatsBaseName + "-" +
+            stats->pixelRatioNames[i] + ".exr";
         for (size_t j = 0; j < n.size(); ++j)
-            if (n[j] == '/')
-                n[j] = '_';
+            if (n[j] == '/') n[j] = '_';
 
         auto AllZero = [](const Image &im) {
             for (int y = 0; y < im.Resolution().y; ++y)
@@ -483,9 +518,7 @@ bool StatsAccumulator::PrintCheckRare(FILE *dest) {
         Float trueFreq = double(rc.numTrue) / double(rc.total);
         Float varianceEstimate = 1 / double(rc.total - 1) * trueFreq * (1 - trueFreq);
         if (trueFreq - 2 * varianceEstimate >= rc.maxFrequency) {
-            fprintf(dest,
-                    "%s @ %.9g failures was %fx over limit %.9g (%" PRId64
-                    " samples, sigma est %.9g)\n",
+            fprintf(dest, "%s @ %.9g failures was %fx over limit %.9g (%" PRId64 " samples, sigma est %.9g)\n",
                     iter.first.c_str(), trueFreq, trueFreq / rc.maxFrequency,
                     rc.maxFrequency, rc.total, varianceEstimate);
             anyFailed = true;

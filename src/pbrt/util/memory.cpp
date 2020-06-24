@@ -1,33 +1,56 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 
 // util/memory.cpp*
 #include <pbrt/util/memory.h>
-
-#include <pbrt/util/check.h>
 #include <pbrt/util/print.h>
 
 #include <cstdlib>
 #ifdef PBRT_HAVE_MALLOC_H
-#include <malloc.h>  // for both memalign and _aligned_malloc
+  #include <malloc.h>  // for both memalign and _aligned_malloc
 #endif
 #ifdef PBRT_IS_WINDOWS
-#include <psapi.h>
-#include <windows.h>
-#pragma comment(lib, "psapi.lib")
-#endif  // PBRT_IS_WINDOWS
+  #include <windows.h>
+  #include <psapi.h>
+  #pragma comment(lib, "psapi.lib")
+#endif // PBRT_IS_WINDOWS
 #ifdef PBRT_IS_LINUX
-#include <unistd.h>
-#include <cstdio>
-#endif  // PBRT_IS_LINUX
+  #include <cstdio>
+  #include <unistd.h>
+#endif // PBRT_IS_LINUX
 #ifdef PBRT_IS_OSX
-#include <mach/mach.h>
-#endif  // PBRT_IS_OSX
-
-#if defined(PBRT_BUILD_GPU_RENDERER)
-#include <cuda_runtime.h>
-#endif
+  #include <mach/mach.h>
+#endif // PBRT_IS_OSX
 
 namespace pbrt {
 
@@ -39,8 +62,7 @@ void *AllocAligned(size_t size, int alignment) {
     void *ptr;
     if (alignment < sizeof(void *))
         return malloc(size);
-    if (posix_memalign(&ptr, alignment, size) != 0)
-        ptr = nullptr;
+    if (posix_memalign(&ptr, alignment, size) != 0) ptr = nullptr;
     return ptr;
 #else
     return memalign(alignment, size);
@@ -48,8 +70,7 @@ void *AllocAligned(size_t size, int alignment) {
 }
 
 void FreeAligned(void *ptr) {
-    if (ptr == nullptr)
-        return;
+    if (ptr == nullptr) return;
 #if defined(PBRT_HAVE__ALIGNED_MALLOC)
     _aligned_free(ptr);
 #else
@@ -57,86 +78,31 @@ void FreeAligned(void *ptr) {
 #endif
 }
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+std::string MemoryArena::ToString() const {
+    auto str = [](const MemoryBlock &b) {
+        return StringPrintf("[ MemoryBlock ptr: %p size: %d ]", b.ptr.get(), b.size);
+    };
+    std::string s = StringPrintf("[ MemoryArena blockSize: %d currentBlock: %s currentBlockPos: %d ",
+                                 blockSize, str(currentBlock).c_str(), currentBlockPos);
+    s += "usedBlocks: ";
+    for (const MemoryBlock &block : usedBlocks)
+        s += str(block);
+    s += "availableBlocks: ";
+    for (const MemoryBlock &block : availableBlocks)
+        s += str(block);
+    s += " ]";
+    return s;
 
-void *CUDAMemoryResource::do_allocate(size_t size, size_t alignment) {
-    void *ptr;
-    CUDA_CHECK(cudaMallocManaged(&ptr, size));
-    CHECK_EQ(0, intptr_t(ptr) % alignment);
-    return ptr;
 }
 
-void CUDAMemoryResource::do_deallocate(void *p, size_t bytes, size_t alignment) {
-    CUDA_CHECK(cudaFree(p));
+namespace detail {
+
+std::string MemoryPoolToString(int maxAlloc, size_t poolSize) {
+    return StringPrintf("[ MemoryPool maxAlloc: %d  pool.size(): %d ]",
+                        maxAlloc, poolSize);
 }
 
-void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
-    std::lock_guard<std::mutex> lock(mutex);
-
-    // GPU cache line alignment to avoid false sharing...
-    alignment = std::max<size_t>(128, alignment);
-
-    if (bypassSlab(size))
-        return cudaAllocate(size, alignment);
-
-    if ((slabOffset % alignment) != 0)
-        slabOffset += alignment - (slabOffset % alignment);
-
-    if (slabOffset + size > slabSize) {
-        currentSlab = (uint8_t *)cudaAllocate(slabSize, alignof(std::max_align_t));
-        slabOffset = 0;
-    }
-
-    uint8_t *ptr = currentSlab + slabOffset;
-    slabOffset += size;
-    return ptr;
-}
-
-void *CUDATrackedMemoryResource::cudaAllocate(size_t size, size_t alignment) {
-    void *ptr;
-    CUDA_CHECK(cudaMallocManaged(&ptr, size));
-    DCHECK_EQ(0, intptr_t(ptr) % alignment);
-
-    allocations[ptr] = size;
-    bytesAllocated += size;
-    return ptr;
-}
-
-void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t alignment) {
-    if (!p)
-        return;
-
-    if (bypassSlab(size)) {
-        CUDA_CHECK(cudaFree(p));
-
-        std::lock_guard<std::mutex> lock(mutex);
-        auto iter = allocations.find(p);
-        DCHECK(iter != allocations.end());
-        allocations.erase(iter);
-        bytesAllocated -= size;
-    } else
-        LOG_VERBOSE("Ignoring dealloc of %d bytes", size);
-}
-
-void CUDATrackedMemoryResource::PrefetchToGPU() const {
-    int deviceIndex;
-    CUDA_CHECK(cudaGetDevice(&deviceIndex));
-
-    LOG_VERBOSE("Prefetching %d allocations to GPU memory", allocations.size());
-    size_t bytes = 0;
-    for (auto iter : allocations) {
-        CUDA_CHECK(
-            cudaMemPrefetchAsync(iter.first, iter.second, deviceIndex, 0 /* stream */));
-        bytes += iter.second;
-    }
-    CUDA_CHECK(cudaDeviceSynchronize());
-    LOG_VERBOSE("Done prefetching: %d bytes total", bytes);
-}
-
-static CUDATrackedMemoryResource cudaTrackedMemoryResource;
-Allocator gpuMemoryAllocator(&cudaTrackedMemoryResource);
-
-#endif  // PBRT_BUILD_GPU_RENDERER
+} // namespace detail
 
 /*
  * Author:  David Robert Nadeau
@@ -147,7 +113,8 @@ Allocator gpuMemoryAllocator(&cudaTrackedMemoryResource);
  * Returns the current resident set size (physical memory use) measured
  * in bytes, or zero if the value cannot be determined on this OS.
  */
-size_t GetCurrentRSS() {
+size_t GetCurrentRSS()
+{
 #ifdef PBRT_IS_WINDOWS
     PROCESS_MEMORY_COUNTERS info;
     GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
@@ -155,9 +122,9 @@ size_t GetCurrentRSS() {
 #elif defined(PBRT_IS_OSX)
     struct mach_task_basic_info info;
     mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
-    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info,
-                  &infoCount) != KERN_SUCCESS)
-        return (size_t)0L; /* Can't access? */
+    if ( task_info( mach_task_self( ), MACH_TASK_BASIC_INFO,
+        (task_info_t)&info, &infoCount ) != KERN_SUCCESS )
+        return (size_t)0L;      /* Can't access? */
     return (size_t)info.resident_size;
 
 #elif defined(PBRT_IS_LINUX)
@@ -175,7 +142,7 @@ size_t GetCurrentRSS() {
     }
     fclose(fp);
     return (size_t)rss * (size_t)sysconf(_SC_PAGESIZE);
-#elif defined(PBRT_IS_GPU_CODE)
+#elif defined(__CUDA_ARCH__)
     return 0;
 #else
 #error "TODO: implement GetCurrentRSS() for this target"

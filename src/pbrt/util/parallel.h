@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -30,25 +58,25 @@ namespace pbrt {
 class AtomicFloat {
   public:
     // AtomicFloat Public Methods
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     explicit AtomicFloat(float v = 0) {
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
         value = v;
 #else
         bits = FloatToBits(v);
 #endif
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     operator float() const {
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
         return value;
 #else
         return BitsToFloat(bits);
 #endif
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float operator=(float v) {
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
         value = v;
         return value;
 #else
@@ -56,9 +84,9 @@ class AtomicFloat {
         return v;
 #endif
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void Add(float v) {
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
         atomicAdd(&value, v);
 #else
         FloatBits oldBits = bits, newBits;
@@ -72,7 +100,7 @@ class AtomicFloat {
 
   private:
     // AtomicFloat Private Data
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
     float value;
 #else
     std::atomic<FloatBits> bits;
@@ -82,7 +110,7 @@ class AtomicFloat {
 class AtomicDouble {
   public:
     // AtomicDouble Public Methods
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     explicit AtomicDouble(double v = 0) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         value = v;
@@ -91,7 +119,7 @@ class AtomicDouble {
 #endif
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     operator double() const {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         return value;
@@ -100,7 +128,7 @@ class AtomicDouble {
 #endif
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     double operator=(double v) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         value = v;
@@ -111,7 +139,7 @@ class AtomicDouble {
 #endif
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     void Add(double v) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         atomicAdd(&value, v);
@@ -145,38 +173,46 @@ class AtomicDouble {
 };
 
 class Barrier {
-  public:
-    explicit Barrier(int n) : numToBlock(n), numToExit(n) {}
+public:
+    explicit Barrier(int n) : numToBlock(n), numToExit(n) { }
 
-    Barrier(const Barrier &) = delete;
-    Barrier &operator=(const Barrier &) = delete;
+    Barrier(const Barrier&) = delete;
+    Barrier& operator=(const Barrier&) = delete;
 
     // All block. Returns true to only one thread (which should delete the
     // barrier).
     bool Block();
 
-  private:
+private:
     std::mutex mutex;
     std::condition_variable cv;
     int numToBlock, numToExit;
 };
 
-void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func);
+void ParallelFor(int64_t start, int64_t end,
+                 std::function<void(int64_t, int64_t)> func,
+                 const char *progressName = nullptr);
 
-inline void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t)> func) {
+inline void ParallelFor(int64_t start, int64_t end,
+                        std::function<void(int64_t)> func,
+                        const char *progressName = nullptr) {
     ParallelFor(start, end, [&func](int64_t start, int64_t end) {
         for (int64_t i = start; i < end; ++i)
             func(i);
-    });
+    }, progressName);
 }
 
-void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func);
+void ParallelFor2D(const Bounds2i &extent,
+                   std::function<void(Bounds2i)> func,
+                   const char *progressName = nullptr);
 
-inline void ParallelFor2D(const Bounds2i &extent, std::function<void(Point2i)> func) {
+inline void ParallelFor2D(const Bounds2i &extent,
+                          std::function<void(Point2i)> func,
+                          const char *progressName = nullptr) {
     ParallelFor2D(extent, [&func](Bounds2i b) {
         for (Point2i p : b)
             func(p);
-    });
+    }, progressName);
 }
 
 void ForEachThread(std::function<void(void)> func);

@@ -404,9 +404,11 @@ bool CyHair::ToCubicBezierCurves(std::vector<float> *vertices,
 #include <vector>
 
 int main(int argc, char *argv[]) {
-    if (argc <= 2 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
-        fprintf(stderr, "usage: cyhair2pbrt [CyHair filename] [pbrt output filename] "
-                        "(max strands) (thickness)\n");
+    if (argc <= 2 || strcmp(argv[1], "--help") == 0 ||
+        strcmp(argv[1], "-h") == 0) {
+        fprintf(stderr,
+                "usage: cyhair2pbrt [CyHair filename] [pbrt output filename] "
+                "(max strands) (thickness)\n");
         return EXIT_FAILURE;
     }
 
@@ -437,8 +439,9 @@ int main(int argc, char *argv[]) {
     std::vector<float> radiuss;
     const float vertex_scale[3] = {1.0f, 1.0f, 1.0f};
     const float vertex_translate[3] = {0.0f, 0.0f, 0.0f};
-    ret = hair.ToCubicBezierCurves(&points, &radiuss, vertex_scale, vertex_translate,
-                                   max_strands, user_thickness);
+    ret =
+        hair.ToCubicBezierCurves(&points, &radiuss, vertex_scale,
+                                 vertex_translate, max_strands, user_thickness);
     if (!ret) {
         fprintf(stderr, "Failed to convert CyHair data\n");
         return EXIT_FAILURE;
@@ -448,21 +451,27 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < points.size() / 3; ++i) {
         const double thickness = static_cast<double>(radiuss[i]);
         for (size_t c = 0; c < 3; ++c) {
-            bounds[0][c] = std::min(bounds[0][c],
-                                    static_cast<double>(points[3 * i + c]) - thickness);
-            bounds[1][c] = std::max(bounds[1][c],
-                                    static_cast<double>(points[3 * i + c]) + thickness);
+            bounds[0][c] =
+                std::min(bounds[0][c],
+                         static_cast<double>(points[3 * i + c]) - thickness);
+            bounds[1][c] =
+                std::max(bounds[1][c],
+                         static_cast<double>(points[3 * i + c]) + thickness);
         }
     }
     fprintf(f, "# Converted from \"%s\" by cyhair2pbrt\n", argv[1]);
     fprintf(f, "# The number of strands = %d. user_thickness = %f\n",
-            static_cast<int>(radiuss.size() / 4), static_cast<double>(user_thickness));
-    fprintf(f, "# Scene bounds: (%f, %f, %f) - (%f, %f, %f)\n\n\n", bounds[0][0],
-            bounds[0][1], bounds[0][2], bounds[1][0], bounds[1][1], bounds[1][2]);
+            static_cast<int>(radiuss.size() / 4),
+            static_cast<double>(user_thickness));
+    fprintf(f, "# Scene bounds: (%f, %f, %f) - (%f, %f, %f)\n\n\n",
+            bounds[0][0], bounds[0][1], bounds[0][2], bounds[1][0],
+            bounds[1][1], bounds[1][2]);
 
     const size_t num_curves = radiuss.size() / 4;
     for (size_t i = 0; i < num_curves; i++) {
-        fprintf(f, R"(Shape "curve" "string type" [ "cylinder" ] "point3 P" [ )");
+        fprintf(
+            f,
+            R"(Shape "curve" "string type" [ "cylinder" ] "point3 P" [ )");
         for (size_t j = 0; j < 12; j++) {
             fprintf(f, "%f ", static_cast<double>(points[12 * i + j]));
         }
@@ -471,10 +480,10 @@ int main(int argc, char *argv[]) {
                 static_cast<double>(radiuss[4 * i + 3]));
     }
 
-    if (f != stdout)
-        fclose(f);
+    if (f != stdout) fclose(f);
 
-    fprintf(stderr, "Converted %d strands.\n", static_cast<int>(radiuss.size() / 4));
+    fprintf(stderr, "Converted %d strands.\n",
+            static_cast<int>(radiuss.size() / 4));
 
     return EXIT_SUCCESS;
 }

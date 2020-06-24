@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,7 +41,7 @@
 // samplers/halton.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/sampler.h>
+#include <pbrt/base.h>
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/util/bluenoise.h>
@@ -23,8 +51,9 @@
 #include <pbrt/util/math.h>
 #include <pbrt/util/pmj02tables.h>
 #include <pbrt/util/primes.h>
-#include <pbrt/util/pstd.h>
 #include <pbrt/util/rng.h>
+#include <pbrt/util/profile.h>
+#include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
 
 #include <limits>
@@ -41,14 +70,14 @@ class alignas(128) HaltonSampler {
                   pstd::vector<DigitPermutation> *digitPermutations = nullptr,
                   Allocator alloc = {});
 
-    static HaltonSampler *Create(const ParameterDictionary &parameters,
-                                 const Point2i &fullResolution, const FileLoc *loc,
-                                 Allocator alloc);
+    static HaltonSampler *Create(const ParameterDictionary &dict,
+                                 const Point2i &fullResolution,
+                                 const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return samplesPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int index) {
         if (p != pixel)
             // Compute Halton sample offset for _currentPixel_
@@ -63,7 +92,7 @@ class alignas(128) HaltonSampler {
         rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
         if (dimension >= PrimeTableSize)
             return rng.Uniform<Float>();
@@ -76,7 +105,7 @@ class alignas(128) HaltonSampler {
                                        (*digitPermutations)[dim]);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D() {
         if (dimension == 0) {
             dimension += 2;
@@ -94,9 +123,6 @@ class alignas(128) HaltonSampler {
         }
     }
 
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
-
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
@@ -105,8 +131,8 @@ class alignas(128) HaltonSampler {
     pstd::vector<DigitPermutation> *digitPermutations;
 
     HaltonPixelIndexer haltonPixelIndexer;
-    Point2i pixel =
-        Point2i(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
+    Point2i pixel = Point2i(std::numeric_limits<int>::max(),
+                            std::numeric_limits<int>::max());
     int sampleIndex = 0;
     int dimension = 0;
     int samplesPerPixel;
@@ -114,76 +140,82 @@ class alignas(128) HaltonSampler {
     RNG rng;  // If we run out of dimensions..
 };
 
+
 // PaddedSobolSampler Declarations
 class alignas(128) PaddedSobolSampler {
   public:
     // PaddedSobolSampler Public Methods
     PaddedSobolSampler(int samplesPerPixel, RandomizeStrategy randomizeStrategy);
 
-    static PaddedSobolSampler *Create(const ParameterDictionary &parameters,
-                                      const FileLoc *loc, Allocator alloc);
+    static PaddedSobolSampler *Create(const ParameterDictionary &dict, const FileLoc *loc,
+                                      Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return samplesPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int index) {
         pixel = p;
         sampleIndex = index;
         dimension = 0;
-
-        rng.SetSequence(p.x + p.y * 65536);
-        rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                ((uint64_t)pixel.y << 32) ^
+                                ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                );
         int dim = dimension++;
 
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
-            return SampleGeneratorMatrix(
-                CVanDerCorput, index,
-                CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y)));
+            return SampleGeneratorMatrix(CVanDerCorput, index,
+                                         CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y)));
         else
             return generateSample(CVanDerCorput, index, hash >> 32);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D() {
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                ((uint64_t)pixel.y << 32) ^
+                                ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                );
         int dim = dimension;
         dimension += 2;
 
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
-            return {SampleGeneratorMatrix(
-                        CSobol[0], index,
-                        CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y))),
-                    SampleGeneratorMatrix(
-                        CSobol[1], index,
-                        CranleyPattersonRotator(BlueNoise(dim + 1, pixel.x, pixel.y)))};
+            return {SampleGeneratorMatrix(CSobol[0], index,
+                                          CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y))),
+                    SampleGeneratorMatrix(CSobol[1], index,
+                                          CranleyPattersonRotator(BlueNoise(dim + 1, pixel.x, pixel.y)))};
         else
             // Note: we're reusing the low 32 bits of the hash both for the
             // permutation and for the random scrambling in the first
             // dimension. This should(?) be fine.
-            return {generateSample(CSobol[0], index, hash >> 8),
-                    generateSample(CSobol[1], index, hash >> 32)};
+            return {generateSample(CSobol[0], index, hash >> 8), generateSample(CSobol[1], index, hash >> 32)};
     }
 
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
   private:
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Float generateSample(pstd::span<const uint32_t> C, uint32_t a, uint32_t hash) const {
         switch (randomizeStrategy) {
         case RandomizeStrategy::None:
@@ -204,7 +236,6 @@ class alignas(128) PaddedSobolSampler {
     int samplesPerPixel;
 
     RandomizeStrategy randomizeStrategy;
-    RNG rng;
 };
 
 class alignas(128) PMJ02BNSampler {
@@ -212,38 +243,41 @@ class alignas(128) PMJ02BNSampler {
     // PMJ02BNSampler Public Methods
     PMJ02BNSampler(int samplesPerPixel, Allocator alloc = {});
 
-    static PMJ02BNSampler *Create(const ParameterDictionary &parameters,
-                                  const FileLoc *loc, Allocator alloc);
+    static PMJ02BNSampler *Create(const ParameterDictionary &dict, const FileLoc *loc,
+                                  Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return samplesPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int index) {
         pixel = p;
         sampleIndex = index;
         dimension = 0;
         pmjInstance = 0;
-
-        rng.SetSequence(p.x + p.y * 65536);
-        rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                ((uint64_t)pixel.y << 32) ^
+                                ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                );
 
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
         Float cpOffset = BlueNoise(dimension, pixel.x, pixel.y);
         Float u = (index + cpOffset) / samplesPerPixel;
-        if (u >= 1)
-            u -= 1;
+        if (u >= 1) u -= 1;
         ++dimension;
         return std::min(u, OneMinusEpsilon);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D() {
         // Don't start permuting until the second time through: when we
         // permute, that breaks the progressive part of the pattern and in
@@ -251,9 +285,15 @@ class alignas(128) PMJ02BNSampler {
         // we generally do well for intermediate images as well.
         int index = sampleIndex;
         if (pmjInstance >= nPMJ02bnSets) {
-            uint64_t hash =
-                MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                        ((uint64_t)dimension << 16) ^ GetOptions().seed);
+            uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                    ((uint64_t)pixel.y << 32) ^
+                                    ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                    );
             index = PermutationElement(sampleIndex, samplesPerPixel, hash);
         }
 
@@ -266,23 +306,18 @@ class alignas(128) PMJ02BNSampler {
             Vector2f cpOffset(BlueNoise(dimension, pixel.x, pixel.y),
                               BlueNoise(dimension + 1, pixel.x, pixel.y));
             Point2f u = GetPMJ02BNSample(pmjInstance++, index) + cpOffset;
-            if (u.x >= 1)
-                u.x -= 1;
-            if (u.y >= 1)
-                u.y -= 1;
+            if (u.x >= 1) u.x -= 1;
+            if (u.y >= 1) u.y -= 1;
             dimension += 2;
             return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
         }
     }
 
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
-
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
   private:
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     int pixelSampleOffset(Point2i p) const {
         DCHECK(p.x >= 0 && p.y >= 0);
         int px = p.x % pixelTileSize, py = p.y % pixelTileSize;
@@ -298,38 +333,36 @@ class alignas(128) PMJ02BNSampler {
     int pixelTileSize;
     int pmjInstance;
     pstd::vector<Point2f> *pixelSamples;
-    RNG rng;
 };
 
 class alignas(128) RandomSampler {
   public:
     RandomSampler(int samplesPerPixel, int seed = 0)
-        : samplesPerPixel(samplesPerPixel), seed(seed) {}
+        : samplesPerPixel(samplesPerPixel), seed(seed) { }
 
-    static RandomSampler *Create(const ParameterDictionary &parameters,
-                                 const FileLoc *loc, Allocator alloc);
+    static RandomSampler *Create(const ParameterDictionary &dict, const FileLoc *loc,
+                                 Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return samplesPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int pixelSample) {
         rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
         // Assume we won't use more than 64k sample dimensions in a pixel...
         rng.Advance(pixelSample * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
         // TODO: (here and elsewhere) profiling..
         return rng.Uniform<Float>();
     }
 
-    PBRT_CPU_GPU
-    Point2f Get2D() { return Point2f{rng.Uniform<Float>(), rng.Uniform<Float>()}; }
-
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
+    PBRT_HOST_DEVICE
+    Point2f Get2D() {
+        return Point2f{rng.Uniform<Float>(), rng.Uniform<Float>()};
+    }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -346,21 +379,21 @@ class alignas(128) SobolSampler {
     // SobolSampler Public Methods
     SobolSampler(int spp, const Point2i &fullResolution,
                  RandomizeStrategy randomizeStrategy)
-        : samplesPerPixel(RoundUpPow2(spp)), randomizeStrategy(randomizeStrategy) {
+        : samplesPerPixel(RoundUpPow2(spp)),
+          randomizeStrategy(randomizeStrategy) {
         if (!IsPowerOf2(spp))
             Warning("Non power-of-two sample count rounded up to %d "
                     "for SobolSampler.",
                     samplesPerPixel);
         resolution = RoundUpPow2(std::max(fullResolution.x, fullResolution.y));
     }
-    static SobolSampler *Create(const ParameterDictionary &parameters,
-                                const Point2i &fullResolution, const FileLoc *loc,
-                                Allocator alloc);
+    static SobolSampler *Create(const ParameterDictionary &dict, const Point2i &fullResolution,
+                                const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return samplesPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int index) {
         DCHECK_LT(sampleIndex, samplesPerPixel);
         pixel = p;
@@ -373,7 +406,7 @@ class alignas(128) SobolSampler {
         rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
         if (dimension >= NSobolDimensions)
             return rng.Uniform<Float>();
@@ -381,7 +414,7 @@ class alignas(128) SobolSampler {
         return sampleDimension(dimension++);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D() {
         if (dimension + 1 >= NSobolDimensions)
             return {rng.Uniform<Float>(), rng.Uniform<Float>()};
@@ -402,21 +435,19 @@ class alignas(128) SobolSampler {
         return u;
     }
 
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
-
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
   private:
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float sampleDimension(int dimension) const {
         if (dimension < 2 || randomizeStrategy == RandomizeStrategy::None)
             return SobolSample(sequenceIndex, dimension, NoRandomizer());
 
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson) {
             uint32_t hash = MixBits(dimension);
-            return SobolSample(sequenceIndex, dimension, CranleyPattersonRotator(hash));
+            return SobolSample(sequenceIndex, dimension,
+                               CranleyPattersonRotator(hash));
         } else if (randomizeStrategy == RandomizeStrategy::Xor) {
             // Only use the dimension! (Want the same scrambling over all
             // pixels).
@@ -438,11 +469,11 @@ class alignas(128) SobolSampler {
 
     int resolution;
 
-    int64_t sequenceIndex;  // offset into Sobol sequence for current sample in
-                            // current pixel
-    RNG rng;                // If we run out of dimensions..
+    int64_t sequenceIndex; // offset into Sobol sequence for current sample in current pixel
+    RNG rng;  // If we run out of dimensions..
     RandomizeStrategy randomizeStrategy;
 };
+
 
 // StratifiedSampler Declarations
 class alignas(128) StratifiedSampler {
@@ -454,13 +485,13 @@ class alignas(128) StratifiedSampler {
           jitter(jitter),
           seed(seed) {}
 
-    static StratifiedSampler *Create(const ParameterDictionary &parameters,
-                                     const FileLoc *loc, Allocator alloc);
+    static StratifiedSampler *Create(const ParameterDictionary &dict, const FileLoc *loc,
+                                     Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return xPixelSamples * yPixelSamples; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int index) {
         pixel = p;
         sampleIndex = index;
@@ -471,10 +502,17 @@ class alignas(128) StratifiedSampler {
         rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D() {
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                ((uint64_t)pixel.y << 32) ^
+                                ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                );
         ++dimension;
 
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
@@ -482,10 +520,17 @@ class alignas(128) StratifiedSampler {
         return (stratum + delta) / SamplesPerPixel();
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D() {
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^
+                                ((uint64_t)pixel.y << 32) ^
+                                ((uint64_t)dimension << 16)
+#ifdef __CUDA_ARCH__
+                                ^ PbrtOptionsGPU.seed
+#else
+                                ^ PbrtOptions.seed
+#endif
+                                );
         dimension += 2;
 
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
@@ -495,9 +540,6 @@ class alignas(128) StratifiedSampler {
         Float dy = jitter ? rng.Uniform<Float>() : 0.5f;
         return {(x + dx) / xPixelSamples, (y + dy) / yPixelSamples};
     }
-
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -526,46 +568,41 @@ class MLTSampler {
           largeStepProbability(largeStepProbability),
           streamCount(streamCount) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int SamplesPerPixel() const { return mutationsPerPixel; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartPixelSample(const Point2i &p, int sampleIndex) {
-        rng.SetSequence(p.x + p.y * 65536);
-        rng.Advance(sampleIndex * 65536);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Float Get1D();
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     Point2f Get2D();
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartIteration();
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void Accept();
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void Reject();
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void StartStream(int index);
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     int GetNextIndex() { return streamIndex + streamCount * sampleIndex++; }
 
     std::string DumpState() const;
 
-    PBRT_CPU_GPU
-    RNG &GetRNG() { return rng; }
-
     std::string ToString() const {
-        return StringPrintf(
-            "[ MLTSampler rng: %s sigma: %f largeStepProbability: %f "
-            "streamCount: %d X: %s currentIteration: %d largeStep: %s "
-            "lastLargeStepIteration: %d streamIndex: %d sampleIndex: %d ] ",
-            rng, sigma, largeStepProbability, streamCount, X, currentIteration, largeStep,
-            lastLargeStepIteration, streamIndex, sampleIndex);
+        return StringPrintf("[ MLTSampler rng: %s sigma: %f largeStepProbability: %f "
+                            "streamCount: %d X: %s currentIteration: %d largeStep: %s "
+                            "lastLargeStepIteration: %d streamIndex: %d sampleIndex: %d ] ",
+                            rng, sigma, largeStepProbability, streamCount, X,
+                            currentIteration, largeStep, lastLargeStepIteration, streamIndex,
+                            sampleIndex);
     }
 
   protected:
@@ -573,12 +610,12 @@ class MLTSampler {
     struct PrimarySample {
         Float value = 0;
         // PrimarySample Public Methods
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         void Backup() {
             valueBackup = value;
             modifyBackup = lastModificationIteration;
         }
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         void Restore() {
             value = valueBackup;
             lastModificationIteration = modifyBackup;
@@ -597,7 +634,7 @@ class MLTSampler {
     };
 
     // MLTSampler Private Methods
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void EnsureReady(int index);
 
     // MLTSampler Private Data
@@ -613,64 +650,136 @@ class MLTSampler {
 };
 
 class DebugMLTSampler : public MLTSampler {
-  public:
-    static DebugMLTSampler Create(pstd::span<const std::string> state,
-                                  int nSampleStreams);
+public:
+    static DebugMLTSampler Create(pstd::span<const std::string> state, int nSampleStreams);
 
-    PBRT_CPU_GPU
     Float Get1D() {
         int index = GetNextIndex();
         CHECK_LT(index, u.size());
-#ifdef PBRT_IS_GPU_CODE
-        return 0;
-#else
         return u[index];
-#endif
     }
 
-    PBRT_CPU_GPU
-    Point2f Get2D() { return {Get1D(), Get1D()}; }
+    Point2f Get2D() {
+        return {Get1D(), Get1D()};
+    }
 
     std::string ToString() const {
         return StringPrintf("[ DebugMLTSampler %s u: %s ]",
                             ((const MLTSampler *)this)->ToString(), u);
     }
 
-  private:
-    DebugMLTSampler(int nSampleStreams) : MLTSampler(1, 0, 0.5, 0.5, nSampleStreams) {}
+private:
+    DebugMLTSampler(int nSampleStreams)
+        : MLTSampler(1, 0, 0.5, 0.5, nSampleStreams) { }
 
     std::vector<Float> u;
 };
 
 inline void SamplerHandle::StartPixelSample(const Point2i &p, int sampleIndex) {
-    auto start = [&](auto ptr) { return ptr->StartPixelSample(p, sampleIndex); };
-    return Apply<void>(start);
+    ProfilerScope _(ProfilePhase::StartPixelSample);
+    switch (Tag()) {
+    case TypeIndex<HaltonSampler>():
+        Cast<HaltonSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<PaddedSobolSampler>():
+        Cast<PaddedSobolSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<PMJ02BNSampler>():
+        Cast<PMJ02BNSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<RandomSampler>():
+        Cast<RandomSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<SobolSampler>():
+        Cast<SobolSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<StratifiedSampler>():
+        Cast<StratifiedSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    case TypeIndex<MLTSampler>():
+        Cast<MLTSampler>()->StartPixelSample(p, sampleIndex);
+        break;
+    default:
+        LOG_FATAL("Unhandled Sampler type");
+    }
 }
 
 inline int SamplerHandle::SamplesPerPixel() const {
-    auto spp = [&](auto ptr) { return ptr->SamplesPerPixel(); };
-    return Apply<int>(spp);
+    switch (Tag()) {
+    case TypeIndex<HaltonSampler>():
+        return Cast<HaltonSampler>()->SamplesPerPixel();
+    case TypeIndex<PaddedSobolSampler>():
+        return Cast<PaddedSobolSampler>()->SamplesPerPixel();
+    case TypeIndex<PMJ02BNSampler>():
+        return Cast<PMJ02BNSampler>()->SamplesPerPixel();
+    case TypeIndex<RandomSampler>():
+        return Cast<RandomSampler>()->SamplesPerPixel();
+    case TypeIndex<SobolSampler>():
+        return Cast<SobolSampler>()->SamplesPerPixel();
+    case TypeIndex<StratifiedSampler>():
+        return Cast<StratifiedSampler>()->SamplesPerPixel();
+    case TypeIndex<MLTSampler>():
+        return Cast<MLTSampler>()->SamplesPerPixel();
+    default:
+        LOG_FATAL("Unhandled Sampler type");
+        return {};
+    }
 }
 
 inline Float SamplerHandle::Get1D() {
-    auto get = [&](auto ptr) { return ptr->Get1D(); };
-    return Apply<Float>(get);
+    ProfilerScope _(ProfilePhase::GetSample);
+    switch (Tag()) {
+    case TypeIndex<HaltonSampler>():
+        return Cast<HaltonSampler>()->Get1D();
+    case TypeIndex<PaddedSobolSampler>():
+        return Cast<PaddedSobolSampler>()->Get1D();
+    case TypeIndex<PMJ02BNSampler>():
+        return Cast<PMJ02BNSampler>()->Get1D();
+    case TypeIndex<RandomSampler>():
+        return Cast<RandomSampler>()->Get1D();
+    case TypeIndex<SobolSampler>():
+        return Cast<SobolSampler>()->Get1D();
+    case TypeIndex<StratifiedSampler>():
+        return Cast<StratifiedSampler>()->Get1D();
+    case TypeIndex<MLTSampler>():
+        return Cast<MLTSampler>()->Get1D();
+    default:
+        LOG_FATAL("Unhandled Sampler type");
+        return {};
+    }
 }
 
 inline Point2f SamplerHandle::Get2D() {
-    auto get = [&](auto ptr) { return ptr->Get2D(); };
-    return Apply<Point2f>(get);
-}
-
-inline RNG &SamplerHandle::GetRNG() {
-    auto rng = [&](auto ptr) -> RNG & { return ptr->GetRNG(); };
-    return Apply<RNG &>(rng);
+    ProfilerScope _(ProfilePhase::GetSample);
+    switch (Tag()) {
+    case TypeIndex<HaltonSampler>():
+        return Cast<HaltonSampler>()->Get2D();
+    case TypeIndex<PaddedSobolSampler>():
+        return Cast<PaddedSobolSampler>()->Get2D();
+    case TypeIndex<PMJ02BNSampler>():
+        return Cast<PMJ02BNSampler>()->Get2D();
+    case TypeIndex<RandomSampler>():
+        return Cast<RandomSampler>()->Get2D();
+    case TypeIndex<SobolSampler>():
+        return Cast<SobolSampler>()->Get2D();
+    case TypeIndex<StratifiedSampler>():
+        return Cast<StratifiedSampler>()->Get2D();
+    case TypeIndex<MLTSampler>():
+        return Cast<MLTSampler>()->Get2D();
+    default:
+        LOG_FATAL("Unhandled Sampler type");
+        return {};
+    }
 }
 
 inline CameraSample SamplerHandle::GetCameraSample(const Point2i &pPixel,
                                                    FilterHandle filter) {
     FilterSample fs = filter.Sample(Get2D());
-    if (GetOptions().disablePixelJitter) {
+#ifdef __CUDA_ARCH__
+    if (PbrtOptionsGPU.disablePixelJitter) {
+#else
+    if (PbrtOptions.disablePixelJitter) {
+#endif
         fs.p = Point2f(0, 0);
         fs.weight = 1;
     }
@@ -681,10 +790,6 @@ inline CameraSample SamplerHandle::GetCameraSample(const Point2i &pPixel,
     cs.pLens = Get2D();
     cs.weight = fs.weight;
     return cs;
-}
-
-inline int SamplerHandle::GetDiscrete1D(int n) {
-    return std::min<int>(Get1D() * n, n - 1);
 }
 
 }  // namespace pbrt

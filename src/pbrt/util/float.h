@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -19,19 +47,15 @@
 #include <limits>
 #include <string>
 
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(PBRT_IS_GPU_CODE)
-#include <cuda_fp16.h>
-#endif
-
 namespace pbrt {
 
-#ifdef PBRT_IS_GPU_CODE
+#ifdef __CUDA_ARCH__
 
 #define DoubleOneMinusEpsilon 0x1.fffffffffffffp-1
 #define FloatOneMinusEpsilon float(0x1.fffffep-1)
 
 #ifdef PBRT_FLOAT_IS_DOUBLE
-#define OneMinusEpsilon DoubleOneMinusEpsilon
+#define OneMinusEpsilon  DoubleOneMinusEpsilon
 #else
 #define OneMinusEpsilon FloatOneMinusEpsilon
 #endif
@@ -42,8 +66,13 @@ namespace pbrt {
 
 #else
 
+#ifndef PBRT_HAVE_HEX_FP_CONSTANTS
+static const double DoubleOneMinusEpsilon = 0.99999999999999989;
+static const float FloatOneMinusEpsilon = 0.99999994;
+#else
 static const double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
 static const float FloatOneMinusEpsilon = 0x1.fffffep-1;
+#endif
 
 #ifdef PBRT_FLOAT_IS_DOUBLE
 static const double OneMinusEpsilon = DoubleOneMinusEpsilon;
@@ -53,13 +82,14 @@ static const float OneMinusEpsilon = FloatOneMinusEpsilon;
 
 static constexpr Float MaxFloat = std::numeric_limits<Float>::max();
 static constexpr Float Infinity = std::numeric_limits<Float>::infinity();
-static constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5;
+static constexpr Float MachineEpsilon =
+    std::numeric_limits<Float>::epsilon() * 0.5;
 
-#endif  // PBRT_IS_GPU_CODE
+#endif // __CUDA_ARCH__
 
-PBRT_CPU_GPU
-inline uint32_t FloatToBits(float f) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_HOST_DEVICE_INLINE
+uint32_t FloatToBits(float f) {
+#ifdef __CUDA_ARCH__
     return __float_as_uint(f);
 #else
     uint32_t ui;
@@ -68,9 +98,9 @@ inline uint32_t FloatToBits(float f) {
 #endif
 }
 
-PBRT_CPU_GPU
-inline float BitsToFloat(uint32_t ui) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_HOST_DEVICE_INLINE
+float BitsToFloat(uint32_t ui) {
+#ifdef __CUDA_ARCH__
     return __uint_as_float(ui);
 #else
     float f;
@@ -79,9 +109,9 @@ inline float BitsToFloat(uint32_t ui) {
 #endif
 }
 
-PBRT_CPU_GPU
-inline uint64_t FloatToBits(double f) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_HOST_DEVICE_INLINE
+uint64_t FloatToBits(double f) {
+#ifdef __CUDA_ARCH__
     return __double_as_longlong(f);
 #else
     uint64_t ui;
@@ -90,9 +120,9 @@ inline uint64_t FloatToBits(double f) {
 #endif
 }
 
-PBRT_CPU_GPU
-inline double BitsToFloat(uint64_t ui) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_HOST_DEVICE_INLINE
+double BitsToFloat(uint64_t ui) {
+#ifdef __CUDA_ARCH__
     return __longlong_as_double(ui);
 #else
     double f;
@@ -101,13 +131,11 @@ inline double BitsToFloat(uint64_t ui) {
 #endif
 }
 
-PBRT_CPU_GPU
-inline float NextFloatUp(float v, int delta = 1) {
+PBRT_HOST_DEVICE_INLINE
+float NextFloatUp(float v, int delta = 1) {
     // Handle infinity and negative zero for _NextFloatUp()_
-    if (std::isinf(v) && v > 0.)
-        return v;
-    if (v == -0.f)
-        v = 0.f;
+    if (std::isinf(v) && v > 0.) return v;
+    if (v == -0.f) v = 0.f;
 
     // Advance _v_ to next higher float
     uint32_t ui = FloatToBits(v);
@@ -118,13 +146,11 @@ inline float NextFloatUp(float v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-PBRT_CPU_GPU
-inline float NextFloatDown(float v, int delta = 1) {
+PBRT_HOST_DEVICE_INLINE
+float NextFloatDown(float v, int delta = 1) {
     // Handle infinity and positive zero for _NextFloatDown()_
-    if (std::isinf(v) && v < 0.)
-        return v;
-    if (v == 0.f)
-        v = -0.f;
+    if (std::isinf(v) && v < 0.) return v;
+    if (v == 0.f) v = -0.f;
     uint32_t ui = FloatToBits(v);
     if (v > 0)
         ui -= delta;
@@ -133,12 +159,10 @@ inline float NextFloatDown(float v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-PBRT_CPU_GPU
-inline double NextFloatUp(double v, int delta = 1) {
-    if (std::isinf(v) && v > 0.)
-        return v;
-    if (v == -0.f)
-        v = 0.f;
+PBRT_HOST_DEVICE_INLINE
+double NextFloatUp(double v, int delta = 1) {
+    if (std::isinf(v) && v > 0.) return v;
+    if (v == -0.f) v = 0.f;
     uint64_t ui = FloatToBits(v);
     if (v >= 0.)
         ui += delta;
@@ -147,12 +171,10 @@ inline double NextFloatUp(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-PBRT_CPU_GPU
-inline double NextFloatDown(double v, int delta = 1) {
-    if (std::isinf(v) && v < 0.)
-        return v;
-    if (v == 0.f)
-        v = -0.f;
+PBRT_HOST_DEVICE_INLINE
+double NextFloatDown(double v, int delta = 1) {
+    if (std::isinf(v) && v < 0.) return v;
+    if (v == 0.f) v = -0.f;
     uint64_t ui = FloatToBits(v);
     if (v > 0.)
         ui -= delta;
@@ -161,49 +183,49 @@ inline double NextFloatDown(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-PBRT_CPU_GPU
-inline int Exponent(float v) {
+PBRT_HOST_DEVICE_INLINE
+int Exponent(float v) {
     return (FloatToBits(v) >> 23) - 127;
 }
 
-PBRT_CPU_GPU
-inline int Significand(float v) {
+PBRT_HOST_DEVICE_INLINE
+int Significand(float v) {
     return FloatToBits(v) & ((1 << 23) - 1);
 }
 
-PBRT_CPU_GPU
-inline int Exponent(double d) {
+PBRT_HOST_DEVICE_INLINE
+int Exponent(double d) {
     return (FloatToBits(d) >> 52) - 1023;
 }
 
-PBRT_CPU_GPU
-inline uint64_t Significand(double d) {
+PBRT_HOST_DEVICE_INLINE
+uint64_t Significand(double d) {
     return FloatToBits(d) & ((1ull << 52) - 1);
 }
 
-PBRT_CPU_GPU
-inline uint32_t SignBit(float v) {
+PBRT_HOST_DEVICE_INLINE
+uint32_t SignBit(float v) {
     return FloatToBits(v) & 0x80000000;
 }
 
-PBRT_CPU_GPU
-inline uint64_t SignBit(double v) {
+PBRT_HOST_DEVICE_INLINE
+uint64_t SignBit(double v) {
     return FloatToBits(v) & 0x8000000000000000;
 }
 
 // Return a float with |a|'s magnitude, but negated if |b| is negative.
-PBRT_CPU_GPU
-inline float FlipSign(float a, float b) {
+PBRT_HOST_DEVICE_INLINE
+float FlipSign(float a, float b) {
     return BitsToFloat(FloatToBits(a) ^ SignBit(b));
 }
 
-PBRT_CPU_GPU
-inline double FlipSign(double a, double b) {
+PBRT_HOST_DEVICE_INLINE
+double FlipSign(double a, double b) {
     return BitsToFloat(FloatToBits(a) ^ SignBit(b));
 }
 
-PBRT_CPU_GPU
-inline constexpr Float gamma(int n) {
+PBRT_HOST_DEVICE_INLINE
+constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
@@ -239,22 +261,18 @@ union FP16 {
     };
 };
 
-}  // namespace
+} // namespace
 
 class Half {
-  public:
+ public:
     Half() = default;
     Half(const Half &) = default;
     Half &operator=(const Half &) = default;
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     static Half FromBits(uint16_t v) { return Half(v); }
 
-    PBRT_CPU_GPU
     explicit Half(float ff) {
-#ifdef PBRT_IS_GPU_CODE
-        h = __half_as_ushort(__float2half(ff));
-#else
         // Rounding ties to nearest even instead of towards +inf
         FP32 f;
         f.f = ff;
@@ -274,11 +292,11 @@ class Half {
 
         if (f.u >= f16max.u)  // result is Inf or NaN (all exponent bits set)
             o.u = (f.u > f32infty.u) ? 0x7e00 : 0x7c00;  // NaN->qNaN and Inf->Inf
-        else {                                           // (De)normalized number or zero
-            if (f.u < (113 << 23)) {  // resulting FP16 is subnormal or zero
-                // use a magic value to align our 10 mantissa bits at the bottom
-                // of the float. as long as FP addition is round-to-nearest-even
-                // this just works.
+        else  { // (De)normalized number or zero
+            if (f.u < (113 << 23))  { // resulting FP16 is subnormal or zero
+                // use a magic value to align our 10 mantissa bits at the bottom of
+                // the float. as long as FP addition is round-to-nearest-even this
+                // just works.
                 f.f += denorm_magic.f;
 
                 // and one integer subtract of the bias later, we have our final
@@ -298,82 +316,62 @@ class Half {
 
         o.u |= sign >> 16;
         h = o.u;
-#endif
     }
-    PBRT_CPU_GPU
     explicit Half(double d) : Half(float(d)) {}
 
-    PBRT_CPU_GPU
     explicit operator float() const {
-#ifdef PBRT_IS_GPU_CODE
-        return __half2float(__ushort_as_half(h));
-#else
         FP16 h;
         h.u = this->h;
         static const FP32 magic = {113 << 23};
-        static const unsigned int shifted_exp = 0x7c00
-                                                << 13;  // exponent mask after shift
+        static const unsigned int shifted_exp = 0x7c00 << 13;  // exponent mask after shift
         FP32 o;
 
-        o.u = (h.u & 0x7fff) << 13;            // exponent/mantissa bits
+        o.u = (h.u & 0x7fff) << 13;    // exponent/mantissa bits
         unsigned int exp = shifted_exp & o.u;  // just the exponent
-        o.u += (127 - 15) << 23;               // exponent adjust
+        o.u += (127 - 15) << 23;       // exponent adjust
 
         // handle exponent special cases
         if (exp == shifted_exp)       // Inf/NaN?
             o.u += (128 - 16) << 23;  // extra exp adjust
-        else if (exp == 0) {          // Zero/Denormal?
-            o.u += 1 << 23;           // extra exp adjust
-            o.f -= magic.f;           // renormalize
+        else if (exp == 0) {            // Zero/Denormal?
+            o.u += 1 << 23;  // extra exp adjust
+            o.f -= magic.f;  // renormalize
         }
 
         o.u |= (h.u & 0x8000) << 16;  // sign bit
         return o.f;
-#endif
     }
-    PBRT_CPU_GPU
-    explicit operator double() const { return (float)(*this); }
+    explicit operator double() const {
+        return (float)(*this);
+    }
 
-    PBRT_CPU_GPU
     bool operator==(const Half &v) const {
-#ifdef PBRT_IS_GPU_CODE
-        return __ushort_as_half(h) == __ushort_as_half(v.h);
-#else
-        if (Bits() == v.Bits())
-            return true;
+        if (Bits() == v.Bits()) return true;
         return ((Bits() == HalfNegativeZero && v.Bits() == HalfPositiveZero) ||
                 (Bits() == HalfPositiveZero && v.Bits() == HalfNegativeZero));
-#endif
     }
-    PBRT_CPU_GPU
-    bool operator!=(const Half &v) const { return !(*this == v); }
+    bool operator!=(const Half &v) const {
+        return !(*this == v);
+    }
 
-    PBRT_CPU_GPU
     Half operator-() const { return FromBits(h ^ (1 << 15)); }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     uint16_t Bits() const { return h; }
 
-    PBRT_CPU_GPU
     int Sign() { return (h >> 15) ? -1 : 1; }
-
-    PBRT_CPU_GPU
-    bool IsInf() { return h == HalfPositiveInfinity || h == HalfNegativeInfinity; }
-
-    PBRT_CPU_GPU
+    bool IsInf() {
+        return h == HalfPositiveInfinity || h == HalfNegativeInfinity;
+    }
     bool IsNaN() {
         return ((h & HalfExponentMask) == HalfExponentMask &&
                 (h & HalfSignificandMask) != 0);
     }
-
-    PBRT_CPU_GPU
     Half NextUp() {
-        if (IsInf() && Sign() == 1)
-            return *this;
+        if (IsInf() && Sign() == 1) return *this;
 
         Half up = *this;
-        if (up.h == HalfNegativeZero)
-            up.h = HalfPositiveZero;
+        if (up.h == HalfNegativeZero) up.h = HalfPositiveZero;
         // Advance _v_ to next higher float
         if (up.Sign() >= 0)
             ++up.h;
@@ -381,15 +379,11 @@ class Half {
             --up.h;
         return up;
     }
-
-    PBRT_CPU_GPU
     Half NextDown() {
-        if (IsInf() && Sign() == -1)
-            return *this;
+        if (IsInf() && Sign() == -1) return *this;
 
         Half down = *this;
-        if (down.h == HalfPositiveZero)
-            down.h = HalfNegativeZero;
+        if (down.h == HalfPositiveZero) down.h = HalfNegativeZero;
         if (down.Sign() >= 0)
             --down.h;
         else
@@ -399,10 +393,9 @@ class Half {
 
     std::string ToString() const;
 
-  private:
-    PBRT_CPU_GPU
-    explicit Half(uint16_t h) : h(h) {}
-
+ private:
+    PBRT_HOST_DEVICE_INLINE
+    explicit Half(uint16_t h) : h(h) { }
     uint16_t h;
 };
 

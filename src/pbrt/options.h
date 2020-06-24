@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -19,47 +47,38 @@
 
 namespace pbrt {
 
-enum class RenderingCoordinateSystem { Camera, CameraWorld, World };
-
 struct BasicOptions {
     int nThreads = 0;
     int seed = 0;
     bool quickRender = false;
     bool quiet = false;
     bool recordPixelStatistics = false;
+    bool profile = false;
     bool upgrade = false;
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool forceDiffuse = false;
-    RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 
-struct ExtendedOptions : BasicOptions {
+struct Options : BasicOptions  {
     pstd::optional<int> pixelSamples;
-    pstd::optional<int> gpuDevice;
     pstd::optional<std::string> imageFile;
     pstd::optional<std::string> mseReferenceImage, mseReferenceOutput;
     pstd::optional<std::string> debugStart;
-    pstd::optional<std::string> displayServer;
     pstd::optional<Bounds2f> cropWindow;
     pstd::optional<Bounds2i> pixelBounds;
+
+    using RenderFunction = void(*)(GeneralScene &scene);
+    RenderFunction renderFunction;
 
     std::string ToString() const;
 };
 
-extern ExtendedOptions *Options;
+extern Options PbrtOptions;
 
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
-extern __constant__ BasicOptions OptionsGPU;
+#if defined(PBRT_HAVE_OPTIX) && defined(__CUDACC__)
+extern __constant__ BasicOptions PbrtOptionsGPU;
 #endif
-
-PBRT_CPU_GPU inline const BasicOptions &GetOptions() {
-#if defined(PBRT_IS_GPU_CODE)
-    return OptionsGPU;
-#else
-    return *Options;
-#endif
-}
 
 }  // namespace pbrt
 
-#endif  // PBRT_CORE_OPTIONS_H
+#endif // PBRT_CORE_OPTIONS_H

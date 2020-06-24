@@ -1,18 +1,47 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 // core/parser.cpp*
 #include <pbrt/parser.h>
 
+#include <pbrt/genscene.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
-#include <pbrt/parsedscene.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/profile.h>
 #include <pbrt/util/stats.h>
 
 #include <double-conversion/double-conversion.h>
@@ -38,44 +67,7 @@
 
 namespace pbrt {
 
-///////////////////////////////////////////////////////////////////////////
-// ParsedParameter
-
-void ParsedParameter::AddNumber(double d) {
-    CHECK(strings.empty() && bools.empty());
-    numbers.push_back(d);
-}
-
-void ParsedParameter::AddString(std::string_view str) {
-    CHECK(numbers.empty() && bools.empty());
-    strings.push_back({str.begin(), str.end()});
-}
-
-void ParsedParameter::AddBool(bool v) {
-    CHECK(numbers.empty() && strings.empty());
-    bools.push_back(v);
-}
-
-std::string ParsedParameter::ToString() const {
-    std::string str;
-    str += std::string("\"") + type + " " + name + std::string("\" [ ");
-    if (!numbers.empty())
-        for (double d : numbers)
-            str += StringPrintf("%f ", d);
-    else if (!strings.empty())
-        for (const auto &s : strings)
-            str += '\"' + s + "\" ";
-    else if (!bools.empty())
-        for (bool b : bools)
-            str += b ? "true " : "false ";
-    str += "] ";
-
-    return str;
-}
-
-SceneRepresentation::~SceneRepresentation() {}
-
-static std::string toString(std::string_view s) {
+static std::string toString(pstd::string_view s) {
     return std::string(s.data(), s.size());
 }
 
@@ -112,8 +104,11 @@ static char decodeEscaped(int ch, const FileLoc &loc) {
 }
 
 static double_conversion::StringToDoubleConverter floatParser(
-    double_conversion::StringToDoubleConverter::ALLOW_HEX, 0. /* empty string value */,
-    0. /* junk string value */, nullptr /* infinity symbol */, nullptr /* NaN symbol */);
+   double_conversion::StringToDoubleConverter::ALLOW_HEX,
+   0. /* empty string value */,
+   0. /* junk string value */,
+   nullptr /* infinity symbol */,
+   nullptr /* NaN symbol */);
 
 std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     const std::string &filename,
@@ -123,48 +118,55 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
         // Handle stdin by slurping everything into a string.
         std::string str;
         int ch;
-        while ((ch = getchar()) != EOF)
-            str.push_back((char)ch);
+        while ((ch = getchar()) != EOF) str.push_back((char)ch);
         return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
     }
 
 #ifdef PBRT_HAVE_MMAP
     int fd = open(filename.c_str(), O_RDONLY);
     if (fd == -1) {
-        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        errorCallback(
+            StringPrintf("%s: %s", filename, strerror(errno)).c_str(), nullptr);
         return nullptr;
     }
 
     struct stat stat;
     if (fstat(fd, &stat) != 0) {
-        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        errorCallback(
+            StringPrintf("%s: %s", filename, strerror(errno)).c_str(), nullptr);
         return nullptr;
     }
 
     size_t len = stat.st_size;
     void *ptr = mmap(nullptr, len, PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
     if (close(fd) != 0) {
-        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        errorCallback(
+            StringPrintf("%s: %s", filename, strerror(errno)).c_str(), nullptr);
         return nullptr;
     }
 
     return std::make_unique<Tokenizer>(ptr, len, filename, std::move(errorCallback));
 #elif defined(PBRT_IS_WINDOWS)
-    auto errorReportLambda = [&errorCallback, &filename]() -> std::unique_ptr<Tokenizer> {
+    auto errorReportLambda = [&errorCallback,
+                              &filename]() -> std::unique_ptr<Tokenizer> {
         LPSTR messageBuffer = nullptr;
-        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                           FORMAT_MESSAGE_IGNORE_INSERTS,
-                       NULL, ::GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                       (LPSTR)&messageBuffer, 0, NULL);
+        FormatMessageA(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, ::GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&messageBuffer, 0, NULL);
 
-        errorCallback(StringPrintf("%s: %s", filename, messageBuffer).c_str(), nullptr);
+        errorCallback(
+            StringPrintf("%s: %s", filename, messageBuffer).c_str(),
+            nullptr);
 
         LocalFree(messageBuffer);
         return nullptr;
     };
 
-    HANDLE fileHandle = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
-                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+    HANDLE fileHandle =
+        CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
     if (!fileHandle) {
         return errorReportLambda();
     }
@@ -185,18 +187,20 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
 
     std::string str(static_cast<const char *>(ptr), len);
 
-    return std::make_unique<Tokenizer>(ptr, len, filename, std::move(errorCallback));
+    return std::make_unique<Tokenizer>(ptr, len, filename,
+                                       std::move(errorCallback));
 #else
     FILE *f = fopen(filename.c_str(), "r");
     if (!f) {
-        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        errorCallback(
+            StringPrintf("%s: %s", filename, strerror(errno)).c_str(),
+            nullptr);
         return nullptr;
     }
 
     std::string str;
     int ch;
-    while ((ch = fgetc(f)) != EOF)
-        str.push_back(char(ch));
+    while ((ch = fgetc(f)) != EOF) str.push_back(char(ch));
     fclose(f);
     return std::make_unique_ptr<Tokenizer>(std::move(str), std::move(errorCallback));
 #endif
@@ -209,7 +213,9 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromString(
 
 Tokenizer::Tokenizer(std::string str,
                      std::function<void(const char *, const FileLoc *)> errorCallback)
-    : loc("<stdin>"), errorCallback(std::move(errorCallback)), contents(std::move(str)) {
+    : loc("<stdin>"),
+      errorCallback(std::move(errorCallback)),
+      contents(std::move(str)) {
     pos = contents.data();
     end = pos + contents.size();
     tokenizerMemory += contents.size();
@@ -218,7 +224,9 @@ Tokenizer::Tokenizer(std::string str,
 #if defined(PBRT_HAVE_MMAP) || defined(PBRT_IS_WINDOWS)
 Tokenizer::Tokenizer(void *ptr, size_t len, std::string filename,
                      std::function<void(const char *, const FileLoc *)> errorCallback)
-    : errorCallback(std::move(errorCallback)), unmapPtr(ptr), unmapLength(len) {
+    : errorCallback(std::move(errorCallback)),
+      unmapPtr(ptr),
+      unmapLength(len) {
     // This is disgusting and leaks memory, but it ensures that the
     // filename in FileLocs returned by the Tokenizer remain valid even
     // after it has been destroyed.
@@ -232,11 +240,24 @@ Tokenizer::~Tokenizer() {
 #ifdef PBRT_HAVE_MMAP
     if ((unmapPtr != nullptr) && unmapLength > 0)
         if (munmap(unmapPtr, unmapLength) != 0)
-            errorCallback(StringPrintf("munmap: %s", ErrorString()).c_str(), nullptr);
+            errorCallback(StringPrintf("munmap: %s", strerror(errno)).c_str(),
+                          nullptr);
 #elif defined(PBRT_IS_WINDOWS)
-    if (unmapPtr && UnmapViewOfFile(unmapPtr) == 0)
-        errorCallback(StringPrintf("UnmapViewOfFile: %s", ErrorString()).c_str(),
-                      nullptr);
+    if (unmapPtr) {
+        if (UnmapViewOfFile(unmapPtr) == 0) {
+            LPSTR messageBuffer = nullptr;
+            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                               FORMAT_MESSAGE_FROM_SYSTEM |
+                               FORMAT_MESSAGE_IGNORE_INSERTS,
+                           NULL, ::GetLastError(),
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                           (LPSTR)&messageBuffer, 0, NULL);
+            errorCallback(
+                StringPrintf("UnmapViewOfFile: %s", messageBuffer).c_str(),
+                nullptr);
+            LocalFree(messageBuffer);
+        }
+    }
 #endif
 }
 
@@ -301,8 +322,8 @@ pstd::optional<Token> Tokenizer::Next() {
             // Regular statement or numeric token; scan until we hit a
             // space, opening quote, or bracket.
             while ((ch = getChar()) != EOF) {
-                if (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '"' ||
-                    ch == '[' || ch == ']') {
+                if (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r' ||
+                    ch == '"' || ch == '[' || ch == ']') {
                     ungetChar();
                     break;
                 }
@@ -336,10 +357,9 @@ static double parseNumber(const Token &t) {
     bufp[t.token.size()] = '\0';
 
     // Can we just use strtol?
-    auto isInteger = [](std::string_view str) {
+    auto isInteger = [](pstd::string_view str) {
         for (char ch : str)
-            if (!(ch >= '0' && ch <= '9'))
-                return false;
+            if (!(ch >= '0' && ch <= '9')) return false;
         return true;
     };
 
@@ -360,15 +380,15 @@ static double parseNumber(const Token &t) {
     return val;
 }
 
-inline bool isQuotedString(std::string_view str) {
+inline bool isQuotedString(pstd::string_view str) {
     return str.size() >= 2 && str[0] == '"' && str.back() == '"';
 }
 
-static std::string_view dequoteString(const Token &t) {
+static pstd::string_view dequoteString(const Token &t) {
     if (!isQuotedString(t.token))
         ErrorExit(&t.loc, "\"%s\": expected quoted string", toString(t.token));
 
-    std::string_view str = t.token;
+    pstd::string_view str = t.token;
     str.remove_prefix(1);
     str.remove_suffix(1);
     return str;
@@ -379,35 +399,32 @@ constexpr int TokenRequired = 1;
 
 template <typename Next, typename Unget>
 static ParsedParameterVector parseParameters(
-    Next nextToken, Unget ungetToken, Allocator alloc, bool formatting,
-    const std::function<void(const Token &token, const char *)> &errorCallback) {
+        Next nextToken, Unget ungetToken, MemoryArena *arena, bool formatting,
+        const std::function<void(const Token &token, const char *)> &errorCallback) {
     ParsedParameterVector parameterVector;
 
     while (true) {
         pstd::optional<Token> t = nextToken(TokenOptional);
-        if (!t.has_value())
-            return parameterVector;
+        if (!t.has_value()) return parameterVector;
 
         if (!isQuotedString(t->token)) {
             ungetToken(*t);
             return parameterVector;
         }
 
-        ParsedParameter *param = alloc.new_object<ParsedParameter>(alloc, t->loc);
+        ParsedParameter *param = arena->Alloc<ParsedParameter>(arena, t->loc);
 
-        std::string_view decl = dequoteString(*t);
+        pstd::string_view decl = dequoteString(*t);
 
-        auto skipSpace = [&decl](std::string_view::const_iterator iter) {
-            while (iter != decl.end() && (*iter == ' ' || *iter == '\t'))
-                ++iter;
-            return iter;
-        };
+        auto skipSpace = [&decl](pstd::string_view::const_iterator iter) {
+                             while (iter != decl.end() && (*iter == ' ' || *iter == '\t')) ++iter;
+                             return iter;
+                         };
         // Skip to the next whitespace character (or the end of the string).
-        auto skipToSpace = [&decl](std::string_view::const_iterator iter) {
-            while (iter != decl.end() && *iter != ' ' && *iter != '\t')
-                ++iter;
-            return iter;
-        };
+        auto skipToSpace = [&decl](pstd::string_view::const_iterator iter) {
+                               while (iter != decl.end() && *iter != ' ' && *iter != '\t') ++iter;
+                               return iter;
+                           };
 
         auto typeBegin = skipSpace(decl.begin());
         if (typeBegin == decl.end())
@@ -419,10 +436,8 @@ static ParsedParameterVector parseParameters(
         param->type.assign(typeBegin, typeEnd);
 
         if (formatting) {  // close enough: upgrade...
-            if (param->type == "point")
-                param->type = "point3";
-            if (param->type == "color")
-                param->type = "rgb";
+            if (param->type == "point") param->type = "point3";
+            if (param->type == "color") param->type = "rgb";
         }
 
         auto nameBegin = skipSpace(typeEnd);
@@ -460,7 +475,7 @@ static ParsedParameterVector parseParameters(
                 case Number:
                     errorCallback(t, "expected number");
                 case Bool:
-                    break;
+                     break;
                 }
 
                 param->AddBool(true);
@@ -474,11 +489,12 @@ static ParsedParameterVector parseParameters(
                 case Number:
                     errorCallback(t, "expected number");
                 case Bool:
-                    break;
+                     break;
                 }
 
                 param->AddBool(false);
-            } else {
+            }
+            else {
                 switch (valType) {
                 case Unknown:
                     valType = Number;
@@ -486,7 +502,7 @@ static ParsedParameterVector parseParameters(
                 case String:
                     errorCallback(t, "expected string");
                 case Number:
-                    break;
+                     break;
                 case Bool:
                     errorCallback(t, "expected bool");
                 }
@@ -500,8 +516,7 @@ static ParsedParameterVector parseParameters(
         if (val.token == "[") {
             while (true) {
                 val = *nextToken(TokenRequired);
-                if (val.token == "]")
-                    break;
+                if (val.token == "]") break;
                 addVal(val);
             }
         } else {
@@ -515,9 +530,7 @@ static ParsedParameterVector parseParameters(
                 else if (b == "false")
                     param->bools.push_back(false);
                 else
-                    Error(&param->loc,
-                          "%s: neither \"true\" nor \"false\" in bool "
-                          "parameter list.",
+                    Error(&param->loc, "%s: neither \"true\" nor \"false\" in bool parameter list.",
                           b);
             }
             param->strings.clear();
@@ -530,10 +543,9 @@ static ParsedParameterVector parseParameters(
 }
 
 // Parsing Global Interface
-static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
+static void parse(GeneralSceneBase *scene, std::unique_ptr<Tokenizer> t) {
     bool formatting = dynamic_cast<FormattingScene *>(scene) != nullptr;
-    TrackedMemoryResource memoryResource;
-    Allocator alloc(&memoryResource);
+    MemoryArena &arena = scene->GetMemoryArena();
 
     std::vector<std::unique_ptr<Tokenizer>> fileStack;
     fileStack.push_back(std::move(t));
@@ -584,21 +596,20 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
     // Helper function for pbrt API entrypoints that take a single string
     // parameter and a ParameterVector (e.g. pbrtShape()).
-    // using BasicEntrypoint = void (ParsedScene::*)(const std::string &,
-    // ParsedParameterVector, FileLoc);
-    auto basicParamListEntrypoint = [&](void (SceneRepresentation::*apiFunc)(
-                                            const std::string &, ParsedParameterVector,
-                                            FileLoc),
+    //using BasicEntrypoint = void (GeneralScene::*)(const std::string &, ParsedParameterVector, FileLoc);
+    auto basicParamListEntrypoint = [&](void (GeneralSceneBase::*apiFunc)(const std::string &,
+                                                                          ParsedParameterVector, FileLoc),
                                         FileLoc loc) {
         Token t = *nextToken(TokenRequired);
-        std::string_view dequoted = dequoteString(t);
+        pstd::string_view dequoted = dequoteString(t);
         std::string n = toString(dequoted);
-        ParsedParameterVector parameterVector = parseParameters(
-            nextToken, unget, alloc, formatting, [&](const Token &t, const char *msg) {
-                std::string token = toString(t.token);
-                std::string str = StringPrintf("%s: %s", token, msg);
-                parseError(str.c_str(), &t.loc);
-            });
+        ParsedParameterVector parameterVector =
+            parseParameters(nextToken, unget, &arena, formatting,
+                            [&](const Token &t, const char *msg) {
+                                std::string token = toString(t.token);
+                                std::string str = StringPrintf("%s: %s", token, msg);
+                                parseError(str.c_str(), &t.loc);
+                            });
         (scene->*apiFunc)(n, std::move(parameterVector), loc);
     };
 
@@ -608,17 +619,16 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
     pstd::optional<Token> tok;
     CheckCallbackScope _([&tok]() -> std::string {
-        if (!tok.has_value())
-            return "";
-        std::string filename(tok->loc.filename.begin(), tok->loc.filename.end());
-        return StringPrintf("Current parser location %s:%d:%d", filename, tok->loc.line,
-                            tok->loc.column);
-    });
+            if (!tok.has_value())
+                return "";
+            std::string filename(tok->loc.filename.begin(), tok->loc.filename.end());
+            return StringPrintf("Current parser location %s:%d:%d", filename,
+                                tok->loc.line, tok->loc.column);
+        });
 
     while (true) {
         tok = nextToken(TokenOptional);
-        if (!tok.has_value())
-            break;
+        if (!tok.has_value()) break;
 
         switch (tok->token[0]) {
         case 'A':
@@ -627,7 +637,7 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             else if (tok->token == "AttributeEnd")
                 scene->AttributeEnd(tok->loc);
             else if (tok->token == "Attribute")
-                basicParamListEntrypoint(&SceneRepresentation::Attribute, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Attribute, tok->loc);
             else if (tok->token == "ActiveTransform") {
                 Token a = *nextToken(TokenRequired);
                 if (a.token == "All")
@@ -639,54 +649,53 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                 else
                     syntaxError(*tok);
             } else if (tok->token == "AreaLightSource")
-                basicParamListEntrypoint(&SceneRepresentation::AreaLightSource, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::AreaLightSource, tok->loc);
             else if (tok->token == "Accelerator")
-                basicParamListEntrypoint(&SceneRepresentation::Accelerator, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Accelerator, tok->loc);
             else
                 syntaxError(*tok);
             break;
 
         case 'C':
             if (tok->token == "ConcatTransform") {
-                if (nextToken(TokenRequired)->token != "[")
-                    syntaxError(*tok);
+                if (nextToken(TokenRequired)->token != "[") syntaxError(*tok);
                 Float m[16];
                 for (int i = 0; i < 16; ++i)
                     m[i] = parseNumber(*nextToken(TokenRequired));
-                if (nextToken(TokenRequired)->token != "]")
-                    syntaxError(*tok);
+                if (nextToken(TokenRequired)->token != "]") syntaxError(*tok);
                 scene->ConcatTransform(m, tok->loc);
             } else if (tok->token == "CoordinateSystem") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->CoordinateSystem(toString(n), tok->loc);
             } else if (tok->token == "CoordSysTransform") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->CoordSysTransform(toString(n), tok->loc);
             } else if (tok->token == "ColorSpace") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->ColorSpace(toString(n), tok->loc);
             } else if (tok->token == "Camera")
-                basicParamListEntrypoint(&SceneRepresentation::Camera, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Camera, tok->loc);
             else
                 syntaxError(*tok);
             break;
 
         case 'F':
             if (tok->token == "Film")
-                basicParamListEntrypoint(&SceneRepresentation::Film, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Film, tok->loc);
             else
                 syntaxError(*tok);
             break;
 
         case 'I':
             if (tok->token == "Integrator")
-                basicParamListEntrypoint(&SceneRepresentation::Integrator, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Integrator, tok->loc);
             else if (tok->token == "Include") {
                 Token filenameToken = *nextToken(TokenRequired);
                 std::string filename = toString(dequoteString(filenameToken));
                 if (formatting)
                     Printf("%sInclude \"%s\"\n",
-                           dynamic_cast<FormattingScene *>(scene)->indent(), filename);
+                           dynamic_cast<FormattingScene *>(scene)->indent(),
+                           filename);
                 else {
                     filename = ResolveFilename(filename);
                     std::unique_ptr<Tokenizer> tinc =
@@ -702,27 +711,26 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         case 'L':
             if (tok->token == "LightSource")
-                basicParamListEntrypoint(&SceneRepresentation::LightSource, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::LightSource, tok->loc);
             else if (tok->token == "LookAt") {
                 Float v[9];
                 for (int i = 0; i < 9; ++i)
                     v[i] = parseNumber(*nextToken(TokenRequired));
-                scene->LookAt(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8],
-                              tok->loc);
+                scene->LookAt(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
+                              v[8], tok->loc);
             } else
                 syntaxError(*tok);
             break;
 
         case 'M':
             if (tok->token == "MakeNamedMaterial")
-                basicParamListEntrypoint(&SceneRepresentation::MakeNamedMaterial,
-                                         tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::MakeNamedMaterial, tok->loc);
             else if (tok->token == "MakeNamedMedium")
-                basicParamListEntrypoint(&SceneRepresentation::MakeNamedMedium, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::MakeNamedMedium, tok->loc);
             else if (tok->token == "Material")
-                basicParamListEntrypoint(&SceneRepresentation::Material, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Material, tok->loc);
             else if (tok->token == "MediumInterface") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 std::string names[2];
                 names[0] = toString(n);
 
@@ -745,7 +753,7 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         case 'N':
             if (tok->token == "NamedMaterial") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->NamedMaterial(toString(n), tok->loc);
             } else
                 syntaxError(*tok);
@@ -753,12 +761,12 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         case 'O':
             if (tok->token == "ObjectBegin") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->ObjectBegin(toString(n), tok->loc);
             } else if (tok->token == "ObjectEnd")
                 scene->ObjectEnd(tok->loc);
             else if (tok->token == "ObjectInstance") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 scene->ObjectInstance(toString(n), tok->loc);
             } else if (tok->token == "Option") {
                 std::string name = toString(dequoteString(*nextToken(TokenRequired)));
@@ -770,7 +778,7 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         case 'P':
             if (tok->token == "PixelFilter")
-                basicParamListEntrypoint(&SceneRepresentation::PixelFilter, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::PixelFilter, tok->loc);
             else
                 syntaxError(*tok);
             break;
@@ -789,9 +797,9 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         case 'S':
             if (tok->token == "Shape")
-                basicParamListEntrypoint(&SceneRepresentation::Shape, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Shape, tok->loc);
             else if (tok->token == "Sampler")
-                basicParamListEntrypoint(&SceneRepresentation::Sampler, tok->loc);
+                basicParamListEntrypoint(&GeneralSceneBase::Sampler, tok->loc);
             else if (tok->token == "Scale") {
                 Float v[3];
                 for (int i = 0; i < 3; ++i)
@@ -807,13 +815,11 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             else if (tok->token == "TransformEnd")
                 scene->TransformEnd(tok->loc);
             else if (tok->token == "Transform") {
-                if (nextToken(TokenRequired)->token != "[")
-                    syntaxError(*tok);
+                if (nextToken(TokenRequired)->token != "[") syntaxError(*tok);
                 Float m[16];
                 for (int i = 0; i < 16; ++i)
                     m[i] = parseNumber(*nextToken(TokenRequired));
-                if (nextToken(TokenRequired)->token != "]")
-                    syntaxError(*tok);
+                if (nextToken(TokenRequired)->token != "]") syntaxError(*tok);
                 scene->Transform(m, tok->loc);
             } else if (tok->token == "Translate") {
                 Float v[3];
@@ -826,21 +832,21 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     v[i] = parseNumber(*nextToken(TokenRequired));
                 scene->TransformTimes(v[0], v[1], tok->loc);
             } else if (tok->token == "Texture") {
-                std::string_view n = dequoteString(*nextToken(TokenRequired));
+                pstd::string_view n = dequoteString(*nextToken(TokenRequired));
                 std::string name = toString(n);
                 n = dequoteString(*nextToken(TokenRequired));
                 std::string type = toString(n);
 
                 Token t = *nextToken(TokenRequired);
-                std::string_view dequoted = dequoteString(t);
+                pstd::string_view dequoted = dequoteString(t);
                 std::string texName = toString(dequoted);
-                ParsedParameterVector params = parseParameters(
-                    nextToken, unget, alloc, formatting,
-                    [&](const Token &t, const char *msg) {
-                        std::string token = toString(t.token);
-                        std::string str = StringPrintf("%s: %s", token, msg);
-                        parseError(str.c_str(), &t.loc);
-                    });
+                ParsedParameterVector params =
+                    parseParameters(nextToken, unget, &arena, formatting,
+                                    [&](const Token &t, const char *msg) {
+                                        std::string token = toString(t.token);
+                                        std::string str = StringPrintf("%s: %s", token, msg);
+                                        parseError(str.c_str(), &t.loc);
+                                    });
 
                 scene->Texture(name, type, texName, std::move(params), tok->loc);
             } else
@@ -850,9 +856,11 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
         case 'W':
             if (tok->token == "WorldBegin")
                 scene->WorldBegin(tok->loc);
-            else if (tok->token == "WorldEnd" && formatting)
-                ;  // just swallow it
-            else
+            else if (tok->token == "WorldEnd") {
+                LOG_VERBOSE("Memory arena used for parsing allocated %d",
+                            arena.BytesAllocated());
+                scene->WorldEnd(tok->loc);
+            } else
                 syntaxError(*tok);
             break;
 
@@ -862,37 +870,25 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     }
 }
 
-void ParseFiles(SceneRepresentation *scene, pstd::span<const std::string> filenames) {
-    auto tokError = [](const char *msg, const FileLoc *loc) {
-        ErrorExit(loc, "%s", msg);
-    };
+void ParseFile(GeneralSceneBase *scene, std::string filename) {
+    ProfilerScope _(ProfilePhase::ParsingAndGenScene);
 
-    // Process scene description
-    if (filenames.empty()) {
-        // Parse scene from standard input
-        std::unique_ptr<Tokenizer> t = Tokenizer::CreateFromFile("-", tokError);
-        if (t)
-            parse(scene, std::move(t));
-    } else {
-        // Parse scene from input files
-        for (const std::string &fn : filenames) {
-            if (fn != "-")
-                SetSearchDirectory(fn);
+    if (filename != "-") SetSearchDirectory(filename);
 
-            std::unique_ptr<Tokenizer> t = Tokenizer::CreateFromFile(fn, tokError);
-            if (t)
-                parse(scene, std::move(t));
-        }
-    }
+    auto tokError = [](const char *msg, const FileLoc *loc) { ErrorExit(loc, "%s", msg); };
+    std::unique_ptr<Tokenizer> t =
+        Tokenizer::CreateFromFile(filename, tokError);
+    if (!t) return;
+    parse(scene, std::move(t));
 }
 
-void ParseString(SceneRepresentation *scene, std::string str) {
-    auto tokError = [](const char *msg, const FileLoc *loc) {
-        ErrorExit(loc, "%s", msg);
-    };
-    std::unique_ptr<Tokenizer> t = Tokenizer::CreateFromString(std::move(str), tokError);
-    if (!t)
-        return;
+void ParseString(GeneralSceneBase *scene, std::string str) {
+    ProfilerScope _(ProfilePhase::ParsingAndGenScene);
+
+    auto tokError = [](const char *msg, const FileLoc *loc) { ErrorExit(loc, "%s", msg); };
+    std::unique_ptr<Tokenizer> t =
+        Tokenizer::CreateFromString(std::move(str), tokError);
+    if (!t) return;
     parse(scene, std::move(t));
 }
 

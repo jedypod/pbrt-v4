@@ -1,18 +1,54 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #include <pbrt/util/math.h>
 
 #include <pbrt/util/check.h>
-#include <pbrt/util/print.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/print.h>
 
 #include <cmath>
 #include <iostream>
 #include <vector>
 
 namespace pbrt {
+
+std::string ToString(Norm n) {
+    switch (n) {
+    case Norm::L1: return "L1";
+    case Norm::L2: return "L2";
+    case Norm::LInfinity: return "LInfinity";
+    default: LOG_FATAL("Unhandled case"); return "";
+    }
+}
 
 std::string CompensatedFloat::ToString() const {
     return StringPrintf("[ CompensatedFloat v: %f err: %f ]", v, err);
@@ -64,26 +100,23 @@ pstd::optional<SquareMatrix<N>> Inverse(const SquareMatrix<N> &m) {
                             icol = k;
                         }
                     } else if (ipiv[k] > 1)
-                        return {};  // singular
+                        return {}; // singular
                 }
             }
         }
         ++ipiv[icol];
         // Swap rows _irow_ and _icol_ for pivot
         if (irow != icol) {
-            for (int k = 0; k < N; ++k)
-                pstd::swap(minv[irow][k], minv[icol][k]);
+            for (int k = 0; k < N; ++k) pstd::swap(minv[irow][k], minv[icol][k]);
         }
         indxr[i] = irow;
         indxc[i] = icol;
-        if (minv[icol][icol] == 0.f)
-            return {};  // singular
+        if (minv[icol][icol] == 0.f) return {}; // singular
 
         // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
         Float pivinv = 1. / minv[icol][icol];
         minv[icol][icol] = 1.;
-        for (int j = 0; j < N; j++)
-            minv[icol][j] *= pivinv;
+        for (int j = 0; j < N; j++) minv[icol][j] *= pivinv;
 
         // Subtract this row from others to zero out their columns
         for (int j = 0; j < N; j++) {
@@ -113,23 +146,19 @@ template class SquareMatrix<3>;
 template class SquareMatrix<4>;
 
 int NextPrime(int x) {
-    if (x == 2)
-        return 3;
-    if ((x & 1) == 0)
-        ++x;  // make it odd
+    if (x == 2) return 3;
+    if ((x & 1) == 0) ++x; // make it odd
 
     std::vector<int> smallPrimes{2};
     // NOTE: isPrime w.r.t. smallPrims...
     auto isPrime = [&smallPrimes](int n) {
         for (int p : smallPrimes)
-            if (n != p && (n % p) == 0)
-                return false;
+            if (n != p && (n % p) == 0) return false;
         return true;
     };
 
     // Initialize smallPrimes
-    // Up to about 2B, the biggest gap between primes:
-    // https://en.wikipedia.org/wiki/Prime_gap
+    // Up to about 2B, the biggest gap between primes: https://en.wikipedia.org/wiki/Prime_gap
     const int maxPrimeGap = 320;
     for (int n = 3; n < int(std::sqrt(x + maxPrimeGap)) + 1; n += 2)
         if (isPrime(n))
@@ -141,21 +170,23 @@ int NextPrime(int x) {
     return x;
 }
 
-pstd::array<Float, 3> FitQuadratic(pstd::array<Float, 2> p0, pstd::array<Float, 2> p1,
+pstd::array<Float, 3> FitQuadratic(pstd::array<Float, 2> p0,
+                                   pstd::array<Float, 2> p1,
                                    pstd::array<Float, 2> p2) {
     CHECK_NE(p0[0], p1[0]);
     CHECK_NE(p1[0], p2[0]);
     CHECK_NE(p2[0], p0[0]);
 
     // y = a x^2 + b x + c
-    SquareMatrix<3> m(p0[0] * p0[0], p0[0], 1, p1[0] * p1[0], p1[0], 1, p2[0] * p2[0],
-                      p2[0], 1);
+    SquareMatrix<3> m(p0[0] * p0[0], p0[0], 1,
+                      p1[0] * p1[0], p1[0], 1,
+                      p2[0] * p2[0], p2[0], 1);
     // m * [ a b c ]^t = [ p0[1] p1[1] p2[1] ]^t
 
     pstd::optional<SquareMatrix<3>> mInv = Inverse(m);
     CHECK((bool)mInv);
 
-    pstd::array<Float, 3> v = {p0[1], p1[1], p2[1]};
+    pstd::array<Float, 3> v = { p0[1], p1[1], p2[1] };
     return (*mInv) * v;
 }
 
@@ -169,7 +200,8 @@ pstd::array<Float, 3> FitQuadratic(pstd::array<Float, 2> p0, pstd::array<Float, 
 //         2 real roots: x[0], x[1],          return 2
 //         1 real root : x[0], x[1] ± i*x[2], return 1
 template <typename Float>
-PBRT_CPU_GPU int SolveP3(Float *x, Float a, Float b, Float c) {
+PBRT_HOST_DEVICE
+int SolveP3(Float *x, Float a, Float b, Float c) {
     const Float eps = 1e-14;
 
     Float a2 = a * a;
@@ -181,10 +213,8 @@ PBRT_CPU_GPU int SolveP3(Float *x, Float a, Float b, Float c) {
     Float A, B;
     if (q3 > 0 && r2 <= (q3 + eps)) {  //<<-- FIXED!
         Float t = r / std::sqrt(q3);
-        if (t < -1)
-            t = -1;
-        if (t > 1)
-            t = 1;
+        if (t < -1) t = -1;
+        if (t > 1) t = 1;
         t = std::acos(t);  // t in [0,pi]
         a /= 3;
         q = -2 * std::sqrt(q);
@@ -222,8 +252,7 @@ PBRT_CPU_GPU int SolveP3(Float *x, Float a, Float b, Float c) {
     } else {
         // A =-pow(std::abs(r)+std::sqrt(r2-q3),1./3);
         A = -std::cbrt(std::abs(r) + std::sqrt(r2 - q3));
-        if (r < 0)
-            A = -A;
+        if (r < 0) A = -A;
         B = (A == 0 ? 0 : B = q / A);
 
         a /= 3;
@@ -256,12 +285,10 @@ int Cubic(Float a, Float b, Float c, Float d, Float t[3]) {
         return SolveP3<Float>(t, b / a, c / a, d / a);
 }
 
-#ifndef PBRT_IS_GPU_CODE
-template <>
-const Interval<float> Interval<float>::Pi = Interval<float>(3.1415925, 3.14159274);
-template <>
-const Interval<double> Interval<double>::Pi = Interval<double>(3.1415926535897931,
-                                                               3.1415926535897936);
+#ifndef __CUDA_ARCH__
+template <> const Interval<float> Interval<float>::Pi = Interval<float>(3.1415925, 3.14159274);
+template <> const Interval<double> Interval<double>::Pi = Interval<double>(3.1415926535897931,
+                                                                           3.1415926535897936);
 #endif
 
 template <typename Float>
@@ -275,8 +302,7 @@ template std::string Interval<double>::ToString() const;
 // Spline Interpolation Definitions
 Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> values, Float x) {
     CHECK_EQ(nodes.size(), values.size());
-    if (!(x >= nodes.front() && x <= nodes.back()))
-        return 0;
+    if (!(x >= nodes.front() && x <= nodes.back())) return 0;
     int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
     Float x0 = nodes[idx], x1 = nodes[idx + 1];
     Float f0 = values[idx], f1 = values[idx + 1];
@@ -293,16 +319,15 @@ Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> values, 
         d1 = f1 - f0;
 
     Float t = (x - x0) / (x1 - x0), t2 = t * t, t3 = t2 * t;
-    return (2 * t3 - 3 * t2 + 1) * f0 + (-2 * t3 + 3 * t2) * f1 + (t3 - 2 * t2 + t) * d0 +
-           (t3 - t2) * d1;
+    return (2 * t3 - 3 * t2 + 1) * f0 + (-2 * t3 + 3 * t2) * f1 +
+           (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
 }
 
 bool CatmullRomWeights(pstd::span<const Float> nodes, Float x, int *offset,
                        pstd::span<Float> weights) {
     CHECK_GE(weights.size(), 4);
     // Return _false_ if _x_ is out of bounds
-    if (!(x >= nodes.front() && x <= nodes.back()))
-        return false;
+    if (!(x >= nodes.front() && x <= nodes.back())) return false;
 
     // Search for the interval _idx_ containing _x_
     int idx = FindInterval(nodes.size(), [&](int i) { return nodes[i] <= x; });
@@ -371,8 +396,7 @@ Float IntegrateCatmullRom(pstd::span<const Float> x, pstd::span<const Float> val
     return sum;
 }
 
-Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values,
-                       Float u) {
+Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values, Float u) {
     // Stop when _u_ is out of bounds
     if (!(u > values.front()))
         return x.front();
@@ -404,10 +428,10 @@ Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values
 
         // Set _Fhat_ using Equation (8.27)
         Float Fhat = (2 * t3 - 3 * t2 + 1) * f0 + (-2 * t3 + 3 * t2) * f1 +
-                     (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
+               (t3 - 2 * t2 + t) * d0 + (t3 - t2) * d1;
         // Set _fhat_ using Equation (not present)
         Float fhat = (6 * t2 - 6 * t) * f0 + (-6 * t2 + 6 * t) * f1 +
-                     (3 * t2 - 4 * t + 1) * d0 + (3 * t2 - 2 * t) * d1;
+               (3 * t2 - 4 * t + 1) * d0 + (3 * t2 - 2 * t) * d1;
         return {Fhat - u, fhat};
     };
     Float t = NewtonBisection(0, 1, eval);
@@ -446,7 +470,7 @@ Vector3f EquiAreaSquareToSphere(const Point2f &p) {
     Float cosPhi = FlipSign(ApproxCos(phi), u);
     Float sinPhi = FlipSign(ApproxSin(phi), v);
 
-    return {sinTheta * cosPhi, sinTheta * sinPhi, z};
+    return { sinTheta * cosPhi, sinTheta * sinPhi, z };
 }
 
 //  ------------------------------------------------------------------------
@@ -469,8 +493,7 @@ Point2f EquiAreaSphereToSquare(const Vector3f &d) {
     b = a == 0 ? 0 : b / a;
 
     // Polynomial approximation of atan(x)*2/pi, x=b
-    // Coefficients for 6th degree minimax approximation of atan(x)*2/pi,
-    // x=[0,1].
+    // Coefficients for 6th degree minimax approximation of atan(x)*2/pi, x=[0,1].
     const Float t1 = 0.406758566246788489601959989e-5;
     const Float t2 = 0.636226545274016134946890922156;
     const Float t3 = 0.61572017898280213493197203466e-2;
@@ -481,14 +504,13 @@ Point2f EquiAreaSphereToSquare(const Vector3f &d) {
     Float phi = EvaluatePolynomial(b, t1, t2, t3, t4, t5, t6, t7);
 
     // Extend phi if the input is in the range 45-90 degrees (u<v)
-    if (x < y)
-        phi = 1 - phi;
+    if (x < y) phi = 1 - phi;
 
     // Find (u,v) based on (r,phi)
     Float v = phi * r;
     Float u = r - v;
 
-    if (d.z < 0) {
+    if (d.z < 0)  {
         // southern hemisphere -> mirror u,v
         pstd::swap(u, v);
         u = 1 - u;

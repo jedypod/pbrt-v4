@@ -1,339 +1,72 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
 
 #ifndef PBRT_CONTAINERS_H
 #define PBRT_CONTAINERS_H
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/check.h>
-#include <pbrt/util/print.h>
 #include <pbrt/util/pstd.h>
-#include <pbrt/util/vecmath.h>
 
-#include <algorithm>
-#include <cstring>
 #include <iterator>
-#include <memory>
-#include <string>
 #include <tuple>
-#include <type_traits>
 
 namespace pbrt {
 
-// Utility classes for working with parameter packs
-template <typename... Ts>
-struct TypePack {
-    static constexpr size_t count = sizeof...(Ts);
-};
-
-template <typename... Ts>
-struct Prepend;
-
-template <typename T, typename... Ts>
-struct Prepend<T, TypePack<Ts...>> {
-    using type = TypePack<T, Ts...>;
-};
-
-template <typename T>
-struct RemoveFirst {};
-
-template <typename T, typename... Ts>
-struct RemoveFirst<TypePack<T, Ts...>> {
-    using type = TypePack<Ts...>;
-};
-
-template <typename T>
-struct GetFirst {};
-
-template <typename T, typename... Ts>
-struct GetFirst<TypePack<T, Ts...>> {
-    using type = T;
-};
-
-template <int index, typename T, typename... Ts>
-struct RemoveFirstN;
-
-template <int index, typename T, typename... Ts>
-struct RemoveFirstN<index, TypePack<T, Ts...>> {
-    using type = typename RemoveFirstN<index - 1, TypePack<Ts...>>::type;
-};
-
-template <typename T, typename... Ts>
-struct RemoveFirstN<0, TypePack<T, Ts...>> {
-    using type = TypePack<T, Ts...>;
-};
-
-template <int index, typename T, typename... Ts>
-struct TakeFirstN;
-
-template <int index, typename T, typename... Ts>
-struct TakeFirstN<index, TypePack<T, Ts...>> {
-    using type =
-        typename Prepend<T, typename TakeFirstN<index - 1, TypePack<Ts...>>::type>::type;
-};
-
-template <typename T, typename... Ts>
-struct TakeFirstN<1, TypePack<T, Ts...>> {
-    using type = TypePack<T>;
-};
-
-template <typename T, typename... Ts>
-struct HasType {};
-
-template <typename T>
-struct HasType<T, TypePack<void>> {
-    static constexpr bool value = false;
-};
-
-template <typename T, typename Tfirst, typename... Ts>
-struct HasType<T, TypePack<Tfirst, Ts...>> {
-    static constexpr bool value =
-        (std::is_same<T, Tfirst>::value || HasType<T, TypePack<Ts...>>::value);
-};
-
 namespace detail {
 
-template <size_t Index, typename Elt, typename... Elements>
-struct ElementOffset;
+template <size_t Index, typename Elt, typename... Elements> struct ElementOffset;
 
-template <size_t Index, typename Elt, typename... Elements>
-struct ElementOffset {
-    // Note: we don't need to worry about alignment assuming the
-    // AoSoA::Factor is >= each element's alignment...
-    static constexpr size_t offset =
-        sizeof(Elt) + ElementOffset<Index - 1, Elements...>::offset;
+template <size_t Index, typename Elt, typename... Elements> struct ElementOffset {
+    static constexpr size_t offset = sizeof(Elt) + ElementOffset<Index - 1, Elements...>::offset;
 };
 
-template <typename Elt, typename... Elements>
-struct ElementOffset<0, Elt, Elements...> {
+template <typename Elt, typename... Elements> struct ElementOffset<0, Elt, Elements...> {
     static constexpr size_t offset = 0;
 };
 
-}  // namespace detail
+} // namespace detail
 
-template <typename T>
-class Array2D {
-  public:
-    using value_type = T;
-    using iterator = value_type *;
-    using const_iterator = const value_type *;
-    using allocator_type = pstd::pmr::polymorphic_allocator<pstd::byte>;
-
-    Array2D(allocator_type allocator = {}) : Array2D({{0, 0}, {0, 0}}, allocator) {}
-    Array2D(const Bounds2i &extent, allocator_type allocator = {})
-        : extent(extent), allocator(allocator) {
-        int n = extent.Area();
-        values = allocator.allocate_object<T>(n);
-        for (int i = 0; i < n; ++i)
-            allocator.construct(values + i);
-    }
-    Array2D(const Bounds2i &extent, T def, allocator_type allocator = {})
-        : Array2D(extent, allocator) {
-        std::fill(begin(), end(), def);
-    }
-
-    template <typename InputIt,
-              typename = typename std::enable_if_t<
-                  !std::is_integral<InputIt>::value &&
-                  std::is_base_of<
-                      std::input_iterator_tag,
-                      typename std::iterator_traits<InputIt>::iterator_category>::value>>
-    Array2D(InputIt first, InputIt last, int nx, int ny, allocator_type allocator = {})
-        : Array2D({{0, 0}, {nx, ny}}, allocator) {
-        std::copy(first, last, begin());
-    }
-    Array2D(int nx, int ny, allocator_type allocator = {})
-        : Array2D({{0, 0}, {nx, ny}}, allocator) {}
-    Array2D(int nx, int ny, T def, allocator_type allocator = {})
-        : Array2D({{0, 0}, {nx, ny}}, def, allocator) {}
-    Array2D(const Array2D &a, allocator_type allocator = {})
-        : Array2D(a.begin(), a.end(), a.xSize(), a.ySize(), allocator) {}
-
-    ~Array2D() {
-        int n = extent.Area();
-        for (int i = 0; i < n; ++i)
-            allocator.destroy(values + i);
-        allocator.deallocate_object(values, n);
-    }
-
-    Array2D(Array2D &&a, allocator_type allocator = {})
-        : extent(a.extent), allocator(allocator) {
-        if (allocator == a.allocator) {
-            values = a.values;
-            a.extent = Bounds2i({0, 0}, {0, 0});
-            a.values = nullptr;
-        } else {
-            values = allocator.allocate_object<T>(extent.Area());
-            std::copy(a.begin(), a.end(), begin());
-        }
-    }
-    Array2D &operator=(const Array2D &a) = delete;
-
-    Array2D &operator=(Array2D &&other) {
-        if (allocator == other.allocator) {
-            pstd::swap(extent, other.extent);
-            pstd::swap(values, other.values);
-        } else if (extent == other.extent) {
-            int n = extent.Area();
-            for (int i = 0; i < n; ++i) {
-                allocator.destroy(values + i);
-                allocator.construct(values + i, other.values[i]);
-            }
-            extent = other.extent;
-        } else {
-            int n = extent.Area();
-            for (int i = 0; i < n; ++i)
-                allocator.destroy(values + i);
-            allocator.deallocate_object(values, n);
-
-            int no = other.extent.Area();
-            values = allocator.allocate_object<T>(no);
-            for (int i = 0; i < no; ++i)
-                allocator.construct(values + i, other.values[i]);
-        }
-        return *this;
-    }
-
-    PBRT_CPU_GPU
-    T &operator()(int x, int y) { return (*this)[{x, y}]; }
-    PBRT_CPU_GPU
-    T &operator[](Point2i p) {
-        DCHECK(InsideExclusive(p, extent));
-        p.x -= extent.pMin.x;
-        p.y -= extent.pMin.y;
-        return values[p.x + (extent.pMax.x - extent.pMin.x) * p.y];
-    }
-    PBRT_CPU_GPU
-    const T &operator()(int x, int y) const { return (*this)[{x, y}]; }
-    PBRT_CPU_GPU
-    const T &operator[](Point2i p) const {
-        DCHECK(InsideExclusive(p, extent));
-        p.x -= extent.pMin.x;
-        p.y -= extent.pMin.y;
-        return values[p.x + (extent.pMax.x - extent.pMin.x) * p.y];
-    }
-
-    PBRT_CPU_GPU
-    int size() const { return extent.Area(); }
-    PBRT_CPU_GPU
-    int xSize() const { return extent.pMax.x - extent.pMin.x; }
-    PBRT_CPU_GPU
-    int ySize() const { return extent.pMax.y - extent.pMin.y; }
-
-    PBRT_CPU_GPU
-    iterator begin() { return values; }
-    PBRT_CPU_GPU
-    iterator end() { return begin() + size(); }
-    PBRT_CPU_GPU
-    const_iterator begin() const { return values; }
-    PBRT_CPU_GPU
-    const_iterator end() const { return begin() + size(); }
-
-    PBRT_CPU_GPU
-    operator pstd::span<T>() { return pstd::span<T>(values, size()); }
-    PBRT_CPU_GPU
-    operator pstd::span<const T>() const { return pstd::span<const T>(values, size()); }
-
-    std::string ToString() const {
-        std::string s = StringPrintf("[ Array2D extent: %s values: [", extent);
-        for (int y = extent.pMin.y; y < extent.pMax.y; ++y) {
-            s += " [ ";
-            for (int x = extent.pMin.x; x < extent.pMax.x; ++x) {
-                T value = (*this)(x, y);
-                s += StringPrintf("%s, ", value);
-            }
-            s += "], ";
-        }
-        s += " ] ]";
-        return s;
-    }
-
-  private:
-    Bounds2i extent;
-    allocator_type allocator;
-    T *values;
-};
-
-// Partially inspired by
-// https://github.com/Lunarsong/StructureOfArrays/blob/master/include/soa.h
+// Partially inspired by https://github.com/Lunarsong/StructureOfArrays/blob/master/include/soa.h
 template <typename... Elements>
 class AoSoA {
-  public:
-    template <int N>
-    using TypeOfNth = typename std::tuple_element<N, std::tuple<Elements...>>::type;
+public:
+    template <int N> using TypeOfNth =
+        typename std::tuple_element<N, std::tuple<Elements...>>::type;
 
-    AoSoA() = default;
-    AoSoA(Allocator alloc, size_t n = 0) : alloc(alloc), n(n) {
+    AoSoA() = delete;
+    AoSoA(size_t n, Allocator alloc)
+        : n(n), alloc(alloc) {
         allocSize = ((n + Factor - 1) / Factor) * ChunkSize;
-        if (n > 0) {
-            CHECK_GE(allocSize, n * ElementSize);
-            buffer = (uint8_t *)alloc.allocate_bytes(allocSize, Alignment);
-        }
-    }
-    ~AoSoA() { alloc.deallocate_bytes(buffer, allocSize, Alignment); }
-
-    AoSoA(const AoSoA &other)
-        : alloc(other.alloc), n(other.n), allocSize(other.allocSize) {
+        CHECK_GE(allocSize, n * ElementSize);
         buffer = (uint8_t *)alloc.allocate_bytes(allocSize, Alignment);
-        std::memcpy(buffer, other.buffer, allocSize);
     }
-    AoSoA(AoSoA &&other)
-        : alloc(other.alloc),
-          buffer(other.buffer),
-          n(other.n),
-          allocSize(other.allocSize) {
-        other.n = other.allocSize = 0;
-        other.buffer = nullptr;
-    }
-    AoSoA &operator=(const AoSoA &other) {
-        if (this != &other) {
-            alloc.deallocate_bytes(buffer, allocSize, Alignment);
-
-            n = other.n;
-            allocSize = other.allocSize;
-            buffer = (uint8_t *)alloc.allocate_bytes(allocSize, Alignment);
-            std::memcpy(buffer, other.buffer, allocSize);
-        }
-        return *this;
-    }
-    AoSoA &operator=(AoSoA &&other) {
-        if (this != &other) {
-            if (alloc == other.alloc) {
-                std::swap(n, other.n);
-                std::swap(allocSize, other.allocSize);
-                std::swap(buffer, other.buffer);
-            } else {
-                alloc.deallocate_bytes(buffer, allocSize, Alignment);
-
-                n = other.n;
-                allocSize = other.allocSize;
-                buffer = (uint8_t *)alloc.allocate_bytes(allocSize, Alignment);
-                std::memcpy(buffer, other.buffer, allocSize);
-            }
-        }
-        return *this;
+    ~AoSoA() {
+        alloc.deallocate_bytes(buffer, allocSize, Alignment);
     }
 
-    PBRT_CPU_GPU
+    AoSoA(const AoSoA &) = delete;
+    AoSoA &operator=(const AoSoA &) = delete;
+
+    PBRT_HOST_DEVICE
     size_t size() const { return n; }
 
     template <int Index>
-    PBRT_CPU_GPU TypeOfNth<Index> &at(int offset) {
+    PBRT_HOST_DEVICE
+    TypeOfNth<Index> &at(int offset) {
         DCHECK_LT(offset, size());
 
         return *ptr<Index>(offset);
     }
     template <int Index>
-    PBRT_CPU_GPU const TypeOfNth<Index> &at(int offset) const {
+    PBRT_HOST_DEVICE
+    const TypeOfNth<Index> &at(int offset) const {
         DCHECK_LT(offset, size());
 
         return *ptr<Index>(offset);
     }
 
     template <int Index>
-    PBRT_CPU_GPU TypeOfNth<Index> *ptr(int offset) {
+    PBRT_HOST_DEVICE
+    TypeOfNth<Index> *ptr(int offset) {
         DCHECK_LT(offset, size());
 
         using ElementType = TypeOfNth<Index>;
@@ -347,7 +80,8 @@ class AoSoA {
         return ((ElementType *)chunkPtr);
     }
     template <int Index>
-    PBRT_CPU_GPU const TypeOfNth<Index> *ptr(int offset) const {
+    PBRT_HOST_DEVICE
+    const TypeOfNth<Index> *ptr(int offset) const {
         DCHECK_LT(offset, size());
 
         using ElementType = TypeOfNth<Index>;
@@ -361,22 +95,142 @@ class AoSoA {
         return (ElementType *)chunkPtr;
     }
 
-  private:
+private:
     static constexpr int Alignment = 128;
     static constexpr int Factor = 32;
     static constexpr size_t ElementSize = sizeof(std::tuple<Elements...>);
     // Make sure each chunk starts out aligned
-    static constexpr size_t ChunkSize =
-        (Factor * ElementSize + Alignment - 1) & ~(Alignment - 1);
+    static constexpr size_t ChunkSize = (Factor * ElementSize + Alignment - 1) & ~(Alignment - 1);
 
+    uint8_t *buffer;
+    size_t n, allocSize;
     Allocator alloc;
-    uint8_t *buffer = nullptr;
-    size_t n = 0, allocSize = 0;
+};
+
+template <typename... Elements>
+class SoA {
+public:
+    template <int N> using TypeOfNth =
+        typename std::tuple_element<N, std::tuple<Elements...>>::type;
+
+    SoA() = delete;
+    SoA(size_t n, Allocator alloc)
+        : n(n), alloc(alloc) {
+        size_t allocSize = n * ElementSize;  // may be too much if there's padding
+        buffer = (uint8_t *)alloc.allocate_bytes(allocSize, Alignment);
+    }
+    ~SoA() {
+        alloc.deallocate_bytes(buffer, n * ElementSize, Alignment);
+    }
+
+    SoA(const SoA &) = delete;
+    SoA &operator=(const SoA &) = delete;
+
+    PBRT_HOST_DEVICE
+    size_t size() const { return n; }
+
+    template <int Index>
+    PBRT_HOST_DEVICE_INLINE
+    TypeOfNth<Index> &at(int offset) {
+        return *ptr<Index>(offset);
+    }
+    template <int Index>
+    PBRT_HOST_DEVICE_INLINE
+    const TypeOfNth<Index> &at(int offset) const {
+        return *ptr<Index>(offset);
+    }
+
+    template <int Index>
+    PBRT_HOST_DEVICE_INLINE
+    TypeOfNth<Index> *ptr(int offset) {
+        DCHECK_LT(offset, size());
+
+        using ElementType = TypeOfNth<Index>;
+        uint8_t *chunkPtr = buffer + detail::ElementOffset<Index, Elements...>::offset * n;
+        chunkPtr += offset * sizeof(ElementType);
+        return (ElementType *)chunkPtr;
+    }
+    template <int Index>
+    PBRT_HOST_DEVICE_INLINE
+    const TypeOfNth<Index> *ptr(int offset) const {
+        DCHECK_LT(offset, size());
+
+        using ElementType = TypeOfNth<Index>;
+        uint8_t *chunkPtr = buffer + detail::ElementOffset<Index, Elements...>::offset * n;
+        chunkPtr += offset * sizeof(ElementType);
+        return (ElementType *)chunkPtr;
+    }
+
+private:
+    static constexpr size_t ElementSize = sizeof(std::tuple<Elements...>);
+
+    static constexpr int Alignment = 128;
+    uint8_t *buffer;
+    size_t n;
+    Allocator alloc;
+};
+
+template <typename T, int N>
+class SOAArray {
+public:
+    SOAArray() = delete;
+    SOAArray(const SOAArray &) = delete;
+    SOAArray &operator=(const SOAArray &) = delete;
+
+    SOAArray(size_t n, Allocator alloc)
+        : n(n), alloc(alloc) {
+        for (int i = 0; i < N; ++i)
+            ptrs[i] = alloc.allocate_object<T>(n);
+    }
+    ~SOAArray() {
+        for (int i = 0; i < N; ++i)
+            alloc.deallocate_object<T>(ptrs[i], n);
+    }
+
+    PBRT_HOST_DEVICE
+    std::array<T, N> at(int offset) const {
+        DCHECK_LT(offset, n);
+        std::array<T, N> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = ptrs[i][offset];
+        return result;
+    }
+
+    template <typename Ta, int Na> struct ArrayRef {
+        PBRT_HOST_DEVICE
+        void operator=(const pstd::array<Ta, Na> &a) {
+            for (int i = 0; i < Na; ++i)
+                *(ptrs[i]) = a[i];
+        }
+
+        PBRT_HOST_DEVICE
+        operator pstd::array<Ta, Na>() const {
+            pstd::array<Ta, Na> a;
+            for (int i = 0; i < Na; ++i)
+                a[i] = *(ptrs[i]);
+            return a;
+        }
+
+        pstd::array<Ta *, Na> ptrs;
+    };
+
+    PBRT_HOST_DEVICE
+    ArrayRef<T, N> at(int offset) {
+        ArrayRef<T, N> ref;
+        for (int i = 0; i < N; ++i)
+            ref.ptrs[i] = &ptrs[i][offset];
+        return ref;
+    }
+
+private:
+    size_t n;
+    Allocator alloc;
+    pstd::array<T *, N> ptrs;
 };
 
 template <typename T, int N, class Allocator = pstd::pmr::polymorphic_allocator<T>>
 class InlinedVector {
-  public:
+public:
     using value_type = T;
     using allocator_type = Allocator;
     using size_type = std::size_t;
@@ -390,7 +244,8 @@ class InlinedVector {
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-    InlinedVector(const Allocator &alloc = {}) : alloc(alloc) {}
+    InlinedVector(const Allocator &alloc = {})
+        : alloc(alloc) {}
     InlinedVector(size_t count, const T &value, const Allocator &alloc = {})
         : alloc(alloc) {
         reserve(count);
@@ -399,7 +254,7 @@ class InlinedVector {
         nStored = count;
     }
     InlinedVector(size_t count, const Allocator &alloc = {})
-        : InlinedVector(count, T{}, alloc) {}
+        : InlinedVector(count, T{}, alloc) { }
     InlinedVector(const InlinedVector &other, const Allocator &alloc = {})
         : alloc(alloc) {
         reserve(other.size());
@@ -414,15 +269,16 @@ class InlinedVector {
         for (InputIt iter = first; iter != last; ++iter, ++nStored)
             this->alloc.template construct<T>(begin() + nStored, *iter);
     }
-    InlinedVector(InlinedVector &&other) : alloc(other.alloc) {
+    InlinedVector(InlinedVector &&other)
+        : alloc(other.alloc) {
         nStored = other.nStored;
         nAlloc = other.nAlloc;
         ptr = other.ptr;
         if (other.nStored <= N)
             for (int i = 0; i < other.nStored; ++i)
                 alloc.template construct<T>(fixed + i, std::move(other.fixed[i]));
-        // Leave other.nStored as is, so that the detrius left after we
-        // moved out of fixed has its destructors run...
+            // Leave other.nStored as is, so that the detrius left after we
+            // moved out of fixed has its destructors run...
         else
             other.nStored = 0;
 
@@ -450,7 +306,7 @@ class InlinedVector {
         }
     }
     InlinedVector(std::initializer_list<T> init, const Allocator &alloc = {})
-        : InlinedVector(init.begin(), init.end(), alloc) {}
+        : InlinedVector(init.begin(), init.end(), alloc) { }
 
     InlinedVector &operator=(const InlinedVector &other) {
         if (this == &other)
@@ -476,7 +332,7 @@ class InlinedVector {
             if (nStored > 0 && ptr == nullptr) {
                 for (int i = 0; i < nStored; ++i)
                     alloc.template construct<T>(fixed + i, std::move(other.fixed[i]));
-                other.nStored = nStored;  // so that dtors run...
+                other.nStored = nStored; // so that dtors run...
             }
         } else {
             reserve(other.size());
@@ -509,43 +365,45 @@ class InlinedVector {
         // TODO
         LOG_FATAL("TODO");
     }
-    void assign(std::initializer_list<T> &init) { assign(init.begin(), init.end()); }
+    void assign(std::initializer_list<T> &init) {
+        assign(init.begin(), init.end());
+    }
 
     ~InlinedVector() {
         clear();
         alloc.deallocate_object(ptr, nAlloc);
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     iterator begin() { return ptr ? ptr : fixed; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     iterator end() { return begin() + nStored; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_iterator begin() const { return ptr ? ptr : fixed; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_iterator end() const { return begin() + nStored; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_iterator cbegin() const { return ptr ? ptr : fixed; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_iterator cend() const { return begin() + nStored; }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     reverse_iterator rbegin() { return reverse_iterator(end()); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     reverse_iterator rend() { return reverse_iterator(begin()); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
 
     allocator_type get_allocator() const { return alloc; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     size_t size() const { return nStored; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     bool empty() const { return size() == 0; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     size_t max_size() const { return (size_t)-1; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     size_t capacity() const { return ptr ? nAlloc : N; }
 
     void reserve(size_t n) {
@@ -564,27 +422,27 @@ class InlinedVector {
     }
     // TODO: shrink_to_fit
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     reference operator[](size_type index) {
         DCHECK_LT(index, size());
         return begin()[index];
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_reference operator[](size_type index) const {
         DCHECK_LT(index, size());
         return begin()[index];
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     reference front() { return *begin(); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_reference front() const { return *begin(); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     reference back() { return *(begin() + nStored - 1); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_reference back() const { return *(begin() + nStored - 1); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     pointer data() { return ptr ? ptr : fixed; }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const_pointer data() const { return ptr ? ptr : fixed; }
 
     void clear() {
@@ -625,19 +483,18 @@ class InlinedVector {
     }
 
     template <class... Args>
-    iterator emplace(const_iterator pos, Args &&... args) {
+    iterator emplace(const_iterator pos, Args&&... args) {
         // TODO
         LOG_FATAL("TODO");
     }
     template <class... Args>
-    void emplace_back(Args &&... args) {
+    void emplace_back(Args&&... args) {
         // TODO
         LOG_FATAL("TODO");
     }
 
     iterator erase(const_iterator cpos) {
-        iterator pos =
-            begin() + (cpos - begin());  // non-const iterator, thank you very much
+        iterator pos = begin() + (cpos - begin());  // non-const iterator, thank you very much
         while (pos != end() - 1) {
             *pos = std::move(*(pos + 1));
             ++pos;
@@ -692,7 +549,7 @@ class InlinedVector {
         LOG_FATAL("TODO");
     }
 
-  private:
+private:
     Allocator alloc;
     // ptr non-null is discriminator for whether fixed[] is valid...
     T *ptr = nullptr;
@@ -702,47 +559,52 @@ class InlinedVector {
     size_t nAlloc = 0, nStored = 0;
 };
 
+
 template <typename Key, typename Value, typename Hash,
-          typename Allocator =
-              pstd::pmr::polymorphic_allocator<pstd::optional<std::pair<Key, Value>>>>
+          typename Allocator = pstd::pmr::polymorphic_allocator<pstd::optional<std::pair<Key, Value>>>>
 class HashMap {
-  public:
+public:
     using TableEntry = pstd::optional<std::pair<Key, Value>>;
 
     class Iterator {
-      public:
-        PBRT_CPU_GPU
+    public:
+        PBRT_HOST_DEVICE
         Iterator &operator++() {
             while (++ptr < end && !ptr->has_value())
                 ;
             return *this;
         }
 
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         Iterator operator++(int) {
             Iterator old = *this;
             operator++();
             return old;
         }
 
-        PBRT_CPU_GPU
-        bool operator==(const Iterator &iter) const { return ptr == iter.ptr; }
-        PBRT_CPU_GPU
-        bool operator!=(const Iterator &iter) const { return ptr != iter.ptr; }
+        PBRT_HOST_DEVICE
+        bool operator==(const Iterator &iter) const {
+            return ptr == iter.ptr;
+        }
+        PBRT_HOST_DEVICE
+        bool operator!=(const Iterator &iter) const {
+            return ptr != iter.ptr;
+        }
 
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         std::pair<Key, Value> &operator*() { return ptr->value(); }
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         const std::pair<Key, Value> &operator*() const { return ptr->value(); }
 
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         std::pair<Key, Value> *operator->() { return &ptr->value(); }
-        PBRT_CPU_GPU
+        PBRT_HOST_DEVICE
         const std::pair<Key, Value> *operator->() const { return ptr->value(); }
 
-      private:
+    private:
         friend class HashMap;
-        Iterator(TableEntry *ptr, TableEntry *end) : ptr(ptr), end(end) {}
+        Iterator(TableEntry *ptr, TableEntry *end)
+            : ptr(ptr), end(end) { }
         TableEntry *ptr;
         TableEntry *end;
     };
@@ -750,7 +612,8 @@ class HashMap {
     using iterator = Iterator;
     using const_iterator = const iterator;
 
-    HashMap(Allocator alloc) : table(8, alloc), alloc(alloc) {}
+    HashMap(Allocator alloc)
+        : table(8, alloc), alloc(alloc) { }
     HashMap(const HashMap &) = delete;
     HashMap &operator=(const HashMap &) = delete;
 
@@ -766,43 +629,50 @@ class HashMap {
         table[offset] = std::make_pair(key, value);
     }
 
-    PBRT_CPU_GPU
-    bool HasKey(const Key &key) const { return table[FindOffset(key)].has_value(); }
+    PBRT_HOST_DEVICE
+    bool HasKey(const Key &key) const {
+        return table[FindOffset(key)].has_value();
+    }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     const Value &operator[](const Key &key) const {
         size_t offset = FindOffset(key);
         CHECK(table[offset].has_value());
         return table[offset]->second;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     iterator begin() {
         Iterator iter(table.data(), table.data() + table.size());
         while (iter.ptr < iter.end && !iter.ptr->has_value())
             ++iter.ptr;
         return iter;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     iterator end() {
         return Iterator(table.data() + table.size(), table.data() + table.size());
     }
 
-    PBRT_CPU_GPU
-    size_t size() const { return nStored; }
-    PBRT_CPU_GPU
-    size_t capacity() const { return table.size(); }
+    PBRT_HOST_DEVICE
+    size_t size() const {
+        return nStored;
+    }
+    PBRT_HOST_DEVICE
+    size_t capacity() const {
+        return table.size();
+    }
 
-    void Clear() { table.clear(); }
+    void Clear() {
+        table.clear();
+    }
 
-  private:
-    PBRT_CPU_GPU
+private:
+    PBRT_HOST_DEVICE
     size_t FindOffset(const Key &key) const {
         size_t baseOffset = Hash()(key) & (capacity() - 1);
         for (int nProbes = 0;; ++nProbes) {
             // Quadratic probing.
-            size_t offset =
-                (baseOffset + nProbes / 2 + nProbes * nProbes / 2) & (capacity() - 1);
+            size_t offset = (baseOffset + nProbes/2 + nProbes*nProbes/2) & (capacity() - 1);
             if (table[offset].has_value() == false || key == table[offset]->first) {
                 return offset;
             }
@@ -821,8 +691,7 @@ class HashMap {
             size_t baseOffset = Hash()(table[i]->first) & (newCapacity - 1);
             for (int nProbes = 0;; ++nProbes) {
                 // Quadratic probing.
-                size_t offset = (baseOffset + nProbes / 2 + nProbes * nProbes / 2) &
-                                (newCapacity - 1);
+                size_t offset = (baseOffset + nProbes/2 + nProbes*nProbes/2) & (newCapacity - 1);
                 if (!newTable[offset]) {
                     newTable[offset] = std::move(*table[i]);
                     break;
@@ -838,110 +707,6 @@ class HashMap {
     Allocator alloc;
 };
 
-template <typename S, typename Index>
-class TypedIndexSpan {
-  public:
-    TypedIndexSpan() = default;
-    PBRT_CPU_GPU
-    TypedIndexSpan(pstd::span<S> span) : span(span) {}
+} // namespace pbrt
 
-    PBRT_CPU_GPU
-    const S &operator[](Index index) const { return span[(size_t)index]; }
-
-    PBRT_CPU_GPU
-    S &operator[](Index index) { return span[(size_t)index]; }
-
-    PBRT_CPU_GPU
-    size_t size() const { return span.size(); }
-    PBRT_CPU_GPU
-    bool empty() const { return span.empty(); }
-
-    auto begin() { return span.begin(); }
-    auto end() { return span.end(); }
-    auto begin() const { return span.begin(); }
-    auto end() const { return span.end(); }
-
-  private:
-    pstd::span<S> span;
-};
-
-template <typename T>
-class SampledGrid {
-public:
-    using const_iterator = typename pstd::vector<T>::const_iterator;
-
-    SampledGrid() = default;
-    SampledGrid(Allocator alloc) : values(alloc) { }
-    SampledGrid(pstd::span<const T> v, int nx, int ny, int nz,
-                Allocator alloc)
-        : values(v.begin(), v.end(), alloc), nx(nx), ny(ny), nz(nz) {
-        CHECK_EQ(nx * ny * nz, values.size());
-    }
-
-    size_t BytesAllocated() const { return values.size() * sizeof(T); }
-
-    int xSize() const { return nx; }
-    int ySize() const { return ny; }
-    int zSize() const { return nz; }
-
-    const_iterator begin() const { return values.begin(); }
-    const_iterator end() const { return values.end(); }
-
-    PBRT_CPU_GPU
-    T Lookup(const Point3f &p) const {
-        // Compute voxel coordinates and offsets for _p_
-        Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
-        Point3i pi = (Point3i)Floor(pSamples);
-        Vector3f d = pSamples - (Point3f)pi;
-
-        // Trilinearly interpolate density values to compute local density
-        T d00 = Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
-        T d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)), Lookup(pi + Vector3i(1, 1, 0)));
-        T d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)), Lookup(pi + Vector3i(1, 0, 1)));
-        T d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)), Lookup(pi + Vector3i(1, 1, 1)));
-        T d0 = Lerp(d.y, d00, d10);
-        T d1 = Lerp(d.y, d01, d11);
-        return Lerp(d.z, d0, d1);
-    }
-
-    PBRT_CPU_GPU
-    T Lookup(const Point3i &p) const {
-        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
-        if (!InsideExclusive(p, sampleBounds))
-            return {};
-        return values[(p.z * ny + p.y) * nx + p.x];
-    }
-
-    T MaximumValue(const Bounds3f &bounds) const {
-        Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                                 bounds.pMin.z * nz - .5f),
-                         Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                                 bounds.pMax.z * nz - .5f)};
-        Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-                         Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
-                             Point3i(nx - 1, ny - 1, nz - 1))};
-
-        T maxValue = Lookup(Point3i(pi[0]));
-        for (int z = pi[0].z; z <= pi[1].z; ++z)
-            for (int y = pi[0].y; y <= pi[1].y; ++y)
-                for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                    using std::max;
-                    maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
-                }
-
-        return maxValue;
-    }
-
-    std::string ToString() const {
-        return StringPrintf("[ SampledGrid nx: %d ny: %d nz: %d values: %s ]", nx, ny, nz,
-                            values);
-    }
-
-private:
-    pstd::vector<T> values;
-    int nx, ny, nz;
-};
-
-}  // namespace pbrt
-
-#endif  // PBRT_CONTAINERS_H
+#endif // PBRT_CONTAINERS_H

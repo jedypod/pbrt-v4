@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,45 +41,49 @@
 // geometry/splines.h*
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/vecmath.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
-#include <pbrt/util/vecmath.h>
 
 namespace pbrt {
 
 template <typename P>
-PBRT_CPU_GPU inline P BlossomCubicBezier(pstd::span<const P> p, Float u0, Float u1,
-                                         Float u2) {
-    P a[3] = {Lerp(u0, p[0], p[1]), Lerp(u0, p[1], p[2]), Lerp(u0, p[2], p[3])};
-    P b[2] = {Lerp(u1, a[0], a[1]), Lerp(u1, a[1], a[2])};
+PBRT_HOST_DEVICE_INLINE
+P BlossomCubicBezier(pstd::span<const P> p, Float u0, Float u1, Float u2) {
+    P a[3] = { Lerp(u0, p[0], p[1]), Lerp(u0, p[1], p[2]),
+               Lerp(u0, p[2], p[3]) };
+    P b[2] = { Lerp(u1, a[0], a[1]), Lerp(u1, a[1], a[2]) };
     return Lerp(u2, b[0], b[1]);
 }
 
 template <typename P>
-PBRT_CPU_GPU inline pstd::array<P, 7> SubdivideCubicBezier(pstd::span<const P> cp) {
-    return {cp[0],
-            (cp[0] + cp[1]) / 2,
-            (cp[0] + 2 * cp[1] + cp[2]) / 4,
-            (cp[0] + 3 * cp[1] + 3 * cp[2] + cp[3]) / 8,
-            (cp[1] + 2 * cp[2] + cp[3]) / 4,
-            (cp[2] + cp[3]) / 2,
-            cp[3]};
+PBRT_HOST_DEVICE_INLINE
+pstd::array<P, 7> SubdivideCubicBezier(pstd::span<const P> cp) {
+    return { cp[0],
+             (cp[0] + cp[1]) / 2,
+             (cp[0] + 2 * cp[1] + cp[2]) / 4,
+             (cp[0] + 3 * cp[1] + 3 * cp[2] + cp[3]) / 8,
+             (cp[1] + 2 * cp[2] + cp[3]) / 4,
+             (cp[2] + cp[3]) / 2,
+             cp[3] };
 }
 
 template <typename P, typename V>
-PBRT_CPU_GPU inline P EvaluateCubicBezier(pstd::span<const P> cp, Float u, V *deriv) {
-    P cp1[3] = {Lerp(u, cp[0], cp[1]), Lerp(u, cp[1], cp[2]), Lerp(u, cp[2], cp[3])};
-    P cp2[2] = {Lerp(u, cp1[0], cp1[1]), Lerp(u, cp1[1], cp1[2])};
+PBRT_HOST_DEVICE_INLINE
+P EvaluateCubicBezier(pstd::span<const P> cp, Float u, V *deriv) {
+    P cp1[3] = { Lerp(u, cp[0], cp[1]), Lerp(u, cp[1], cp[2]),
+                 Lerp(u, cp[2], cp[3]) };
+    P cp2[2] = { Lerp(u, cp1[0], cp1[1]), Lerp(u, cp1[1], cp1[2]) };
     if (deriv != nullptr) {
         if (LengthSquared(cp2[1] - cp2[0]) > 0)
             *deriv = 3 * (cp2[1] - cp2[0]);
         else {
             // For a cubic Bezier, if the first three control points (say) are
-            // coincident, then the derivative of the curve is legitimately
-            // (0,0,0) at u=0.  This is problematic for us, though, since we'd
-            // like to be able to compute a surface normal there.  In that case,
-            // just punt and take the difference between the first and last
-            // control points, which ain't great, but will hopefully do.
+            // coincident, then the derivative of the curve is legitimately (0,0,0)
+            // at u=0.  This is problematic for us, though, since we'd like to be
+            // able to compute a surface normal there.  In that case, just punt and
+            // take the difference between the first and last control points, which
+            // ain't great, but will hopefully do.
             *deriv = cp[3] - cp[0];
         }
     }
@@ -59,23 +91,26 @@ PBRT_CPU_GPU inline P EvaluateCubicBezier(pstd::span<const P> cp, Float u, V *de
 }
 
 template <typename P>
-PBRT_CPU_GPU inline P EvaluateCubicBezier(pstd::span<const P> cp, Float u) {
-    P cp1[3] = {Lerp(u, cp[0], cp[1]), Lerp(u, cp[1], cp[2]), Lerp(u, cp[2], cp[3])};
-    P cp2[2] = {Lerp(u, cp1[0], cp1[1]), Lerp(u, cp1[1], cp1[2])};
+PBRT_HOST_DEVICE_INLINE
+P EvaluateCubicBezier(pstd::span<const P> cp, Float u) {
+    P cp1[3] = { Lerp(u, cp[0], cp[1]), Lerp(u, cp[1], cp[2]),
+                 Lerp(u, cp[2], cp[3]) };
+    P cp2[2] = { Lerp(u, cp1[0], cp1[1]), Lerp(u, cp1[1], cp1[2]) };
     return Lerp(u, cp2[0], cp2[1]);
 }
 
 template <typename P>
-PBRT_CPU_GPU inline pstd::array<P, 4> CubicBezierControlPoints(pstd::span<const P> cp,
-                                                               Float uMin, Float uMax) {
-    return {BlossomCubicBezier(cp, uMin, uMin, uMin),
-            BlossomCubicBezier(cp, uMin, uMin, uMax),
-            BlossomCubicBezier(cp, uMin, uMax, uMax),
-            BlossomCubicBezier(cp, uMax, uMax, uMax)};
+PBRT_HOST_DEVICE_INLINE
+pstd::array<P, 4> CubicBezierControlPoints(pstd::span<const P> cp, Float uMin, Float uMax) {
+    return { BlossomCubicBezier(cp, uMin, uMin, uMin),
+             BlossomCubicBezier(cp, uMin, uMin, uMax),
+             BlossomCubicBezier(cp, uMin, uMax, uMax),
+             BlossomCubicBezier(cp, uMax, uMax, uMax) };
 }
 
 template <typename B, typename P>
-PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp) {
+PBRT_HOST_DEVICE_INLINE
+B BoundCubicBezier(pstd::span<const P> cp) {
 #if 1
     return Union(B(cp[0], cp[1]), B(cp[2], cp[3]));
 #else
@@ -85,7 +120,7 @@ PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp) {
         Float mi = std::min(cp[0][i], cp[3][i]), ma = std::max(cp[0][i], cp[3][i]);
 
         Float c = -1.0 * cp[0][i] + 1.0 * cp[1][i];
-        Float b = 1.0 * cp[0][i] - 2.0 * cp[1][i] + 1.0 * cp[2][i];
+        Float b =  1.0 * cp[0][i] - 2.0 * cp[1][i] + 1.0 * cp[2][i];
         Float a = -1.0 * cp[0][i] + 3.0 * cp[1][i] - 3.0 * cp[2][i] + 1.0 * cp[3][i];
 
         Float h = b * b - a * c;
@@ -97,10 +132,10 @@ PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp) {
             Float s1 = 1 - t1;
             Float t2 = Clamp((-b + g) / a, 0, 1);
             Float s2 = 1 - t2;
-            Float q1 = (s1 * s1 * s1 * cp[0][i] + 3.0 * s1 * s1 * t1 * cp[1][i] +
-                        3.0 * s1 * t1 * t1 * cp[2][i] + t1 * t1 * t1 * cp[3][i]);
-            Float q2 = (s2 * s2 * s2 * cp[0][i] + 3.0 * s2 * s2 * t2 * cp[1][i] +
-                        3.0 * s2 * t2 * t2 * cp[2][i] + t2 * t2 * t2 * cp[3][i]);
+            Float q1 = (s1*s1*s1*cp[0][i] + 3.0*s1*s1*t1*cp[1][i] +
+                        3.0*s1*t1*t1*cp[2][i] + t1*t1*t1*cp[3][i]);
+            Float q2 = (s2*s2*s2*cp[0][i] + 3.0*s2*s2*t2*cp[1][i] +
+                        3.0*s2*t2*t2*cp[2][i] + t2*t2*t2*cp[3][i]);
 
             mi = std::min(mi, std::min(q1, q2));
             ma = std::max(ma, std::max(q1, q2));
@@ -114,7 +149,8 @@ PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp) {
 }
 
 template <typename B, typename P>
-PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp, Float uMin, Float uMax) {
+PBRT_HOST_DEVICE_INLINE
+B BoundCubicBezier(pstd::span<const P> cp, Float uMin, Float uMax) {
     if (uMin == 0 && uMax == 1)
         return BoundCubicBezier<B>(cp);
     pstd::array<P, 4> cpSeg = CubicBezierControlPoints(cp, uMin, uMax);
@@ -122,13 +158,17 @@ PBRT_CPU_GPU inline B BoundCubicBezier(pstd::span<const P> cp, Float uMin, Float
 }
 
 template <typename P>
-PBRT_CPU_GPU inline pstd::array<P, 4> ElevateQuadraticBezierToCubic(
-    pstd::span<const P> cp) {
-    return {cp[0], Lerp(2.f / 3.f, cp[0], cp[1]), Lerp(1.f / 3.f, cp[1], cp[2]), cp[2]};
+PBRT_HOST_DEVICE_INLINE
+pstd::array<P, 4> ElevateQuadraticBezierToCubic(pstd::span<const P> cp) {
+    return { cp[0],
+             Lerp(2.f/3.f, cp[0], cp[1]),
+             Lerp(1.f/3.f, cp[1], cp[2]),
+             cp[2] };
 }
 
 template <typename P>
-PBRT_CPU_GPU inline pstd::array<P, 3> QuadraticBSplineToBezier(pstd::span<const P> cp) {
+PBRT_HOST_DEVICE_INLINE
+pstd::array<P, 3> QuadraticBSplineToBezier(pstd::span<const P> cp) {
     // We can compute equivalent Bezier control points via some blossiming.
     // We have three control points and a uniform knot vector; we'll label
     // the points p01, p12, and p23.  We want the Bezier control points of
@@ -136,25 +176,26 @@ PBRT_CPU_GPU inline pstd::array<P, 3> QuadraticBSplineToBezier(pstd::span<const 
     // p12.
     P p11 = Lerp(0.5, cp[0], cp[1]);
     P p22 = Lerp(0.5, cp[1], cp[2]);
-    return {p11, cp[1], p22};
+    return { p11, cp[1], p22 };
 }
 
 template <typename P>
-PBRT_CPU_GPU inline pstd::array<P, 4> CubicBSplineToBezier(pstd::span<const P> cp) {
+PBRT_HOST_DEVICE_INLINE
+pstd::array<P, 4> CubicBSplineToBezier(pstd::span<const P> cp) {
     // Blossom from p012, p123, p234, and p345 to the Bezier control points
     // p222, p223, p233, and p333.
     // https://people.eecs.berkeley.edu/~sequin/CS284/IMGS/cubicbsplinepoints.gif
     P p012 = cp[0], p123 = cp[1], p234 = cp[2], p345 = cp[3];
 
-    P p122 = Lerp(2.f / 3.f, p012, p123);
-    P p223 = Lerp(1.f / 3.f, p123, p234);
-    P p233 = Lerp(2.f / 3.f, p123, p234);
-    P p334 = Lerp(1.f / 3.f, p234, p345);
+    P p122 = Lerp(2.f/3.f, p012, p123);
+    P p223 = Lerp(1.f/3.f, p123, p234);
+    P p233 = Lerp(2.f/3.f, p123, p234);
+    P p334 = Lerp(1.f/3.f, p234, p345);
 
     P p222 = Lerp(0.5f, p122, p223);
     P p333 = Lerp(0.5f, p233, p334);
 
-    return {p222, p223, p233, p333};
+    return { p222, p223, p233, p333 };
 }
 
 }  // namespace pbrt

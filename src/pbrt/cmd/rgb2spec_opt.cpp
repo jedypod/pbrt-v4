@@ -1,10 +1,6 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
-
 #if defined(_MSC_VER)
-#define NOMINMAX
-#define strcasecmp _stricmp
+#  define NOMINMAX
+#  define strcasecmp _stricmp
 #endif
 
 #include <assert.h>
@@ -37,103 +33,122 @@
  */
 #define CIE_LAMBDA_MIN 360.0
 #define CIE_LAMBDA_MAX 830.0
-#define CIE_SAMPLES 95
+#define CIE_SAMPLES    95
 
 const double cie_x[CIE_SAMPLES] = {
-    0.000129900000, 0.000232100000, 0.000414900000, 0.000741600000, 0.001368000000,
-    0.002236000000, 0.004243000000, 0.007650000000, 0.014310000000, 0.023190000000,
-    0.043510000000, 0.077630000000, 0.134380000000, 0.214770000000, 0.283900000000,
-    0.328500000000, 0.348280000000, 0.348060000000, 0.336200000000, 0.318700000000,
-    0.290800000000, 0.251100000000, 0.195360000000, 0.142100000000, 0.095640000000,
-    0.057950010000, 0.032010000000, 0.014700000000, 0.004900000000, 0.002400000000,
-    0.009300000000, 0.029100000000, 0.063270000000, 0.109600000000, 0.165500000000,
-    0.225749900000, 0.290400000000, 0.359700000000, 0.433449900000, 0.512050100000,
-    0.594500000000, 0.678400000000, 0.762100000000, 0.842500000000, 0.916300000000,
-    0.978600000000, 1.026300000000, 1.056700000000, 1.062200000000, 1.045600000000,
-    1.002600000000, 0.938400000000, 0.854449900000, 0.751400000000, 0.642400000000,
-    0.541900000000, 0.447900000000, 0.360800000000, 0.283500000000, 0.218700000000,
-    0.164900000000, 0.121200000000, 0.087400000000, 0.063600000000, 0.046770000000,
-    0.032900000000, 0.022700000000, 0.015840000000, 0.011359160000, 0.008110916000,
-    0.005790346000, 0.004109457000, 0.002899327000, 0.002049190000, 0.001439971000,
-    0.000999949300, 0.000690078600, 0.000476021300, 0.000332301100, 0.000234826100,
-    0.000166150500, 0.000117413000, 0.000083075270, 0.000058706520, 0.000041509940,
-    0.000029353260, 0.000020673830, 0.000014559770, 0.000010253980, 0.000007221456,
-    0.000005085868, 0.000003581652, 0.000002522525, 0.000001776509, 0.000001251141};
+    0.000129900000, 0.000232100000, 0.000414900000, 0.000741600000,
+    0.001368000000, 0.002236000000, 0.004243000000, 0.007650000000,
+    0.014310000000, 0.023190000000, 0.043510000000, 0.077630000000,
+    0.134380000000, 0.214770000000, 0.283900000000, 0.328500000000,
+    0.348280000000, 0.348060000000, 0.336200000000, 0.318700000000,
+    0.290800000000, 0.251100000000, 0.195360000000, 0.142100000000,
+    0.095640000000, 0.057950010000, 0.032010000000, 0.014700000000,
+    0.004900000000, 0.002400000000, 0.009300000000, 0.029100000000,
+    0.063270000000, 0.109600000000, 0.165500000000, 0.225749900000,
+    0.290400000000, 0.359700000000, 0.433449900000, 0.512050100000,
+    0.594500000000, 0.678400000000, 0.762100000000, 0.842500000000,
+    0.916300000000, 0.978600000000, 1.026300000000, 1.056700000000,
+    1.062200000000, 1.045600000000, 1.002600000000, 0.938400000000,
+    0.854449900000, 0.751400000000, 0.642400000000, 0.541900000000,
+    0.447900000000, 0.360800000000, 0.283500000000, 0.218700000000,
+    0.164900000000, 0.121200000000, 0.087400000000, 0.063600000000,
+    0.046770000000, 0.032900000000, 0.022700000000, 0.015840000000,
+    0.011359160000, 0.008110916000, 0.005790346000, 0.004109457000,
+    0.002899327000, 0.002049190000, 0.001439971000, 0.000999949300,
+    0.000690078600, 0.000476021300, 0.000332301100, 0.000234826100,
+    0.000166150500, 0.000117413000, 0.000083075270, 0.000058706520,
+    0.000041509940, 0.000029353260, 0.000020673830, 0.000014559770,
+    0.000010253980, 0.000007221456, 0.000005085868, 0.000003581652,
+    0.000002522525, 0.000001776509, 0.000001251141 };
 
 const double cie_y[CIE_SAMPLES] = {
-    0.000003917000, 0.000006965000, 0.000012390000, 0.000022020000, 0.000039000000,
-    0.000064000000, 0.000120000000, 0.000217000000, 0.000396000000, 0.000640000000,
-    0.001210000000, 0.002180000000, 0.004000000000, 0.007300000000, 0.011600000000,
-    0.016840000000, 0.023000000000, 0.029800000000, 0.038000000000, 0.048000000000,
-    0.060000000000, 0.073900000000, 0.090980000000, 0.112600000000, 0.139020000000,
-    0.169300000000, 0.208020000000, 0.258600000000, 0.323000000000, 0.407300000000,
-    0.503000000000, 0.608200000000, 0.710000000000, 0.793200000000, 0.862000000000,
-    0.914850100000, 0.954000000000, 0.980300000000, 0.994950100000, 1.000000000000,
-    0.995000000000, 0.978600000000, 0.952000000000, 0.915400000000, 0.870000000000,
-    0.816300000000, 0.757000000000, 0.694900000000, 0.631000000000, 0.566800000000,
-    0.503000000000, 0.441200000000, 0.381000000000, 0.321000000000, 0.265000000000,
-    0.217000000000, 0.175000000000, 0.138200000000, 0.107000000000, 0.081600000000,
-    0.061000000000, 0.044580000000, 0.032000000000, 0.023200000000, 0.017000000000,
-    0.011920000000, 0.008210000000, 0.005723000000, 0.004102000000, 0.002929000000,
-    0.002091000000, 0.001484000000, 0.001047000000, 0.000740000000, 0.000520000000,
-    0.000361100000, 0.000249200000, 0.000171900000, 0.000120000000, 0.000084800000,
-    0.000060000000, 0.000042400000, 0.000030000000, 0.000021200000, 0.000014990000,
-    0.000010600000, 0.000007465700, 0.000005257800, 0.000003702900, 0.000002607800,
-    0.000001836600, 0.000001293400, 0.000000910930, 0.000000641530, 0.000000451810};
+    0.000003917000, 0.000006965000, 0.000012390000, 0.000022020000,
+    0.000039000000, 0.000064000000, 0.000120000000, 0.000217000000,
+    0.000396000000, 0.000640000000, 0.001210000000, 0.002180000000,
+    0.004000000000, 0.007300000000, 0.011600000000, 0.016840000000,
+    0.023000000000, 0.029800000000, 0.038000000000, 0.048000000000,
+    0.060000000000, 0.073900000000, 0.090980000000, 0.112600000000,
+    0.139020000000, 0.169300000000, 0.208020000000, 0.258600000000,
+    0.323000000000, 0.407300000000, 0.503000000000, 0.608200000000,
+    0.710000000000, 0.793200000000, 0.862000000000, 0.914850100000,
+    0.954000000000, 0.980300000000, 0.994950100000, 1.000000000000,
+    0.995000000000, 0.978600000000, 0.952000000000, 0.915400000000,
+    0.870000000000, 0.816300000000, 0.757000000000, 0.694900000000,
+    0.631000000000, 0.566800000000, 0.503000000000, 0.441200000000,
+    0.381000000000, 0.321000000000, 0.265000000000, 0.217000000000,
+    0.175000000000, 0.138200000000, 0.107000000000, 0.081600000000,
+    0.061000000000, 0.044580000000, 0.032000000000, 0.023200000000,
+    0.017000000000, 0.011920000000, 0.008210000000, 0.005723000000,
+    0.004102000000, 0.002929000000, 0.002091000000, 0.001484000000,
+    0.001047000000, 0.000740000000, 0.000520000000, 0.000361100000,
+    0.000249200000, 0.000171900000, 0.000120000000, 0.000084800000,
+    0.000060000000, 0.000042400000, 0.000030000000, 0.000021200000,
+    0.000014990000, 0.000010600000, 0.000007465700, 0.000005257800,
+    0.000003702900, 0.000002607800, 0.000001836600, 0.000001293400,
+    0.000000910930, 0.000000641530, 0.000000451810
+};
 
 const double cie_z[CIE_SAMPLES] = {
-    0.000606100000, 0.001086000000, 0.001946000000, 0.003486000000, 0.006450001000,
-    0.010549990000, 0.020050010000, 0.036210000000, 0.067850010000, 0.110200000000,
-    0.207400000000, 0.371300000000, 0.645600000000, 1.039050100000, 1.385600000000,
-    1.622960000000, 1.747060000000, 1.782600000000, 1.772110000000, 1.744100000000,
-    1.669200000000, 1.528100000000, 1.287640000000, 1.041900000000, 0.812950100000,
-    0.616200000000, 0.465180000000, 0.353300000000, 0.272000000000, 0.212300000000,
-    0.158200000000, 0.111700000000, 0.078249990000, 0.057250010000, 0.042160000000,
-    0.029840000000, 0.020300000000, 0.013400000000, 0.008749999000, 0.005749999000,
-    0.003900000000, 0.002749999000, 0.002100000000, 0.001800000000, 0.001650001000,
-    0.001400000000, 0.001100000000, 0.001000000000, 0.000800000000, 0.000600000000,
-    0.000340000000, 0.000240000000, 0.000190000000, 0.000100000000, 0.000049999990,
-    0.000030000000, 0.000020000000, 0.000010000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
-    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000};
+    0.000606100000, 0.001086000000, 0.001946000000, 0.003486000000,
+    0.006450001000, 0.010549990000, 0.020050010000, 0.036210000000,
+    0.067850010000, 0.110200000000, 0.207400000000, 0.371300000000,
+    0.645600000000, 1.039050100000, 1.385600000000, 1.622960000000,
+    1.747060000000, 1.782600000000, 1.772110000000, 1.744100000000,
+    1.669200000000, 1.528100000000, 1.287640000000, 1.041900000000,
+    0.812950100000, 0.616200000000, 0.465180000000, 0.353300000000,
+    0.272000000000, 0.212300000000, 0.158200000000, 0.111700000000,
+    0.078249990000, 0.057250010000, 0.042160000000, 0.029840000000,
+    0.020300000000, 0.013400000000, 0.008749999000, 0.005749999000,
+    0.003900000000, 0.002749999000, 0.002100000000, 0.001800000000,
+    0.001650001000, 0.001400000000, 0.001100000000, 0.001000000000,
+    0.000800000000, 0.000600000000, 0.000340000000, 0.000240000000,
+    0.000190000000, 0.000100000000, 0.000049999990, 0.000030000000,
+    0.000020000000, 0.000010000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000, 0.000000000000,
+    0.000000000000, 0.000000000000, 0.000000000000
+};
 
 #define N(x) (x / 10566.864005283874576)
 
 const double cie_d65[CIE_SAMPLES] = {
-    N(46.6383), N(49.3637), N(52.0891), N(51.0323), N(49.9755), N(52.3118), N(54.6482),
-    N(68.7015), N(82.7549), N(87.1204), N(91.486),  N(92.4589), N(93.4318), N(90.057),
-    N(86.6823), N(95.7736), N(104.865), N(110.936), N(117.008), N(117.41),  N(117.812),
-    N(116.336), N(114.861), N(115.392), N(115.923), N(112.367), N(108.811), N(109.082),
-    N(109.354), N(108.578), N(107.802), N(106.296), N(104.79),  N(106.239), N(107.689),
-    N(106.047), N(104.405), N(104.225), N(104.046), N(102.023), N(100.0),   N(98.1671),
-    N(96.3342), N(96.0611), N(95.788),  N(92.2368), N(88.6856), N(89.3459), N(90.0062),
-    N(89.8026), N(89.5991), N(88.6489), N(87.6987), N(85.4936), N(83.2886), N(83.4939),
-    N(83.6992), N(81.863),  N(80.0268), N(80.1207), N(80.2146), N(81.2462), N(82.2778),
-    N(80.281),  N(78.2842), N(74.0027), N(69.7213), N(70.6652), N(71.6091), N(72.979),
-    N(74.349),  N(67.9765), N(61.604),  N(65.7448), N(69.8856), N(72.4863), N(75.087),
-    N(69.3398), N(63.5927), N(55.0054), N(46.4182), N(56.6118), N(66.8054), N(65.0941),
-    N(63.3828), N(63.8434), N(64.304),  N(61.8779), N(59.4519), N(55.7054), N(51.959),
-    N(54.6998), N(57.4406), N(58.8765), N(60.3125)};
+    N(46.6383),  N(49.3637),  N(52.0891),  N(51.0323),  N(49.9755),  N(52.3118),  N(54.6482),  N(68.7015),
+    N(82.7549),  N(87.1204),  N(91.486),   N(92.4589),  N(93.4318),  N(90.057),   N(86.6823),  N(95.7736),
+    N(104.865),  N(110.936),  N(117.008),  N(117.41),   N(117.812),  N(116.336),  N(114.861),  N(115.392),
+    N(115.923),  N(112.367),  N(108.811),  N(109.082),  N(109.354),  N(108.578),  N(107.802),  N(106.296),
+    N(104.79),   N(106.239),  N(107.689),  N(106.047),  N(104.405),  N(104.225),  N(104.046),  N(102.023),
+    N(100.0),    N(98.1671),  N(96.3342),  N(96.0611),  N(95.788),   N(92.2368),  N(88.6856),  N(89.3459),
+    N(90.0062),  N(89.8026),  N(89.5991),  N(88.6489),  N(87.6987),  N(85.4936),  N(83.2886),  N(83.4939),
+    N(83.6992),  N(81.863),   N(80.0268),  N(80.1207),  N(80.2146),  N(81.2462),  N(82.2778),  N(80.281),
+    N(78.2842),  N(74.0027),  N(69.7213),  N(70.6652),  N(71.6091),  N(72.979),   N(74.349),   N(67.9765),
+    N(61.604),   N(65.7448),  N(69.8856),  N(72.4863),  N(75.087),   N(69.3398),  N(63.5927),  N(55.0054),
+    N(46.4182),  N(56.6118),  N(66.8054),  N(65.0941),  N(63.3828),  N(63.8434),  N(64.304),   N(61.8779),
+    N(59.4519),  N(55.7054),  N(51.959),   N(54.6998),  N(57.4406),  N(58.8765),  N(60.3125)
+};
 
 #undef N
 
 #define N(x) (x / 106.8)
 const double cie_e[CIE_SAMPLES] = {
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),
-    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0)};
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0),  N(1.0),
+    N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0), N(1.0)
+};
 #undef N
 
 #define N(x) (x / 10503.2)
@@ -157,7 +172,8 @@ const double cie_d50[CIE_SAMPLES] = {
     N(89.546000),  N(92.580000),  N(85.405000),  N(78.230000),  N(67.961000),
     N(57.692000),  N(70.307000),  N(82.923000),  N(80.599000),  N(78.274000),
     N(0),          N(0),          N(0),          N(0),          N(0),
-    N(0),          N(0),          N(0),          N(0)};
+    N(0),          N(0),          N(0),          N(0)
+};
 
 #undef N
 
@@ -182,64 +198,81 @@ const double cie_d60[CIE_SAMPLES] = {
     N(78.556612),  N(79.527120),  N(75.584935),  N(67.307163),  N(55.275106),
     N(49.273538),  N(59.008629),  N(70.892412),  N(70.950115),  N(67.163996),
     N(67.445480),  N(68.171371),  N(66.466636),  N(62.989809),  N(58.067786),
-    N(54.990892),  N(56.915942),  N(60.825601),  N(62.987850)};
+    N(54.990892),  N(56.915942),  N(60.825601),  N(62.987850)
+};
 
 #undef N
 
-const double xyz_to_srgb[3][3] = {{3.240479, -1.537150, -0.498535},
-                                  {-0.969256, 1.875991, 0.041556},
-                                  {0.055648, -0.204043, 1.057311}};
+const double xyz_to_srgb[3][3] = {
+    { 3.240479, -1.537150, -0.498535 },
+    {-0.969256,  1.875991,  0.041556 },
+    { 0.055648, -0.204043,  1.057311 }
+};
 
-const double srgb_to_xyz[3][3] = {{0.412453, 0.357580, 0.180423},
-                                  {0.212671, 0.715160, 0.072169},
-                                  {0.019334, 0.119193, 0.950227}};
+const double srgb_to_xyz[3][3] = {
+    { 0.412453, 0.357580, 0.180423 },
+    { 0.212671, 0.715160, 0.072169 },
+    { 0.019334, 0.119193, 0.950227 }
+};
 
 const double xyz_to_xyz[3][3] = {
-    {1.0, 0.0, 0.0},
-    {0.0, 1.0, 0.0},
-    {0.0, 0.0, 1.0},
+  { 1.0, 0.0, 0.0 },
+  { 0.0, 1.0, 0.0 },
+  { 0.0, 0.0, 1.0 },
 };
 
 const double xyz_to_ergb[3][3] = {
-    {2.689989, -1.276020, -0.413844},
-    {-1.022095, 1.978261, 0.043821},
-    {0.061203, -0.224411, 1.162859},
+  {  2.689989, -1.276020, -0.413844},
+  { -1.022095,  1.978261,  0.043821},
+  {  0.061203, -0.224411,  1.162859},
 };
 
 const double ergb_to_xyz[3][3] = {
-    {0.496859, 0.339094, 0.164047},
-    {0.256193, 0.678188, 0.065619},
-    {0.023290, 0.113031, 0.863978},
+  { 0.496859,  0.339094,  0.164047 },
+  { 0.256193,  0.678188,  0.065619 },
+  { 0.023290,  0.113031,  0.863978 },
 };
 
-const double xyz_to_prophoto_rgb[3][3] = {{1.3459433, -0.2556075, -0.0511118},
-                                          {-0.5445989, 1.5081673, 0.0205351},
-                                          {0.0000000, 0.0000000, 1.2118128}};
+const double xyz_to_prophoto_rgb[3][3] = {
+    { 1.3459433,  -0.2556075, -0.0511118 },
+    { -0.5445989,  1.5081673,  0.0205351 },
+    {  0.0000000,  0.0000000,  1.2118128 }
+};
 
-const double prophoto_rgb_to_xyz[3][3] = {{0.7976749, 0.1351917, 0.0313534},
-                                          {0.2880402, 0.7118741, 0.0000857},
-                                          {0.0000000, 0.0000000, 0.8252100}};
+const double prophoto_rgb_to_xyz[3][3] = {
+    { 0.7976749,  0.1351917,  0.0313534 },
+    { 0.2880402,  0.7118741,  0.0000857 },
+    { 0.0000000,  0.0000000,  0.8252100 }
+};
 
-const double xyz_to_aces2065_1[3][3] = {{1.0498110175, 0.0000000000, -0.0000974845},
-                                        {-0.4959030231, 1.3733130458, 0.0982400361},
-                                        {0.0000000000, 0.0000000000, 0.9912520182}};
+const double xyz_to_aces2065_1[3][3] = {
+    {  1.0498110175, 0.0000000000, -0.0000974845 },
+    { -0.4959030231, 1.3733130458, 0.0982400361 },
+    {  0.0000000000, 0.0000000000, 0.9912520182 }
+};
 
-const double aces2065_1_to_xyz[3][3] = {{0.9525523959, 0.0000000000, 0.0000936786},
-                                        {0.3439664498, 0.7281660966, -0.0721325464},
-                                        {0.0000000000, 0.0000000000, 1.0088251844}};
+const double aces2065_1_to_xyz[3][3] = {
+    { 0.9525523959, 0.0000000000, 0.0000936786 },
+    { 0.3439664498, 0.7281660966, -0.0721325464 },
+    { 0.0000000000, 0.0000000000, 1.0088251844 }
+};
 
-const double xyz_to_rec2020[3][3] = {{1.7166511880, -0.3556707838, -0.2533662814},
-                                     {-0.6666843518, 1.6164812366, 0.0157685458},
-                                     {0.0176398574, -0.0427706133, 0.9421031212}};
+const double xyz_to_rec2020[3][3] = {
+    {  1.7166511880, -0.3556707838, -0.2533662814 },
+    { -0.6666843518,  1.6164812366,  0.0157685458 },
+    {  0.0176398574, -0.0427706133,  0.9421031212 }
+};
 
-const double rec2020_to_xyz[3][3] = {{0.6369580483, 0.1446169036, 0.1688809752},
-                                     {0.2627002120, 0.6779980715, 0.0593017165},
-                                     {0.0000000000, 0.0280726930, 1.0609850577}};
+const double rec2020_to_xyz[3][3] = {
+    { 0.6369580483, 0.1446169036, 0.1688809752 },
+    { 0.2627002120, 0.6779980715, 0.0593017165 },
+    { 0.0000000000, 0.0280726930, 1.0609850577 }
+};
 
 double cie_interp(const double *data, double x) {
     x -= CIE_LAMBDA_MIN;
     x *= (CIE_SAMPLES - 1) / (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
-    int offset = (int)x;
+    int offset = (int) x;
     if (offset < 0)
         offset = 0;
     if (offset > CIE_SAMPLES - 2)
@@ -251,19 +284,19 @@ double cie_interp(const double *data, double x) {
 // LU decomposition & triangular solving code lifted from Wikipedia
 
 /* INPUT: A - array of pointers to rows of a square matrix having dimension N
- *        Tol - small tolerance number to detect failure when the matrix is near
- * degenerate OUTPUT: Matrix A is changed, it contains both matrices L-E and U
- * as A=(L-E)+U such that P*A=L*U. The permutation matrix is not stored as a
- * matrix, but in an integer vector P of size N+1 containing column indexes
- * where the permutation matrix has "1". The last element P[N]=S+N, where S is
- * the number of row exchanges needed for determinant computation, det(P)=(-1)^S
+ *        Tol - small tolerance number to detect failure when the matrix is near degenerate
+ * OUTPUT: Matrix A is changed, it contains both matrices L-E and U as A=(L-E)+U such that P*A=L*U.
+ *        The permutation matrix is not stored as a matrix, but in an integer vector P of size N+1
+ *        containing column indexes where the permutation matrix has "1". The last element P[N]=S+N,
+ *        where S is the number of row exchanges needed for determinant computation, det(P)=(-1)^S
  */
 int LUPDecompose(double **A, int N, double Tol, int *P) {
+
     int i, j, k, imax;
     double maxA, *ptr, absA;
 
     for (i = 0; i <= N; i++)
-        P[i] = i;  // Unit permutation matrix, P[N] initialized with N
+        P[i] = i; //Unit permutation matrix, P[N] initialized with N
 
     for (i = 0; i < N; i++) {
         maxA = 0.0;
@@ -275,21 +308,20 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
                 imax = k;
             }
 
-        if (maxA < Tol)
-            return 0;  // failure, matrix is degenerate
+        if (maxA < Tol) return 0; //failure, matrix is degenerate
 
         if (imax != i) {
-            // pivoting P
+            //pivoting P
             j = P[i];
             P[i] = P[imax];
             P[imax] = j;
 
-            // pivoting rows of A
+            //pivoting rows of A
             ptr = A[i];
             A[i] = A[imax];
             A[imax] = ptr;
 
-            // counting pivots starting from N (for determinant)
+            //counting pivots starting from N (for determinant)
             P[N]++;
         }
 
@@ -301,13 +333,14 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
         }
     }
 
-    return 1;  // decomposition done
+    return 1;  //decomposition done
 }
 
 /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
  * OUTPUT: x - solution vector of A*x=b
  */
 void LUPSolve(double **A, int *P, double *b, int N, double *x) {
+
     for (int i = 0; i < N; i++) {
         x[i] = b[P[i]];
 
@@ -323,11 +356,12 @@ void LUPSolve(double **A, int *P, double *b, int N, double *x) {
     }
 }
 
+
 #if defined(_OPENMP)
-#define RGB2SPEC_USE_OPENMP 1
+#  define RGB2SPEC_USE_OPENMP 1
 #elif defined(__APPLE__)
-#define RGB2SPEC_USE_GCD 1
-#include <dispatch/dispatch.h>
+#  define RGB2SPEC_USE_GCD    1
+#  include <dispatch/dispatch.h>
 #endif
 
 /// Discretization of quadrature scheme
@@ -335,8 +369,11 @@ void LUPSolve(double **A, int *P, double *b, int N, double *x) {
 #define RGB2SPEC_EPSILON 1e-4
 
 /// Precomputed tables for fast spectral -> RGB conversion
-double lambda_tbl[CIE_FINE_SAMPLES], rgb_tbl[3][CIE_FINE_SAMPLES], rgb_to_xyz[3][3],
-    xyz_to_rgb[3][3], xyz_whitepoint[3];
+double lambda_tbl[CIE_FINE_SAMPLES],
+       rgb_tbl[3][CIE_FINE_SAMPLES],
+       rgb_to_xyz[3][3],
+       xyz_to_rgb[3][3],
+       xyz_whitepoint[3];
 
 /// Currently supported gamuts
 enum Gamut {
@@ -357,13 +394,13 @@ double smoothstep(double x) {
     return x * x * (3.0 - 2.0 * x);
 }
 
-double sqr(double x) {
-    return x * x;
-}
+double sqr(double x) { return x * x; }
 
 void cie_lab(double *p) {
-    double X = 0.0, Y = 0.0, Z = 0.0, Xw = xyz_whitepoint[0], Yw = xyz_whitepoint[1],
-           Zw = xyz_whitepoint[2];
+    double X = 0.0, Y = 0.0, Z = 0.0,
+      Xw = xyz_whitepoint[0],
+      Yw = xyz_whitepoint[1],
+      Zw = xyz_whitepoint[2];
 
     for (int j = 0; j < 3; ++j) {
         X += p[j] * rgb_to_xyz[0][j];
@@ -373,10 +410,10 @@ void cie_lab(double *p) {
 
     auto f = [](double t) -> double {
         double delta = 6.0 / 29.0;
-        if (t > delta * delta * delta)
+        if (t > delta*delta*delta)
             return cbrt(t);
         else
-            return t / (delta * delta * 3.0) + (4.0 / 29.0);
+            return t / (delta*delta * 3.0) + (4.0 / 29.0);
     };
 
     p[0] = 116.0 * f(Y / Yw) - 16.0;
@@ -404,51 +441,52 @@ void init_tables(Gamut gamut) {
     const double *illuminant = nullptr;
 
     switch (gamut) {
-    case SRGB:
-        illuminant = cie_d65;
-        memcpy(xyz_to_rgb, xyz_to_srgb, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, srgb_to_xyz, sizeof(double) * 9);
-        break;
+        case SRGB:
+            illuminant = cie_d65;
+            memcpy(xyz_to_rgb, xyz_to_srgb, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, srgb_to_xyz, sizeof(double) * 9);
+            break;
 
-    case ERGB:
-        illuminant = cie_e;
-        memcpy(xyz_to_rgb, xyz_to_ergb, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, ergb_to_xyz, sizeof(double) * 9);
-        break;
+        case ERGB:
+            illuminant = cie_e;
+            memcpy(xyz_to_rgb, xyz_to_ergb, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, ergb_to_xyz, sizeof(double) * 9);
+            break;
 
-    case XYZ:
-        illuminant = cie_e;
-        memcpy(xyz_to_rgb, xyz_to_xyz, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, xyz_to_xyz, sizeof(double) * 9);
-        break;
+        case XYZ:
+            illuminant = cie_e;
+            memcpy(xyz_to_rgb, xyz_to_xyz, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, xyz_to_xyz, sizeof(double) * 9);
+            break;
 
-    case ProPhotoRGB:
-        illuminant = cie_d50;
-        memcpy(xyz_to_rgb, xyz_to_prophoto_rgb, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, prophoto_rgb_to_xyz, sizeof(double) * 9);
-        break;
+        case ProPhotoRGB:
+            illuminant = cie_d50;
+            memcpy(xyz_to_rgb, xyz_to_prophoto_rgb, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, prophoto_rgb_to_xyz, sizeof(double) * 9);
+            break;
 
-    case ACES2065_1:
-        illuminant = cie_d60;
-        memcpy(xyz_to_rgb, xyz_to_aces2065_1, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, aces2065_1_to_xyz, sizeof(double) * 9);
-        break;
+        case ACES2065_1:
+            illuminant = cie_d60;
+            memcpy(xyz_to_rgb, xyz_to_aces2065_1, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, aces2065_1_to_xyz, sizeof(double) * 9);
+            break;
 
-    case REC2020:
-        illuminant = cie_d65;
-        memcpy(xyz_to_rgb, xyz_to_rec2020, sizeof(double) * 9);
-        memcpy(rgb_to_xyz, rec2020_to_xyz, sizeof(double) * 9);
-        break;
+        case REC2020:
+            illuminant = cie_d65;
+            memcpy(xyz_to_rgb, xyz_to_rec2020, sizeof(double) * 9);
+            memcpy(rgb_to_xyz, rec2020_to_xyz, sizeof(double) * 9);
+            break;
 
-    default:
-        throw std::runtime_error("init_gamut(): invalid/unsupported gamut.");
+        default:
+            throw std::runtime_error("init_gamut(): invalid/unsupported gamut.");
     }
 
     for (int i = 0; i < CIE_FINE_SAMPLES; ++i) {
         double lambda = CIE_LAMBDA_MIN + i * h;
 
-        double xyz[3] = {cie_interp(cie_x, lambda), cie_interp(cie_y, lambda),
-                         cie_interp(cie_z, lambda)},
+        double xyz[3] = { cie_interp(cie_x, lambda),
+                          cie_interp(cie_y, lambda),
+                          cie_interp(cie_z, lambda) },
                I = cie_interp(illuminant, lambda);
 
         double weight = 3.0 / 8.0 * h;
@@ -470,12 +508,12 @@ void init_tables(Gamut gamut) {
 }
 
 void eval_residual(const double *coeffs, const double *rgb, double *residual) {
-    double out[3] = {0.0, 0.0, 0.0};
+    double out[3] = { 0.0, 0.0, 0.0 };
 
     for (int i = 0; i < CIE_FINE_SAMPLES; ++i) {
         /* Scale lambda to 0..1 range */
-        double lambda =
-            (lambda_tbl[i] - CIE_LAMBDA_MIN) / (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
+        double lambda = (lambda_tbl[i] - CIE_LAMBDA_MIN) /
+                        (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
 
         /* Polynomial */
         double x = 0.0;
@@ -517,7 +555,7 @@ void eval_jacobian(const double *coeffs, const double *rgb, double **jac) {
 double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
     double r = 0;
     for (int i = 0; i < it; ++i) {
-        double J0[3], J1[3], J2[3], *J[3] = {J0, J1, J2};
+        double J0[3], J1[3], J2[3], *J[3] = { J0, J1, J2 };
 
         double residual[3];
 
@@ -528,8 +566,7 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
         int rv = LUPDecompose(J, 3, 1e-15, P);
         if (rv != 1) {
             std::cout << "RGB " << rgb[0] << " " << rgb[1] << " " << rgb[2] << std::endl;
-            std::cout << "-> " << coeffs[0] << " " << coeffs[1] << " " << coeffs[2]
-                      << std::endl;
+            std::cout << "-> " << coeffs[0] << " " << coeffs[1] << " " << coeffs[2] << std::endl;
             throw std::runtime_error("LU decomposition failed!");
         }
 
@@ -576,18 +613,17 @@ static Gamut parse_gamut(const char *str) {
    these tables whenever that header file changed.
  */
 
-void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func,
+void ParallelFor(int64_t start, int64_t end,
+                 std::function<void(int64_t, int64_t)> func,
                  const char *progressName = nullptr);
 
-inline void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t)> func,
+inline void ParallelFor(int64_t start, int64_t end,
+                        std::function<void(int64_t)> func,
                         const char *progressName = nullptr) {
-    ParallelFor(
-        start, end,
-        [&func](int64_t start, int64_t end) {
-            for (int64_t i = start; i < end; ++i)
-                func(i);
-        },
-        progressName);
+    ParallelFor(start, end, [&func](int64_t start, int64_t end) {
+        for (int64_t i = start; i < end; ++i)
+            func(i);
+    }, progressName);
 }
 
 class ParallelJob {
@@ -600,7 +636,7 @@ class ParallelJob {
 
     bool Finished() const { return !HaveWork() && activeWorkers == 0; }
 
-  private:
+private:
     friend class ThreadPool;
 
     ParallelJob *prev = nullptr, *next = nullptr;
@@ -652,8 +688,7 @@ ThreadPool::ThreadPool(int nThreads) {
 }
 
 ThreadPool::~ThreadPool() {
-    if (threads.empty())
-        return;
+    if (threads.empty()) return;
 
     {
         std::lock_guard<std::mutex> lock(jobListMutex);
@@ -661,14 +696,12 @@ ThreadPool::~ThreadPool() {
         jobListCondition.notify_all();
     }
 
-    for (std::thread &thread : threads)
-        thread.join();
+    for (std::thread &thread : threads) thread.join();
 }
 
 std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
     std::unique_lock<std::mutex> lock(jobListMutex);
-    if (jobList != nullptr)
-        jobList->prev = job;
+    if (jobList != nullptr) jobList->prev = job;
     job->next = jobList;
     jobList = job;
     jobListCondition.notify_all();
@@ -726,12 +759,15 @@ class ParallelForLoop1D : public ParallelJob {
   public:
     ParallelForLoop1D(int64_t start, int64_t end, int chunkSize,
                       std::function<void(int64_t, int64_t)> func)
-        : func(std::move(func)), nextIndex(start), maxIndex(end), chunkSize(chunkSize) {}
+        : func(std::move(func)),
+          nextIndex(start),
+          maxIndex(end),
+          chunkSize(chunkSize) {}
 
     bool HaveWork() const { return nextIndex < maxIndex; }
     void RunStep(std::unique_lock<std::mutex> *lock);
 
-  private:
+private:
     std::function<void(int64_t, int64_t)> func;
     int64_t nextIndex;
     int64_t maxIndex;
@@ -770,16 +806,15 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
         threadPool->WorkOrWait(&lock);
 }
 
+
 int main(int argc, char **argv) {
     if (argc < 3) {
         printf("Syntax: rgb2spec_opt <resolution> <output> [<gamut>]\n"
-               "where <gamut> is one of "
-               "sRGB,eRGB,XYZ,ProPhotoRGB,ACES2065_1,REC2020\n");
+               "where <gamut> is one of sRGB,eRGB,XYZ,ProPhotoRGB,ACES2065_1,REC2020\n");
         exit(-1);
     }
     Gamut gamut = SRGB;
-    if (argc > 3)
-        gamut = parse_gamut(argv[3]);
+    if (argc > 3) gamut = parse_gamut(argv[3]);
     if (gamut == NO_GAMUT) {
         fprintf(stderr, "Could not parse gamut `%s'!\n", argv[3]);
         exit(-1);
@@ -800,9 +835,9 @@ int main(int argc, char **argv) {
 
     float *scale = new float[res];
     for (int k = 0; k < res; ++k)
-        scale[k] = (float)smoothstep(smoothstep(k / double(res - 1)));
+        scale[k] = (float) smoothstep(smoothstep(k / double(res - 1)));
 
-    size_t bufsize = 3 * 3 * res * res * res;
+    size_t bufsize = 3*3*res*res*res;
     float *out = new float[bufsize];
 
     for (int l = 0; l < 3; ++l) {
@@ -812,54 +847,55 @@ int main(int argc, char **argv) {
             for (int i = 0; i < res; ++i) {
                 const double x = i / double(res - 1);
                 double coeffs[3], rgb[3];
-                memset(coeffs, 0, sizeof(double) * 3);
+                memset(coeffs, 0, sizeof(double)*3);
 
                 int start = res / 5;
 
                 for (int k = start; k < res; ++k) {
-                    double b = (double)scale[k];
+                    double b = (double) scale[k];
 
                     rgb[l] = b;
-                    rgb[(l + 1) % 3] = x * b;
-                    rgb[(l + 2) % 3] = y * b;
+                    rgb[(l + 1) % 3] = x*b;
+                    rgb[(l + 2) % 3] = y*b;
 
                     double resid = gauss_newton(rgb, coeffs);
-                    (void)resid;
+                    (void) resid;
 
                     double c0 = 360.0, c1 = 1.0 / (830.0 - 360.0);
                     double A = coeffs[0], B = coeffs[1], C = coeffs[2];
 
-                    int idx = ((l * res + k) * res + j) * res + i;
+                    int idx = ((l*res + k) * res + j)*res+i;
 
-                    out[3 * idx + 0] = float(A * (sqr(c1)));
-                    out[3 * idx + 1] = float(B * c1 - 2 * A * c0 * (sqr(c1)));
-                    out[3 * idx + 2] = float(C - B * c0 * c1 + A * (sqr(c0 * c1)));
-                    // out[3*idx + 2] = resid;
+                    out[3*idx + 0] = float(A*(sqr(c1)));
+                    out[3*idx + 1] = float(B*c1 - 2*A*c0*(sqr(c1)));
+                    out[3*idx + 2] = float(C - B*c0*c1 + A*(sqr(c0*c1)));
+                    //out[3*idx + 2] = resid;
                 }
 
-                memset(coeffs, 0, sizeof(double) * 3);
-                for (int k = start; k >= 0; --k) {
-                    double b = (double)scale[k];
+                memset(coeffs, 0, sizeof(double)*3);
+                for (int k = start; k>=0; --k) {
+                    double b = (double) scale[k];
 
                     rgb[l] = b;
-                    rgb[(l + 1) % 3] = x * b;
-                    rgb[(l + 2) % 3] = y * b;
+                    rgb[(l + 1) % 3] = x*b;
+                    rgb[(l + 2) % 3] = y*b;
 
                     double resid = gauss_newton(rgb, coeffs);
-                    (void)resid;
+                    (void) resid;
 
                     double c0 = 360.0, c1 = 1.0 / (830.0 - 360.0);
                     double A = coeffs[0], B = coeffs[1], C = coeffs[2];
 
-                    int idx = ((l * res + k) * res + j) * res + i;
+                    int idx = ((l*res + k) * res + j)*res+i;
 
-                    out[3 * idx + 0] = float(A * (sqr(c1)));
-                    out[3 * idx + 1] = float(B * c1 - 2 * A * c0 * (sqr(c1)));
-                    out[3 * idx + 2] = float(C - B * c0 * c1 + A * (sqr(c0 * c1)));
-                    // out[3*idx + 2] = resid;
+                    out[3*idx + 0] = float(A*(sqr(c1)));
+                    out[3*idx + 1] = float(B*c1 - 2*A*c0*(sqr(c1)));
+                    out[3*idx + 2] = float(C - B*c0*c1 + A*(sqr(c0*c1)));
+                    //out[3*idx + 2] = resid;
                 }
             }
-        });
+        }
+        );
     }
 
     FILE *f = fopen(argv[2], "w");
@@ -872,10 +908,9 @@ int main(int argc, char **argv) {
     for (int i = 0; i < res; ++i)
         fprintf(f, "%.9g, ", scale[i]);
     fprintf(f, "};\n");
-    fprintf(f, "extern PBRT_CONST float %sToSpectrumTable_Data[%d] = {\n", argv[3],
-            (int)bufsize);
+    fprintf(f, "extern PBRT_CONST float %sToSpectrumTable_Data[%d] = {\n", argv[3], (int)bufsize);
     for (int i = 0; i < bufsize; ++i)
-        fprintf(f, "%.9g,%c", out[i], ((i + 1) % 9) == 8 ? '\n' : ' ');
+        fprintf(f, "%.9g,%c", out[i], ((i+1)%9) == 8 ? '\n' : ' ');
     fprintf(f, "};\n");
     fprintf(f, "} // namespace pbrt\n");
     fclose(f);

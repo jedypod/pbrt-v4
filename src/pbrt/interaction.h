@@ -1,6 +1,34 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
+
+/*
+    pbrt source code is Copyright(c) 1998-2016
+                        Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+
+    This file is part of pbrt.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #if defined(_MSC_VER)
 #define NOMINMAX
@@ -13,13 +41,8 @@
 // core/interaction.h*
 #include <pbrt/pbrt.h>
 
-#include <pbrt/base/bssrdf.h>
-#include <pbrt/base/light.h>
-#include <pbrt/base/material.h>
-#include <pbrt/base/medium.h>
-#include <pbrt/base/sampler.h>
+#include <pbrt/base.h>
 #include <pbrt/ray.h>
-#include <pbrt/util/spectrum.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 
@@ -29,13 +52,14 @@ namespace pbrt {
 
 // Interaction Declarations
 class Interaction {
-  public:
+ public:
     // Interaction Public Methods
     Interaction() = default;
     // used by surface ctor
-    PBRT_CPU_GPU
-    Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv,
-                const Vector3f &wo, Float time, const MediumInterface *mediumInterface)
+    PBRT_HOST_DEVICE_INLINE
+    Interaction(const Point3fi &pi, const Normal3f &n,
+                const Point2f &uv, const Vector3f &wo, Float time,
+                const MediumInterface *mediumInterface)
         : pi(pi),
           n(n),
           uv(uv),
@@ -43,45 +67,47 @@ class Interaction {
           time(time),
           mediumInterface(mediumInterface) {}
     // used by medium ctor
-    PBRT_CPU_GPU
-    Interaction(const Point3f &p, const Vector3f &wo, Float time, MediumHandle medium)
+    PBRT_HOST_DEVICE_INLINE
+    Interaction(const Point3f &p, const Vector3f &wo, Float time,
+                const Medium *medium)
         : pi(p), time(time), wo(wo), medium(medium) {}
-    PBRT_CPU_GPU
-    Interaction(const Point3f &p, const Normal3f &n, Float time, MediumHandle medium)
+    PBRT_HOST_DEVICE_INLINE
+    Interaction(const Point3f &p, const Normal3f &n, Float time,
+                const Medium *medium)
         : pi(p), n(n), time(time), medium(medium) {}
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Interaction(const Point3fi &pi, const Normal3f &n, Float time = 0,
                 const Point2f &uv = {})
         : pi(pi), n(n), uv(uv), time(time) {}
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv)
         : pi(pi), n(n), uv(uv) {}
-    PBRT_CPU_GPU
-    Interaction(const Point3f &p, Float time, MediumHandle medium)
+    PBRT_HOST_DEVICE_INLINE
+    Interaction(const Point3f &p, Float time, const Medium *medium)
         : pi(p), time(time), medium(medium) {}
-    PBRT_CPU_GPU
-    Interaction(const Point3f &p, Float time, const MediumInterface *mediumInterface)
+    PBRT_HOST_DEVICE_INLINE
+    Interaction(const Point3f &p, Float time,
+                const MediumInterface *mediumInterface)
         : pi(p), time(time), mediumInterface(mediumInterface) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     bool IsSurfaceInteraction() const { return n != Normal3f(0, 0, 0); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const SurfaceInteraction &AsSurface() const {
         CHECK(IsSurfaceInteraction());
         return (const SurfaceInteraction &)*this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     SurfaceInteraction &AsSurface() {
         CHECK(IsSurfaceInteraction());
         return (SurfaceInteraction &)*this;
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Point3f OffsetRayOrigin(const Vector3f &w) const {
         Float d = Dot(Abs(n), pi.Error());
         Vector3f offset = d * Vector3f(n);
-        if (Dot(w, n) < 0)
-            offset = -offset;
+        if (Dot(w, n) < 0) offset = -offset;
         Point3f po = Point3f(pi) + offset;
         // Round offset point _po_ away from _p_
         for (int i = 0; i < 3; ++i) {
@@ -92,54 +118,44 @@ class Interaction {
         }
         return po;
     }
-    PBRT_CPU_GPU
-    Point3f OffsetRayOrigin(const Point3f &pt) const { return OffsetRayOrigin(pt - p()); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
+    Point3f OffsetRayOrigin(const Point3f &pt) const {
+        return OffsetRayOrigin(pt - p());
+    }
+    PBRT_HOST_DEVICE_INLINE
     RayDifferential SpawnRay(const Vector3f &d) const {
         return RayDifferential(OffsetRayOrigin(d), d, time, GetMedium(d));
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Ray SpawnRayTo(const Point3f &p2) const {
         Vector3f d = p2 - p();
         return Ray(OffsetRayOrigin(d), d, time, GetMedium(d));
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     Ray SpawnRayTo(const Interaction &it) const {
         Point3f po = OffsetRayOrigin(it.p());
         Point3f pt = it.OffsetRayOrigin(po);
         Vector3f d = pt - po;
         return Ray(po, d, time, GetMedium(d));
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     bool IsMediumInteraction() const { return !IsSurfaceInteraction(); }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     const MediumInteraction &AsMedium() const {
         CHECK(IsMediumInteraction());
         return (const MediumInteraction &)*this;
     }
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE_INLINE
     MediumInteraction &AsMedium() {
         CHECK(IsMediumInteraction());
         return (MediumInteraction &)*this;
     }
 
-    PBRT_CPU_GPU
-    MediumHandle GetMedium(const Vector3f &w) const {
-        if (mediumInterface != nullptr)
-            return Dot(w, n) > 0 ? mediumInterface->outside : mediumInterface->inside;
-        return medium;
-    }
-
-    PBRT_CPU_GPU
-    MediumHandle GetMedium() const {
-        if (mediumInterface != nullptr) {
-            DCHECK_EQ(mediumInterface->inside, mediumInterface->outside);
-            return mediumInterface->inside;
-        }
-        return medium;
-    }
-
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
+    const Medium *GetMedium(const Vector3f &w) const;
+    PBRT_HOST_DEVICE
+    const Medium *GetMedium() const;
+    PBRT_HOST_DEVICE_INLINE
     Point3f p() const { return Point3f(pi); }
 
     std::string ToString() const;
@@ -150,44 +166,27 @@ class Interaction {
     Point2f uv;
     Vector3f wo;
     Float time = 0;
-    MediumHandle medium = nullptr;
+    const Medium *medium = nullptr;
     const MediumInterface *mediumInterface = nullptr;
 };
 
 class MediumInteraction : public Interaction {
   public:
     // MediumInteraction Public Methods
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     MediumInteraction() : phase(nullptr) {}
-    // TODO: get rid of this once old volume stuff is gone...
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
-                      MediumHandle medium, PhaseFunctionHandle phase)
+                      const Medium *medium, const PhaseFunction *phase)
         : Interaction(p, wo, time, medium), phase(phase) {}
-    PBRT_CPU_GPU
-    MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
-                      const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s,
-                      const SampledSpectrum &sigma_maj, const SampledSpectrum &Le,
-                      MediumHandle medium, PhaseFunctionHandle phase)
-        : Interaction(p, wo, time, medium), phase(phase), sigma_a(sigma_a),
-          sigma_s(sigma_s), sigma_maj(sigma_maj), Le(Le) {}
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     bool IsValid() const { return phase != nullptr; }
-
-    PBRT_CPU_GPU
-    SampledSpectrum sigma_n() const {
-        SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = sigma_maj - sigma_t;
-        CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
-        return ClampZero(sigma_n);
-    }
 
     std::string ToString() const;
 
     // MediumInteraction Public Data
-    PhaseFunctionHandle phase;
-    SampledSpectrum sigma_a, sigma_s, sigma_maj, Le;
+    const PhaseFunction *phase;
 };
 
 // SurfaceInteraction Declarations
@@ -195,12 +194,11 @@ class SurfaceInteraction : public Interaction {
   public:
     // SurfaceInteraction Public Methods
     SurfaceInteraction() = default;
-
-    PBRT_CPU_GPU
-    SurfaceInteraction(const Point3fi &pi, const Point2f &uv, const Vector3f &wo,
-                       const Vector3f &dpdu, const Vector3f &dpdv, const Normal3f &dndu,
-                       const Normal3f &dndv, Float time, bool flipNormal,
-                       int faceIndex = 0)
+    PBRT_HOST_DEVICE
+    SurfaceInteraction(const Point3fi &pi, const Point2f &uv,
+                       const Vector3f &wo, const Vector3f &dpdu, const Vector3f &dpdv,
+                       const Normal3f &dndu, const Normal3f &dndv, Float time,
+                       bool flipNormal, int faceIndex = 0)
         : Interaction(pi, Normal3f(Normalize(Cross(dpdu, dpdv))), uv, wo, time,
                       (MediumInterface *)nullptr),
           dpdu(dpdu),
@@ -222,7 +220,7 @@ class SurfaceInteraction : public Interaction {
         }
     }
 
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void SetShadingGeometry(const Normal3f &ns, const Vector3f &dpdus,
                             const Vector3f &dpdvs, const Normal3f &dndus,
                             const Normal3f &dndvs, bool orientationIsAuthoritative) {
@@ -246,20 +244,22 @@ class SurfaceInteraction : public Interaction {
         }
     }
 
-    PBRT_CPU_GPU
-    void ComputeScatteringFunctions(const RayDifferential &ray,
-                                    const SampledWavelengths &lambda, CameraHandle camera,
-                                    ScratchBuffer &scratchBuffer, SamplerHandle sampler);
-    PBRT_CPU_GPU
-    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
+    void ComputeScatteringFunctions(
+        const RayDifferential &ray, const SampledWavelengths &lambda,
+        const Camera &camera, MaterialBuffer &materialBuffer, SamplerHandle sampler,
+        TransportMode mode = TransportMode::Radiance);
+    PBRT_HOST_DEVICE
+    void ComputeDifferentials(const RayDifferential &r,
+                              const Camera &camera) const;
+    PBRT_HOST_DEVICE
     SampledSpectrum Le(const Vector3f &w, const SampledWavelengths &lambda) const;
 
     using Interaction::SpawnRay;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     RayDifferential SpawnRay(const RayDifferential &rayi, const Vector3f &wi,
                              BxDFFlags flags) const;
-    PBRT_CPU_GPU
+    PBRT_HOST_DEVICE
     void SkipIntersection(RayDifferential *ray, Float t) const;
 
     std::string ToString() const;

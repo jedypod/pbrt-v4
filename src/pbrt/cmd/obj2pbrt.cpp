@@ -1,7 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// It is licensed under the BSD license; see the file LICENSE.txt
-// SPDX: BSD-3-Clause
-
 //
 // obj2pbrt.cpp
 //
@@ -1328,8 +1324,7 @@ int main(int argc, char *argv[]) {
     std::vector<shape_t> shapes;
     std::vector<material_t> materials;
     std::string err;
-    if (!LoadObj(shapes, materials, err, objFilename,
-                 /* mtl_basepath */ nullptr,
+    if (!LoadObj(shapes, materials, err, objFilename, /* mtl_basepath */ nullptr,
                  ptexQuads ? 0 : load_flags_t(triangulation))) {
         fprintf(stderr, "%s: errors loading OBJ file: %s\n", objFilename, err.c_str());
         return 1;
@@ -1352,8 +1347,9 @@ int main(int argc, char *argv[]) {
         }
     }
     fprintf(f, "# Converted from \"%s\" by obj2pbrt\n", objFilename);
-    fprintf(f, "# Scene bounds: (%f, %f, %f) - (%f, %f, %f)\n\n\n", bounds[0][0],
-            bounds[0][1], bounds[0][2], bounds[1][0], bounds[1][1], bounds[1][2]);
+    fprintf(f, "# Scene bounds: (%f, %f, %f) - (%f, %f, %f)\n\n\n",
+            bounds[0][0], bounds[0][1], bounds[0][2], bounds[1][0],
+            bounds[1][1], bounds[1][2]);
 
     int numAreaLights = 0;
     int numTriangles = 0;
@@ -1363,22 +1359,21 @@ int main(int argc, char *argv[]) {
     for (const material_t &mtl : materials) {
         bool hasDiffuseTex = (!mtl.diffuse_texname.empty());
         if (!mtl.diffuse_texname.empty()) {
-            if (mtl.diffuse[0] != 0 || mtl.diffuse[1] != 0 || mtl.diffuse[2] != 0) {
+            if (mtl.diffuse[0] != 0 || mtl.diffuse[1] != 0 ||
+                mtl.diffuse[2] != 0) {
                 fprintf(f,
                         "Texture \"%s-kd-img\" \"spectrum\" \"imagemap\" "
                         "\"string imagefile\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.diffuse_texname.c_str());
                 float scale = (mtl.diffuse[0] + mtl.diffuse[1] + mtl.diffuse[2]) / 3;
                 if (mtl.diffuse[0] != mtl.diffuse[1] || mtl.diffuse[1] != mtl.diffuse[2])
-                    fprintf(stderr,
-                            "Averaging non-constant RGB scale for \"%s\" (%f "
-                            "%f %f).\n",
-                            mtl.name.c_str(), mtl.diffuse[0], mtl.diffuse[1],
-                            mtl.diffuse[2]);
-                fprintf(f,
-                        "Texture \"%s-kd\" \"spectrum\" \"scale\" \"texture tex\" "
-                        "\"%s-kd-img\" \"float scale\" [%f]\n",
-                        mtl.name.c_str(), mtl.name.c_str(), scale);
+                    fprintf(stderr, "Averaging non-constant RGB scale for \"%s\" (%f %f %f).\n",
+                            mtl.name.c_str(), mtl.diffuse[0], mtl.diffuse[1], mtl.diffuse[2]);
+                fprintf(
+                    f,
+                    "Texture \"%s-kd\" \"spectrum\" \"scale\" \"texture tex\" "
+                    "\"%s-kd-img\" \"float scale\" [%f]\n",
+                    mtl.name.c_str(), mtl.name.c_str(), scale);
             } else {
                 fprintf(f,
                         "Texture \"%s-kd\" \"spectrum\" \"imagemap\" "
@@ -1389,23 +1384,21 @@ int main(int argc, char *argv[]) {
 
         bool hasSpecularTex = (!mtl.specular_texname.empty());
         if (!mtl.specular_texname.empty()) {
-            if (mtl.specular[0] != 0 || mtl.specular[1] != 0 || mtl.specular[2] != 0) {
+            if (mtl.specular[0] != 0 || mtl.specular[1] != 0 ||
+                mtl.specular[2] != 0) {
                 fprintf(f,
                         "Texture \"%s-ks-img\" \"spectrum\" \"imagemap\" "
                         "\"string imagefile\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.specular_texname.c_str());
                 float scale = (mtl.specular[0] + mtl.specular[1] + mtl.specular[2]) / 3;
-                if (mtl.specular[0] != mtl.specular[1] ||
-                    mtl.specular[1] != mtl.specular[2])
-                    fprintf(stderr,
-                            "Averaging non-constant RGB scale for \"%s\" (%f "
-                            "%f %f).\n",
-                            mtl.name.c_str(), mtl.specular[0], mtl.specular[1],
-                            mtl.specular[2]);
-                fprintf(f,
-                        "Texture \"%s-ks\" \"spectrum\" \"scale\" \"texture tex\" "
-                        "\"%s-ks-img\" \"float scale\" [%f]\n",
-                        mtl.name.c_str(), mtl.name.c_str(), scale);
+                if (mtl.specular[0] != mtl.specular[1] || mtl.specular[1] != mtl.specular[2])
+                    fprintf(stderr, "Averaging non-constant RGB scale for \"%s\" (%f %f %f).\n",
+                            mtl.name.c_str(), mtl.specular[0], mtl.specular[1], mtl.specular[2]);
+                fprintf(
+                    f,
+                    "Texture \"%s-ks\" \"spectrum\" \"scale\" \"texture tex\" "
+                    "\"%s-ks-img\" \"float scale\" [%f]\n",
+                    mtl.name.c_str(), mtl.name.c_str(), scale);
             } else {
                 fprintf(f,
                         "Texture \"%s-ks\" \"spectrum\" \"imagemap\" "
@@ -1422,18 +1415,19 @@ int main(int argc, char *argv[]) {
         }
 
         float roughness = (mtl.shininess == 0) ? 0. : (1.f / mtl.shininess);
-        fprintf(f, R"(MakeNamedMaterial "%s" "string type" "uber" )", mtl.name.c_str());
+        fprintf(f, R"(MakeNamedMaterial "%s" "string type" "uber" )",
+                mtl.name.c_str());
 
         if (hasDiffuseTex)
             fprintf(f, R"("texture reflectance" "%s-kd" )", mtl.name.c_str());
         else
-            fprintf(f, "\"rgb reflectance\" [%f %f %f] ", mtl.diffuse[0], mtl.diffuse[1],
-                    mtl.diffuse[2]);
+            fprintf(f, "\"rgb reflectance\" [%f %f %f] ", mtl.diffuse[0],
+                    mtl.diffuse[1], mtl.diffuse[2]);
         if (hasSpecularTex)
             fprintf(f, R"("texture Ks" "%s-ks" )", mtl.name.c_str());
         else
-            fprintf(f, "\"rgb Ks\" [%f %f %f] ", mtl.specular[0], mtl.specular[1],
-                    mtl.specular[2]);
+            fprintf(f, "\"rgb Ks\" [%f %f %f] ", mtl.specular[0],
+                    mtl.specular[1], mtl.specular[2]);
         if (mtl.dissolve < 1)
             fprintf(stderr, "Warning: ignoring opacity for \"%s\" material/\n",
                     mtl.name.c_str());
@@ -1457,8 +1451,7 @@ int main(int argc, char *argv[]) {
 
         // Get the set of material ids used for faces in this mesh.
         std::set<int> materialIds;
-        for (int id : mesh.material_ids)
-            materialIds.insert(id);
+        for (int id : mesh.material_ids) materialIds.insert(id);
 
         // Now emit the chunks of the mesh for each material
         for (int id : materialIds) {
@@ -1470,28 +1463,23 @@ int main(int argc, char *argv[]) {
                 std::map<std::string, std::string>::const_iterator iter;
                 for (iter = mtl.unknown_parameter.begin();
                      iter != mtl.unknown_parameter.end(); ++iter)
-                    fprintf(stderr, "Unknown parameter: %s = %s\n", iter->first.c_str(),
-                            iter->second.c_str());
+                  fprintf(stderr, "Unknown parameter: %s = %s\n",
+                          iter->first.c_str(), iter->second.c_str());
 
-                if (mtl.emission[0] > 0 || mtl.emission[1] > 0 || mtl.emission[2] > 0) {
-                    fprintf(f, "AreaLightSource \"area\" \"rgb L\" [ %f %f %f ]\n",
-                            mtl.emission[0], mtl.emission[1], mtl.emission[2]);
-                    ++numAreaLights;
+                if (mtl.emission[0] > 0 || mtl.emission[1] > 0 ||
+                    mtl.emission[2] > 0) {
+                  fprintf(f, "AreaLightSource \"area\" \"rgb L\" [ %f %f %f ]\n",
+                          mtl.emission[0], mtl.emission[1], mtl.emission[2]);
+                  ++numAreaLights;
                 }
 
                 fprintf(f, "NamedMaterial \"%s\"\n", mtl.name.c_str());
             }
 
             // Now emit all the faces that have the matching material id.
-            struct Point3f {
-                float x, y, z;
-            };
-            struct Point2f {
-                float x, y;
-            };
-            struct Normal3f {
-                float x, y, z;
-            };
+            struct Point3f { float x, y, z; };
+            struct Point2f { float x, y; };
+            struct Normal3f { float x, y, z; };
             std::vector<Point3f> P;
             std::vector<Normal3f> N;
             std::vector<Point2f> st;
@@ -1503,15 +1491,12 @@ int main(int argc, char *argv[]) {
             for (size_t i = 0; i < mesh.material_ids.size(); ++i) {
                 // Skip the ones that don't match the current id that we're
                 // emitting the mesh for.
-                if (mesh.material_ids[i] != id)
-                    continue;
+                if (mesh.material_ids[i] != id) continue;
 
                 if (ptexQuads) {
                     if (mesh.num_vertices[i] != 4) {
-                        // We assume all quads when indexing into the indices
-                        // array
-                        fprintf(stderr, "%d: Mesh has a non quad face.. Sorry.\n",
-                                mesh.num_vertices[i]);
+                        // We assume all quads when indexing into the indices array
+                        fprintf(stderr, "%d: Mesh has a non quad face.. Sorry.\n", mesh.num_vertices[i]);
                         exit(1);
                     }
 
@@ -1521,20 +1506,22 @@ int main(int argc, char *argv[]) {
                     int index = P.size();
                     // Triangulate
                     indices.push_back(index);
-                    indices.push_back(index + 1);
-                    indices.push_back(index + 2);
+                    indices.push_back(index+1);
+                    indices.push_back(index+2);
 
                     indices.push_back(index);
-                    indices.push_back(index + 2);
-                    indices.push_back(index + 3);
+                    indices.push_back(index+2);
+                    indices.push_back(index+3);
 
                     for (int v = 0; v < 4; ++v) {
                         int vi = mesh.indices[4 * i + v];
-                        P.push_back({mesh.positions[3 * vi], mesh.positions[3 * vi + 1],
-                                     mesh.positions[3 * vi + 2]});
+                        P.push_back({mesh.positions[3 * vi],
+                                    mesh.positions[3 * vi + 1],
+                                    mesh.positions[3 * vi + 2]});
                         if (!mesh.normals.empty())
-                            N.push_back({mesh.normals[3 * vi], mesh.normals[3 * vi + 1],
-                                         mesh.normals[3 * vi + 2]});
+                            N.push_back({mesh.normals[3 * vi],
+                                        mesh.normals[3 * vi + 1],
+                                        mesh.normals[3 * vi + 2]});
                     }
 
                     // fixed texture coords over [0,1]
@@ -1556,19 +1543,18 @@ int main(int argc, char *argv[]) {
                         int objIndex = mesh.indices[3 * i + v];
                         if (indexRemap.find(objIndex) == indexRemap.end()) {
                             // First time we've seen this index.
-                            indexRemap.insert(
-                                std::make_pair(objIndex, (int)indexRemap.size()));
+                            indexRemap.insert(std::make_pair(objIndex, (int)indexRemap.size()));
 
                             P.push_back({mesh.positions[3 * objIndex],
-                                         mesh.positions[3 * objIndex + 1],
-                                         mesh.positions[3 * objIndex + 2]});
+                                        mesh.positions[3 * objIndex + 1],
+                                        mesh.positions[3 * objIndex + 2]});
                             if (!mesh.normals.empty())
                                 N.push_back({mesh.normals[3 * objIndex],
-                                             mesh.normals[3 * objIndex + 1],
-                                             mesh.normals[3 * objIndex + 2]});
+                                            mesh.normals[3 * objIndex + 1],
+                                            mesh.normals[3 * objIndex + 2]});
                             if (!mesh.texcoords.empty())
                                 st.push_back({mesh.texcoords[2 * objIndex],
-                                              mesh.texcoords[2 * objIndex + 1]});
+                                            mesh.texcoords[2 * objIndex + 1]});
                         }
 
                         // In any case emit the index (but remapped
@@ -1583,18 +1569,18 @@ int main(int argc, char *argv[]) {
             fprintf(f, "  \"point3 P\" [ \n");
             for (Point3f p : P)
                 fprintf(f, "\t%.10g %.10g %.10g\n", p.x, p.y, p.z);
-            fprintf(f, "]\n");
+            fprintf(f,"]\n");
             if (!N.empty()) {
                 fprintf(f, "  \"normal N\" [ \n");
                 for (Normal3f n : N)
                     fprintf(f, "\t%.10g %.10g %.10g\n", n.x, n.y, n.z);
-                fprintf(f, "]\n");
+                fprintf(f,"]\n");
             }
             if (!st.empty()) {
                 fprintf(f, "  \"point2 st\" [ \n");
                 for (Point2f tex : st)
                     fprintf(f, "\t%.10g %.10g\n", tex.x, tex.y);
-                fprintf(f, "]\n");
+                fprintf(f,"]\n");
             }
             fprintf(f, "  \"integer indices\" [ \n\t");
             for (size_t i = 0; i < indices.size(); ++i)
@@ -1608,11 +1594,10 @@ int main(int argc, char *argv[]) {
         }
         fprintf(f, "AttributeEnd\n\n\n");
     }
-    if (f != stdout)
-        fclose(f);
+    if (f != stdout) fclose(f);
 
-    fprintf(stderr, "Converted %d meshes (%d triangles, %d mesh emitters).\n", numMeshes,
-            numTriangles, numAreaLights);
+    fprintf(stderr, "Converted %d meshes (%d triangles, %d mesh emitters).\n",
+            numMeshes, numTriangles, numAreaLights);
 
     return 0;
 }
