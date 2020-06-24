@@ -105,7 +105,7 @@ PointLight *PointLight::Create(const AnimatedTransform &worldFromLight,
                                const RGBColorSpace *colorSpace, const FileLoc *loc,
                                Allocator alloc) {
     SpectrumHandle I =
-        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+        parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
@@ -160,7 +160,7 @@ DistantLight *DistantLight::Create(const AnimatedTransform &worldFromLight,
                                    const RGBColorSpace *colorSpace, const FileLoc *loc,
                                    Allocator alloc) {
     SpectrumHandle L =
-        parameters.GetOneSpectrum("L", &colorSpace->illuminant, SpectrumType::General,
+        parameters.GetOneSpectrum("L", colorSpace->illuminant, SpectrumType::General,
                                   alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
@@ -495,7 +495,7 @@ GoniometricLight *GoniometricLight::Create(const AnimatedTransform &worldFromLig
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc) {
     SpectrumHandle I =
-        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+        parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
@@ -724,7 +724,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const AnimatedTransform &worldFromLig
 
         imageColorSpace = im->metadata.GetColorSpace();
     } else if (L == nullptr)
-        L = &colorSpace->illuminant;
+        L = colorSpace->illuminant;
 
     return alloc.new_object<DiffuseAreaLight>(worldFromLight, medium, L, scale, shape,
                                               std::move(image), imageColorSpace, twoSided,
@@ -1281,7 +1281,7 @@ SpotLight *SpotLight::Create(const AnimatedTransform &worldFromLight, MediumHand
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc) {
     SpectrumHandle I =
-        parameters.GetOneSpectrum("I", &colorSpace->illuminant, SpectrumType::General, alloc);
+        parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
     if (sc != 1)
         I = alloc.new_object<ScaledSpectrum>(sc, I);
@@ -1375,7 +1375,7 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
         if (L.empty() && filename.empty())
             // Default: color space's std illuminant
             light = alloc.new_object<UniformInfiniteLight>(
-                worldFromLight, &colorSpace->illuminant, alloc);
+                worldFromLight, colorSpace->illuminant, alloc);
         else if (!L.empty()) {
             if (!filename.empty())
                 ErrorExit(loc, "Can't specify both emission \"L\" and "

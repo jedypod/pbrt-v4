@@ -3398,7 +3398,7 @@ std::unique_ptr<Integrator> Integrator::Create(
     else if (name == "mlt")
         integrator = MLTIntegrator::Create(parameters, camera, aggregate, lights, loc);
     else if (name == "ambientocclusion")
-        integrator = AOIntegrator::Create(parameters, &colorSpace->illuminant, camera,
+        integrator = AOIntegrator::Create(parameters, colorSpace->illuminant, camera,
                                           sampler, aggregate, lights, loc);
     else if (name == "sppm")
         integrator = SPPMIntegrator::Create(parameters, colorSpace, camera, aggregate,

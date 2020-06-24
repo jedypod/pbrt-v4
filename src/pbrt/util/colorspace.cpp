@@ -4,6 +4,8 @@
 
 #include <pbrt/util/colorspace.h>
 
+#include <pbrt/util/spectrum.h>
+
 namespace pbrt {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -14,14 +16,14 @@ PBRT_CONST RGBColorSpace *RGBColorSpace_sRGB;
 
 // TODO: improve variable names now that this works
 RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, Point2f w,
-                             SpectrumHandle illum,
+                             SpectrumHandle illuminant,
                              const RGBToSpectrumTable *rgbToSpectrumTable,
                              Allocator alloc)
     : r(r),
       g(g),
       b(b),
       w(w),
-      illuminant(illum, alloc),
+      illuminant(illuminant),
       rgbToSpectrumTable(rgbToSpectrumTable) {
     /* Try n:
        http://www.babelcolor.com/index_htm_files/A%20review%20of%20RGB%20color%20spaces.pfd
@@ -141,8 +143,8 @@ void RGBColorSpace::Init(Allocator alloc) {
 }
 
 std::string RGBColorSpace::ToString() const {
-    return StringPrintf("[ RGBColorSpace r: %s g: %s b: %s w: %s illuminant: "
-                        "%s RGBToXYZ: %s XYZToRGB: %s ]",
+    return StringPrintf("[ RGBColorSpace r: %s g: %s b: %s w: %s illuminant: %s "
+                        "RGBToXYZ: %s XYZToRGB: %s ]",
                         r, g, b, w, illuminant, XYZFromRGB, RGBFromXYZ);
 }
 
