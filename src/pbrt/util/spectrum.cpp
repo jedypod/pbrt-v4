@@ -177,24 +177,6 @@ std::string ConstantSpectrum::ParameterString() const {
     return {};
 }
 
-SampledSpectrum ScaledSpectrum::Sample(const SampledWavelengths &lambda) const {
-    return scale * s.Sample(lambda);
-}
-
-std::string ScaledSpectrum::ToString() const {
-    return StringPrintf("[ ScaledSpectrum scale: %f s: %s ]", scale, s);
-}
-
-std::string ScaledSpectrum::ParameterType() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
-std::string ScaledSpectrum::ParameterString() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
 DenselySampledSpectrum::DenselySampledSpectrum(SpectrumHandle s, int lambdaMin,
                                                int lambdaMax, Allocator alloc)
     : lambdaMin(lambdaMin), lambdaMax(lambdaMax), v(lambdaMax - lambdaMin + 1, alloc) {
@@ -1396,7 +1378,7 @@ pbrt::SpectrumHandle MakeSpectrumFromInterleaved(pstd::span<const Float> samples
 
     if (normalize)
         // Normalize to have luminance of 1.
-        spec = alloc.new_object<pbrt::ScaledSpectrum>(1 / SpectrumToY(spec), spec);
+        spec.Scale(1 / SpectrumToY(spec));
 
     return spec;
 }

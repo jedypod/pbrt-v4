@@ -107,8 +107,7 @@ PointLight *PointLight::Create(const AnimatedTransform &worldFromLight,
     SpectrumHandle I =
         parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
-    if (sc != 1)
-        I = alloc.new_object<ScaledSpectrum>(sc, I);
+    I.Scale(sc);
 
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform tf = Translate(Vector3f(from.x, from.y, from.z));
@@ -163,8 +162,7 @@ DistantLight *DistantLight::Create(const AnimatedTransform &worldFromLight,
         parameters.GetOneSpectrum("L", colorSpace->illuminant, SpectrumType::General,
                                   alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
-    if (sc != 1)
-        L = alloc.new_object<ScaledSpectrum>(sc, L);
+    L.Scale(sc);
 
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
@@ -497,8 +495,7 @@ GoniometricLight *GoniometricLight::Create(const AnimatedTransform &worldFromLig
     SpectrumHandle I =
         parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
-    if (sc != 1)
-        I = alloc.new_object<ScaledSpectrum>(sc, I);
+    I.Scale(sc);
 
     Image image(alloc);
     const RGBColorSpace *imageColorSpace = nullptr;
@@ -1283,8 +1280,7 @@ SpotLight *SpotLight::Create(const AnimatedTransform &worldFromLight, MediumHand
     SpectrumHandle I =
         parameters.GetOneSpectrum("I", colorSpace->illuminant, SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
-    if (sc != 1)
-        I = alloc.new_object<ScaledSpectrum>(sc, I);
+    I.Scale(sc);
 
     Float coneangle = parameters.GetOneFloat("coneangle", 30.);
     Float conedelta = parameters.GetOneFloat("conedeltaangle", 5.);
@@ -1384,12 +1380,9 @@ LightHandle LightHandle::Create(const std::string &name, const ParameterDictiona
             if (!portal.empty())
                 ErrorExit(loc, "Portals are not supported for InfiniteAreaLights "
                                "without \"imagefile\".");
-            if (scale != 1) {
-                SpectrumHandle Ls = alloc.new_object<ScaledSpectrum>(scale, L[0]);
-                light = alloc.new_object<UniformInfiniteLight>(worldFromLight, Ls, alloc);
-            } else
-                light =
-                    alloc.new_object<UniformInfiniteLight>(worldFromLight, L[0], alloc);
+
+            L[0].Scale(scale);
+            light = alloc.new_object<UniformInfiniteLight>(worldFromLight, L[0], alloc);
         } else {
             pstd::optional<ImageAndMetadata> imageAndMetadata =
                 Image::Read(filename, alloc);

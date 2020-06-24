@@ -169,10 +169,8 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
         Le = alloc.new_object<ConstantSpectrum>(0.f);
 
     Float scale = parameters.GetOneFloat("scale", 1.f);
-    if (scale != 1) {
-        sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
-        sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
-    }
+    sig_a.Scale(scale);
+    sig_s.Scale(scale);
 
     Float g = parameters.GetOneFloat("g", 0.0f);
 
@@ -344,10 +342,8 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &paramete
     }
 
     Float scale = parameters.GetOneFloat("scale", 1.f);
-    if (scale != 1) {
-        sig_a = alloc.new_object<ScaledSpectrum>(scale, sig_a);
-        sig_s = alloc.new_object<ScaledSpectrum>(scale, sig_s);
-    }
+    sig_a.Scale(scale);
+    sig_s.Scale(scale);
 
     Float g = parameters.GetOneFloat("g", 0.0f);
 

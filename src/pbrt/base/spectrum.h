@@ -22,18 +22,19 @@ class SampledWavelengths;
 
 class BlackbodySpectrum;
 class ConstantSpectrum;
-class ScaledSpectrum;
 class PiecewiseLinearSpectrum;
 class DenselySampledSpectrum;
 class RGBReflectanceSpectrum;
 class RGBSpectrum;
 
 class SpectrumHandle
-    : public TaggedPointer<BlackbodySpectrum, ConstantSpectrum,
-                           ScaledSpectrum, PiecewiseLinearSpectrum,
+    : public TaggedPointer<BlackbodySpectrum, ConstantSpectrum, PiecewiseLinearSpectrum,
                            DenselySampledSpectrum, RGBReflectanceSpectrum, RGBSpectrum> {
   public:
     using TaggedPointer::TaggedPointer;
+
+    PBRT_CPU_GPU
+    void Scale(Float scale);
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const;

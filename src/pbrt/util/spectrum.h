@@ -320,6 +320,11 @@ class alignas(8) BlackbodySpectrum {
     }
 
     PBRT_CPU_GPU
+    void Scale(Float s) {
+        scale *= s;
+    }
+
+    PBRT_CPU_GPU
     Float operator()(Float lambda) const {
         return scale * Blackbody(lambda, T) * normalizationFactor;
     }
@@ -347,6 +352,11 @@ class alignas(8) ConstantSpectrum {
     ConstantSpectrum(Float c) : c(c) {}
 
     PBRT_CPU_GPU
+    void Scale(Float s) {
+        c *= s;
+    }
+
+    PBRT_CPU_GPU
     Float operator()(Float lambda) const { return c; }
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &) const;
@@ -361,27 +371,6 @@ class alignas(8) ConstantSpectrum {
     Float c;
 };
 
-class alignas(8) ScaledSpectrum {
-  public:
-    ScaledSpectrum(Float scale, SpectrumHandle s) : scale(scale), s(s) {}
-
-    PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return scale * s(lambda); }
-    PBRT_CPU_GPU
-    SampledSpectrum Sample(const SampledWavelengths &lambda) const;
-
-    PBRT_CPU_GPU
-    Float MaxValue() const { return scale * s.MaxValue(); }
-
-    std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
-
-  private:
-    Float scale;
-    SpectrumHandle s;
-};
-
 class alignas(8) PiecewiseLinearSpectrum {
   public:
     PiecewiseLinearSpectrum() = default;
@@ -389,7 +378,14 @@ class alignas(8) PiecewiseLinearSpectrum {
                             Allocator alloc = {});
 
     PBRT_CPU_GPU
+    void Scale(Float s) {
+        for (Float &value : v)
+            value *= s;
+    }
+
+    PBRT_CPU_GPU
     Float MaxValue() const;
+
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
@@ -433,6 +429,12 @@ class alignas(8) DenselySampledSpectrum {
     }
 
     PBRT_CPU_GPU
+    void Scale(Float s) {
+        for (Float &value : v)
+            value *= s;
+    }
+
+    PBRT_CPU_GPU
     Float operator()(Float lambda) const {
         DCHECK_GT(lambda, 0);
         // Constant outside the defined range.
@@ -471,24 +473,30 @@ class alignas(8) RGBReflectanceSpectrum {
         : rgb(rgb), rsp(cs.ToRGBCoeffs(rgb)) {}
 
     PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return rsp(lambda); }
+    void Scale(Float s) {
+        scale *= s;
+    }
+
+    PBRT_CPU_GPU
+    Float operator()(Float lambda) const { return scale * rsp(lambda); }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
-            s[i] = rsp(lambda[i]);
+            s[i] = scale * rsp(lambda[i]);
         return s;
     }
 
     PBRT_CPU_GPU
-    Float MaxValue() const { return rsp.MaxValue(); }
+    Float MaxValue() const { return scale * rsp.MaxValue(); }
 
     std::string ToString() const;
     std::string ParameterType() const;
     std::string ParameterString() const;
 
   private:
+    Float scale = 1;
     RGB rgb;
     RGBSigmoidPolynomial rsp;
 };
@@ -501,26 +509,31 @@ class alignas(8) RGBSpectrum {
     RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
         : rgb(rgb), illuminant(cs.illuminant) {
         Float m = std::max({rgb.r, rgb.g, rgb.b});
-        scale = m > 0 ? 0.5f / m : 0;
-        rsp = cs.ToRGBCoeffs(rgb * scale);
+        scale = 2 * m;
+        rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
+    }
+
+    PBRT_CPU_GPU
+    void Scale(Float s) {
+        scale *= s;
     }
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {
-        return rsp(lambda) / (scale > 0 ? scale : 1) * illuminant(lambda);
+        return scale * rsp(lambda) * illuminant(lambda);
     }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
-            s[i] = rsp(lambda[i]) / (scale > 0 ? scale : 1);
+            s[i] = scale * rsp(lambda[i]);
         return s * illuminant.Sample(lambda);
     }
 
     PBRT_CPU_GPU
     Float MaxValue() const {
-        return rsp.MaxValue() / (scale > 0 ? scale : 1) * illuminant.MaxValue();
+        return scale * rsp.MaxValue() * illuminant.MaxValue();
     }
 
     std::string ToString() const;
@@ -677,6 +690,11 @@ SpectrumHandle GetNamed(const std::string &name);
 std::string FindMatchingNamed(SpectrumHandle s);
 
 }  // namespace SPDs
+
+inline void SpectrumHandle::Scale(Float scale) {
+    auto s = [&](auto ptr) { return ptr->Scale(scale); };
+    return Apply<void>(s);
+}
 
 inline Float SpectrumHandle::operator()(Float lambda) const {
     auto op = [&](auto ptr) { return (*ptr)(lambda); };

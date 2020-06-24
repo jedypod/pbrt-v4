@@ -113,13 +113,6 @@ TEST(Spectrum, MaxValue) {
         for (Float lambda = 360; lambda < 830; lambda += .92)
             EXPECT_LE(si(lambda), m);
     }
-
-    const Float scale = 4;
-    ScaledSpectrum ss(scale, &bb);
-    Float m = ss.MaxValue();
-    for (Float lambda = 300; lambda < 800; lambda += .92)
-        EXPECT_LE(.9999f * scale * bb(lambda), m)
-            << StringPrintf("%f <= (not) %f", scale * bb(lambda), m);
 }
 
 TEST(Spectrum, SamplingPdfY) {
